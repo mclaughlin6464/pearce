@@ -7,8 +7,9 @@ from os import path
 from itertools import izip
 import numpy as np
 from astropy import cosmology
-from halotools.sim_manager import RockstarHlistReader
+from halotools.sim_manager import RockstarHlistReader, CachedHaloCatalog
 from halotools.empirical_models import PrebuiltHodModelFactory
+from halotools.empirical_models import HodModelFactory, TrivialPhaseSpace, NFWPhaseSpace
 from customHODModels import *
 
 
@@ -86,6 +87,7 @@ class Cat(object):
 
         self.halocat = None #halotools halocat that we wrap
         self.model = None #same as above, but for the model
+        self.populated_once = False
 
     def __len__(self):
         '''Number of separate catalogs contained in one object. '''
@@ -170,6 +172,7 @@ class Cat(object):
                                          self.halo_finder, z, self.version_name, self.Lbox, self.pmass, overwrite=overwrite)
             reader.read_halocat(self.columns_to_convert, write_to_disk=True, overwrite=overwrite)
 
+    #NOTE separate functions for loading model or halocat?
     def load(self, scale_factor, HOD='redMagic', tol = 0.05):
         '''
         Load both a halocat and a model to prepare for population and calculation.
@@ -188,7 +191,54 @@ class Cat(object):
         assert HOD in {'redMagic', 'stepFunc', 'zheng07', 'leauthaud11', 'tinker13', 'hearin15'}
 
         if HOD=='redMagic':
-            cens_occ = RedMagicCens(redshift=cat.redshifts[idx])
-            sats_occ = RedMagicSats(redshift=cat.redshifts[idx], cenocc_model=cens_occ)
+            cens_occ = RedMagicCens(redshift=z)
+            sats_occ = RedMagicSats(redshift=z, cenocc_model=cens_occ)
+
+            self.model = HodModelFactory(
+            centrals_occupation=cens_occ,
+            centrals_profile=TrivialPhaseSpace(redshift=z),
+            satellites_occupation=sats_occ,
+            satellites_profile=NFWPhaseSpace(redshift=z))
+
+        elif HOD=='stepFunc':
+            cens_occ = StepFuncCens(redshift=z)
+            sats_occ = StepFuncSats(redshift=z)
+
+            self.model = HodModelFactory(
+            centrals_occupation=cens_occ,
+            centrals_profile=TrivialPhaseSpace(redshift=z),
+            satellites_occupation=sats_occ,
+            satellites_profile=NFWPhaseSpace(redshift=z))
+
+        else:
+            self.model=PrebuiltHodModelFactory(HOD)
+
+        self.halocat = CachedHaloCatalog(simname = self.simname, halo_finder=self.halo_finder,
+                                         version_name=self.version_name, redshift= z)
+
+    def populate(self, params={}, min_ptcl=200):
+        '''
+        Populate the stored halocatalog with a new realization. Load must be called first.
+        :param params:
+            HOD parameters. Only those that are changed from the original are required; the rest will remain the default.
+        :param min_ptcl:
+            Minimum number of particles which constitutes a halo.
+        :return: None
+        '''
+        try:
+            assert self.model is not None
+        except AssertionError:
+            raise AssertionError("Please call load before calling populate.")
+
+        self.model.param_dict.update(params)
+        #might be able to check is model has_attr mock.
+        if self.populated_once:
+            self.model.mock.populate_mock(self.halocat, Num_ptcl_requirement=min_ptcl)
+        else:
+            self.model.populate_mock(self.halocat, Num_ptcl_requirement=min_ptcl)
+            self.populated_once = True
+
+    def calc_number_density(self):
+
 
 
