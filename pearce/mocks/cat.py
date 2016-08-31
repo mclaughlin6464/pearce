@@ -1,27 +1,40 @@
-#!bin/bash
-#TODO better docstring
+#!/bin/bash
+# TODO better docstring
 '''Module containing the main Cat object, which implements caching, loading, populating, and calculating observables
 on catalogs. '''
 
 from os import path
 from itertools import izip
+from multiprocessing import cpu_count
+import warnings
+from time import time
 import numpy as np
 from astropy import cosmology
 from halotools.sim_manager import RockstarHlistReader, CachedHaloCatalog
 from halotools.empirical_models import PrebuiltHodModelFactory
 from halotools.empirical_models import HodModelFactory, TrivialPhaseSpace, NFWPhaseSpace
-from customHODModels import *
+from halotools.mock_observables import return_xyz_formatted_array, tpcf, \
+    tpcf_jackknife  # , tpcf_one_two_halo_decomp, wp
+from customHODModels import RedMagicSats, RedMagicCens, StepFuncCens, StepFuncSats
+
+# try to import corrfunc, determine if it was successful
+try:
+    from Corrfunc._countpairs import counpairs_xi
+
+    CORRFUNC_AVAILABLE = True
+except ImportError:
+    CORRFUNC_AVAILABLE = False
 
 
 class Cat(object):
-    def __init__(self, simname='cat', loc='',filenames=[],cache_loc='/u/ki/swmclau2/des/halocats/',
-                 columns_to_keep={}, halo_finder='rockstar',version_name='most_recent',
-                 Lbox=1.0, pmass=1.0,scale_factors=[],cosmo=cosmology.WMAP5,
-                **kwargs):
+    def __init__(self, simname='cat', loc='', filenames=[], cache_loc='/u/ki/swmclau2/des/halocats/',
+                 columns_to_keep={}, halo_finder='rockstar', version_name='most_recent',
+                 Lbox=1.0, pmass=1.0, scale_factors=[], cosmo=cosmology.WMAP5,
+                 **kwargs):
 
-        #TODO need both loc and filenames?
-        #TODO emply filenames does a glob?
-        #TODO change 'loc' to dir?
+        # TODO need both loc and filenames?
+        # TODO emply filenames does a glob?
+        # TODO change 'loc' to dir?
         '''
         The main object controlling manipulation and actions on catalogs.
 
@@ -50,12 +63,12 @@ class Cat(object):
             An astropy.cosmology object with the cosmology of this simulation.
         '''
 
-        #relevant information for Halotools
+        # relevant information for Halotools
         self.simname = simname
         self.loc = loc
         self.columns_to_keep = columns_to_keep
 
-        #TODO allow the user access to this? Probably.
+        # TODO allow the user access to this? Probably.
         self.columns_to_convert = set(["halo_rvir", "halo_rs"])
         self.columns_to_convert = list(self.columns_to_convert & set(self.columns_to_keep.keys()))
 
@@ -71,9 +84,9 @@ class Cat(object):
         self.cosmology = cosmo  # default cosmology
         self.h = self.cosmology.H(0).value / 100.0
 
-        #TODO Well this makes me think loc doesn't do anything...
-        #I use it in the subclasses though. Doesn't mean I need it here though.
-        #This one doesn't need to be easy to use; just general.
+        # TODO Well this makes me think loc doesn't do anything...
+        # I use it in the subclasses though. Doesn't mean I need it here though.
+        # This one doesn't need to be easy to use; just general.
         self.filenames = filenames
         for i, fname in enumerate(self.filenames):
             self.filenames[i] = self.loc + fname
@@ -82,11 +95,11 @@ class Cat(object):
         # halotools builtins have no filenames, so there is a case filenames = []
         assert (len(self.filenames) == len(self.redshifts)) or len(self.filenames) == 0
 
-        self.cache_filenames = [path.join(cache_loc, 'hlist_%.2f.list.%s.hdf5'%(a,self.simname))\
-                                                                    for a in self.scale_factors]
+        self.cache_filenames = [path.join(cache_loc, 'hlist_%.2f.list.%s.hdf5' % (a, self.simname)) \
+                                for a in self.scale_factors]
 
-        self.halocat = None #halotools halocat that we wrap
-        self.model = None #same as above, but for the model
+        self.halocat = None  # halotools halocat that we wrap
+        self.model = None  # same as above, but for the model
         self.populated_once = False
 
     def __len__(self):
@@ -95,7 +108,7 @@ class Cat(object):
 
     def __str__(self):
         '''Return an informative output string.'''
-        #TODO Some things could be removed, others added
+        # TODO Some things could be removed, others added
         output = []
         output.append(self.simname)
         output.append('-' * 25)
@@ -137,7 +150,7 @@ class Cat(object):
                 assert a in tmp_scale_factors
                 user_kwargs['filenames'].append(tmp_fnames[tmp_scale_factors.index(a)])  # get teh matching scale factor
 
-    def _return_nearest_sf(self, a, tol = 0.05):
+    def _return_nearest_sf(self, a, tol=0.05):
         '''
         Find the nearest scale factor to a that is stored, within tolerance. If none exists, return None.
         :param a:
@@ -146,8 +159,8 @@ class Cat(object):
             Tolerance within which "near" is defined. Default is 0.05
         :return: If a nearest scale factor is found, returns it. Else, returns None.
         '''
-        assert 0<a<1 #assert a valid scale factor
-        if a in self.scale_factors:# try for an exact match.
+        assert 0 < a < 1  # assert a valid scale factor
+        if a in self.scale_factors:  # try for an exact match.
             return a
         idx = np.argmin(np.abs(np.array(self.scale_factors) - a))
         if np.abs(self.scale_factors[idx] - a) < tol:
@@ -155,7 +168,7 @@ class Cat(object):
         else:
             return None
 
-    def cache(self, scale_factors = 'all',overwrite=False):
+    def cache(self, scale_factors='all', overwrite=False):
         '''
         Cache a halo catalog in the halotools format, for later use.
         :param scale_factors:
@@ -164,16 +177,16 @@ class Cat(object):
             Overwrite the file currently on disk, if it exists. Default is false.
         :return: None
         '''
-        for a,z, fname, cache_fnames in izip(self.scale_factors, self.redshifts, self.filenames, self.cache_filenames):
-            #TODO get right reader for each halofinder.
-            if scale_factors !='all' and a not in scale_factors:
+        for a, z, fname, cache_fnames in izip(self.scale_factors, self.redshifts, self.filenames, self.cache_filenames):
+            # TODO get right reader for each halofinder.
+            if scale_factors != 'all' and a not in scale_factors:
                 continue
             reader = RockstarHlistReader(fname, self.columns_to_keep, cache_fnames, self.simname,
-                                         self.halo_finder, z, self.version_name, self.Lbox, self.pmass, overwrite=overwrite)
+                                         self.halo_finder, z, self.version_name, self.Lbox, self.pmass,
+                                         overwrite=overwrite)
             reader.read_halocat(self.columns_to_convert, write_to_disk=True, overwrite=overwrite)
 
-    #NOTE separate functions for loading model or halocat?
-    def load(self, scale_factor, HOD='redMagic', tol = 0.05):
+    def load(self, scale_factor, HOD='redMagic', tol=0.05):
         '''
         Load both a halocat and a model to prepare for population and calculation.
         :param scale_factor:
@@ -185,36 +198,78 @@ class Cat(object):
 
         a = self._return_nearest_sf(scale_factor, tol)
         if a is None:
-            raise ValueError('Scale factor %.3f not within given tolerance.'%scale_factor)
+            raise ValueError('Scale factor %.3f not within given tolerance.' % scale_factor)
+        self.load_catalog(a, tol, check_sf=False)
+        self.load_model(a, HOD, check_sf=False)
+
+    def load_catalog(self, scale_factor, tol=0.05, check_sf=True):
+        '''
+        Load only a specific catalog. Not reccomended to use separately from broader load function.
+        Its possible for the redshift ni the model to be different fro the one from the catalog,
+        though the difference will be small.
+        :param a:
+            The scale factor of the catalog of interest
+        :param check_sf:
+            Boolean whether or not to use the passed in scale_factor blindly. Default is false.
+        :return: None
+        '''
+        if check_sf:
+            a = self._return_nearest_sf(scale_factor, tol)
+            if a is None:
+                raise ValueError('Scale factor %.3f not within given tolerance.' % scale_factor)
+        else:
+            a = scale_factor#YOLO
         z = 1/(1+a)
+
+        self.halocat = CachedHaloCatalog(simname=self.simname, halo_finder=self.halo_finder,
+                                         version_name=self.version_name, redshift=z)
+
+    def load_model(self, scale_factor, HOD='redMagic', check_sf=True):
+        '''
+        Load an HOD model. Not reccomended to be used separately from the load function. It
+        is possible for the scale_factor of the model and catalog to be different.
+        :param scale_factor:
+            Scale factor for the model
+        :param HOD:
+            HOD model to load. Currently available options are redMagic, stepFunc, and the halotools defatuls.
+        :param check_sf:
+            Boolean whether or not to use the passed in scale_factor blindly. Default is false.
+        :return: None
+        '''
+
+        if check_sf:
+            a = self._return_nearest_sf(scale_factor, tol)
+            if a is None:
+                raise ValueError('Scale factor %.3f not within given tolerance.' % scale_factor)
+        else:
+            a = scale_factor#YOLO
+        z = 1 / (1 + a)
 
         assert HOD in {'redMagic', 'stepFunc', 'zheng07', 'leauthaud11', 'tinker13', 'hearin15'}
 
-        if HOD=='redMagic':
+        if HOD == 'redMagic':
             cens_occ = RedMagicCens(redshift=z)
             sats_occ = RedMagicSats(redshift=z, cenocc_model=cens_occ)
 
             self.model = HodModelFactory(
-            centrals_occupation=cens_occ,
-            centrals_profile=TrivialPhaseSpace(redshift=z),
-            satellites_occupation=sats_occ,
-            satellites_profile=NFWPhaseSpace(redshift=z))
+                centrals_occupation=cens_occ,
+                centrals_profile=TrivialPhaseSpace(redshift=z),
+                satellites_occupation=sats_occ,
+                satellites_profile=NFWPhaseSpace(redshift=z))
 
-        elif HOD=='stepFunc':
+        elif HOD == 'stepFunc':
             cens_occ = StepFuncCens(redshift=z)
             sats_occ = StepFuncSats(redshift=z)
 
             self.model = HodModelFactory(
-            centrals_occupation=cens_occ,
-            centrals_profile=TrivialPhaseSpace(redshift=z),
-            satellites_occupation=sats_occ,
-            satellites_profile=NFWPhaseSpace(redshift=z))
+                centrals_occupation=cens_occ,
+                centrals_profile=TrivialPhaseSpace(redshift=z),
+                satellites_occupation=sats_occ,
+                satellites_profile=NFWPhaseSpace(redshift=z))
 
         else:
-            self.model=PrebuiltHodModelFactory(HOD)
+            self.model = PrebuiltHodModelFactory(HOD)
 
-        self.halocat = CachedHaloCatalog(simname = self.simname, halo_finder=self.halo_finder,
-                                         version_name=self.version_name, redshift= z)
 
     def populate(self, params={}, min_ptcl=200):
         '''
@@ -231,7 +286,7 @@ class Cat(object):
             raise AssertionError("Please call load before calling populate.")
 
         self.model.param_dict.update(params)
-        #might be able to check is model has_attr mock.
+        # might be able to check is model has_attr mock.
         if self.populated_once:
             self.model.mock.populate_mock(self.halocat, Num_ptcl_requirement=min_ptcl)
         else:
@@ -239,6 +294,80 @@ class Cat(object):
             self.populated_once = True
 
     def calc_number_density(self):
+        '''
+        Return the number density for a populated box.
+        :return: Number density of a populated box.
+        '''
+        assert self.populated_once
 
+        return len(self.model.mock.galaxy_table['x']) / (self.Lbox ** 3)
 
+    def calc_xi(self, rbins, n_cores='all', do_jackknife=True, use_corrfunc=False):
+        '''
+        Calculate a 3-D correlation function on a populated catalog.
+        :param rbins: Radial bins for the correlation function.
+        :param do_jackknife:
+            Whether or not to do a jackknife along with the xi calculation. Generally slower. Not supported with
+            with corrfunc at present.
+        :param use_corrfunc:
+            Whether or not to use the halotools function to calculate xi, or Manodeep's corrfunc. Corrfunc is not
+            available on all systems and currently jackknife is not supported.
+        :return: xi:
+                len(rbins) 3-D correlation function
+                xi_cov (if do_jacknife and ! use_corrfunc):
+                (len(rbins), len(rbins)) covariance matrix for xi.
+        '''
+        assert self.populated_once
+        assert do_jackknife != use_corrfunc  # xor
+        if use_corrfunc and not CORRFUNC_AVAILABLE:
+            # NOTE just switch to halotools in this case? Or fail?
+            raise ImportError("Corrfunc is not available on this machine!")
 
+        assert n_cores == 'all' or n_cores > 0
+        assert int(n_cores) == n_cores
+
+        max_cores = cpu_count()
+        if n_cores == 'all':
+            n_cores = max_cores
+        elif n_cores > max_cores:
+            warnings.warn('n_cores invalid. Changing from %d to maximum %d.' % (n_cores, max_cores))
+            n_cores = max_cores
+        # else, we're good!
+
+        x, y, z = [self.model.mock.galaxy_table[c] for c in ['x', 'y', 'z']]
+        pos = return_xyz_formatted_array(x, y, z)
+
+        if use_corrfunc:
+            # write bins to file
+            # unforunately how corrfunc has to work
+            # TODO A custom binfile, or one that's already written?
+            bindir = path.dirname(path.abspath(__file__))  # location of files with bin edges
+            with open(path.join(bindir, './binfile'), 'w') as f:
+                for low, high in zip(rbins[:-1], rbins[1:]):
+                    f.write('\t%f\t%f\n' % (low, high))
+
+            # countpairs requires casting in order to work right.
+            xi_all = countpairs_xi(self.model.mock.Lbox * self.h, n_cores, path.join(bindir, './binfile'),
+                                   x.astype('float32') * self.h, y.astype('float32') * self.h,
+                                   z.astype('float32') * self.h)
+            xi_all = np.array(xi_all, dtype='float64')[:, 3]
+
+        else:
+            if do_jackknife:
+                np.random.seed(int(time()))
+                # TODO customize these?
+                n_rands = 5
+                n_sub = 5
+
+                randoms = np.random.random((pos.shape[0] * n_rands,
+                                            3)) * self.Lbox * self.cat.h  # Solution to NaNs: Just fuck me up with randoms
+                xi_all, xi_cov = tpcf_jackknife(pos * self.h, randoms, rbins, period=self.Lbox * self.h,
+                                                num_threads=n_cores(), Nsub=n_sub)
+            else:
+                xi_all = tpcf(pos * self.h, rbins, period=self.Lbox * self.h, num_threads=n_cores())
+
+        # TODO 1, 2 halo terms? Angular? Probably in other functions
+
+        if do_jackknife:
+            return xi_all, xi_cov
+        return xi_all

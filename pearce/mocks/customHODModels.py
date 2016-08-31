@@ -1,4 +1,4 @@
-#!bin/bash
+#!/bin/bash
 # This module contains custom HODModels, which are subclasses of Halotools implementations.
 
 import numpy as np
