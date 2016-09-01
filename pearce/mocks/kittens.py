@@ -245,6 +245,7 @@ class MDHR(Cat):
                                    pmass=pmass **kwargs)
 
 #a dict that maps the default simnames to objects, which makes construction easier.
+#TODO kitten_dict
 cat_dict = {'bolshoi': Bolshoi, 'multidark': Multidark, 'emu': Emu, 'fox': Fox, 'multidark_highres': MDHR,
             'chinchilla': Chinchilla,
             'aardvark': Aardvark, 'guppy': Guppy}
