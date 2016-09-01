@@ -15,7 +15,7 @@ from halotools.empirical_models import PrebuiltHodModelFactory
 from halotools.empirical_models import HodModelFactory, TrivialPhaseSpace, NFWPhaseSpace
 from halotools.mock_observables import return_xyz_formatted_array, tpcf, \
     tpcf_jackknife  # , tpcf_one_two_halo_decomp, wp
-from customHODModels import RedMagicSats, RedMagicCens, StepFuncCens, StepFuncSats
+from .customHODModels import RedMagicSats, RedMagicCens, StepFuncCens, StepFuncSats
 
 # try to import corrfunc, determine if it was successful
 try:
@@ -305,7 +305,8 @@ class Cat(object):
     def calc_xi(self, rbins, n_cores='all', do_jackknife=True, use_corrfunc=False):
         '''
         Calculate a 3-D correlation function on a populated catalog.
-        :param rbins: Radial bins for the correlation function.
+        :param rbins:
+            Radial bins for the correlation function.
         :param do_jackknife:
             Whether or not to do a jackknife along with the xi calculation. Generally slower. Not supported with
             with corrfunc at present.
