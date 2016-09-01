@@ -3,6 +3,7 @@
 points in parameter space. '''
 
 from time import time
+from itertools import izip
 from collections import namedtuple
 import numpy as np
 
@@ -35,13 +36,13 @@ def makeLHC(N=500):
     np.random.seed(int(time()))
 
     #this is a bad name...
-    ranges = []
+    points = []
     #by linspacing each parameter and shuffling, I ensure there is only one point in each row, in each dimension.
     for p in PARAMS:
         point = np.linspace(p.low, p.high, num=N)
         np.random.shuffle(point)#makes the cube random.
-        ranges.append(point)
-    return np.stack(ranges).T
+        points.append(point)
+    return np.stack(points).T
 
 def makeFHC(N=4):
     '''
@@ -57,3 +58,23 @@ def makeFHC(N=4):
         N = [N for i in xrange(len(PARAMS))]
 
     assert type(N) is list
+
+    n_total = np.prod(N)
+    # TODO check if n_total is 1.
+    points = np.zeros((n_total, len(PARAMS)))
+    n_segment = n_total #could use the same variable, but this is clearer
+    for i, (n, param) in enumerate(izip(N, PARAMS)):
+        values = np.linspace(param.low, param.high, n)
+        n_segment/=n
+        for j, p in enumerate(points):
+            idx = (j / n_segment) %n
+            p[i] = values[idx]
+
+    #shuffle to even out computation times
+    np.random.seed(int(time()))
+    idxs = np.random.permutation(n_total)
+    return points[idxs, :]
+    #return points
+
+
+
