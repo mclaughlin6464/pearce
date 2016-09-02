@@ -3,12 +3,12 @@
 
 from os import path
 import numpy as np
-from .trainingData import PARAMS
+from .trainingData import PARAMS, GLOBAL_FILENAME
+from .ioHelpers import global_file_reader
 from ..mocks.kittens import cat_dict
 
-
-
-def load_params(param_file, global_file='global_file.npy'):
+# TODO to ioHelpers?
+def load_training_params(param_file):
     '''
     Load the parameters to calculate. Will load bins, parameters, cosmology info, output directory, and a unique id!
     :param param_file:
@@ -18,22 +18,13 @@ def load_params(param_file, global_file='global_file.npy'):
     '''
     hod_params = np.loadtxt(param_file)
     dirname = path.dirname(param_file)
-    rbins = np.loadtxt(path.join(dirname, global_file))
-
-    #cosmology parameters are stored in the global header
-    cosmo_params = {}
-    with open(path.join(dirname, global_file)) as f:
-        for i, line in enumerate(f):
-            if line[0] != '#' or i == 0:
-                continue  # only looking at comments, and first two lines don't have params. Note: Does have cosmo!
-            splitLine = line.strip('# \n').split(':')  # split into key val pair
-            cosmo_params[splitLine[0]] = float(splitLine[1])
+    rbins, cosmo_params, _ = global_file_reader(path.join(dirname, GLOBAL_FILENAME))
 
     job_id = int(param_file.split('.')[0][-3:]) #last 3 digits of paramfile is a unique id.
 
     return hod_params, rbins, cosmo_params, dirname, job_id
 
-def calc_points(hod_params, rbins, cosmo_params, dirname, job_id):
+def calc_training_points(hod_params, rbins, cosmo_params, dirname, job_id):
     '''
     given an array of hod parameters (and a few other things) populate a catalog and calculate xi at those points.
     :param hod_params:
@@ -81,10 +72,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Helper function called as main from "trainingData.py." Reads in \
                                                 collections of HOD params and calculates their correlation functions.')
     parser.add_argument('param_file', type = str, help='File where the vector of HOD params are stored.')
-    parser.add_argument('--global_file', type=str, default='global_file.npy',
-                        help='File containing radial bin and cosmology information. Default is global_file.npy')
 
     args = vars(parser.parse_args())
 
-    hod_params, rbins, cosmo_params, dirname, job_id = load_params(args['param_file'], args['global_file'])
-    calc_points(hod_params, rbins, cosmo_params, dirname, job_id)
+    hod_params, rbins, cosmo_params, dirname, job_id = load_training_params(args['param_file'])
+    calc_training_points(hod_params, rbins, cosmo_params, dirname, job_id)

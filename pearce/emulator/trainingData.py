@@ -8,6 +8,7 @@ from subprocess import call
 from itertools import izip
 from collections import namedtuple
 import numpy as np
+from .ioHelpers import config_reader
 
 parameter = namedtuple('Parameter', ['name', 'low', 'high'])
 
@@ -21,6 +22,8 @@ PARAMS = [parameter('logMmin', 11.7, 12.5),
           parameter('alpha', 0.75, 1.25),
           parameter('f_c', 0.1, 0.5)]
 
+# I initially had the global_filename be variable. Howerver, I couldn't find a reason one would change it!
+GLOBAL_FILENAME = 'global_file.npy'
 
 # I think that it's better to have this param global, as it prevents there from being any conflicts.
 
@@ -81,7 +84,7 @@ def makeFHC(N=4):
 # redshift/scale_factor
 # system
 
-def make_kils_command(jobname, max_time, outputdir, global_filename=None, queue='bulletmpi'):
+def make_kils_command(jobname, max_time, outputdir, queue='bulletmpi'):
     '''
     Return a list of strings that comprise a bash command to call trainingHelper.py on the cluster.
     Designed to work on ki-ls's batch system
@@ -91,8 +94,6 @@ def make_kils_command(jobname, max_time, outputdir, global_filename=None, queue=
         Time for the job to run, in hours.
     :param outputdir:
         Directory to store output and param files.
-    :param global_filename:
-        Optional. The filename where the global parameters are stored. If left out, the default will be use.
     :param queue:
         Optional. Which queue to submit the job to.
     :return:
@@ -108,13 +109,11 @@ def make_kils_command(jobname, max_time, outputdir, global_filename=None, queue=
                '-W', '%d:00' % max_time,
                'python', path.join(path.dirname(__file__), 'trainingHelper.py'),
                param_file]
-    if global_filename is not None:
-        command.append(path.join(outputdir, global_filename))
 
     return command
 
 
-def make_sherlock_command(jobname, max_time, outputdir, global_filename=None, queue=None):
+def make_sherlock_command(jobname, max_time, outputdir, queue=None):
     '''
     Return a list of strings that comprise a bash command to call trainingHelper.py on the cluster.
     Designed to work on sherlock's sbatch system. Differnet from the above in that it must write a file
@@ -125,8 +124,6 @@ def make_sherlock_command(jobname, max_time, outputdir, global_filename=None, qu
         Time for the job to run, in hours.
     :param outputdir:
         Directory to store output and param files.
-    :param global_filename:
-        Optional. The filename where the global parameters are stored. If left out, the default will be use.
     :param queue:
         Optional. Which queue to submit the job to.
     :return:
@@ -154,9 +151,6 @@ def make_sherlock_command(jobname, max_time, outputdir, global_filename=None, qu
     call_str = ['python', path.join(path.dirname(__file__), 'trainingData.py'),
                 param_file]
 
-    if global_filename is not None:
-        call_str.append(path.join(outputdir, global_filename))
-
     call_str = ' '.join(call_str)
     # have to write to file in order to work.
     with open(path.join(outputdir, 'tmp.sbatch'), 'w') as f:
@@ -170,26 +164,6 @@ def make_sherlock_command(jobname, max_time, outputdir, global_filename=None, qu
 # system, n_jobs
 # rbins, cosmology info
 # outputdir, max_time
-
-# Could use ConfigParser maybe
-# TODO move this to a different, helper folder
-def config_reader(filename):
-    '''
-    General helper module. Turns a file of key:value pairs into a dictionary.
-    :param filename:
-        Config filename.
-    :return:
-        A dictionary of key-value pairs.
-    '''
-    config = {}
-    with open(filename) as f:
-        for line in f:
-            line = line.strip()
-            splitline = line.split(':')
-            config[splitline[0]] = config[splitline[1]]
-
-    return config
-
 
 def training_config_reader(filename):
     '''
@@ -263,11 +237,11 @@ def make_training_data(config_filename):
         raise ValueError('Invalid system for making training data: %s' % system)
 
     # write the global file used by all params
-    header_start = ['Cosmology Params:']
+    # TODO Write system (maybe) and method (definetly) to file!
+    header_start = ['Sampling Method: %s'%method, 'Cosmology Params:']
     header_start.extend('%s:%.3f' % (key, val) for key, val in cosmo_params.iteritems())
     header = '\n'.join(header_start)
-    # default name.
-    np.savetxt(path.join(outputdir, 'global_file.npy'), rbins, header=header)
+    np.savetxt(path.join(outputdir, GLOBAL_FILENAME), rbins, header=header)
 
     # call each job individually
     points_per_job = int(points.shape[0] / n_jobs)
