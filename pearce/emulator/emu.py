@@ -45,107 +45,8 @@ class Emu(object):
 
     # I can get LHC from the training data. If any coordinate equals any other in its column we know!
     def get_training_data(self,training_dir, independent_variable, fixed_params):
-        '''
-        Read the training data for the emulator and attach it to the object.
-        :param training_dir:
-            Directory where training data from trainginData is stored.
-        :param independent_variable:
-            Independant variable to emulate. Options are xi, r2xi, and bias (eventually).
-        :param fixed_params:
-            Parameters to hold fixed. Only available if data in training_dir is a full hypercube, not a latin hypercube.
-        :return: None
-        '''
-
-        rbins, cosmo_params, method = global_file_reader(path.join(training_dir, GLOBAL_FILENAME))
-
-        if not fixed_params and method=='LHC':
-            raise ValueError('Fixed parameters is not empty, but the data in training_dir is form a Latin Hypercube. \
-                                Cannot performs slices on a LHC.')
-
-        corr_files = sorted(glob(path.join(training_dir, 'xi*.npy')))
-        cov_files = sorted(
-            glob(path.join(training_dir, '*cov*.npy')))  # since they're sorted, they'll be paired up by params.
-        self.rpoints = (rbins[:-1]+rbins[1:])/2
-        nbins = self.rpoints.shape[0]
-        #HERE
-        npoints = len(corr_files) * nbins # each file contains NBINS points in r, and each file is a 6-d point
-
-        #HERE
-        varied_params = set([p.name for p in self.ordered_params]) - set(fixed_params.keys())
-        ndim = len(varied_params)   # lest we forget r
-
-        #not sure about this.
-
-        x = np.zeros((npoints, ndim))
-        y = np.zeros((npoints,))
-        yerr = np.zeros((npoints,))
-
-        warned = False
-        num_skipped = 0
-        num_used = 0
-        for idx, (corr_file, cov_file) in enumerate(izip(corr_files, cov_files)):
-            params, xi, cov = xi_file_reader(corr_file, cov_file)
-
-            # skip values that aren't where we've fixed them to be.
-            # It'd be nice to do this before the file I/O. Not possible without putting all info in the filename.
-            # or, a more nuanced file structure
-            # TODO check if a fixed_param is not one of the options i.e. typo
-            if any(params[key] != val for key, val in fixed_params.iteritems()):
-                continue
-
-            if np.any(np.isnan(cov)) or np.any(np.isnan(xi)):
-                if not warned:
-                    warnings.warn('WARNING: NaN detected. Skipping point in %s' % cov_file)
-                    warned = True
-                num_skipped += 1
-                continue
-
-            num_used += 1
-
-            # doing some shuffling and stacking
-            file_params = []
-            # NOTE could do a param ordering here
-            for p in self.ordered_params:
-                if p.name in fixed_params:
-                    continue
-                if p.name == 'r':
-                    file_params.append(np.log10(self.rpoints))
-                else:
-                    file_params.append(np.ones((nbins,)) * params[p.name])
-
-
-            x[idx * nbins:(idx + 1) * nbins, :] = np.stack(file_params).T
-            #TODO helper function that handles this part
-            # TODO the time has come to do something smarter for bias... I will ignore for now.
-            '''
-            if independent_variable == 'bias':
-                y[idx * NBINS:(idx + 1) * NBINS] = xi / xi_mm
-                ycovs.append(cov / np.outer(xi_mm, xi_mm))
-            '''
-            if independent_variable == 'xi':
-                y[idx * nbins:(idx + 1) * nbins] = np.log10(xi)
-                # Approximately true, may need to revisit
-                yerr[idx * nbins:(idx + 1) * nbins] = np.sqrt(np.diag(cov)) / (xi * np.log(10))
-                #ycovs.append(cov / (np.outer(xi, xi) * np.log(10) ** 2))  # I think this is right, extrapolating from the above.
-            else: #r2xi
-                y[idx * nbins:(idx + 1) * nbins] = xi * self.rpoints * self.rpoints
-                yerr[idx * nbins:(idx + 1) * nbins] = cov * np.outer(self.rpoints, self.rpoints)
-
-        # ycov = block_diag(*ycovs)
-        # ycov = np.sqrt(np.diag(ycov))
-
-        # remove rows that were skipped due to the fixed thing
-        # NOTE: HACK
-        # a reshape may be faster.
-        zeros_slice = np.all(x != 0.0, axis=1)
-        #set the results of these calculations.
-        self.ndim = ndim
-        self.x =  x[zeros_slice]
-        self.y = y[zeros_slice]
-        self.yerr = yerr[zeros_slice]
-
-        self.y_hat = self.y.mean()
-        self.y-=self.y_hat #mean-subtract.
+        '''Implemented in subclasses. '''
+        pass
 
     def build_emulator(self,independent_variable, fixed_params):
         '''
@@ -274,13 +175,170 @@ class Emu(object):
         return ig
 
     def train(self, **kwargs):
+        pass
+
+    def emulate(self, em_params):
+        pass
+
+    def emulate_wrt_r(self, em_params, rpoints):
+        pass
+
+    def goodness_of_fit(self, truth_dir, N=None, statistic = 'r2'):
         '''
-        Train the emulator. Has a spotty record of working. Better luck may be had with the NAMEME code.
-        :param kwargs:
-            Kwargs that will be passed into the scipy.optimize.minimize
-        :return: success: True if the training was successful.
+        Calculate the goodness of fit of an emulator as compared to some validation data.
+        :param truth_dir:
+            Directory structured similary to the training data, but NOT used for training.
+        :param N:
+            Number of points to use to calculate G.O.F. measures. "None" tests against all values in truth_dir. If N
+            is less than the number of points, N are randomly selected.
+        :param statistic:
+            What G.O.F. statistic to calculate. Default is R2. Other option is rmsfd.
+        :return: values, a numpy arrray of the calculated statistics at each of the N training opints.
         '''
-        #move these outside? hm.
+        assert statistic in {'r2', 'rmsfd'}
+
+        corr_files = sorted(glob(path.join(truth_dir, '*corr*.npy')))
+        cov_files = sorted(glob(path.join(truth_dir, '*cov*.npy')))
+
+        np.random.seed(int(time()))
+
+        if N is None:
+            idxs = np.arange(len(corr_files))
+        else:
+            idxs = np.random.choice(len(corr_files), N, replace=False)
+
+        values = []
+        rbins, _, _ = global_file_reader(path.join(truth_dir, GLOBAL_FILENAME))
+        r_centers = (rbins[:1]+rbins[:-1])/2
+        for idx in idxs:
+            params, true_xi, _ = xi_file_reader(corr_files[idx], cov_files[idx])
+            pred_log_xi, _ = self.emulate_wrt_r(params, np.log10(r_centers))
+
+            if statistic == 'rmsfd':
+                values.append(np.sqrt(np.mean(((pred_log_xi - np.log10(true_xi)) ** 2) / (np.log10(true_xi) ** 2))))
+            else: #r2
+                SSR = np.sum((pred_log_xi - np.log10(true_xi)) ** 2)
+                SST = np.sum((np.log10(true_xi) - np.log10(true_xi).mean()) ** 2)
+
+                values.append(1 - SSR / SST)
+
+        return np.array(values)
+
+
+class OriginalRecipe(Emu):
+
+    def get_training_data(self,training_dir, independent_variable, fixed_params):
+        '''
+        Read the training data for the emulator and attach it to the object.
+        :param training_dir:
+            Directory where training data from trainginData is stored.
+        :param independent_variable:
+            Independant variable to emulate. Options are xi, r2xi, and bias (eventually).
+        :param fixed_params:
+            Parameters to hold fixed. Only available if data in training_dir is a full hypercube, not a latin hypercube.
+        :return: None
+        '''
+
+        rbins, cosmo_params, method = global_file_reader(path.join(training_dir, GLOBAL_FILENAME))
+
+        if not fixed_params and method=='LHC':
+            raise ValueError('Fixed parameters is not empty, but the data in training_dir is form a Latin Hypercube. \
+                                Cannot performs slices on a LHC.')
+
+        corr_files = sorted(glob(path.join(training_dir, 'xi*.npy')))
+        cov_files = sorted(
+            glob(path.join(training_dir, '*cov*.npy')))  # since they're sorted, they'll be paired up by params.
+        self.rpoints = (rbins[:-1]+rbins[1:])/2
+        nbins = self.rpoints.shape[0]
+        #HERE
+        npoints = len(corr_files) * nbins # each file contains NBINS points in r, and each file is a 6-d point
+
+        #HERE
+        varied_params = set([p.name for p in self.ordered_params]) - set(fixed_params.keys())
+        ndim = len(varied_params)   # lest we forget r
+
+        #not sure about this.
+
+        x = np.zeros((npoints, ndim))
+        y = np.zeros((npoints,))
+        yerr = np.zeros((npoints,))
+
+        warned = False
+        num_skipped = 0
+        num_used = 0
+        for idx, (corr_file, cov_file) in enumerate(izip(corr_files, cov_files)):
+            params, xi, cov = xi_file_reader(corr_file, cov_file)
+
+            # skip values that aren't where we've fixed them to be.
+            # It'd be nice to do this before the file I/O. Not possible without putting all info in the filename.
+            # or, a more nuanced file structure
+            # TODO check if a fixed_param is not one of the options i.e. typo
+            if any(params[key] != val for key, val in fixed_params.iteritems()):
+                continue
+
+            if np.any(np.isnan(cov)) or np.any(np.isnan(xi)):
+                if not warned:
+                    warnings.warn('WARNING: NaN detected. Skipping point in %s' % cov_file)
+                    warned = True
+                num_skipped += 1
+                continue
+
+            num_used += 1
+
+            # doing some shuffling and stacking
+            file_params = []
+            # NOTE could do a param ordering here
+            for p in self.ordered_params:
+                if p.name in fixed_params:
+                    continue
+                if p.name == 'r':
+                    file_params.append(np.log10(self.rpoints))
+                else:
+                    file_params.append(np.ones((nbins,)) * params[p.name])
+
+
+            x[idx * nbins:(idx + 1) * nbins, :] = np.stack(file_params).T
+            #TODO helper function that handles this part
+            # TODO the time has come to do something smarter for bias... I will ignore for now.
+            '''
+            if independent_variable == 'bias':
+                y[idx * NBINS:(idx + 1) * NBINS] = xi / xi_mm
+                ycovs.append(cov / np.outer(xi_mm, xi_mm))
+            '''
+            if independent_variable == 'xi':
+                y[idx * nbins:(idx + 1) * nbins] = np.log10(xi)
+                # Approximately true, may need to revisit
+                yerr[idx * nbins:(idx + 1) * nbins] = np.sqrt(np.diag(cov)) / (xi * np.log(10))
+                #ycovs.append(cov / (np.outer(xi, xi) * np.log(10) ** 2))  # I think this is right, extrapolating from the above.
+            else: #r2xi
+                y[idx * nbins:(idx + 1) * nbins] = xi * self.rpoints * self.rpoints
+                yerr[idx * nbins:(idx + 1) * nbins] = cov * np.outer(self.rpoints, self.rpoints)
+
+        # ycov = block_diag(*ycovs)
+        # ycov = np.sqrt(np.diag(ycov))
+
+        # remove rows that were skipped due to the fixed thing
+        # NOTE: HACK
+        # a reshape may be faster.
+        zeros_slice = np.all(x != 0.0, axis=1)
+        #set the results of these calculations.
+        self.ndim = ndim
+        self.x =  x[zeros_slice]
+        self.y = y[zeros_slice]
+        self.yerr = yerr[zeros_slice]
+
+        self.y_hat = self.y.mean()
+        self.y-=self.y_hat #mean-subtract.
+
+    def train(self, **kwargs):
+        '''
+            Train the emulator. Has a spotty record of working. Better luck may be had with the NAMEME code.
+            :param kwargs:
+                Kwargs that will be passed into the scipy.optimize.minimize
+            :return: success: True if the training was successful.
+            '''
+
+        # move these outside? hm.
         def nll(p):
             # Update the kernel parameters and compute the likelihood.
             # params are log(a) and log(m)
@@ -298,7 +356,7 @@ class Emu(object):
 
         p0 = self.gp.kernel.vector
         results = op.minimize(nll, p0, jac=grad_nll, **kwargs)
-        #results = op.minimize(nll, p0, jac=grad_nll, method='TNC', bounds =\
+        # results = op.minimize(nll, p0, jac=grad_nll, method='TNC', bounds =\
         #   [(np.log(0.01), np.log(10)) for i in xrange(ndim+1)],options={'maxiter':50})
 
         self.gp.kernel[:] = results.x
@@ -351,49 +409,6 @@ class Emu(object):
         vep.update({'r':rpoints})
 
         return self.emulate(vep)
-
-    def goodness_of_fit(self, truth_dir, N=None, statistic = 'r2'):
-        '''
-        Calculate the goodness of fit of an emulator as compared to some validation data.
-        :param truth_dir:
-            Directory structured similary to the training data, but NOT used for training.
-        :param N:
-            Number of points to use to calculate G.O.F. measures. "None" tests against all values in truth_dir. If N
-            is less than the number of points, N are randomly selected.
-        :param statistic:
-            What G.O.F. statistic to calculate. Default is R2. Other option is rmsfd.
-        :return: values, a numpy arrray of the calculated statistics at each of the N training opints.
-        '''
-        assert statistic in {'r2', 'rmsfd'}
-
-        corr_files = sorted(glob(path.join(truth_dir, '*corr*.npy')))
-        cov_files = sorted(glob(path.join(truth_dir, '*cov*.npy')))
-
-        np.random.seed(int(time()))
-
-        if N is None:
-            idxs = np.arange(len(corr_files))
-        else:
-            idxs = np.random.choice(len(corr_files), N, replace=False)
-
-        values = []
-        rbins, _, _ = global_file_reader(path.join(truth_dir, GLOBAL_FILENAME))
-        r_centers = (rbins[:1]+rbins[:-1])/2
-        for idx in idxs:
-            params, true_xi, _ = xi_file_reader(corr_files[idx], cov_files[idx])
-            pred_log_xi, _ = self.emulate_wrt_r(params, np.log10(r_centers))
-
-            if statistic == 'rmsfd':
-                values.append(np.sqrt(np.mean(((pred_log_xi - np.log10(true_xi)) ** 2) / (np.log10(true_xi) ** 2))))
-            else: #r2
-                SSR = np.sum((pred_log_xi - np.log10(true_xi)) ** 2)
-                SST = np.sum((np.log10(true_xi) - np.log10(true_xi).mean()) ** 2)
-
-                values.append(1 - SSR / SST)
-
-        return np.array(values)
-
-
 
 class ExtraCrispy(Emu):
 
@@ -590,3 +605,4 @@ class ExtraCrispy(Emu):
             interp_err = err_interp(rpoints)
             new_output.append((interp_mean, interp_err))
         return  new_output
+
