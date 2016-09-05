@@ -22,7 +22,7 @@ class Emu(object):
     # have to copy a lot of it to the subclass
 
     #TODO load initial guesses from file.
-    def __init__(self, training_dir, independent_variable='xi',fixed_params = {}):
+    def __init__(self, training_dir,params=PARAMS, independent_variable='xi',fixed_params = {}):
 
         '''
         # TODO change name of type
@@ -36,6 +36,8 @@ class Emu(object):
             raise NotImplementedError("I have to work on how to do xi_mm first.")
 
         assert independent_variable in {'xi', 'r2xi'} #no bias for now.
+
+        self.ordered_params = params
 
         self.get_training_data(self, training_dir, independent_variable, fixed_params)
         self.build_emulator(independent_variable, fixed_params)
@@ -69,8 +71,8 @@ class Emu(object):
         npoints = len(corr_files) * nbins # each file contains NBINS points in r, and each file is a 6-d point
 
         #HERE
-        varied_params = set(PARAMS) - set(fixed_params.keys())
-        ndim = len(varied_params) + 1  # lest we forget r
+        varied_params = set([p.name for p in self.ordered_params]) - set(fixed_params.keys())
+        ndim = len(varied_params)   # lest we forget r
 
         #not sure about this.
 
@@ -103,13 +105,14 @@ class Emu(object):
             # doing some shuffling and stacking
             file_params = []
             # NOTE could do a param ordering here
-            for p in PARAMS:
+            for p in self.ordered_params:
                 if p.name in fixed_params:
                     continue
-                #HERE
-                file_params.append(np.ones((nbins,)) * params[p.name])
+                if p.name == 'r':
+                    file_params.append(np.log10(self.rpoints))
+                else:
+                    file_params.append(np.ones((nbins,)) * params[p.name])
 
-            file_params.append(np.log10(self.rpoints))
 
             x[idx * nbins:(idx + 1) * nbins, :] = np.stack(file_params).T
             #TODO helper function that handles this part
@@ -156,13 +159,10 @@ class Emu(object):
         ig = self.get_initial_guess(independent_variable)
 
         self.metric = []
-        for p in PARAMS:
+        for p in self.ordered_params:
             if p.name in fixed_params:
                 continue
             self.metric.append(ig[p.name])
-
-        #can i wrap this into params somehow?
-        self.metric.append(ig['r'])
 
         a = ig['amp']
         kernel = a * ExpSquaredKernel(self.metric, ndim=self.ndim)
@@ -186,7 +186,7 @@ class Emu(object):
             Parameters to hold fixed. Only available if data in training_dir is a full hypercube, not a latin hypercube.
         :return: log_r, y, yerr for the independent variable at the points specified by fixed nad em params.
         '''
-        assert len(em_params) + len(fixed_params) + 1 == len(PARAMS)
+        assert len(em_params) + len(fixed_params) == len(self.ordered_params)
 
         rbins, cosmo_params, method = global_file_reader(path.join(training_dir, GLOBAL_FILENAME))
 
@@ -265,7 +265,7 @@ class Emu(object):
                    'f_c':0.041, 'r':0.040}
         else:# independent_variable == 'r2xi':
             ig = {'amp':1}
-            ig.update({p.name:0.1 for p in PARAMS})
+            ig.update({p.name:0.1 for p in self.ordered_params})
 
         #remove entries for variables that are being held fixed.
         for key in fixed_params.iterkeys():
@@ -319,11 +319,10 @@ class Emu(object):
         input_params.update(em_params)
         assert len(input_params) == self.ndim  # check dimenstionality
         for i in input_params:
-            assert any(i==p.name for p in PARAMS or i=='r')
+            assert any(i==p.name for p in self.ordered_params)
 
         #i'd like to remove 'r'. possibly requiring a passed in param?
-        t_list = [input_params[p.name] for p in PARAMS]
-        t_list.append(input_params['r'])
+        t_list = [input_params[p.name] for p in self.ordered_params]
         t_grid = np.meshgrid(*t_list)
         t = np.stack(t_grid).T
 
@@ -426,7 +425,7 @@ class ExtraCrispy(Emu):
         npoints = len(corr_files)  # each file contains NBINS points in r, and each file is a 6-d point
 
         # HERE
-        varied_params = set(PARAMS) - set(fixed_params.keys())
+        varied_params = set(self.ordered_params) - set(fixed_params.keys())
         ndim = len(varied_params)  # lest we forget r
 
         # not sure about this.
@@ -460,7 +459,7 @@ class ExtraCrispy(Emu):
             # doing some shuffling and stacking
             file_params = []
             # NOTE could do a param ordering here
-            for p in PARAMS:
+            for p in self.ordered_params:
                 if p.name in fixed_params:
                     continue
                 # HERE
@@ -498,30 +497,6 @@ class ExtraCrispy(Emu):
 
         self.y_hat = self.y.mean()
         self.y -= self.y_hat  # mean-subtract.
-
-    def build_emulator(self, independent_variable, fixed_params):
-        '''
-        Initialization of the emulator from recovered training data.
-        :param independent_variable:
-            independent_variable to emulate.
-        :param fixed_params:
-            Parameterst to hold fixed in teh training data
-        :return: None
-        '''
-        ig = self.get_initial_guess(independent_variable)
-
-        self.metric = []
-        for p in PARAMS:
-            if p.name in fixed_params:
-                continue
-            self.metric.append(ig[p.name])
-
-        a = ig['amp']
-        kernel = a * ExpSquaredKernel(self.metric, ndim=self.ndim)
-        self.gp = george.GP(kernel)
-        # gp = george.GP(kernel, solver=george.HODLRSolver, nleaf=x.shape[0]+1,tol=1e-18)
-        self.fixed_params = fixed_params  # remember which params were fixed
-        self.gp.compute(self.x, self.yerr)  # NOTE I'm using a modified version of ge
 
     def train(self, **kwargs):
         '''
@@ -572,10 +547,10 @@ class ExtraCrispy(Emu):
         input_params.update(em_params)
         assert len(input_params) == self.ndim  # check dimenstionality
         for i in input_params:
-            assert any(i == p.name for p in PARAMS or i == 'r')
+            assert any(i == p.name for p in self.ordered_params)
 
         # i'd like to remove 'r'. possibly requiring a passed in param?
-        t_list = [input_params[p.name] for p in PARAMS]
+        t_list = [input_params[p.name] for p in self.ordered_params]
         t_grid = np.meshgrid(*t_list)
         t = np.stack(t_grid).T
 
