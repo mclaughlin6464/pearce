@@ -2,11 +2,13 @@
 '''The Emu object esentially wraps the George gaussian process code. It handles building, training, and predicting.'''
 
 from os import path
+from time import time
 import warnings
 from glob import glob
 from itertools import izip
 import numpy as np
 import scipy.optimize as op
+from scipy.interpolate import interp1d
 import george
 from george.kernels import *
 
@@ -36,22 +38,8 @@ class Emu(object):
         assert independent_variable in {'xi', 'r2xi'} #no bias for now.
 
         self.get_training_data(self, training_dir, independent_variable, fixed_params)
-        ig = self.get_initial_guess(independent_variable)
+        self.build_emulator(independent_variable, fixed_params)
 
-        self.metric = []
-        for p in PARAMS:
-            if p.name in fixed_params:
-                continue
-            self.metric.append(ig[p.name])
-
-        self.metric.append(ig['r'])
-
-        a = ig['amp']
-        kernel = a * ExpSquaredKernel(self.metric, ndim=self.ndim)
-        self.gp = george.GP(kernel)
-        # gp = george.GP(kernel, solver=george.HODLRSolver, nleaf=x.shape[0]+1,tol=1e-18)
-
-        self.gp.compute(self.x, self.yerr)  # NOTE I'm using a modified version of george!
 
     # I can get LHC from the training data. If any coordinate equals any other in its column we know!
     def get_training_data(self,training_dir, independent_variable, fixed_params):
@@ -155,6 +143,33 @@ class Emu(object):
 
         self.y_hat = self.y.mean()
         self.y-=self.y_hat #mean-subtract.
+
+    def build_emulator(self,independent_variable, fixed_params):
+        '''
+        Initialization of the emulator from recovered training data.
+        :param independent_variable:
+            independent_variable to emulate.
+        :param fixed_params:
+            Parameterst to hold fixed in teh training data
+        :return: None
+        '''
+        ig = self.get_initial_guess(independent_variable)
+
+        self.metric = []
+        for p in PARAMS:
+            if p.name in fixed_params:
+                continue
+            self.metric.append(ig[p.name])
+
+        #can i wrap this into params somehow?
+        self.metric.append(ig['r'])
+
+        a = ig['amp']
+        kernel = a * ExpSquaredKernel(self.metric, ndim=self.ndim)
+        self.gp = george.GP(kernel)
+        # gp = george.GP(kernel, solver=george.HODLRSolver, nleaf=x.shape[0]+1,tol=1e-18)
+        self.fixed_params = fixed_params #remember which params were fixed
+        self.gp.compute(self.x, self.yerr)  # NOTE I'm using a modified version of george!
 
     # Not sure this will work at all in an LHC scheme.
     def get_plot_data(self, em_params, training_dir, independent_variable='xi', fixed_params={}):
@@ -279,7 +294,7 @@ class Emu(object):
         def grad_nll(p):
             # Update the kernel parameters and compute the likelihood.
             self.gp.kernel[:] = p
-            return -self.gp.grad_lnlikelihood(y, quiet=True)
+            return -self.gp.grad_lnlikelihood(self.y, quiet=True)
 
         p0 = self.gp.kernel.vector
         results = op.minimize(nll, p0, jac=grad_nll, **kwargs)
@@ -291,66 +306,312 @@ class Emu(object):
 
         return results.success
 
-    def emulate(self, fixed_em_params, varied_em_params):
-
-        input_params = set(fixed_em_params) | set(varied_em_params)
+    def emulate(self, em_params):
+        '''
+        Perform predictions with the emulator.
+        :param varied_em_params:
+            Dictionary of what values to predict at for each param. Values can be
+            an array or a float.
+        :return: mu, cov. The predicted value and the covariance matrix for the predictions
+        '''
+        input_params = {}
+        input_params.update(self.fixed_em_params)
+        input_params.update(em_params)
         assert len(input_params) == self.ndim  # check dimenstionality
         for i in input_params:
             assert any(i==p.name for p in PARAMS or i=='r')
 
-        if y_param is None:
-            # We only have to vary one parameter, as given by x_points
-            t_list = []
-            for p in PARAMS:
-                if p in em_params:
-                    t_list.append(np.ones_like(x_points) * em_params[p])
-                elif p == x_param:
-                    t_list.append(x_points)
-                else:
-                    continue
-            # adding 'r' in as a special case
-            if 'r' in em_params:
-                t_list.append(np.ones_like(x_points) * em_params['r'])
-            elif 'r' == x_param:
-                t_list.append(x_points)
+        #i'd like to remove 'r'. possibly requiring a passed in param?
+        t_list = [input_params[p.name] for p in PARAMS]
+        t_list.append(input_params['r'])
+        t_grid = np.meshgrid(*t_list)
+        t = np.stack(t_grid).T
 
-            t = np.stack(t_list).T
+        mu, cov = self.gp.predict(self.y, t)
+        mu.reshape((-1, len(self.rpoints)))
+        errs = np.sqrt(np.diag(cov))
+        errs.reshape((-1, len(self.rpoints)))
+        #Note ordering is unclear if em_params has more than 1 value.
+        outputs = []
+        for m, e in izip(mu, errs):
+            outputs.append((m,e))
+        return outputs
 
-            # TODO mean subtraction?
-            mu, cov = gp.predict(em_y, t)
+    def emulate_wrt_r(self, em_params, rpoints):
+        '''
+        Conveniance function. Add's 'r' to the emulation automatically, as this is the
+        most common use case.
+        :param em_params:
+            Dictionary of what values to predict at for each param. Values can be array
+            or float.
+        :param rpoints:
+            Points in 'r' to predict at, for each point in HOD-space.
+        :return:
+        '''
+        vep = dict(em_params)
+        vep.update({'r':rpoints})
 
-            # TODO return std or cov?
-            # TODO return r's too? Just have those be passed in?
-            em_y+=em_y_hat
-            return mu+em_y_hat, np.diag(cov)
+        return self.emulate(vep)
+
+    def goodness_of_fit(self, truth_dir, N=None, statistic = 'r2'):
+        '''
+        Calculate the goodness of fit of an emulator as compared to some validation data.
+        :param truth_dir:
+            Directory structured similary to the training data, but NOT used for training.
+        :param N:
+            Number of points to use to calculate G.O.F. measures. "None" tests against all values in truth_dir. If N
+            is less than the number of points, N are randomly selected.
+        :param statistic:
+            What G.O.F. statistic to calculate. Default is R2. Other option is rmsfd.
+        :return: values, a numpy arrray of the calculated statistics at each of the N training opints.
+        '''
+        assert statistic in {'r2', 'rmsfd'}
+
+        corr_files = sorted(glob(path.join(truth_dir, '*corr*.npy')))
+        cov_files = sorted(glob(path.join(truth_dir, '*cov*.npy')))
+
+        np.random.seed(int(time()))
+
+        if N is None:
+            idxs = np.arange(len(corr_files))
         else:
-            output = []
-            assert len(y_points) <= 20  # y_points has a limit, otherwise this'd be crazy
+            idxs = np.random.choice(len(corr_files), N, replace=False)
+
+        values = []
+        rbins, _, _ = global_file_reader(path.join(truth_dir, GLOBAL_FILENAME))
+        r_centers = (rbins[:1]+rbins[:-1])/2
+        for idx in idxs:
+            params, true_xi, _ = xi_file_reader(corr_files[idx], cov_files[idx])
+            pred_log_xi, _ = self.emulate_wrt_r(params, np.log10(r_centers))
+
+            if statistic == 'rmsfd':
+                values.append(np.sqrt(np.mean(((pred_log_xi - np.log10(true_xi)) ** 2) / (np.log10(true_xi) ** 2))))
+            else: #r2
+                SSR = np.sum((pred_log_xi - np.log10(true_xi)) ** 2)
+                SST = np.sum((np.log10(true_xi) - np.log10(true_xi).mean()) ** 2)
+
+                values.append(1 - SSR / SST)
+
+        return np.array(values)
 
 
-            for y in y_points:  # I thought this had a little too mcuh copying, but
-                # this is the best wayt ensure the ordering is consistent.
-                t_list = []
-                for p in PARAMS:
-                    if p in em_params:
-                        t_list.append(np.ones_like(x_points) * em_params[p])
-                    elif p == x_param:
-                        t_list.append(x_points)
-                    elif p == y_param:
-                        t_list.append(np.ones_like(x_points) * y)
-                    else:
-                        continue
 
-                if 'r' in em_params:
-                    t_list.append(np.ones_like(x_points) * em_params['r'])
-                elif 'r' == x_param:
-                    t_list.append(x_points)
-                elif 'r' == y_param:
-                    t_list.append(np.ones_like(x_points) * y)
+class ExtraCrispy(Emu):
 
-                t = np.stack(t_list).T
 
-                mu, cov = gp.predict(em_y, t)
-                output.append((mu+em_y_hat, np.sqrt(np.diag(cov))))
-            em_y+=em_y_hat
+    def get_training_data(self, training_dir, independent_variable, fixed_params):
+        '''
+        Read the training data for the emulator and attach it to the object.
+        :param training_dir:
+            Directory where training data from trainginData is stored.
+        :param independent_variable:
+            Independant variable to emulate. Options are xi, r2xi, and bias (eventually).
+        :param fixed_params:
+            Parameters to hold fixed. Only available if data in training_dir is a full hypercube, not a latin hypercube.
+        :return: None
+        '''
+
+        rbins, cosmo_params, method = global_file_reader(path.join(training_dir, GLOBAL_FILENAME))
+
+        if not fixed_params and method == 'LHC':
+            raise ValueError('Fixed parameters is not empty, but the data in training_dir is form a Latin Hypercube. \
+                                Cannot performs slices on a LHC.')
+
+        corr_files = sorted(glob(path.join(training_dir, 'xi*.npy')))
+        cov_files = sorted(
+            glob(path.join(training_dir, '*cov*.npy')))  # since they're sorted, they'll be paired up by params.
+        self.rpoints = (rbins[:-1] + rbins[1:]) / 2
+        nbins = self.rpoints.shape[0]
+        # HERE
+        npoints = len(corr_files)  # each file contains NBINS points in r, and each file is a 6-d point
+
+        # HERE
+        varied_params = set(PARAMS) - set(fixed_params.keys())
+        ndim = len(varied_params)  # lest we forget r
+
+        # not sure about this.
+
+        x = np.zeros((npoints, ndim))
+        y = np.zeros((npoints,nbins))
+        yerr = np.zeros((npoints,nbins))
+
+        warned = False
+        num_skipped = 0
+        num_used = 0
+        for idx, (corr_file, cov_file) in enumerate(izip(corr_files, cov_files)):
+            params, xi, cov = xi_file_reader(corr_file, cov_file)
+
+            # skip values that aren't where we've fixed them to be.
+            # It'd be nice to do this before the file I/O. Not possible without putting all info in the filename.
+            # or, a more nuanced file structure
+            # TODO check if a fixed_param is not one of the options i.e. typo
+            if any(params[key] != val for key, val in fixed_params.iteritems()):
+                continue
+
+            if np.any(np.isnan(cov)) or np.any(np.isnan(xi)):
+                if not warned:
+                    warnings.warn('WARNING: NaN detected. Skipping point in %s' % cov_file)
+                    warned = True
+                num_skipped += 1
+                continue
+
+            num_used += 1
+
+            # doing some shuffling and stacking
+            file_params = []
+            # NOTE could do a param ordering here
+            for p in PARAMS:
+                if p.name in fixed_params:
+                    continue
+                # HERE
+                file_params.append(np.ones((nbins,)) * params[p.name])
+
+            x[idx, :] = np.stack(file_params).T
+            # TODO helper function that handles this part
+            # TODO the time has come to do something smarter for bias... I will ignore for now.
+            '''
+            if independent_variable == 'bias':
+                y[idx * NBINS:(idx + 1) * NBINS] = xi / xi_mm
+                ycovs.append(cov / np.outer(xi_mm, xi_mm))
+            '''
+            if independent_variable == 'xi':
+                y[idx, :] = np.log10(xi)
+                # Approximately true, may need to revisit
+                yerr[idx,:] = np.sqrt(np.diag(cov)) / (xi * np.log(10))
+                # ycovs.append(cov / (np.outer(xi, xi) * np.log(10) ** 2))  # I think this is right, extrapolating from the above.
+            else:  # r2xi
+                y[idx,:] = xi * self.rpoints * self.rpoints
+                yerr[idx,:] = cov * np.outer(self.rpoints, self.rpoints)
+
+        # ycov = block_diag(*ycovs)
+        # ycov = np.sqrt(np.diag(ycov))
+
+        # remove rows that were skipped due to the fixed thing
+        # NOTE: HACK
+        # a reshape may be faster.
+        zeros_slice = np.all(x != 0.0, axis=1)
+        # set the results of these calculations.
+        self.ndim = ndim
+        self.x = x[zeros_slice]
+        self.y = y[zeros_slice]
+        self.yerr = yerr[zeros_slice]
+
+        self.y_hat = self.y.mean()
+        self.y -= self.y_hat  # mean-subtract.
+
+    def build_emulator(self, independent_variable, fixed_params):
+        '''
+        Initialization of the emulator from recovered training data.
+        :param independent_variable:
+            independent_variable to emulate.
+        :param fixed_params:
+            Parameterst to hold fixed in teh training data
+        :return: None
+        '''
+        ig = self.get_initial_guess(independent_variable)
+
+        self.metric = []
+        for p in PARAMS:
+            if p.name in fixed_params:
+                continue
+            self.metric.append(ig[p.name])
+
+        a = ig['amp']
+        kernel = a * ExpSquaredKernel(self.metric, ndim=self.ndim)
+        self.gp = george.GP(kernel)
+        # gp = george.GP(kernel, solver=george.HODLRSolver, nleaf=x.shape[0]+1,tol=1e-18)
+        self.fixed_params = fixed_params  # remember which params were fixed
+        self.gp.compute(self.x, self.yerr)  # NOTE I'm using a modified version of ge
+
+    def train(self, **kwargs):
+        '''
+        Train the emulator. Has a spotty record of working. Better luck may be had with the NAMEME code.
+        :param kwargs:
+            Kwargs that will be passed into the scipy.optimize.minimize
+        :return: success: True if the training was successful.
+        '''
+
+        # move these outside? hm.
+        def nll(p):
+            # Update the kernel parameters and compute the likelihood.
+            # params are log(a) and log(m)
+            self.gp.kernel[:] = p
+            #check this has the right direction
+            ll = np.sum(self.gp.lnlikelihood(y, quiet=True) for y in self.y)
+
+            # The scipy optimizer doesn't play well with infinities.
+            return -ll if np.isfinite(ll) else 1e25
+
+        # And the gradient of the objective function.
+        def grad_nll(p):
+            # Update the kernel parameters and compute the likelihood.
+            self.gp.kernel[:] = p
+            #mean or sum?
+            return -np.mean(self.gp.grad_lnlikelihood(y, quiet=True) for y in self.y)
+
+        p0 = self.gp.kernel.vector
+        results = op.minimize(nll, p0, jac=grad_nll, **kwargs)
+        # results = op.minimize(nll, p0, jac=grad_nll, method='TNC', bounds =\
+        #   [(np.log(0.01), np.log(10)) for i in xrange(ndim+1)],options={'maxiter':50})
+
+        self.gp.kernel[:] = results.x
+        self.gp.recompute()
+
+        return results.success
+
+    def emulate(self, em_params):
+        '''
+        Perform predictions with the emulator.
+        :param varied_em_params:
+            Dictionary of what values to predict at for each param. Values can be
+            an array or a float.
+        :return: mu, cov. The predicted value and the covariance matrix for the predictions
+        '''
+        input_params = {}
+        input_params.update(self.fixed_em_params)
+        input_params.update(em_params)
+        assert len(input_params) == self.ndim  # check dimenstionality
+        for i in input_params:
+            assert any(i == p.name for p in PARAMS or i == 'r')
+
+        # i'd like to remove 'r'. possibly requiring a passed in param?
+        t_list = [input_params[p.name] for p in PARAMS]
+        t_grid = np.meshgrid(*t_list)
+        t = np.stack(t_grid).T
+
+        output = []
+        for i, y in enumerate(self.y):
+            mu, cov = self.gp.predict(self.y, t)
+            output.append((mu+self.y_hat, np.sqrt(np.diag(cov))))
+        # note may want to do a reshape here., Esp to be consistent with the other
+        # implementation
+        return output
+
+    def emulate_wrt_r(self, em_params, rpoints, kind = 'slinear'):
+        '''
+        Conveniance function. Add's 'r' to the emulation automatically, as this is the
+        most common use case.
+        :param em_params:
+            Dictionary of what values to predict at for each param. Values can be array
+            or float.
+        :param rpoints:
+            Points in 'r' to predict at, for each point in HOD-space.
+        :param kind:
+            Kind of interpolation to do, is necessary. Default is slinear.
+        :return:
+        '''
+        #turns out this how it already works!
+        output = self.emulate(em_params)
+        #don't need to interpolate!
+        if rpoints == self.rpoints:
             return output
+        #TODO check rpoints in bounds!
+        new_output = []
+        for mean, err in output:
+            xi_interpolator = interp1d(rpoints, mean, kind=kind)
+            interp_mean = xi_interpolator(rpoints)
+
+            err_interp = interp1d(rpoints, err, kind=kind)
+            interp_err = err_interp(rpoints)
+            new_output.append((interp_mean, interp_err))
+        return  new_output

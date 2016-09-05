@@ -62,21 +62,31 @@ def makeFHC(N=4):
 
     n_total = np.prod(N)
     # TODO check if n_total is 1.
-    points = np.zeros((n_total, len(PARAMS)))
-    n_segment = n_total  # could use the same variable, but this is clearer
-    # For each param, assign the values such that it fills out the cube.
-    for i, (n, param) in enumerate(izip(N, PARAMS)):
-        values = np.linspace(param.low, param.high, n)
-        n_segment /= n
-        for j, p in enumerate(points):
-            idx = (j / n_segment) % n
-            p[i] = values[idx]
+
+    grid_points = np.meshgrid(*[np.linspace(param.low, param.high, n) \
+                               for n, param in izip(N, PARAMS)])
+    points = np.stack(grid_points).T
+
+    # Not sure the change i've made is right yet.
+    # points = np.zeros((n_total, len(PARAMS)))
+    # n_segment = n_total  # could use the same variable, but this is clearer
+    # # For each param, assign the values such that it fills out the cube.
+    # for i, (n, param) in enumerate(izip(N, PARAMS)):
+    #     values = np.linspace(param.low, param.high, n)
+    #     n_segment /= n
+    #     for j, p in enumerate(points):
+    #         idx = (j / n_segment) % n
+    #         p[i] = values[idx]
+
 
     # shuffle to even out computation times
     np.random.seed(int(time()))
     idxs = np.random.permutation(n_total)
     return points[idxs, :]
     # return points
+
+
+
 
 # cosmo params required:
 # simname
