@@ -52,8 +52,14 @@ class Aardvark(Cat):
         # However, the amount of copy-pasting that would save would be minimal, it turns out.
         self._update_lists(kwargs, tmp_fnames, tmp_scale_factors)
         #Now fnames and scale factors are rolled into kwargs
+        new_kwargs = kwargs.copy()
+        #delete the keys that are fixed, if they exist
+        for key in ['simname', 'loc', 'columns_to_keep', 'Lbox','pmass', 'cosmo']:
+            if key in new_kwargs:
+                del new_kwargs[key]
+
         super(Aardvark, self).__init__(simname, loc,columns_to_keep=columns_to_keep,Lbox=Lbox,\
-                                       pmass=pmass,cosmo=cosmo**kwargs)
+                                       pmass=pmass,cosmo=cosmo, **new_kwargs)
 
 class Bolshoi(Cat):
     'Builtin catalog, so needs very little. Will never be manually cached!'
@@ -122,9 +128,14 @@ class Chinchilla(Cat):
         # if the user passed in stuff, have to check a bunch of things
         self._update_lists(kwargs, tmp_fnames, tmp_scale_factors)
 
+        new_kwargs =kwargs.copy()
+        for key in ['simname', 'loc', 'columns_to_keep','version_name', 'Lbox','pmass', 'cosmo']:
+            if key in new_kwargs:
+                del new_kwargs[key]
+
         super(Chinchilla, self).__init__(simname=simname, loc=loc, columns_to_keep = columns_to_keep,
                                          version_name=version_name, Lbox=Lbox,
-                                         pmass=pmass, cosmo=cosmo, **kwargs)
+                                         pmass=pmass, cosmo=cosmo, **new_kwargs)
         #Chinchillas also have to be cached differently.
         cache_locs = {'ki-ls':'/u/ki/swmclau2/des/halocats/hlist_%.2f.list.%s_%s.hdf5',
                       'sherlock':'/scratch/users/swmclau2/halocats/hlist_%.2f.list.%s_%s.hdf5' }
@@ -167,9 +178,14 @@ class Emu(Cat):
         version_name = 'most_recent_%d'%int(Lbox)
 
         self._update_lists(kwargs, tmp_fnames, tmp_scale_factors)
+        new_kwargs = kwargs.copy()
+        for key in ['simname', 'loc', 'columns_to_keep', 'version_name', 'Lbox', 'pmass', 'cosmo']:
+            if key in new_kwargs:
+                del new_kwargs[key]
+
         super(Emu, self).__init__(simname=simname, loc=loc, columns_to_keep=columns_to_keep,
                                   version_name=version_name,Lbox=Lbox,pmass=pmass,
-                                  cosmo=cosmo,**kwargs)
+                                  cosmo=cosmo,**new_kwargs)
 
 class Fox(Cat):
     def __init__(self, system='ki-ls', **kwargs):
@@ -187,8 +203,14 @@ class Fox(Cat):
         tmp_scale_factors = [0.25, 0.333, 0.5, 0.540541, 0.588235, 0.645161, 0.714286, 0.8, 0.909091, 1.0]
 
         self._update_lists(kwargs, tmp_fnames, tmp_scale_factors)
+
+        new_kwargs = kwargs.copy()
+        for key in ['simname', 'loc', 'columns_to_keep', 'Lbox', 'pmass']:
+            if key in new_kwargs:
+                del new_kwargs[key]
+
         super(Fox,self).__init__(simname=simname, loc=loc,columns_to_keep=columns_to_keep, Lbox=Lbox,
-                                 pmass=pmass, **kwargs)
+                                 pmass=pmass, **new_kwargs)
 
 class Guppy(Cat):
     def __init__(self, system='ki-ls', **kwargs):
@@ -207,6 +229,12 @@ class Guppy(Cat):
         tmp_scale_factors = [0.1429, 0.1667, 0.2, 0.25, 0.3333, 0.4, 0.5, 0.6667, 0.8, 1.0]
 
         self._update_lists(kwargs, tmp_fnames, tmp_scale_factors)
+
+        new_kwargs = kwargs.copy()
+        for key in ['simname', 'loc', 'columns_to_keep', 'Lbox', 'pmass', 'cosmo']:
+            if key in new_kwargs:
+                del new_kwargs[key]
+
         super(Fox, self).__init__(simname=simname, loc=loc, columns_to_keep=columns_to_keep, Lbox=Lbox,
                                   pmass=pmass,cosmo=cosmo, **kwargs)
 
@@ -218,7 +246,7 @@ class Multidark(Cat):
         version_name = 'halotools_alpha_version2'
         scale_factors = [2.0/3, 1.0]
 
-        super(Multidark, self).__init__(simname, version_name=version_name, scale_factors=scale_factors,**kwargs)
+        super(Multidark, self).__init__(simname, version_name=version_name, scale_factors=scale_factors)
 
 #TODO put this under Multidark? not sure I want to mix builtins and mine.
 class MDHR(Cat):
@@ -241,8 +269,13 @@ class MDHR(Cat):
 
         self._update_lists(kwargs, tmp_fnames, tmp_scale_factors)
 
+        new_kwargs = kwargs.copy()
+        for key in ['simname', 'loc', 'columns_to_keep', 'version_name', 'Lbox', 'pmass', 'cosmo']:
+            if key in new_kwargs:
+                del new_kwargs[key]
+
         super(MDHR, self).__init__(simname, loc=loc,columns_to_keep=columns_to_keep, Lbox=Lbox,
-                                   pmass=pmass **kwargs)
+                                   pmass=pmass **new_kwargs)
 
 #a dict that maps the default simnames to objects, which makes construction easier.
 #TODO kitten_dict
