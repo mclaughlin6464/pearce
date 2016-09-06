@@ -2,10 +2,17 @@
 '''Training helper. Is called from training data as main, to send to cluster.'''
 
 from os import path
+import sys
 import numpy as np
-from .trainingData import PARAMS, GLOBAL_FILENAME
-from .ioHelpers import global_file_reader
-from ..mocks.kittens import cat_dict
+#from trainingData import PARAMS, GLOBAL_FILENAME
+#from ioHelpers import global_file_reader
+#from ..mocks.kittens import cat_dict
+#Not happy about this, look into a change.
+
+sys.path.append('..')
+from pearce.emulator.trainingData import PARAMS, GLOBAL_FILENAME
+from pearce.emulator.ioHelpers import global_file_reader
+from pearce.mocks.kittens import cat_dict
 
 # TODO to ioHelpers?
 def load_training_params(param_file):

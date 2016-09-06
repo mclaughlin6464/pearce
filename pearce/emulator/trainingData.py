@@ -118,7 +118,7 @@ def make_kils_command(jobname, max_time, outputdir, queue='bulletmpi'):
                '-oo', path.join(outputdir, log_file),
                '-W', '%d:00' % max_time,
                'python', path.join(path.dirname(__file__), 'trainingHelper.py'),
-               param_file]
+               path.join(outputdir, param_file)]
 
     return command
 
@@ -159,7 +159,7 @@ def make_sherlock_command(jobname, max_time, outputdir, queue=None):
     sbatch_header = '\n#SBATCH '.join(sbatch_header)
 
     call_str = ['python', path.join(path.dirname(__file__), 'trainingData.py'),
-                param_file]
+                path.join(outputdir, param_file)]
 
     call_str = ' '.join(call_str)
     # have to write to file in order to work.
@@ -191,7 +191,7 @@ def training_config_reader(filename):
         method = config['method']
         n_points = int(config['n_points'])
         system = config['system']
-        n_jobs = config['n_jobs']
+        n_jobs = int(config['n_jobs'])
         max_time = int(config['max_time'])
         outputdir = config['outputdir']
 
@@ -249,7 +249,7 @@ def make_training_data(config_filename):
     # write the global file used by all params
     # TODO Write system (maybe) and method (definetly) to file!
     header_start = ['Sampling Method: %s'%method, 'Cosmology Params:']
-    header_start.extend('%s:%.3f' % (key, val) for key, val in cosmo_params.iteritems())
+    header_start.extend('%s:%s' % (key, str(val)) for key, val in cosmo_params.iteritems())
     header = '\n'.join(header_start)
     np.savetxt(path.join(outputdir, GLOBAL_FILENAME), rbins, header=header)
 

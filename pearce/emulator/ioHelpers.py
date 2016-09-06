@@ -53,7 +53,11 @@ def global_file_reader(global_filename):
             elif line[0] != '#' or i < 2:
                 continue  # only looking at comments, and first two lines don't have params. Note: Does have cosmo!
             splitLine = line.strip('# \n').split(':')  # split into key val pair
-            cosmo_params[splitLine[0]] = float(splitLine[1])
+            try:
+                cosmo_params[splitLine[0]] = float(splitLine[1])
+            except ValueError:
+                cosmo_params[splitLine[0]] = splitLine[1]
+
 
     return rbins, cosmo_params, method
 
@@ -71,6 +75,6 @@ def config_reader(filename):
         for line in f:
             line = line.strip()
             splitline = line.split(':')
-            config[splitline[0]] = config[splitline[1]]
+            config[splitline[0].strip()] = splitline[1].strip()
 
     return config

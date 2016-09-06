@@ -50,7 +50,7 @@ class Aardvark(Cat):
         # If use specified scale factors or filenames, select only those.
         # Looked into a way to put this in the global init.
         # However, the amount of copy-pasting that would save would be minimal, it turns out.
-        self.update_lists(kwargs, tmp_fnames, tmp_scale_factors)
+        self._update_lists(kwargs, tmp_fnames, tmp_scale_factors)
         #Now fnames and scale factors are rolled into kwargs
         super(Aardvark, self).__init__(simname, loc,columns_to_keep=columns_to_keep,Lbox=Lbox,\
                                        pmass=pmass,cosmo=cosmo**kwargs)
@@ -109,10 +109,10 @@ class Chinchilla(Cat):
             version_name = 'Lb%d-%d' % (int(Lbox), npart)
             assert version_name in valid_version_names
             #add a subdirectory
-            kwargs['loc'] += 'c%d-%d/' % (int(kwargs['Lbox']), kwargs['npart'])
+            loc += 'c%d-%d/' % (int(Lbox), int(npart))
 
             if system=='ki-ls':  # differences in how the files are stored.
-                kwargs['loc'] += '/rockstar/hlists/'
+                loc += '/rockstar/hlists/'
 
 
             tmp_fnames = glob(loc + 'hlist_*.list')  # snag all the hlists
@@ -120,7 +120,7 @@ class Chinchilla(Cat):
             tmp_scale_factors = [float(fname[6:-5]) for fname in tmp_fnames]  # pull out scale factors
 
         # if the user passed in stuff, have to check a bunch of things
-        self.update_lists(kwargs, tmp_fnames, tmp_scale_factors)
+        self._update_lists(kwargs, tmp_fnames, tmp_scale_factors)
 
         super(Chinchilla, self).__init__(simname=simname, loc=loc, columns_to_keep = columns_to_keep,
                                          version_name=version_name, Lbox=Lbox,
@@ -166,7 +166,7 @@ class Emu(Cat):
 
         version_name = 'most_recent_%d'%int(Lbox)
 
-        self.update_lists(kwargs, tmp_fnames, tmp_scale_factors)
+        self._update_lists(kwargs, tmp_fnames, tmp_scale_factors)
         super(Emu, self).__init__(simname=simname, loc=loc, columns_to_keep=columns_to_keep,
                                   version_name=version_name,Lbox=Lbox,pmass=pmass,
                                   cosmo=cosmo,**kwargs)
@@ -186,7 +186,7 @@ class Fox(Cat):
         tmp_fnames = ['hlist_%d' % n for n in [46, 57, 73, 76, 79, 82, 86, 90, 95, 99]]
         tmp_scale_factors = [0.25, 0.333, 0.5, 0.540541, 0.588235, 0.645161, 0.714286, 0.8, 0.909091, 1.0]
 
-        self.update_lists(kwargs, tmp_fnames, tmp_scale_factors)
+        self._update_lists(kwargs, tmp_fnames, tmp_scale_factors)
         super(Fox,self).__init__(simname=simname, loc=loc,columns_to_keep=columns_to_keep, Lbox=Lbox,
                                  pmass=pmass, **kwargs)
 
@@ -206,7 +206,7 @@ class Guppy(Cat):
         tmp_fnames = ['out_%d.list' % i for i in xrange(10)]
         tmp_scale_factors = [0.1429, 0.1667, 0.2, 0.25, 0.3333, 0.4, 0.5, 0.6667, 0.8, 1.0]
 
-        self.update_lists(kwargs, tmp_fnames, tmp_scale_factors)
+        self._update_lists(kwargs, tmp_fnames, tmp_scale_factors)
         super(Fox, self).__init__(simname=simname, loc=loc, columns_to_keep=columns_to_keep, Lbox=Lbox,
                                   pmass=pmass,cosmo=cosmo, **kwargs)
 
@@ -239,7 +239,7 @@ class MDHR(Cat):
         tmp_scale_factors = [0.25690, 0.34800, 0.49990, 0.53030, 0.65180, 0.71250, 0.80370, 0.91000, 1.00110]
         tmp_fnames = ['hlist_%.5f.list' % a for a in tmp_scale_factors]
 
-        self.update_lists(kwargs, tmp_fnames, tmp_scale_factors)
+        self._update_lists(kwargs, tmp_fnames, tmp_scale_factors)
 
         super(MDHR, self).__init__(simname, loc=loc,columns_to_keep=columns_to_keep, Lbox=Lbox,
                                    pmass=pmass **kwargs)

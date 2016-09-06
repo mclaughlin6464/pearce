@@ -1,4 +1,6 @@
 from distutils.core import setup
+from glob import glob
+scripts = glob('bin/*')
 
 setup(name='pearce',
         version='0.1',
@@ -6,4 +8,5 @@ setup(name='pearce',
         author='Sean McLaughlin',
         author_email='swmclau2@stanford.edu',
         url='https://github.com/mclaughlin6464/pearce',
-        packages=['pearce'])
+        scripts=scripts,
+        packages=['pearce', 'pearce.emulator', 'pearce.mocks'])
