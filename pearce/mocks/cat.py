@@ -77,7 +77,7 @@ class Cat(object):
         self.Lbox = Lbox
         self.pmass = pmass
 
-        self.scale_factors = scale_factors
+        self.scale_factors = sorted(scale_factors)
         self.redshifts = [1.0 / a - 1 for a in
                           self.scale_factors]  # TODO let user pass in redshift and get a scale factor
 
@@ -87,7 +87,7 @@ class Cat(object):
         # TODO Well this makes me think loc doesn't do anything...
         # I use it in the subclasses though. Doesn't mean I need it here though.
         # This one doesn't need to be easy to use; just general.
-        self.filenames = filenames
+        self.filenames = sorted(filenames)
         for i, fname in enumerate(self.filenames):
             self.filenames[i] = self.loc + fname
 
@@ -184,7 +184,7 @@ class Cat(object):
             reader = RockstarHlistReader(fname, self.columns_to_keep, cache_fnames, self.simname,
                                          self.halo_finder, z, self.version_name, self.Lbox, self.pmass,
                                          overwrite=overwrite)
-            reader.read_halocat(self.columns_to_convert, write_to_disk=True, overwrite=overwrite)
+            reader.read_halocat(self.columns_to_convert, write_to_disk=True)
 
     def load(self, scale_factor, HOD='redMagic', tol=0.05):
         '''
@@ -195,8 +195,9 @@ class Cat(object):
             HOD model to load. Currently available options are redMagic, stepFunc, and the halotools defatuls.
         :return: None
         '''
-
+        print scale_factor
         a = self._return_nearest_sf(scale_factor, tol)
+        print a
         if a is None:
             raise ValueError('Scale factor %.3f not within given tolerance.' % scale_factor)
         self.load_catalog(a, tol, check_sf=False)
