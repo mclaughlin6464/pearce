@@ -142,6 +142,7 @@ class Chinchilla(Cat):
         self.cache_locs = [cache_locs[system] % (a, self.simname, self.version_name)
                            for a in self.scale_factors]  # make sure we don't have redunancies.
 
+# TODO consider a name change, as there could be a conflict with the emulator object
 class Emu(Cat):
 
     def __init__(self, Lbox, system='ki-ls', **kwargs):
