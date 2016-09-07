@@ -195,9 +195,7 @@ class Cat(object):
             HOD model to load. Currently available options are redMagic, stepFunc, and the halotools defatuls.
         :return: None
         '''
-        print scale_factor
         a = self._return_nearest_sf(scale_factor, tol)
-        print a
         if a is None:
             raise ValueError('Scale factor %.3f not within given tolerance.' % scale_factor)
         self.load_catalog(a, tol, check_sf=False)
@@ -326,7 +324,8 @@ class Cat(object):
             raise ImportError("Corrfunc is not available on this machine!")
 
         assert n_cores == 'all' or n_cores > 0
-        assert int(n_cores) == n_cores
+        if type(n_cores) is not str:
+            assert int(n_cores) == n_cores
 
         max_cores = cpu_count()
         if n_cores == 'all':
@@ -362,9 +361,9 @@ class Cat(object):
                 n_sub = 5
 
                 randoms = np.random.random((pos.shape[0] * n_rands,
-                                            3)) * self.Lbox * self.cat.h  # Solution to NaNs: Just fuck me up with randoms
+                                            3)) * self.Lbox * self.h  # Solution to NaNs: Just fuck me up with randoms
                 xi_all, xi_cov = tpcf_jackknife(pos * self.h, randoms, rbins, period=self.Lbox * self.h,
-                                                num_threads=n_cores(), Nsub=n_sub)
+                                                num_threads=n_cores, Nsub=n_sub)
             else:
                 xi_all = tpcf(pos * self.h, rbins, period=self.Lbox * self.h, num_threads=n_cores())
 

@@ -26,7 +26,7 @@ class RedMagicSats(Zheng07Sats):
 
     def __init__(self, cenocc_model, **kwargs):
         # We define modulation to be true. An existing central model is required.
-        super(RedMagicSats, self).__init__(modulate_with_cenocc=True, cenocc_model=cenocc_model ** kwargs)
+        super(RedMagicSats, self).__init__(modulate_with_cenocc=True, cenocc_model=cenocc_model, **kwargs)
         defaults = {'logM0': 12.20, 'logM1': 13.7, 'alpha': 1.02, 'logMmin': 12.1, 'f_c': 0.19, 'sigma_logM': 0.46}
         self.param_dict.update(defaults)
         # It does not like that we have parameters defined multiple places.

@@ -94,7 +94,7 @@ def makeFHC(N=4):
 # redshift/scale_factor
 # system
 
-def make_kils_command(jobname, max_time, outputdir, queue='kipac-ibq'):
+def make_kils_command(jobname, max_time, outputdir, queue='bulletmpi'):
     '''
     Return a list of strings that comprise a bash command to call trainingHelper.py on the cluster.
     Designed to work on ki-ls's batch system
