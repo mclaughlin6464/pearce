@@ -139,9 +139,10 @@ class Chinchilla(Cat):
         #Chinchillas also have to be cached differently.
         cache_locs = {'ki-ls':'/u/ki/swmclau2/des/halocats/hlist_%.2f.list.%s_%s.hdf5',
                       'sherlock':'/scratch/users/swmclau2/halocats/hlist_%.2f.list.%s_%s.hdf5' }
-        self.cache_locs = [cache_locs['system'] % (a, self.simname, self.version_name)
+        self.cache_locs = [cache_locs[system] % (a, self.simname, self.version_name)
                            for a in self.scale_factors]  # make sure we don't have redunancies.
 
+# TODO consider a name change, as there could be a conflict with the emulator object
 class Emu(Cat):
 
     def __init__(self, Lbox, system='ki-ls', **kwargs):

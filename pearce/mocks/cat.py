@@ -219,7 +219,7 @@ class Cat(object):
                 raise ValueError('Scale factor %.3f not within given tolerance.' % scale_factor)
         else:
             a = scale_factor#YOLO
-        z = 1/(1+a)
+        z = 1.0/a-1
 
         self.halocat = CachedHaloCatalog(simname=self.simname, halo_finder=self.halo_finder,
                                          version_name=self.version_name, redshift=z)
@@ -243,7 +243,7 @@ class Cat(object):
                 raise ValueError('Scale factor %.3f not within given tolerance.' % scale_factor)
         else:
             a = scale_factor#YOLO
-        z = 1 / (1 + a)
+        z = 1.0/a-1
 
         assert HOD in {'redMagic', 'stepFunc', 'zheng07', 'leauthaud11', 'tinker13', 'hearin15'}
 
