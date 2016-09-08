@@ -387,6 +387,7 @@ class OriginalRecipe(Emu):
         print t[0]
 
         mu, cov = self.gp.predict(self.y, t)
+        print mu.shape, cov.shape
         mu = mu.reshape((-1, len(self.rpoints)))
         errs = np.sqrt(np.diag(cov))
         errs = errs.reshape((-1, len(self.rpoints)))
