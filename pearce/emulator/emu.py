@@ -572,6 +572,7 @@ class ExtraCrispy(Emu):
         for y, y_hat in zip(self.y.T, self.y_hat):
             mu, cov = self.gp.predict(y, t)
             #mu and cov come out as (1,) arrays.
+            print cov
             output.append((mu[0] + y_hat, np.sqrt(cov[0])))
         # note may want to do a reshape here., Esp to be consistent with the other
         # implementation
