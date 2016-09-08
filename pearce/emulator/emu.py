@@ -380,6 +380,7 @@ class OriginalRecipe(Emu):
         t_list = [input_params[p.name] for p in self.ordered_params]
         t_grid = np.meshgrid(*t_list)
         t = np.stack(t_grid).T
+        print t.shape, self.y.shape
 
         mu, cov = self.gp.predict(self.y, t)
         mu.reshape((-1, len(self.rpoints)))
