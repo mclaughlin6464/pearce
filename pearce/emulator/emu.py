@@ -569,9 +569,10 @@ class ExtraCrispy(Emu):
         t = t.reshape((-1, self.ndim))
 
         output = []
-        for y in self.y:
+        for y, y_hat in self.y, self.y_hat:
+            print y.shape, t.shape, self.ndim
             mu, cov = self.gp.predict(y, t)
-            output.append((mu + self.y_hat, np.sqrt(np.diag(cov))))
+            output.append((mu + y_hat, np.sqrt(np.diag(cov))))
         # note may want to do a reshape here., Esp to be consistent with the other
         # implementation
         return output
