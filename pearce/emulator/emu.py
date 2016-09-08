@@ -69,8 +69,7 @@ class Emu(object):
         self.gp = george.GP(kernel)
         # gp = george.GP(kernel, solver=george.HODLRSolver, nleaf=x.shape[0]+1,tol=1e-18)
         self.fixed_params = fixed_params  # remember which params were fixed
-        print self.x[0,:]
-        print self.yerr[0]
+
         self.gp.compute(self.x, self.yerr)  # NOTE I'm using a modified version of george!
 
     # Not sure this will work at all in an LHC scheme.
@@ -406,7 +405,7 @@ class OriginalRecipe(Emu):
         :return:
         '''
         vep = dict(em_params)
-        vep.update({'r': rpoints})
+        vep.update({'r': np.log10(rpoints)})
 
         return self.emulate(vep)
 
