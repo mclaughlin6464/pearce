@@ -383,9 +383,9 @@ class OriginalRecipe(Emu):
         t = t.reshape((-1, self.ndim))
 
         mu, cov = self.gp.predict(self.y, t)
-        mu.reshape((-1, len(self.rpoints)))
+        mu = mu.reshape((-1, len(self.rpoints)))
         errs = np.sqrt(np.diag(cov))
-        errs.reshape((-1, len(self.rpoints)))
+        errs = errs.reshape((-1, len(self.rpoints)))
         # Note ordering is unclear if em_params has more than 1 value.
         outputs = []
         for m, e in izip(mu, errs):
@@ -573,7 +573,7 @@ class ExtraCrispy(Emu):
             mu, cov = self.gp.predict(y, t)
             #mu and cov come out as (1,) arrays.
             print cov
-            output.append((mu[0] + y_hat, np.sqrt(cov[0])))
+            output.append((mu[0] + y_hat, np.sqrt(cov[0,0])))
         # note may want to do a reshape here., Esp to be consistent with the other
         # implementation
         return output
