@@ -322,6 +322,7 @@ class OriginalRecipe(Emu):
         zeros_slice = np.all(x != 0.0, axis=1)
         # set the results of these calculations.
         self.ndim = ndim
+        print self.y[0]
         self.x = x[zeros_slice]
         self.y = y[zeros_slice]
         self.yerr = yerr[zeros_slice]
@@ -510,7 +511,7 @@ class ExtraCrispy(Emu):
         self.yerr = np.zeros((self.x.shape[0], )) #We don't use errors for extra crispy!
         #self.yerr = yerr[zeros_slice]
 
-        self.y_hat = self.y.mean(axis=0)
+        self.y_hat = 0#self.y.mean(axis=0)
         self.y -= self.y_hat  # mean-subtract.
 
     def train(self, **kwargs):
