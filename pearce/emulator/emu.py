@@ -322,7 +322,6 @@ class OriginalRecipe(Emu):
         zeros_slice = np.all(x != 0.0, axis=1)
         # set the results of these calculations.
         self.ndim = ndim
-        print self.y[0]
         self.x = x[zeros_slice]
         self.y = y[zeros_slice]
         self.yerr = yerr[zeros_slice]
@@ -384,6 +383,8 @@ class OriginalRecipe(Emu):
         t_grid = np.meshgrid(*t_list)
         t = np.stack(t_grid).T
         t = t.reshape((-1, self.ndim))
+
+        print t[0]
 
         mu, cov = self.gp.predict(self.y, t)
         mu = mu.reshape((-1, len(self.rpoints)))
@@ -511,7 +512,7 @@ class ExtraCrispy(Emu):
         self.yerr = np.zeros((self.x.shape[0], )) #We don't use errors for extra crispy!
         #self.yerr = yerr[zeros_slice]
 
-        self.y_hat = 0#self.y.mean(axis=0)
+        self.y_hat = np.zeros((self.y.shape[0],))#self.y.mean(axis=0)
         self.y -= self.y_hat  # mean-subtract.
 
     def train(self, **kwargs):
@@ -570,6 +571,8 @@ class ExtraCrispy(Emu):
         t_grid = np.meshgrid(*t_list)
         t = np.stack(t_grid).T
         t = t.reshape((-1, self.ndim))
+
+        print t[0]
 
         output = []
         for y, y_hat in zip(self.y.T, self.y_hat):
