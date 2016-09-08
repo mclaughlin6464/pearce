@@ -41,8 +41,6 @@ class Emu(object):
 
         self.get_training_data(training_dir, independent_variable, fixed_params)
         self.build_emulator(independent_variable, fixed_params)
-        print self.x[0, :]
-        print self.y[0]
 
     # I can get LHC from the training data. If any coordinate equals any other in its column we know!
     def get_training_data(self, training_dir, independent_variable, fixed_params):
@@ -65,6 +63,9 @@ class Emu(object):
             if p.name in fixed_params:
                 continue
             self.metric.append(ig[p.name])
+
+        print self.metric, self.ndim
+        print ig
 
         a = ig['amp']
         kernel = a * ExpSquaredKernel(self.metric, ndim=self.ndim)
@@ -384,14 +385,8 @@ class OriginalRecipe(Emu):
         t = np.stack(t_grid).T
         t = t.reshape((-1, self.ndim))
 
-        print t[0]
-
         mu, cov = self.gp.predict(self.y, t)
-        print mu.shape
-        print mu
         mu = mu.reshape((-1, len(self.rpoints)))
-        print mu.shape
-        print mu
         errs = np.sqrt(np.diag(cov))
         errs = errs.reshape((-1, len(self.rpoints)))
         # Note ordering is unclear if em_params has more than 1 value.
@@ -575,8 +570,6 @@ class ExtraCrispy(Emu):
         t_grid = np.meshgrid(*t_list)
         t = np.stack(t_grid).T
         t = t.reshape((-1, self.ndim))
-
-        print t[0]
 
         output = []
         for y, y_hat in zip(self.y.T, self.y_hat):
