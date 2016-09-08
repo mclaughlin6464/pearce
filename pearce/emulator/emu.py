@@ -592,7 +592,7 @@ class ExtraCrispy(Emu):
         # turns out this how it already works!
         output = self.emulate(em_params)
         # don't need to interpolate!
-        if rpoints == self.rpoints:
+        if np.all(rpoints == self.rpoints):
             return output
         # TODO check rpoints in bounds!
         new_output = []
