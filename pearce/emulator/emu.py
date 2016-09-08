@@ -64,14 +64,13 @@ class Emu(object):
                 continue
             self.metric.append(ig[p.name])
 
-        print self.metric, self.ndim
-        print ig
-
         a = ig['amp']
         kernel = a * ExpSquaredKernel(self.metric, ndim=self.ndim)
         self.gp = george.GP(kernel)
         # gp = george.GP(kernel, solver=george.HODLRSolver, nleaf=x.shape[0]+1,tol=1e-18)
         self.fixed_params = fixed_params  # remember which params were fixed
+        print self.x[0,:]
+        print self.yerr[0]
         self.gp.compute(self.x, self.yerr)  # NOTE I'm using a modified version of george!
 
     # Not sure this will work at all in an LHC scheme.
