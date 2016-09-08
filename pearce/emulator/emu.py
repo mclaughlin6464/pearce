@@ -504,11 +504,11 @@ class ExtraCrispy(Emu):
         # set the results of these calculations.
         self.ndim = ndim
         self.x = x[zeros_slice]
-        self.y = y[zeros_slice]
-        self.yerr = np.zeros((self.x.shape[0],)) #We don't use errors for extra crispy!
+        self.y = y[zeros_slice, :]
+        self.yerr = np.zeros_like(self.y) #We don't use errors for extra crispy!
         #self.yerr = yerr[zeros_slice]
 
-        self.y_hat = self.y.mean()
+        self.y_hat = self.y.mean(axis=0)
         self.y -= self.y_hat  # mean-subtract.
 
     def train(self, **kwargs):
@@ -569,7 +569,7 @@ class ExtraCrispy(Emu):
         t = t.reshape((-1, self.ndim))
 
         output = []
-        for y, y_hat in self.y, self.y_hat:
+        for y, y_hat in zip(self.y, self.y_hat):
             print y.shape, t.shape, self.ndim
             mu, cov = self.gp.predict(y, t)
             output.append((mu + y_hat, np.sqrt(np.diag(cov))))
