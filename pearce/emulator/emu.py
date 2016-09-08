@@ -39,7 +39,7 @@ class Emu(object):
 
         self.ordered_params = params
 
-        self.get_training_data(self, training_dir, independent_variable, fixed_params)
+        self.get_training_data(training_dir, independent_variable, fixed_params)
         self.build_emulator(independent_variable, fixed_params)
 
     # I can get LHC from the training data. If any coordinate equals any other in its column we know!
@@ -56,7 +56,7 @@ class Emu(object):
             Parameterst to hold fixed in teh training data
         :return: None
         '''
-        ig = self.get_initial_guess(independent_variable)
+        ig = self.get_initial_guess(independent_variable, fixed_params)
 
         self.metric = []
         for p in self.ordered_params:
@@ -370,7 +370,7 @@ class OriginalRecipe(Emu):
         :return: mu, cov. The predicted value and the covariance matrix for the predictions
         '''
         input_params = {}
-        input_params.update(self.fixed_em_params)
+        input_params.update(self.fixed_params)
         input_params.update(em_params)
         assert len(input_params) == self.ndim  # check dimenstionality
         for i in input_params:
@@ -554,7 +554,7 @@ class ExtraCrispy(Emu):
         :return: mu, cov. The predicted value and the covariance matrix for the predictions
         '''
         input_params = {}
-        input_params.update(self.fixed_em_params)
+        input_params.update(self.fixed_params)
         input_params.update(em_params)
         assert len(input_params) == self.ndim  # check dimenstionality
         for i in input_params:
