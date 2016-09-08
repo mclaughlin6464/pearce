@@ -42,7 +42,7 @@ class Emu(object):
         self.get_training_data(training_dir, independent_variable, fixed_params)
         self.build_emulator(independent_variable, fixed_params)
         print self.x[0, :]
-        print self.y[:10]
+        print self.y[0]
 
     # I can get LHC from the training data. If any coordinate equals any other in its column we know!
     def get_training_data(self, training_dir, independent_variable, fixed_params):
@@ -326,7 +326,7 @@ class OriginalRecipe(Emu):
         self.y = y[zeros_slice]
         self.yerr = yerr[zeros_slice]
 
-        self.y_hat = self.y.mean()
+        self.y_hat = 0#self.y.mean()
         self.y -= self.y_hat  # mean-subtract.
 
     def train(self, **kwargs):
