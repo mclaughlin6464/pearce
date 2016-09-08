@@ -326,7 +326,7 @@ class OriginalRecipe(Emu):
         self.y = y[zeros_slice]
         self.yerr = yerr[zeros_slice]
 
-        self.y_hat = self.y.mean()
+        self.y_hat = 0#self.y.mean()
         self.y -= self.y_hat  # mean-subtract.
 
     def train(self, **kwargs):
