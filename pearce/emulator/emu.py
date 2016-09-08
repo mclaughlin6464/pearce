@@ -571,6 +571,7 @@ class ExtraCrispy(Emu):
         output = []
         for y, y_hat in zip(self.y.T, self.y_hat):
             mu, cov = self.gp.predict(y, t)
+            print type(mu+y_hat)
             output.append((mu + y_hat, np.sqrt(np.diag(cov))))
         # note may want to do a reshape here., Esp to be consistent with the other
         # implementation
@@ -599,7 +600,7 @@ class ExtraCrispy(Emu):
         for mean, err in output:
             xi_interpolator = interp1d(rpoints, mean, kind=kind)
             interp_mean = xi_interpolator(rpoints)
-
+            print type(interp_mean)
             err_interp = interp1d(rpoints, err, kind=kind)
             interp_err = err_interp(rpoints)
             new_output.append((interp_mean, interp_err))
