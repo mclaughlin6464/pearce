@@ -322,7 +322,7 @@ class OriginalRecipe(Emu):
         zeros_slice = np.all(x != 0.0, axis=1)
         # set the results of these calculations.
         self.ndim = ndim
-        print self.y[0]
+        print y[0]
         self.x = x[zeros_slice]
         self.y = y[zeros_slice]
         self.yerr = yerr[zeros_slice]
