@@ -507,6 +507,9 @@ class ExtraCrispy(Emu):
         self.y = y[zeros_slice]
         self.yerr = yerr[zeros_slice]
 
+        print self.ndim
+        print self.x.shape, self.y.shape, self.yerr.shape
+
         self.y_hat = self.y.mean()
         self.y -= self.y_hat  # mean-subtract.
 
