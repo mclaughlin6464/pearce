@@ -509,6 +509,7 @@ class ExtraCrispy(Emu):
         #self.yerr = yerr[zeros_slice]
 
         self.y_hat = self.y.mean(axis=0)
+        print self.y_hat.shape, self.y.shape
         self.y -= self.y_hat  # mean-subtract.
 
     def train(self, **kwargs):
