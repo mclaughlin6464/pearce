@@ -39,7 +39,7 @@ class Emu(object):
 
         self.ordered_params = params
 
-        self.get_training_data(self, training_dir, independent_variable, fixed_params)
+        self.get_training_data(training_dir, independent_variable, fixed_params)
         self.build_emulator(independent_variable, fixed_params)
 
     # I can get LHC from the training data. If any coordinate equals any other in its column we know!
@@ -56,7 +56,7 @@ class Emu(object):
             Parameterst to hold fixed in teh training data
         :return: None
         '''
-        ig = self.get_initial_guess(independent_variable)
+        ig = self.get_initial_guess(independent_variable,fixed_params)
 
         self.metric = []
         for p in self.ordered_params:

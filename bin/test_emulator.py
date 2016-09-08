@@ -13,12 +13,14 @@ rpoints = (rbins[1:]+rbins[:-1])/2
 or_params = PARAMS[:]
 or_params.append(parameter('r', 0, 1)) #95% sure bounds aren't used for r
 emu1 = OriginalRecipe(training_dir,or_params)
+print 'Emu1 Built.'
 #TODO test plot_data
 #emu1.train()
 outputs1 = emu1.emulate_wrt_r(fiducial_params, rpoints)
 print outputs1
 
 emu2 = ExtraCrispy(training_dir)#no r in params
+print 'Emu2 Built.'
 #emu2.train()
 outputs2 = emu2.emulate_wrt_r(fiducial_params, rpoints)
 print outputs2

@@ -66,6 +66,7 @@ def makeFHC(N=4):
     grid_points = np.meshgrid(*[np.linspace(param.low, param.high, n) \
                                for n, param in izip(N, PARAMS)])
     points = np.stack(grid_points).T
+    points = points.reshape((-1, len(PARAMS)))
 
     # Not sure the change i've made is right yet.
     # points = np.zeros((n_total, len(PARAMS)))
