@@ -444,7 +444,7 @@ class ExtraCrispy(Emu):
 
         x = np.zeros((npoints, ndim))
         y = np.zeros((npoints, nbins))
-        yerr = np.zeros((npoints, nbins))
+        #yerr = np.zeros((npoints, nbins))
 
         warned = False
         num_skipped = 0
@@ -488,11 +488,11 @@ class ExtraCrispy(Emu):
             if independent_variable == 'xi':
                 y[idx, :] = np.log10(xi)
                 # Approximately true, may need to revisit
-                yerr[idx, :] = np.sqrt(np.diag(cov)) / (xi * np.log(10))
+                #yerr[idx, :] = np.sqrt(np.diag(cov)) / (xi * np.log(10))
                 # ycovs.append(cov / (np.outer(xi, xi) * np.log(10) ** 2))  # I think this is right, extrapolating from the above.
             else:  # r2xi
                 y[idx, :] = xi * self.rpoints * self.rpoints
-                yerr[idx, :] = cov * np.outer(self.rpoints, self.rpoints)
+                #yerr[idx, :] = cov * np.outer(self.rpoints, self.rpoints)
 
         # ycov = block_diag(*ycovs)
         # ycov = np.sqrt(np.diag(ycov))
@@ -505,10 +505,8 @@ class ExtraCrispy(Emu):
         self.ndim = ndim
         self.x = x[zeros_slice]
         self.y = y[zeros_slice]
-        self.yerr = yerr[zeros_slice]
-
-        print self.ndim
-        print self.x.shape, self.y.shape, self.yerr.shape
+        self.yerr = np.zeros((self.x.shape[0],)) #We don't use errors for extra crispy!
+        #self.yerr = yerr[zeros_slice]
 
         self.y_hat = self.y.mean()
         self.y -= self.y_hat  # mean-subtract.
