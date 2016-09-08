@@ -382,11 +382,9 @@ class OriginalRecipe(Emu):
         t_grid = np.meshgrid(*t_list)
         t = np.stack(t_grid).T
         t = t.reshape((-1, self.ndim))
-
+        #TODO give some thought to what is the best way to format the output
         mu, cov = self.gp.predict(self.y, t)
-        mu = mu.reshape((-1, len(self.rpoints)))
         errs = np.sqrt(np.diag(cov))
-        errs = errs.reshape((-1, len(self.rpoints)))
         # Note ordering is unclear if em_params has more than 1 value.
         outputs = []
         for m, e in izip(mu, errs):
