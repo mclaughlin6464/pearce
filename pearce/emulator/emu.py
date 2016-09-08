@@ -56,7 +56,7 @@ class Emu(object):
             Parameterst to hold fixed in teh training data
         :return: None
         '''
-        ig = self.get_initial_guess(independent_variable,fixed_params)
+        ig = self.get_initial_guess(independent_variable, fixed_params)
 
         self.metric = []
         for p in self.ordered_params:
@@ -370,7 +370,7 @@ class OriginalRecipe(Emu):
         :return: mu, cov. The predicted value and the covariance matrix for the predictions
         '''
         input_params = {}
-        input_params.update(self.fixed_em_params)
+        input_params.update(self.fixed_params)
         input_params.update(em_params)
         assert len(input_params) == self.ndim  # check dimenstionality
         for i in input_params:
@@ -554,7 +554,7 @@ class ExtraCrispy(Emu):
         :return: mu, cov. The predicted value and the covariance matrix for the predictions
         '''
         input_params = {}
-        input_params.update(self.fixed_em_params)
+        input_params.update(self.fixed_params)
         input_params.update(em_params)
         assert len(input_params) == self.ndim  # check dimenstionality
         for i in input_params:
