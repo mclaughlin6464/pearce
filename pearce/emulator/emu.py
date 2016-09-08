@@ -512,7 +512,7 @@ class ExtraCrispy(Emu):
         self.yerr = np.zeros((self.x.shape[0], )) #We don't use errors for extra crispy!
         #self.yerr = yerr[zeros_slice]
 
-        self.y_hat = np.zeros((self.y.shape[0],))#self.y.mean(axis=0)
+        self.y_hat = np.zeros((self.y.shape[1],))#self.y.mean(axis=0)
         self.y -= self.y_hat  # mean-subtract.
 
     def train(self, **kwargs):
