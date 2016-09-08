@@ -381,7 +381,6 @@ class OriginalRecipe(Emu):
         t_grid = np.meshgrid(*t_list)
         t = np.stack(t_grid).T
         t = t.reshape((-1, self.ndim))
-        print t[:10, :]
 
         mu, cov = self.gp.predict(self.y, t)
         mu.reshape((-1, len(self.rpoints)))
@@ -476,7 +475,7 @@ class ExtraCrispy(Emu):
                 if p.name in fixed_params:
                     continue
                 # HERE
-                file_params.append(np.ones((nbins,)) * params[p.name])
+                file_params.append(params[p.name])
 
             x[idx, :] = np.stack(file_params).T
             # TODO helper function that handles this part
@@ -566,6 +565,7 @@ class ExtraCrispy(Emu):
         t_list = [input_params[p.name] for p in self.ordered_params]
         t_grid = np.meshgrid(*t_list)
         t = np.stack(t_grid).T
+        t = t.reshape((-1, self.ndim))
 
         output = []
         for i, y in enumerate(self.y):
