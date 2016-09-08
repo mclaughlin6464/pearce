@@ -571,7 +571,7 @@ class ExtraCrispy(Emu):
         output = []
         for y, y_hat in zip(self.y.T, self.y_hat):
             mu, cov = self.gp.predict(y, t)
-            print type(mu+y_hat)
+            print type(mu+y_hat), type(mu)
             output.append((mu + y_hat, np.sqrt(np.diag(cov))))
         # note may want to do a reshape here., Esp to be consistent with the other
         # implementation
