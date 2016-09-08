@@ -287,7 +287,7 @@ class Cat(object):
         self.model.param_dict.update(params)
         # might be able to check is model has_attr mock.
         if self.populated_once:
-            self.model.mock.populate(self.halocat, Num_ptcl_requirement=min_ptcl)
+            self.model.mock.populate(Num_ptcl_requirement=min_ptcl)
         else:
             self.model.populate_mock(self.halocat, Num_ptcl_requirement=min_ptcl)
             self.populated_once = True
