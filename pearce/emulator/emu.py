@@ -581,17 +581,20 @@ class ExtraCrispy(Emu):
         t_grid = np.meshgrid(*t_list)
         t = np.stack(t_grid).T
         t = t.reshape((-1, self.ndim))
-        print t.shape
+        t = np.sort(t.view(','.join(['float64' for _ in self.ordered_params])),
+                    order=['f%d' % i for i in xrange(self.ndim)], axis=0).view(np.float)
 
-        all_mu, all_err = [],[]
-        for y, y_hat in zip(self.y.T, self.y_hat):
+        all_mu = np.zeros((t.shape[0], self.y.shape[1]))#t down rbins across
+        all_err = np.zeros((t.shape[0], self.y.shape[1]))
+        for idx, (y, y_hat) in enumerate(zip(self.y.T, self.y_hat)):
             mu, cov = self.gp.predict(y, t)
             # mu and cov come out as (1,) arrays.
-            all_mu.append(mu[0]+y_hat)
-            all_err.append(np.sqrt(cov[0,0]))
+            all_mu[:, idx] = mu
+            all_err[:,idx] = np.sqrt(np.diag(cov))
+
         # note may want to do a reshape here., Esp to be consistent with the other
         # implementation
-        return np.array(all_mu), np.array(all_err)
+        return all_mu, all_err
 
     def emulate_wrt_r(self, em_params, rpoints, kind='slinear'):
         '''
@@ -610,8 +613,7 @@ class ExtraCrispy(Emu):
         all_mu, all_err= self.emulate(em_params)
         # don't need to interpolate!
         if np.all(rpoints == self.rpoints):
-            print 'A'
-            return all_mu, all_err 
+            return all_mu, all_err
 
         # TODO check rpoints in bounds!
         print all_mu.shape
@@ -620,7 +622,6 @@ class ExtraCrispy(Emu):
             new_mu = xi_interpolator(rpoints)
             err_interp = interp1d(self.rpoints, all_err, kind=kind)
             new_err = err_interp(rpoints)
-            print 'B'
             return new_mu, new_err
 
         new_mu, new_err = [], []
@@ -631,5 +632,4 @@ class ExtraCrispy(Emu):
             err_interp = interp1d(self.rpoints, err, kind=kind)
             interp_err = err_interp(rpoints)
             new_err.append(interp_err)
-        print 'C'
         return np.array(new_mu), np.array(new_err)
