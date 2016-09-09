@@ -87,7 +87,7 @@ class Emu(object):
             Parameters to hold fixed. Only available if data in training_dir is a full hypercube, not a latin hypercube.
         :return: log_r, y, yerr for the independent variable at the points specified by fixed nad em params.
         '''
-        assert len(em_params) + len(fixed_params) == len(self.ordered_params)
+        assert len(em_params) + len(fixed_params)  -  len(self.ordered_params) <= 1 #can exclude r 
 
         rbins, cosmo_params, method = global_file_reader(path.join(training_dir, GLOBAL_FILENAME))
 
@@ -120,8 +120,22 @@ class Emu(object):
             if any(params[key] != val for key, val in fixed_params.iteritems()):
                 continue
 
-            if any(params[key] != val for key, val in em_params.iteritems()):
+
+            to_continue = True
+            for key,val in em_params.iteritems():
+                if type(val) is type(y): 
+                    if np.all(np.abs(params[key]-val) > 1e-3):
+                        break
+                elif np.abs(params[key]-val) > 1e-3:
+                    break
+            else:
+                to_continue = False #no break
+
+            if to_continue:
                 continue
+
+            #if any(params[key] != val for key, val in em_params.iteritems()):
+            #    continue
 
             if np.any(np.isnan(cov)) or np.any(np.isnan(xi)):
                 if not warned:
@@ -246,7 +260,7 @@ class OriginalRecipe(Emu):
 
         corr_files = sorted(glob(path.join(training_dir, 'xi*.npy')))
         cov_files = sorted(
-            glob(path.join(training_dir, '*cov*.npy')))  # since they're sorted, they'll be paired up by params.
+            glob(path.join(training_dir, 'cov*.npy')))  # since they're sorted, they'll be paired up by params.
         self.rpoints = (rbins[:-1] + rbins[1:]) / 2
         nbins = self.rpoints.shape[0]
         # HERE
@@ -382,9 +396,13 @@ class OriginalRecipe(Emu):
         t_grid = np.meshgrid(*t_list)
         t = np.stack(t_grid).T
         t = t.reshape((-1, self.ndim))
+        t = np.sort(t.view(','.join(['float64' for _ in self.ordered_params])), 
+                order = ['f%d'%i for i in xrange(self.ndim)], axis = 0).view(np.float)
         # TODO give some thought to what is the best way to format the output
         mu, cov = self.gp.predict(self.y, t)
         errs = np.sqrt(np.diag(cov))
+        #mu = mu.reshape((-1, len(self.rpoints)))
+        #errs = errs.reshape((-1, len(self.rpoints)))
         # Note ordering is unclear if em_params has more than 1 value.
         return mu, errs
 
@@ -401,8 +419,8 @@ class OriginalRecipe(Emu):
         '''
         vep = dict(em_params)
         vep.update({'r': np.log10(rpoints)})
-
-        return self.emulate(vep)
+        out = self.emulate(vep)
+        return out
 
 
 class ExtraCrispy(Emu):
@@ -563,6 +581,7 @@ class ExtraCrispy(Emu):
         t_grid = np.meshgrid(*t_list)
         t = np.stack(t_grid).T
         t = t.reshape((-1, self.ndim))
+        print t.shape
 
         all_mu, all_err = [],[]
         for y, y_hat in zip(self.y.T, self.y_hat):
@@ -588,17 +607,29 @@ class ExtraCrispy(Emu):
         :return:
         '''
         # turns out this how it already works!
-        output = self.emulate(em_params)
+        all_mu, all_err= self.emulate(em_params)
         # don't need to interpolate!
         if np.all(rpoints == self.rpoints):
-            return output
+            print 'A'
+            return all_mu, all_err 
+
         # TODO check rpoints in bounds!
-        new_mu, new_err = []
-        for mean, err in zip(*output):
-            xi_interpolator = interp1d(rpoints, mean, kind=kind)
+        print all_mu.shape
+        if len(all_mu.shape) == 1:# just one calculation
+            xi_interpolator = interp1d(self.rpoints, all_mu, kind=kind)
+            new_mu = xi_interpolator(rpoints)
+            err_interp = interp1d(self.rpoints, all_err, kind=kind)
+            new_err = err_interp(rpoints)
+            print 'B'
+            return new_mu, new_err
+
+        new_mu, new_err = [], []
+        for mean, err in zip(all_mu, all_err):
+            xi_interpolator = interp1d(self.rpoints, mean, kind=kind)
             interp_mean = xi_interpolator(rpoints)
             new_mu.append(interp_mean)
-            err_interp = interp1d(rpoints, err, kind=kind)
+            err_interp = interp1d(self.rpoints, err, kind=kind)
             interp_err = err_interp(rpoints)
             new_err.append(interp_err)
+        print 'C'
         return np.array(new_mu), np.array(new_err)
