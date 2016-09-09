@@ -197,7 +197,7 @@ def training_config_reader(filename):
 
         rbins_str = config['rbins']
         # need to do a little work to get this right
-        rbins = [float(r) for r in rbins_str.strip('[ ]').split(',')]
+        rbins = [float(r.strip()) for r in rbins_str.strip('[ ]').split(',')]
 
         # cosmology information assumed to be in the remaining ones!
         #Delete the ones we've removed.
@@ -210,7 +210,14 @@ def training_config_reader(filename):
         # check simname and scale_factor (the 100% required ones) are in there!
         # if fails, will throw a KeyError
         cosmo_params['simname']
-        cosmo_params['scale_factor']
+        cosmo_params['scale_factor'] = float(cosmo_params['scale_factor'].strip())
+
+        for cp, t in zip(['Lbox', 'npart'], [float, int]):
+            try:
+                cosmo_params[cp] = t(cosmo_params[cp])
+            except KeyError:
+                continue
+
 
     except KeyError:
         raise KeyError("The config file %s is missing a parameter." % filename)

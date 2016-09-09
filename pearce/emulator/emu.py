@@ -386,10 +386,7 @@ class OriginalRecipe(Emu):
         mu, cov = self.gp.predict(self.y, t)
         errs = np.sqrt(np.diag(cov))
         # Note ordering is unclear if em_params has more than 1 value.
-        outputs = []
-        for m, e in izip(mu, errs):
-            outputs.append((m, e))
-        return outputs
+        return mu, errs
 
     def emulate_wrt_r(self, em_params, rpoints):
         '''
@@ -567,14 +564,15 @@ class ExtraCrispy(Emu):
         t = np.stack(t_grid).T
         t = t.reshape((-1, self.ndim))
 
-        output = []
+        all_mu, all_err = [],[]
         for y, y_hat in zip(self.y.T, self.y_hat):
             mu, cov = self.gp.predict(y, t)
             # mu and cov come out as (1,) arrays.
-            output.append((mu[0] + y_hat, np.sqrt(cov[0, 0])))
+            all_mu.append(mu[0]+y_hat)
+            all_err.append(np.sqrt(cov[0,0]))
         # note may want to do a reshape here., Esp to be consistent with the other
         # implementation
-        return output
+        return np.array(all_mu), np.array(all_err)
 
     def emulate_wrt_r(self, em_params, rpoints, kind='slinear'):
         '''
@@ -595,11 +593,12 @@ class ExtraCrispy(Emu):
         if np.all(rpoints == self.rpoints):
             return output
         # TODO check rpoints in bounds!
-        new_output = []
-        for mean, err in output:
+        new_mu, new_err = []
+        for mean, err in zip(*output):
             xi_interpolator = interp1d(rpoints, mean, kind=kind)
             interp_mean = xi_interpolator(rpoints)
+            new_mu.append(interp_mean)
             err_interp = interp1d(rpoints, err, kind=kind)
             interp_err = err_interp(rpoints)
-            new_output.append((interp_mean, interp_err))
-        return new_output
+            new_err.append(interp_err)
+        return np.array(new_mu), np.array(new_err)
