@@ -325,7 +325,7 @@ class OriginalRecipe(Emu):
         self.y = y[zeros_slice]
         self.yerr = yerr[zeros_slice]
 
-        self.y_hat = 0#self.y.mean()
+        self.y_hat = 0  # self.y.mean()
         self.y -= self.y_hat  # mean-subtract.
 
     def train(self, **kwargs):
@@ -382,14 +382,11 @@ class OriginalRecipe(Emu):
         t_grid = np.meshgrid(*t_list)
         t = np.stack(t_grid).T
         t = t.reshape((-1, self.ndim))
-        #TODO give some thought to what is the best way to format the output
+        # TODO give some thought to what is the best way to format the output
         mu, cov = self.gp.predict(self.y, t)
         errs = np.sqrt(np.diag(cov))
         # Note ordering is unclear if em_params has more than 1 value.
-        outputs = []
-        for m, e in izip(mu, errs):
-            outputs.append((m, e))
-        return outputs
+        return mu, errs
 
     def emulate_wrt_r(self, em_params, rpoints):
         '''
@@ -443,7 +440,7 @@ class ExtraCrispy(Emu):
 
         x = np.zeros((npoints, ndim))
         y = np.zeros((npoints, nbins))
-        #yerr = np.zeros((npoints, nbins))
+        # yerr = np.zeros((npoints, nbins))
 
         warned = False
         num_skipped = 0
@@ -487,11 +484,11 @@ class ExtraCrispy(Emu):
             if independent_variable == 'xi':
                 y[idx, :] = np.log10(xi)
                 # Approximately true, may need to revisit
-                #yerr[idx, :] = np.sqrt(np.diag(cov)) / (xi * np.log(10))
+                # yerr[idx, :] = np.sqrt(np.diag(cov)) / (xi * np.log(10))
                 # ycovs.append(cov / (np.outer(xi, xi) * np.log(10) ** 2))  # I think this is right, extrapolating from the above.
             else:  # r2xi
                 y[idx, :] = xi * self.rpoints * self.rpoints
-                #yerr[idx, :] = cov * np.outer(self.rpoints, self.rpoints)
+                # yerr[idx, :] = cov * np.outer(self.rpoints, self.rpoints)
 
         # ycov = block_diag(*ycovs)
         # ycov = np.sqrt(np.diag(ycov))
@@ -504,10 +501,10 @@ class ExtraCrispy(Emu):
         self.ndim = ndim
         self.x = x[zeros_slice]
         self.y = y[zeros_slice, :]
-        self.yerr = np.zeros((self.x.shape[0], )) #We don't use errors for extra crispy!
-        #self.yerr = yerr[zeros_slice]
+        self.yerr = np.zeros((self.x.shape[0],))  # We don't use errors for extra crispy!
+        # self.yerr = yerr[zeros_slice]
 
-        self.y_hat = np.zeros((self.y.shape[1],))#self.y.mean(axis=0)
+        self.y_hat = np.zeros((self.y.shape[1],))  # self.y.mean(axis=0)
         self.y -= self.y_hat  # mean-subtract.
 
     def train(self, **kwargs):
@@ -567,14 +564,15 @@ class ExtraCrispy(Emu):
         t = np.stack(t_grid).T
         t = t.reshape((-1, self.ndim))
 
-        output = []
+        all_mu, all_err = [],[]
         for y, y_hat in zip(self.y.T, self.y_hat):
             mu, cov = self.gp.predict(y, t)
-            #mu and cov come out as (1,) arrays.
-            output.append((mu[0] + y_hat, np.sqrt(cov[0,0])))
+            # mu and cov come out as (1,) arrays.
+            all_mu.append(mu[0]+y_hat)
+            all_err.append(np.sqrt(cov[0,0]))
         # note may want to do a reshape here., Esp to be consistent with the other
         # implementation
-        return output
+        return np.array(all_mu), np.array(all_err)
 
     def emulate_wrt_r(self, em_params, rpoints, kind='slinear'):
         '''
@@ -595,11 +593,12 @@ class ExtraCrispy(Emu):
         if np.all(rpoints == self.rpoints):
             return output
         # TODO check rpoints in bounds!
-        new_output = []
-        for mean, err in output:
+        new_mu, new_err = []
+        for mean, err in zip(*output):
             xi_interpolator = interp1d(rpoints, mean, kind=kind)
             interp_mean = xi_interpolator(rpoints)
+            new_mu.append(interp_mean)
             err_interp = interp1d(rpoints, err, kind=kind)
             interp_err = err_interp(rpoints)
-            new_output.append((interp_mean, interp_err))
-        return new_output
+            new_err.append(interp_err)
+        return np.array(new_mu), np.array(new_err)
