@@ -404,7 +404,7 @@ class OriginalRecipe(Emu):
         #mu = mu.reshape((-1, len(self.rpoints)))
         #errs = errs.reshape((-1, len(self.rpoints)))
         # Note ordering is unclear if em_params has more than 1 value.
-        return mu, errs, t
+        return mu, errs
 
     def emulate_wrt_r(self, em_params, rpoints):
         '''
@@ -581,10 +581,11 @@ class ExtraCrispy(Emu):
         t_grid = np.meshgrid(*t_list)
         t = np.stack(t_grid).T
         t = t.reshape((-1, self.ndim))
-       return t
         #t.view(','.join(['float64' for _ in self.ordered_params]))
-        t = np.sort(t.view(','.join(['float64' for _ in self.ordered_params])),
-                                order = ['f%d'%i for i in xrange(self.ndim)], axis = 0).view(np.float)
+        #for some reason this one has different requirements than the other.
+        #i give up, it's black magic
+        t = np.sort(t.view(','.join(['float64' for _ in xrange(t.shape[0])])),
+                                order = ['f%d'%i for i in xrange(t.shape[0])], axis = 0).view(np.float)
 
         all_mu = np.zeros((t.shape[0], self.y.shape[1]))#t down rbins across
         all_err = np.zeros((t.shape[0], self.y.shape[1]))
