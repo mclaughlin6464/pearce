@@ -393,11 +393,16 @@ class OriginalRecipe(Emu):
 
         # i'd like to remove 'r'. possibly requiring a passed in param?
         t_list = [input_params[p.name] for p in self.ordered_params]
+        print t_list
         t_grid = np.meshgrid(*t_list)
+        print t_grid
         t = np.stack(t_grid).T
+        print t
         t = t.reshape((-1, self.ndim))
+        print t
         t = np.sort(t.view(','.join(['float64' for _ in self.ordered_params])), 
                 order = ['f%d'%i for i in xrange(self.ndim)], axis = 0).view(np.float)
+        print t
         # TODO give some thought to what is the best way to format the output
         mu, cov = self.gp.predict(self.y, t)
         errs = np.sqrt(np.diag(cov))
@@ -578,12 +583,17 @@ class ExtraCrispy(Emu):
 
         # i'd like to remove 'r'. possibly requiring a passed in param?
         t_list = [input_params[p.name] for p in self.ordered_params]
+        print t_list
         t_grid = np.meshgrid(*t_list)
+        print t_grid
         t = np.stack(t_grid).T
+        print t
         t = t.reshape((-1, self.ndim))
+        print t
         #t.view(','.join(['float64' for _ in self.ordered_params]))
         t = np.sort(t.view(','.join(['float64' for _ in self.ordered_params])),
                                 order = ['f%d'%i for i in xrange(self.ndim)], axis = 0).view(np.float)
+        print t
 
         all_mu = np.zeros((t.shape[0], self.y.shape[1]))#t down rbins across
         all_err = np.zeros((t.shape[0], self.y.shape[1]))
