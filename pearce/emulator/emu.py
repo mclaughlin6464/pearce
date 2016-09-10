@@ -581,8 +581,9 @@ class ExtraCrispy(Emu):
         t_grid = np.meshgrid(*t_list)
         t = np.stack(t_grid).T
         t = t.reshape((-1, self.ndim))
+        #t.view(','.join(['float64' for _ in self.ordered_params]))
         t = np.sort(t.view(','.join(['float64' for _ in self.ordered_params])),
-                    order=['f%d' % i for i in xrange(self.ndim)], axis=0).view(np.float)
+                                order = ['f%d'%i for i in xrange(self.ndim)], axis = 0).view(np.float)
 
         all_mu = np.zeros((t.shape[0], self.y.shape[1]))#t down rbins across
         all_err = np.zeros((t.shape[0], self.y.shape[1]))
