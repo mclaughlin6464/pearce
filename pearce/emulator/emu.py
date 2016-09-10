@@ -590,7 +590,8 @@ class ExtraCrispy(Emu):
         print t
         t = t.reshape((-1, self.ndim))
         print t
-        #t.view(','.join(['float64' for _ in self.ordered_params]))
+        t.view(','.join(['float32' for _ in self.ordered_params]))
+        print t
         t = np.sort(t.view(','.join(['float64' for _ in self.ordered_params])),
                                 order = ['f%d'%i for i in xrange(self.ndim)], axis = 0).view(np.float)
         print t
