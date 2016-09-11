@@ -6,7 +6,20 @@ import numpy as np
 from .emu import OriginalRecipe, ExtraCrispy
 
 def low_dim_train(training_dir, ordered_params, independent_variable, n_params = 3, emu_type = 'OriginalRecipe'):
-
+    '''
+    Train the hyperparameters in lower dimensions and average them together.
+    :param training_dir:
+        Directory with the training data, passed into the emu object
+    :param ordered_params:
+        Ordered parameter list, passed into the emu object
+    :param independent_variable:
+        The independent variable to emulate and learn params for.
+    :param n_params:
+        Number of parameters to hold train the emulator with. Default is 3.
+    :param emu_type:
+        Type of emulator to use. Default is OriginalRecipe
+    :return:
+    '''
 
     emu_obj = OriginalRecipe if emu_type == 'OriginalRecipe' else ExtraCrispy
     emu = emu_obj(training_dir, ordered_params, independent_variable)
