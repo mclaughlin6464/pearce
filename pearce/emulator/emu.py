@@ -63,6 +63,7 @@ class Emu(object):
             if p.name in fixed_params:
                 continue
             self.metric.append(ig[p.name])
+        self.metric = np.array(self.metric)
 
         a = ig['amp']
         kernel = a * ExpSquaredKernel(self.metric, ndim=self.ndim)
@@ -373,6 +374,7 @@ class OriginalRecipe(Emu):
 
         self.gp.kernel[:] = results.x
         self.gp.recompute()
+        self.metric = np.exp(results.x)
 
         return results.success
 
@@ -524,7 +526,7 @@ class ExtraCrispy(Emu):
 
         self.y_hat = np.zeros((self.y.shape[1],))  # self.y.mean(axis=0)
         self.y -= self.y_hat  # mean-subtract.
-
+    #TODO train isn't the best word here, since I used "training data" for another purpose
     def train(self, **kwargs):
         '''
         Train the emulator. Has a spotty record of working. Better luck may be had with the NAMEME code.
@@ -558,6 +560,7 @@ class ExtraCrispy(Emu):
 
         self.gp.kernel[:] = results.x
         self.gp.recompute()
+        self.metric = np.exp(results.x)
 
         return results.success
 
