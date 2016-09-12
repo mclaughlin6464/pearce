@@ -26,7 +26,6 @@ def low_dim_train(training_dir, ordered_params, independent_variable, n_params =
     '''
 
     emu_obj = OriginalRecipe if emu_type == 'OriginalRecipe' else ExtraCrispy
-    emu = emu_obj(training_dir, ordered_params, independent_variable)
 
     if ordered_params[-1].name == 'r':
         #we don' do combinations in 'r'
@@ -43,7 +42,7 @@ def low_dim_train(training_dir, ordered_params, independent_variable, n_params =
     emu = None
 
     for pc in param_combinations:
-        print pc.name
+        print pc
         #for each combination, also train for each combination of unique values
         #we're being very thorough
         #these are unique values of the params were holding fixed, those not in pc
