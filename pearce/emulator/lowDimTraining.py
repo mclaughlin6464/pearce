@@ -40,7 +40,7 @@ def low_dim_train(training_dir, ordered_params, independent_variable, n_params =
     param_combinations = combinations(varied_params, n_params)
 
     emu = None
-    n_max = 50#
+    n_max = 20#
 
     for pc in param_combinations:
         print pc
@@ -49,12 +49,18 @@ def low_dim_train(training_dir, ordered_params, independent_variable, n_params =
         #these are unique values of the params were holding fixed, those not in pc
         fixed_pc = [p for p in varied_params if p not in pc]
         unique_values_pc = product(*[list(unique_values[p.name]) for p in fixed_pc])
+        n_uv = np.prod([len(list(unique_values[p.name])) for p in fixed_pc])
 
-        if len(unique_values_pc)> n_max:
-            unique_values_pc = np.random.choice(unique_values_pc, size = n_max, replace=False)
+        if n_uv > n_max:
+            #select a subsample
+            unique_values_idx = set(np.random.choice(n_uv,size = n_max, replace=False))
+        else:
+            unique_values_idx = set(xrange(n_uv))
 
         #now, rebuild and train the emulator.
-        for uv in unique_values_pc:
+        for idx, uv in enumerate(unique_values_pc):
+            if idx not in unique_values_idx:
+                continue
             print uv
             #hold these parameters fixed
             fixed_params = {p.name:uv[idx] for idx, p in enumerate(fixed_pc)}
@@ -79,7 +85,8 @@ def low_dim_train(training_dir, ordered_params, independent_variable, n_params =
         hyper_params[key] = np.array(hyper_params[key])
 
     for key, val in hyper_params.iteritems():
-        print key, val.mean(), val.std()
+        print key,val.shape,np.meadian(val), val.mean(), val.std()
+    print
 
     return {key:val.mean() for key, val in hyper_params.iteritems()}
 
