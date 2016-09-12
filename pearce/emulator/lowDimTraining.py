@@ -41,6 +41,7 @@ def low_dim_train(training_dir, ordered_params, independent_variable, n_params =
     param_combinations = combinations(varied_params, n_params)
 
     emu = None
+    n_max = 50#
 
     for pc in param_combinations:
         print pc
@@ -50,6 +51,9 @@ def low_dim_train(training_dir, ordered_params, independent_variable, n_params =
         #these are unique values of the params were holding fixed, those not in pc
         fixed_pc = [p for p in varied_params if p not in pc]
         unique_values_pc = product(*[list(unique_values[p.name]) for p in fixed_pc])
+
+        if len(unique_values_pc)> n_max:
+            unique_values_pc = np.random.choice(unique_values_pc, size = n_max, replace=False)
 
         #now, rebuild and train the emulator.
         for uv in unique_values_pc:
