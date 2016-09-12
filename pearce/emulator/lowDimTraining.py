@@ -38,7 +38,7 @@ def low_dim_train(training_dir, ordered_params, independent_variable, n_params =
     param_combinations = combinations(varied_params, n_params)
 
     for pc in param_combinations:
-        print pc
+        print pc.name
         #for each combination, also train for each combination of unique values
         #we're being very thorough
         #these are unique values of the params were holding fixed, those not in pc
@@ -51,6 +51,7 @@ def low_dim_train(training_dir, ordered_params, independent_variable, n_params =
             #hold these parameters fixed
             fixed_params = {p.name:uv[idx] for idx, p in enumerate(fixed_pc)}
             emu.get_training_data(training_dir, independent_variable, fixed_params)
+            print emu.x.shape
             emu.build_emulator(independent_variable, fixed_params)
             success = emu.train()
 
