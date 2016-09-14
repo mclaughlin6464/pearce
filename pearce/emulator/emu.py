@@ -325,7 +325,7 @@ class OriginalRecipe(Emu):
                 # ycovs.append(cov / (np.outer(xi, xi) * np.log(10) ** 2))  # I think this is right, extrapolating from the above.
             else:  # r2xi
                 y[idx * nbins:(idx + 1) * nbins] = xi * self.rpoints * self.rpoints
-                yerr[idx * nbins:(idx + 1) * nbins] = cov * np.outer(self.rpoints, self.rpoints)
+                yerr[idx * nbins:(idx + 1) * nbins] = np.diag(cov) * self.rpoints*self.rpoints
 
         # ycov = block_diag(*ycovs)
         # ycov = np.sqrt(np.diag(ycov))
