@@ -9,6 +9,7 @@ import numpy as np
 from .emu import OriginalRecipe, ExtraCrispy
 from .ioHelpers import xi_file_reader
 
+#TODO does this need to be in a separate file here? Can I attach it to emu?
 def low_dim_train(training_dir, ordered_params, independent_variable, n_params = 3, emu_type = 'OriginalRecipe'):
     '''
     Train the hyperparameters in lower dimensions and average them together.

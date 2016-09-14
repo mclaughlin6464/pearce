@@ -22,7 +22,7 @@ class Emu(object):
     # have to copy a lot of it to the subclass
 
     # TODO load initial guesses from file.
-    def __init__(self, training_dir, params=PARAMS, independent_variable='xi', fixed_params={}):
+    def __init__(self, training_dir, params=PARAMS, independent_variable='xi', fixed_params={}, metric={}):
 
         '''
         # TODO change name of type
@@ -40,29 +40,38 @@ class Emu(object):
         self.ordered_params = params
 
         self.get_training_data(training_dir, independent_variable, fixed_params)
-        self.build_emulator(independent_variable, fixed_params)
+        self.build_emulator(independent_variable, fixed_params, metric)
 
     # I can get LHC from the training data. If any coordinate equals any other in its column we know!
     def get_training_data(self, training_dir, independent_variable, fixed_params):
         '''Implemented in subclasses. '''
         pass
 
-    def build_emulator(self, independent_variable, fixed_params):
+    def build_emulator(self, independent_variable, fixed_params, metric={}):
         '''
         Initialization of the emulator from recovered training data.
         :param independent_variable:
             independent_variable to emulate.
         :param fixed_params:
             Parameterst to hold fixed in teh training data
+        :param metric:
+            Optional. Define a metric instead of the ones that are built in.
         :return: None
         '''
-        ig = self.get_initial_guess(independent_variable, fixed_params)
+        if not metric:
+            ig = self.get_initial_guess(independent_variable, fixed_params)
+        else:
+            ig = metric #use the user's initial guesses
 
         self.metric = []
         for p in self.ordered_params:
             if p.name in fixed_params:
                 continue
-            self.metric.append(ig[p.name])
+            try:
+                self.metric.append(ig[p.name])
+            except KeyError:
+                raise KeyError('Key %s was not in the metric.'%p.name)
+
         self.metric = np.array(self.metric)
 
         a = ig['amp']
@@ -197,6 +206,36 @@ class Emu(object):
 
     def emulate_wrt_r(self, em_params, rpoints):
         pass
+
+    #TODO docstring, comments
+    def _jackknife_errors(self, t):
+
+        K_inv_full = self.gp.solver.apply_inverse(np.eye(self.gp._alpha.size),
+                                          in_place=True)
+
+        N = K_inv_full.shape[0]
+
+        mus = np.zeros((N, t.shape[0]))
+
+        for idx in xrange(N):
+            rotation_matrix = np.eye(N)
+            rotation_matrix[idx,idx] = rotation_matrix[N,N] = 0
+            rotation_matrix[idx, N] = rotation_matrix[N,idx] = 1
+
+            K_inv_idx_N = np.dot(rotation_matrix, np.dot(K_inv_full, rotation_matrix))
+
+            #TODO check this worked!
+            K_inv_m_idx = K_inv_idx_N[:N,:][:,:N]-np.outer(K_inv_idx_N[N,:N], K_inv_idx_N[:N,N])/K_inv_idx_N[N,N]
+
+            Kxxs = self.gp.kernel.value(t, np.dot(rotation_matrix, self.gp._x)[:N])
+
+            #TODO currently doesn't work on ExtraCrispy. Could make y an input and it would.
+            alpha = np.dot(K_inv_m_idx, np.dot(rotation_matrix, self.gp._y)[:N])
+
+            mus[idx, :] = np.dot(Kxxs, alpha)
+
+        return (N-1)/N*np.cov(mus, rowvar=False)
+
 
     def goodness_of_fit(self, truth_dir, N=None, statistic='r2'):
         '''
@@ -403,6 +442,8 @@ class OriginalRecipe(Emu):
         # TODO give some thought to what is the best way to format the output
         mu, cov = self.gp.predict(self.y, t)
         errs = np.sqrt(np.diag(cov))
+        jk_errs = self._jackknife_errors(t)
+        print jk_errs.shape
         #mu = mu.reshape((-1, len(self.rpoints)))
         #errs = errs.reshape((-1, len(self.rpoints)))
         # Note ordering is unclear if em_params has more than 1 value.
