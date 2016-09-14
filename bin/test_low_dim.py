@@ -5,8 +5,8 @@ training_dir = '/u/ki/swmclau2/des/PearceData/'
 
 or_params = PARAMS[:]
 or_params.append(parameter('r', 0, 1)) #95% sure bounds aren't used for r
-independent_variable = 'xi'
-n_params = 1
+independent_variable = 'r2xi'
+n_params = 3
 metric = low_dim_train(training_dir, or_params, independent_variable, n_params)
 for key, val in metric.iteritems():
     print key, val

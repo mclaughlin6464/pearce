@@ -85,7 +85,7 @@ def low_dim_train(training_dir, ordered_params, independent_variable, n_params =
         hyper_params[key] = np.array(hyper_params[key])
 
     for key, val in hyper_params.iteritems():
-        print key,val.shape,np.meadian(val), val.mean(), val.std()
+        print key,val.shape,np.median(val), val.mean(), val.std()
     print
 
     return {key:val.mean() for key, val in hyper_params.iteritems()}
