@@ -8,6 +8,7 @@ from glob import glob
 from itertools import izip
 import numpy as np
 import scipy.optimize as op
+from scipy.linalg import inv
 from scipy.interpolate import interp1d
 import george
 from george.kernels import *
@@ -209,31 +210,42 @@ class Emu(object):
 
     #TODO docstring, comments
     def _jackknife_errors(self, t):
-
+        from time import time
         K_inv_full = self.gp.solver.apply_inverse(np.eye(self.gp._alpha.size),
                                           in_place=True)
 
         N = K_inv_full.shape[0]
 
         mus = np.zeros((N, t.shape[0]))
-
         for idx in xrange(N):
+            print idx
+
+            t0 = time()
             rotation_matrix = np.eye(N)
-            rotation_matrix[idx,idx] = rotation_matrix[N,N] = 0
-            rotation_matrix[idx, N] = rotation_matrix[N,idx] = 1
+            rotation_matrix[idx,idx] = rotation_matrix[N-1,N-1] = 0
+            rotation_matrix[idx, N-1] = rotation_matrix[N-1,idx] = 1
+            print time()-t0
 
-            K_inv_idx_N = np.dot(rotation_matrix, np.dot(K_inv_full, rotation_matrix))
+            #This operation was really slow. Trying something else.
+            #K_inv_idx_N = np.dot(rotation_matrix, np.dot(K_inv_full, rotation_matrix))
+            #Small
+            K_inv_idx_N = K_inv_full.copy()
+            print time()-t0
+            K_inv_idx_N[[idx,N-1], :] = K_inv_idx_N[[N-1, idx], :] 
+            K_inv_idx_N[:, [idx,N-1]] = K_inv_idx_N[:, [N-1, idx]] 
+            print time()-t0
 
-            #TODO check this worked!
-            K_inv_m_idx = K_inv_idx_N[:N,:][:,:N]-np.outer(K_inv_idx_N[N,:N], K_inv_idx_N[:N,N])/K_inv_idx_N[N,N]
-
-            Kxxs = self.gp.kernel.value(t, np.dot(rotation_matrix, self.gp._x)[:N])
-
+            K_inv_m_idx = K_inv_idx_N[:N-1,:][:,:N-1]#-np.outer(K_inv_idx_N[N-1,:N-1], K_inv_idx_N[:N-1,N-1])/K_inv_idx_N[N-1,N-1]
+            print time()-t0
+            K_inv_m_idx-=np.outer(K_inv_idx_N[N-1,:N-1], K_inv_idx_N[:N-1,N-1])/K_inv_idx_N[N-1,N-1]
+            print time()-t0
+            Kxxs = self.gp.kernel.value(t, np.dot(rotation_matrix, self.gp._x)[:N-1])
+            print time()-t0
             #TODO currently doesn't work on ExtraCrispy. Could make y an input and it would.
-            alpha = np.dot(K_inv_m_idx, np.dot(rotation_matrix, self.gp._y)[:N])
-
+            alpha = np.dot(K_inv_m_idx, np.dot(rotation_matrix, self.gp._y)[:N-1])
+            print time()-t0
             mus[idx, :] = np.dot(Kxxs, alpha)
-
+            print time()-t0
         return (N-1)/N*np.cov(mus, rowvar=False)
 
 
