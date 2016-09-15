@@ -62,7 +62,7 @@ class Emu(object):
         if not metric:
             ig = self.get_initial_guess(independent_variable, fixed_params)
         else:
-            ig = metric #use the user's initial guesses
+            ig = metric  # use the user's initial guesses
 
         self.metric = []
         for p in self.ordered_params:
@@ -71,7 +71,7 @@ class Emu(object):
             try:
                 self.metric.append(ig[p.name])
             except KeyError:
-                raise KeyError('Key %s was not in the metric.'%p.name)
+                raise KeyError('Key %s was not in the metric.' % p.name)
 
         self.metric = np.array(self.metric)
 
@@ -98,7 +98,7 @@ class Emu(object):
             Parameters to hold fixed. Only available if data in training_dir is a full hypercube, not a latin hypercube.
         :return: log_r, y, yerr for the independent variable at the points specified by fixed nad em params.
         '''
-        assert len(em_params) + len(fixed_params)  -  len(self.ordered_params) <= 1 #can exclude r 
+        assert len(em_params) + len(fixed_params) - len(self.ordered_params) <= 1  # can exclude r
 
         rbins, cosmo_params, method = global_file_reader(path.join(training_dir, GLOBAL_FILENAME))
 
@@ -131,21 +131,20 @@ class Emu(object):
             if any(params[key] != val for key, val in fixed_params.iteritems()):
                 continue
 
-
             to_continue = True
-            for key,val in em_params.iteritems():
-                if type(val) is type(y): 
-                    if np.all(np.abs(params[key]-val) > 1e-3):
+            for key, val in em_params.iteritems():
+                if type(val) is type(y):
+                    if np.all(np.abs(params[key] - val) > 1e-3):
                         break
-                elif np.abs(params[key]-val) > 1e-3:
+                elif np.abs(params[key] - val) > 1e-3:
                     break
             else:
-                to_continue = False #no break
+                to_continue = False  # no break
 
             if to_continue:
                 continue
 
-            #if any(params[key] != val for key, val in em_params.iteritems()):
+            # if any(params[key] != val for key, val in em_params.iteritems()):
             #    continue
 
             if np.any(np.isnan(cov)) or np.any(np.isnan(xi)):
@@ -208,11 +207,11 @@ class Emu(object):
     def emulate_wrt_r(self, em_params, rpoints):
         pass
 
-    #TODO docstring, comments
+    # TODO docstring, comments
     def _jackknife_errors(self, t):
         from time import time
         K_inv_full = self.gp.solver.apply_inverse(np.eye(self.gp._alpha.size),
-                                          in_place=True)
+                                                  in_place=True)
 
         x, y = self.gp._x[:], self.gp._y[:]
 
@@ -223,27 +222,28 @@ class Emu(object):
             print idx
 
             t0 = time()
-            #This operation was really slow. Trying something else.
-            #K_inv_idx_N = np.dot(rotation_matrix, np.dot(K_inv_full, rotation_matrix))
-            #Small
-            K_inv_full[[idx,N-1], :] = K_inv_full[[N-1, idx], :]
-            K_inv_full[:, [idx,N-1]] = K_inv_full[:, [N-1, idx]]
-            print time()-t0
-            #swap x and y as well
-            x[[idx, N-1], : ] = x[[N-1, idx],:]
-            y[[idx,N-1]] = y[[idx,N-1]]
+            # This operation was really slow. Trying something else.
+            # K_inv_idx_N = np.dot(rotation_matrix, np.dot(K_inv_full, rotation_matrix))
+            # Small
+            K_inv_full[[idx, N - 1], :] = K_inv_full[[N - 1, idx], :]
+            K_inv_full[:, [idx, N - 1]] = K_inv_full[:, [N - 1, idx]]
+            print time() - t0
+            # swap x and y as well
+            x[[idx, N - 1], :] = x[[N - 1, idx], :]
+            y[[idx, N - 1]] = y[[idx, N - 1]]
 
-            K_inv_m_idx = K_inv_full[:N-1,:][:,:N-1]#-np.outer(K_inv_full[N-1,:N-1], K_inv_full[:N-1,N-1])/K_inv_full[N-1,N-1]
-            print time()-t0
-            K_inv_m_idx-=np.outer(K_inv_full[N-1,:N-1], K_inv_full[:N-1,N-1])/K_inv_full[N-1,N-1]
-            print time()-t0 #slow
-            Kxxs = self.gp.kernel.value(t, x[:N-1])
-            print time()-t0#slow-ish
-            #TODO currently doesn't work on ExtraCrispy. Could make y an input and it would.
-            alpha = np.dot(K_inv_m_idx,  y[:N-1])
-            print time()-t0#slow-ish
+            K_inv_m_idx = K_inv_full[:N - 1, :][:,
+                          :N - 1]  # -np.outer(K_inv_full[N-1,:N-1], K_inv_full[:N-1,N-1])/K_inv_full[N-1,N-1]
+            print time() - t0
+            K_inv_m_idx -= np.outer(K_inv_full[N - 1, :N - 1], K_inv_full[:N - 1, N - 1]) / K_inv_full[N - 1, N - 1]
+            print time() - t0  # slow
+            Kxxs = self.gp.kernel.value(t, x[:N - 1])
+            print time() - t0  # slow-ish
+            # TODO currently doesn't work on ExtraCrispy. Could make y an input and it would.
+            alpha = np.dot(K_inv_m_idx, y[:N - 1])
+            print time() - t0  # slow-ish
             mus[idx, :] = np.dot(Kxxs, alpha)
-            print time()-t0
+            print time() - t0
 
             K_inv_full[[idx, N - 1], :] = K_inv_full[[N - 1, idx], :]
             K_inv_full[:, [idx, N - 1]] = K_inv_full[:, [N - 1, idx]]
@@ -251,8 +251,7 @@ class Emu(object):
             x[[idx, N - 1], :] = x[[N - 1, idx], :]
             y[[idx, N - 1]] = y[[idx, N - 1]]
 
-        return (N-1)/N*np.cov(mus, rowvar=False)
-
+        return (N - 1) / N * np.cov(mus, rowvar=False)
 
     def goodness_of_fit(self, truth_dir, N=None, statistic='r2'):
         '''
@@ -381,7 +380,7 @@ class OriginalRecipe(Emu):
                 # ycovs.append(cov / (np.outer(xi, xi) * np.log(10) ** 2))  # I think this is right, extrapolating from the above.
             else:  # r2xi
                 y[idx * nbins:(idx + 1) * nbins] = xi * self.rpoints * self.rpoints
-                yerr[idx * nbins:(idx + 1) * nbins] = np.diag(cov) * self.rpoints*self.rpoints
+                yerr[idx * nbins:(idx + 1) * nbins] = np.diag(cov) * self.rpoints * self.rpoints
 
         # ycov = block_diag(*ycovs)
         # ycov = np.sqrt(np.diag(ycov))
@@ -455,14 +454,14 @@ class OriginalRecipe(Emu):
         t = np.stack(t_grid).T
         t = t.reshape((-1, self.ndim))
         t = np.sort(t.view(','.join(['float64' for _ in self.ordered_params])),
-                order = ['f%d'%i for i in xrange(self.ndim)], axis = 0).view(np.float)
+                    order=['f%d' % i for i in xrange(self.ndim)], axis=0).view(np.float)
         # TODO give some thought to what is the best way to format the output
         mu, cov = self.gp.predict(self.y, t)
         errs = np.sqrt(np.diag(cov))
         jk_errs = self._jackknife_errors(t)
         print jk_errs.shape
-        #mu = mu.reshape((-1, len(self.rpoints)))
-        #errs = errs.reshape((-1, len(self.rpoints)))
+        # mu = mu.reshape((-1, len(self.rpoints)))
+        # errs = errs.reshape((-1, len(self.rpoints)))
         # Note ordering is unclear if em_params has more than 1 value.
         return mu, errs
 
@@ -584,7 +583,8 @@ class ExtraCrispy(Emu):
 
         self.y_hat = np.zeros((self.y.shape[1],))  # self.y.mean(axis=0)
         self.y -= self.y_hat  # mean-subtract.
-    #TODO train isn't the best word here, since I used "training data" for another purpose
+
+    # TODO train isn't the best word here, since I used "training data" for another purpose
     def train(self, **kwargs):
         '''
         Train the emulator. Has a spotty record of working. Better luck may be had with the NAMEME code.
@@ -642,19 +642,19 @@ class ExtraCrispy(Emu):
         t_grid = np.meshgrid(*t_list)
         t = np.stack(t_grid).T
         t = t.reshape((-1, self.ndim))
-        #t.view(','.join(['float64' for _ in self.ordered_params]))
-        #for some reason this one has different requirements than the other.
-        #i give up, it's black magic
+        # t.view(','.join(['float64' for _ in self.ordered_params]))
+        # for some reason this one has different requirements than the other.
+        # i give up, it's black magic
         t = np.sort(t.view(','.join(['float64' for _ in xrange(t.shape[0])])),
-                                order = ['f%d'%i for i in xrange(t.shape[0])], axis = 0).view(np.float)
+                    order=['f%d' % i for i in xrange(t.shape[0])], axis=0).view(np.float)
 
-        all_mu = np.zeros((t.shape[0], self.y.shape[1]))#t down rbins across
+        all_mu = np.zeros((t.shape[0], self.y.shape[1]))  # t down rbins across
         all_err = np.zeros((t.shape[0], self.y.shape[1]))
         for idx, (y, y_hat) in enumerate(zip(self.y.T, self.y_hat)):
             mu, cov = self.gp.predict(y, t)
             # mu and cov come out as (1,) arrays.
             all_mu[:, idx] = mu
-            all_err[:,idx] = np.sqrt(np.diag(cov))
+            all_err[:, idx] = np.sqrt(np.diag(cov))
 
         # note may want to do a reshape here., Esp to be consistent with the other
         # implementation
@@ -674,14 +674,14 @@ class ExtraCrispy(Emu):
         :return:
         '''
         # turns out this how it already works!
-        all_mu, all_err= self.emulate(em_params)
+        all_mu, all_err = self.emulate(em_params)
         # don't need to interpolate!
         if np.all(rpoints == self.rpoints):
             return all_mu, all_err
 
         # TODO check rpoints in bounds!
         print all_mu.shape
-        if len(all_mu.shape) == 1:# just one calculation
+        if len(all_mu.shape) == 1:  # just one calculation
             xi_interpolator = interp1d(self.rpoints, all_mu, kind=kind)
             new_mu = xi_interpolator(rpoints)
             err_interp = interp1d(self.rpoints, all_err, kind=kind)
