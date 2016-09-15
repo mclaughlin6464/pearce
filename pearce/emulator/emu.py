@@ -214,6 +214,8 @@ class Emu(object):
         K_inv_full = self.gp.solver.apply_inverse(np.eye(self.gp._alpha.size),
                                           in_place=True)
 
+        x, y = self.gp._x[:], self.gp._y[:]
+
         N = K_inv_full.shape[0]
 
         mus = np.zeros((N, t.shape[0]))
@@ -221,31 +223,34 @@ class Emu(object):
             print idx
 
             t0 = time()
-            rotation_matrix = np.eye(N)
-            rotation_matrix[idx,idx] = rotation_matrix[N-1,N-1] = 0
-            rotation_matrix[idx, N-1] = rotation_matrix[N-1,idx] = 1
-            print time()-t0
-
             #This operation was really slow. Trying something else.
             #K_inv_idx_N = np.dot(rotation_matrix, np.dot(K_inv_full, rotation_matrix))
             #Small
-            K_inv_idx_N = K_inv_full.copy()
+            K_inv_full[[idx,N-1], :] = K_inv_full[[N-1, idx], :]
+            K_inv_full[:, [idx,N-1]] = K_inv_full[:, [N-1, idx]]
             print time()-t0
-            K_inv_idx_N[[idx,N-1], :] = K_inv_idx_N[[N-1, idx], :] 
-            K_inv_idx_N[:, [idx,N-1]] = K_inv_idx_N[:, [N-1, idx]] 
-            print time()-t0
+            #swap x and y as well
+            x[[idx, N-1], : ] = x[[N-1, idx],:]
+            y[[idx,N-1]] = y[[idx,N-1]]
 
-            K_inv_m_idx = K_inv_idx_N[:N-1,:][:,:N-1]#-np.outer(K_inv_idx_N[N-1,:N-1], K_inv_idx_N[:N-1,N-1])/K_inv_idx_N[N-1,N-1]
+            K_inv_m_idx = K_inv_full[:N-1,:][:,:N-1]#-np.outer(K_inv_full[N-1,:N-1], K_inv_full[:N-1,N-1])/K_inv_full[N-1,N-1]
             print time()-t0
-            K_inv_m_idx-=np.outer(K_inv_idx_N[N-1,:N-1], K_inv_idx_N[:N-1,N-1])/K_inv_idx_N[N-1,N-1]
-            print time()-t0
-            Kxxs = self.gp.kernel.value(t, np.dot(rotation_matrix, self.gp._x)[:N-1])
-            print time()-t0
+            K_inv_m_idx-=np.outer(K_inv_full[N-1,:N-1], K_inv_full[:N-1,N-1])/K_inv_full[N-1,N-1]
+            print time()-t0 #slow
+            Kxxs = self.gp.kernel.value(t, x[:N-1])
+            print time()-t0#slow-ish
             #TODO currently doesn't work on ExtraCrispy. Could make y an input and it would.
-            alpha = np.dot(K_inv_m_idx, np.dot(rotation_matrix, self.gp._y)[:N-1])
-            print time()-t0
+            alpha = np.dot(K_inv_m_idx,  y[:N-1])
+            print time()-t0#slow-ish
             mus[idx, :] = np.dot(Kxxs, alpha)
             print time()-t0
+
+            K_inv_full[[idx, N - 1], :] = K_inv_full[[N - 1, idx], :]
+            K_inv_full[:, [idx, N - 1]] = K_inv_full[:, [N - 1, idx]]
+            print time() - t0
+            x[[idx, N - 1], :] = x[[N - 1, idx], :]
+            y[[idx, N - 1]] = y[[idx, N - 1]]
+
         return (N-1)/N*np.cov(mus, rowvar=False)
 
 
