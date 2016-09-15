@@ -219,37 +219,48 @@ class Emu(object):
 
         mus = np.zeros((N, t.shape[0]))
         for idx in xrange(N):
-            print idx
-
+            print idx,N
+            print np.sum(x-self.gp._x[:])
+            print np.sum(y-self.gp._y[:])
             t0 = time()
             # This operation was really slow. Trying something else.
             # K_inv_idx_N = np.dot(rotation_matrix, np.dot(K_inv_full, rotation_matrix))
             # Small
             K_inv_full[[idx, N - 1], :] = K_inv_full[[N - 1, idx], :]
             K_inv_full[:, [idx, N - 1]] = K_inv_full[:, [N - 1, idx]]
-            print time() - t0
             # swap x and y as well
             x[[idx, N - 1], :] = x[[N - 1, idx], :]
-            y[[idx, N - 1]] = y[[idx, N - 1]]
+            y[[idx, N - 1]] = y[[N - 1,idx]]
 
             K_inv_m_idx = K_inv_full[:N - 1, :][:,
                           :N - 1]  # -np.outer(K_inv_full[N-1,:N-1], K_inv_full[:N-1,N-1])/K_inv_full[N-1,N-1]
-            print time() - t0
-            K_inv_m_idx -= np.outer(K_inv_full[N - 1, :N - 1], K_inv_full[:N - 1, N - 1]) / K_inv_full[N - 1, N - 1]
-            print time() - t0  # slow
+            c = K_inv_full[N - 1, :N - 1]
+            #The subtracction takes a long time
+            K_inv_m_idx -= np.outer(c/K_inv_full[N-1,N-1], c) 
             Kxxs = self.gp.kernel.value(t, x[:N - 1])
-            print time() - t0  # slow-ish
             # TODO currently doesn't work on ExtraCrispy. Could make y an input and it would.
+            #this proudct takes a long time
             alpha = np.dot(K_inv_m_idx, y[:N - 1])
-            print time() - t0  # slow-ish
             mus[idx, :] = np.dot(Kxxs, alpha)
-            print time() - t0
+
+            print mus[idx,:]
+            print time()-t0
+            print
+            t0 = time()
+            rotation_matrix = np.eye(N)
+            rotation_matrix[idx,idx] = rotation_matrix[N-1,N-1] = 0.0
+            rotation_matrix[idx,N-1] = rotation_matrix[N-1,idx] = 1.0
+            t_x = np.dot(rotation_matrix, self.gp._x)
+            K = self.gp.kernel.value(t_x[:N-1], t_x[:N-1]) 
+            alpha2 = np.dot(inv(K),np.dot(rotation_matrix, self.gp._y)[:N-1])
+            Kxxs2 = self.gp.kernel.value(t, t_x[:N-1])
+            print np.dot(Kxxs2, alpha2)
+            print time()-t0
 
             K_inv_full[[idx, N - 1], :] = K_inv_full[[N - 1, idx], :]
             K_inv_full[:, [idx, N - 1]] = K_inv_full[:, [N - 1, idx]]
-            print time() - t0
             x[[idx, N - 1], :] = x[[N - 1, idx], :]
-            y[[idx, N - 1]] = y[[idx, N - 1]]
+            y[[idx, N - 1]] = y[[N - 1,idx]]
 
         return (N - 1) / N * np.cov(mus, rowvar=False)
 
@@ -457,6 +468,8 @@ class OriginalRecipe(Emu):
                     order=['f%d' % i for i in xrange(self.ndim)], axis=0).view(np.float)
         # TODO give some thought to what is the best way to format the output
         mu, cov = self.gp.predict(self.y, t)
+        print mu
+        print
         errs = np.sqrt(np.diag(cov))
         jk_errs = self._jackknife_errors(t)
         print jk_errs.shape
