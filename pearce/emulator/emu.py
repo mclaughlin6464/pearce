@@ -232,26 +232,40 @@ class Emu(object):
             print time() - t0
             # swap x and y as well
             x[[idx, N - 1], :] = x[[N - 1, idx], :]
-            y[[idx, N - 1]] = y[[idx, N - 1]]
+            y[[idx, N - 1]] = y[[N - 1,idx]]
 
             K_inv_m_idx = K_inv_full[:N - 1, :][:,
                           :N - 1]  # -np.outer(K_inv_full[N-1,:N-1], K_inv_full[:N-1,N-1])/K_inv_full[N-1,N-1]
-            print time() - t0
-            K_inv_m_idx -= np.outer(K_inv_full[N - 1, :N - 1], K_inv_full[:N - 1, N - 1]) / K_inv_full[N - 1, N - 1]
-            print time() - t0  # slow
+            c = K_inv_full[N - 1, :N - 1]
+            #The subtracction takes a long time
+            K_inv_m_idx -= np.outer(c/K_inv_full[N-1,N-1], c)
             Kxxs = self.gp.kernel.value(t, x[:N - 1])
             print time() - t0  # slow-ish
             # TODO currently doesn't work on ExtraCrispy. Could make y an input and it would.
+            #this proudct takes a long time
             alpha = np.dot(K_inv_m_idx, y[:N - 1])
             print time() - t0  # slow-ish
             mus[idx, :] = np.dot(Kxxs, alpha)
-            print time() - t0
+
+            print mus[idx,:]
+            print time()-t0
+            print
+            t0 = time()
+            rotation_matrix = np.eye(N)
+            rotation_matrix[idx,idx] = rotation_matrix[N-1,N-1] = 0.0
+            rotation_matrix[idx,N-1] = rotation_matrix[N-1,idx] = 1.0
+            t_x = np.dot(rotation_matrix, self.gp._x)
+            K = self.gp.kernel.value(t_x[:N-1], t_x[:N-1])
+            alpha2 = np.dot(inv(K),np.dot(rotation_matrix, self.gp._y)[:N-1])
+            Kxxs2 = self.gp.kernel.value(t, t_x[:N-1])
+            print np.dot(Kxxs2, alpha2)
+            print time()-t0
 
             K_inv_full[[idx, N - 1], :] = K_inv_full[[N - 1, idx], :]
             K_inv_full[:, [idx, N - 1]] = K_inv_full[:, [N - 1, idx]]
             print time() - t0
             x[[idx, N - 1], :] = x[[N - 1, idx], :]
-            y[[idx, N - 1]] = y[[idx, N - 1]]
+            y[[idx, N - 1]] = y[[N - 1,idx]]
 
         return (N - 1) / N * np.cov(mus, rowvar=False)
 
