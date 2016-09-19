@@ -232,40 +232,40 @@ class Emu(object):
             print time() - t0
             # swap x and y as well
             x[[idx, N - 1], :] = x[[N - 1, idx], :]
-            y[[idx, N - 1]] = y[[N - 1,idx]]
+            y[[idx, N - 1]] = y[[N - 1, idx]]
 
             K_inv_m_idx = K_inv_full[:N - 1, :][:,
                           :N - 1]  # -np.outer(K_inv_full[N-1,:N-1], K_inv_full[:N-1,N-1])/K_inv_full[N-1,N-1]
             c = K_inv_full[N - 1, :N - 1]
-            #The subtracction takes a long time
-            K_inv_m_idx -= np.outer(c/K_inv_full[N-1,N-1], c)
+            # The subtracction takes a long time
+            K_inv_m_idx -= np.outer(c / K_inv_full[N - 1, N - 1], c)
             Kxxs = self.gp.kernel.value(t, x[:N - 1])
             print time() - t0  # slow-ish
             # TODO currently doesn't work on ExtraCrispy. Could make y an input and it would.
-            #this proudct takes a long time
+            # this proudct takes a long time
             alpha = np.dot(K_inv_m_idx, y[:N - 1])
             print time() - t0  # slow-ish
             mus[idx, :] = np.dot(Kxxs, alpha)
 
-            print mus[idx,:]
-            print time()-t0
+            print mus[idx, :]
+            print time() - t0
             print
             t0 = time()
             rotation_matrix = np.eye(N)
-            rotation_matrix[idx,idx] = rotation_matrix[N-1,N-1] = 0.0
-            rotation_matrix[idx,N-1] = rotation_matrix[N-1,idx] = 1.0
+            rotation_matrix[idx, idx] = rotation_matrix[N - 1, N - 1] = 0.0
+            rotation_matrix[idx, N - 1] = rotation_matrix[N - 1, idx] = 1.0
             t_x = np.dot(rotation_matrix, self.gp._x)
-            K = self.gp.kernel.value(t_x[:N-1], t_x[:N-1])
-            alpha2 = np.dot(inv(K),np.dot(rotation_matrix, self.gp._y)[:N-1])
-            Kxxs2 = self.gp.kernel.value(t, t_x[:N-1])
+            K = self.gp.kernel.value(t_x[:N - 1], t_x[:N - 1])
+            alpha2 = np.dot(inv(K), np.dot(rotation_matrix, self.gp._y)[:N - 1])
+            Kxxs2 = self.gp.kernel.value(t, t_x[:N - 1])
             print np.dot(Kxxs2, alpha2)
-            print time()-t0
+            print time() - t0
 
             K_inv_full[[idx, N - 1], :] = K_inv_full[[N - 1, idx], :]
             K_inv_full[:, [idx, N - 1]] = K_inv_full[:, [N - 1, idx]]
             print time() - t0
             x[[idx, N - 1], :] = x[[N - 1, idx], :]
-            y[[idx, N - 1]] = y[[N - 1,idx]]
+            y[[idx, N - 1]] = y[[N - 1, idx]]
 
         return (N - 1) / N * np.cov(mus, rowvar=False)
 
@@ -321,7 +321,7 @@ class Emu(object):
         '''
         return 0 if all(p.low < val < p.high for p, val in izip(self.ordered_params, theta)) else -np.inf
 
-    def lnlike(self, theta, y,cov, rpoints):
+    def lnlike(self, theta, y, cov, rpoints):
         raise NotImplementedError
 
     def lnprob(self, theta, **args):
@@ -340,7 +340,7 @@ class Emu(object):
             return -np.inf
         return lp + self.lnlike(theta, **args)
 
-    def run_mcmc(self, xi,cov, rpoints, nwalkers=1000, nsteps=100, nburn = 20,n_cores='all'):
+    def run_mcmc(self, xi, cov, rpoints, nwalkers=1000, nsteps=100, nburn=20, n_cores='all'):
         '''
         Run an MCMC sampler, using the emulator. Uses emcee to perform sampling.
         :param xi:
@@ -377,11 +377,11 @@ class Emu(object):
         assert xi.shape[0] == rpoints.shape[0]
 
         sampler = mc.EnsemblerSampler(nwalkers, self.sampling_ndim, self.lnprob,
-                                      threads=n_cores, args=(xi,cov,rpoints))
+                                      threads=n_cores, args=(xi, cov, rpoints))
 
         pos0 = np.zeros((nwalkers, self.sampling_ndim))
-        #The zip ensures we don't use the params that are only for the emulator
-        for idx, (p,_) in enumerate(izip(self.ordered_params, xrange(self.sampling_ndim))):
+        # The zip ensures we don't use the params that are only for the emulator
+        for idx, (p, _) in enumerate(izip(self.ordered_params, xrange(self.sampling_ndim))):
             pos0[:, idx] = np.random.uniform(p.low, p.high, size=nwalkers)
 
         sampler.run_mcmc(pos0, nsteps)
@@ -487,8 +487,8 @@ class OriginalRecipe(Emu):
         # a reshape may be faster.
         zeros_slice = np.all(x != 0.0, axis=1)
         # set the results of these calculations.
-        self.emulator_ndim = ndim #The number of params for the emulator is different than those in sampling.
-        self.sampling_ndim = ndim-1
+        self.emulator_ndim = ndim  # The number of params for the emulator is different than those in sampling.
+        self.sampling_ndim = ndim - 1
         self.x = x[zeros_slice]
         self.y = y[zeros_slice]
         self.yerr = yerr[zeros_slice]
@@ -556,10 +556,10 @@ class OriginalRecipe(Emu):
         # TODO give some thought to what is the best way to format the output
         # TODO option to return errors or cov?
         mu, cov = self.gp.predict(self.y, t)
-        #errs = np.sqrt(np.diag(cov))
+        # errs = np.sqrt(np.diag(cov))
 
-        #jk_errs = self._jackknife_errors(t)
-        #print jk_errs.shape
+        # jk_errs = self._jackknife_errors(t)
+        # print jk_errs.shape
 
         # mu = mu.reshape((-1, len(self.rpoints)))
         # errs = errs.reshape((-1, len(self.rpoints)))
@@ -599,17 +599,18 @@ class OriginalRecipe(Emu):
         '''
         em_params = {p.name: theta for p in self.ordered_params}
 
-        #using my own notation
+        # using my own notation
         y_bar, G = self.emulate_wrt_r(em_params, rpoints)
-        #should chi2 be calculated in log or linear?
-        #T == cov
+        # should chi2 be calculated in log or linear?
+        # T == cov
         TG_inv = np.dot(cov, inv(G))
         d = np.dot(TG_inv, y_bar)
-        I_TG_inv = TG_inv[np.diag_indices(TG_inv)]+1
-        D = np.dot(I_TG_inv, cov) # sadly not a faster way to compute D inverse.
-        delta = d-y
+        I_TG_inv = TG_inv[np.diag_indices(TG_inv)] + 1
+        D = np.dot(I_TG_inv, cov)  # sadly not a faster way to compute D inverse.
+        delta = d - y
         chi2 = -0.5 * np.dot(delta, np.dot(inv(D), delta))
         return chi2
+
 
 class ExtraCrispy(Emu):
     def get_training_data(self, training_dir, independent_variable, fixed_params):
@@ -704,8 +705,8 @@ class ExtraCrispy(Emu):
         # a reshape may be faster.
         zeros_slice = np.all(x != 0.0, axis=1)
         # set the results of these calculations.
-        self.emulator_ndim = ndim #the number of parameters for the emulator different than a sampler, in some cases
-        self.sampling_ndim = ndim # TODO not sure if this is the best design choice.
+        self.emulator_ndim = ndim  # the number of parameters for the emulator different than a sampler, in some cases
+        self.sampling_ndim = ndim  # TODO not sure if this is the best design choice.
         self.x = x[zeros_slice]
         self.y = y[zeros_slice, :]
         self.yerr = np.zeros((self.x.shape[0],))  # We don't use errors for extra crispy!
@@ -779,13 +780,13 @@ class ExtraCrispy(Emu):
                     order=['f%d' % i for i in xrange(t.shape[0])], axis=0).view(np.float)
 
         all_mu = np.zeros((t.shape[0], self.y.shape[1]))  # t down rbins across
-        #all_err = np.zeros((t.shape[0], self.y.shape[1]))
+        # all_err = np.zeros((t.shape[0], self.y.shape[1]))
         all_cov = np.zeros((t.shape[0], t.shape[0], self.y.shape[1]))
         for idx, (y, y_hat) in enumerate(izip(self.y.T, self.y_hat)):
             mu, cov = self.gp.predict(y, t)
             # mu and cov come out as (1,) arrays.
             all_mu[:, idx] = mu
-            #all_err[:, idx] = np.sqrt(np.diag(cov))
+            # all_err[:, idx] = np.sqrt(np.diag(cov))
             all_cov[:, :, idx] = cov
 
         # note may want to do a reshape here., Esp to be consistent with the other
