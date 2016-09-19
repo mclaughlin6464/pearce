@@ -6,12 +6,14 @@ from time import time
 import warnings
 from glob import glob
 from itertools import izip
+from multiprocessing import cpu_count
 import numpy as np
 import scipy.optimize as op
 from scipy.linalg import inv
 from scipy.interpolate import interp1d
 import george
 from george.kernels import *
+import emcee as mc
 
 from .trainingData import PARAMS, GLOBAL_FILENAME
 from .ioHelpers import global_file_reader, xi_file_reader
@@ -46,7 +48,7 @@ class Emu(object):
     # I can get LHC from the training data. If any coordinate equals any other in its column we know!
     def get_training_data(self, training_dir, independent_variable, fixed_params):
         '''Implemented in subclasses. '''
-        pass
+        raise NotImplementedError
 
     def build_emulator(self, independent_variable, fixed_params, metric={}):
         '''
@@ -76,7 +78,7 @@ class Emu(object):
         self.metric = np.array(self.metric)
 
         a = ig['amp']
-        kernel = a * ExpSquaredKernel(self.metric, ndim=self.ndim)
+        kernel = a * ExpSquaredKernel(self.metric, ndim=self.emulator_ndim)
         self.gp = george.GP(kernel)
         # gp = george.GP(kernel, solver=george.HODLRSolver, nleaf=x.shape[0]+1,tol=1e-18)
         self.fixed_params = fixed_params  # remember which params were fixed
@@ -199,13 +201,13 @@ class Emu(object):
         return ig
 
     def train(self, **kwargs):
-        pass
+        raise NotImplementedError
 
     def emulate(self, em_params):
-        pass
+        raise NotImplementedError
 
     def emulate_wrt_r(self, em_params, rpoints):
-        pass
+        raise NotImplementedError
 
     # TODO docstring, comments
     def _jackknife_errors(self, t):
@@ -293,6 +295,87 @@ class Emu(object):
                 values.append(1 - SSR / SST)
 
         return np.array(values)
+
+    def lnprior(self, theta):
+        '''
+        Prior for an MCMC. Currently asserts theta is between the boundaries used to make the emulator.
+        Could do something more clever later.
+        :param theta:
+            The parameters proposed by the sampler.
+        :return:
+            Either 0 or -np.inf, depending if the params are allowed or not.
+        '''
+        return 0 if all(p.low < val < p.high for p, val in izip(self.ordered_params, theta)) else -np.inf
+
+    def lnlike(self, theta, y,cov, rpoints):
+        raise NotImplementedError
+
+    def lnprob(self, theta, **args):
+        '''
+        The total liklihood for an MCMC.
+        lnlike is not implemented, so this can only be called in a child class.
+        :param theta:
+            Parameters for the proposal
+        :param args:
+            Arguments to pass into the liklihood
+        :return:
+            Log Liklihood of theta, a float.
+        '''
+        lp = self.lnprior(theta)
+        if not np.isfinite(lp):
+            return -np.inf
+        return lp + self.lnlike(theta, **args)
+
+    def run_mcmc(self, xi,cov, rpoints, nwalkers=1000, nsteps=100, nburn = 20,n_cores='all'):
+        '''
+        Run an MCMC sampler, using the emulator. Uses emcee to perform sampling.
+        :param xi:
+            A true xi value to recover the parameters of
+        :param cov:
+            The measurement covariance matrix of xi
+        :param rpoints:
+            The centers of the radial bins of xi.
+        :param nwalkers:
+            Optional. Number of walkers for emcee. Default is 1000.
+        :param nsteps:
+            Optional. Number of steps for emcee. Default is 100.
+        :param nburn:
+            Optional. Number of burn-in steps for emcee. Default is 20.
+        :param n_cores:
+            Number of cores, either an iteger or 'all'. Default is 'all'.
+        :return:
+            chain, a numpy array of the sample chain.
+        '''
+
+        assert n_cores == 'all' or n_cores > 0
+        if type(n_cores) is not str:
+            assert int(n_cores) == n_cores
+
+        max_cores = cpu_count()
+        if n_cores == 'all':
+            n_cores = max_cores
+        elif n_cores > max_cores:
+            warnings.warn('n_cores invalid. Changing from %d to maximum %d.' % (n_cores, max_cores))
+            n_cores = max_cores
+            # else, we're good!
+
+        assert xi.shape[0] == cov.shape[0] and cov.shape[1] == cov.shape[0]
+        assert xi.shape[0] == rpoints.shape[0]
+
+        sampler = mc.EnsemblerSampler(nwalkers, self.sampling_ndim, self.lnprob,
+                                      threads=n_cores, args=(xi,cov,rpoints))
+
+        pos0 = np.zeros((nwalkers, self.sampling_ndim))
+        #The zip ensures we don't use the params that are only for the emulator
+        for idx, (p,_) in enumerate(izip(self.ordered_params, xrange(self.sampling_ndim))):
+            pos0[:, idx] = np.random.uniform(p.low, p.high, size=nwalkers)
+
+        sampler.run_mcmc(pos0, nsteps)
+
+        # Note, still an issue of param label ordering here.
+        chain = sampler.chain[:, nburn:, :].reshape((-1, self.sampling_ndim))
+
+        return chain
 
 
 class OriginalRecipe(Emu):
@@ -390,7 +473,8 @@ class OriginalRecipe(Emu):
         # a reshape may be faster.
         zeros_slice = np.all(x != 0.0, axis=1)
         # set the results of these calculations.
-        self.ndim = ndim
+        self.emulator_ndim = ndim #The number of params for the emulator is different than those in sampling.
+        self.sampling_ndim = ndim-1
         self.x = x[zeros_slice]
         self.y = y[zeros_slice]
         self.yerr = yerr[zeros_slice]
@@ -444,7 +528,7 @@ class OriginalRecipe(Emu):
         input_params = {}
         input_params.update(self.fixed_params)
         input_params.update(em_params)
-        assert len(input_params) == self.ndim  # check dimenstionality
+        assert len(input_params) == self.emulator_ndim  # check dimenstionality
         for i in input_params:
             assert any(i == p.name for p in self.ordered_params)
 
@@ -452,18 +536,21 @@ class OriginalRecipe(Emu):
         t_list = [input_params[p.name] for p in self.ordered_params]
         t_grid = np.meshgrid(*t_list)
         t = np.stack(t_grid).T
-        t = t.reshape((-1, self.ndim))
+        t = t.reshape((-1, self.emulator_ndim))
         t = np.sort(t.view(','.join(['float64' for _ in self.ordered_params])),
-                    order=['f%d' % i for i in xrange(self.ndim)], axis=0).view(np.float)
+                    order=['f%d' % i for i in xrange(self.emulator_ndim)], axis=0).view(np.float)
         # TODO give some thought to what is the best way to format the output
+        # TODO option to return errors or cov?
         mu, cov = self.gp.predict(self.y, t)
-        errs = np.sqrt(np.diag(cov))
-        jk_errs = self._jackknife_errors(t)
-        print jk_errs.shape
+        #errs = np.sqrt(np.diag(cov))
+
+        #jk_errs = self._jackknife_errors(t)
+        #print jk_errs.shape
+
         # mu = mu.reshape((-1, len(self.rpoints)))
         # errs = errs.reshape((-1, len(self.rpoints)))
         # Note ordering is unclear if em_params has more than 1 value.
-        return mu, errs
+        return mu, cov
 
     def emulate_wrt_r(self, em_params, rpoints):
         '''
@@ -481,6 +568,34 @@ class OriginalRecipe(Emu):
         out = self.emulate(vep)
         return out
 
+    # TODO rename other functiosn to have general notation
+    def lnlike(self, theta, y, cov, rpoints):
+        '''
+        The liklihood of parameters theta given the other parameters and the emulator.
+        :param theta:
+            Proposed parameters.
+        :param xi:
+            The measured value of xi to compare to the emulator.
+        :param cov:
+            The covariance matrix of the measured values.
+        :param rpoints:
+            The centers of the rbins for xi.
+        :return:
+            The log liklihood of theta given the measurements and the emulator.
+        '''
+        em_params = {p.name: theta for p in self.ordered_params}
+
+        #using my own notation
+        y_bar, G = self.emulate_wrt_r(em_params, rpoints)
+        #should chi2 be calculated in log or linear?
+        #T == cov
+        TG_inv = np.dot(cov, inv(G))
+        d = np.dot(TG_inv, y_bar)
+        I_TG_inv = TG_inv[np.diag_indices(TG_inv)]+1
+        D = np.dot(I_TG_inv, cov) # sadly not a faster way to compute D inverse.
+        delta = d-y
+        chi2 = -0.5 * np.dot(delta, np.dot(inv(D), delta))
+        return chi2
 
 class ExtraCrispy(Emu):
     def get_training_data(self, training_dir, independent_variable, fixed_params):
@@ -575,7 +690,8 @@ class ExtraCrispy(Emu):
         # a reshape may be faster.
         zeros_slice = np.all(x != 0.0, axis=1)
         # set the results of these calculations.
-        self.ndim = ndim
+        self.emulator_ndim = ndim #the number of parameters for the emulator different than a sampler, in some cases
+        self.sampling_ndim = ndim # TODO not sure if this is the best design choice.
         self.x = x[zeros_slice]
         self.y = y[zeros_slice, :]
         self.yerr = np.zeros((self.x.shape[0],))  # We don't use errors for extra crispy!
@@ -633,7 +749,7 @@ class ExtraCrispy(Emu):
         input_params = {}
         input_params.update(self.fixed_params)
         input_params.update(em_params)
-        assert len(input_params) == self.ndim  # check dimenstionality
+        assert len(input_params) == self.emulator_ndim  # check dimenstionality
         for i in input_params:
             assert any(i == p.name for p in self.ordered_params)
 
@@ -641,7 +757,7 @@ class ExtraCrispy(Emu):
         t_list = [input_params[p.name] for p in self.ordered_params]
         t_grid = np.meshgrid(*t_list)
         t = np.stack(t_grid).T
-        t = t.reshape((-1, self.ndim))
+        t = t.reshape((-1, self.emulator_ndim))
         # t.view(','.join(['float64' for _ in self.ordered_params]))
         # for some reason this one has different requirements than the other.
         # i give up, it's black magic
@@ -649,16 +765,18 @@ class ExtraCrispy(Emu):
                     order=['f%d' % i for i in xrange(t.shape[0])], axis=0).view(np.float)
 
         all_mu = np.zeros((t.shape[0], self.y.shape[1]))  # t down rbins across
-        all_err = np.zeros((t.shape[0], self.y.shape[1]))
-        for idx, (y, y_hat) in enumerate(zip(self.y.T, self.y_hat)):
+        #all_err = np.zeros((t.shape[0], self.y.shape[1]))
+        all_cov = np.zeros((t.shape[0], t.shape[0], self.y.shape[1]))
+        for idx, (y, y_hat) in enumerate(izip(self.y.T, self.y_hat)):
             mu, cov = self.gp.predict(y, t)
             # mu and cov come out as (1,) arrays.
             all_mu[:, idx] = mu
-            all_err[:, idx] = np.sqrt(np.diag(cov))
+            #all_err[:, idx] = np.sqrt(np.diag(cov))
+            all_cov[:, :, idx] = cov
 
         # note may want to do a reshape here., Esp to be consistent with the other
         # implementation
-        return all_mu, all_err
+        return all_mu, all_cov
 
     def emulate_wrt_r(self, em_params, rpoints, kind='slinear'):
         '''
@@ -674,13 +792,17 @@ class ExtraCrispy(Emu):
         :return:
         '''
         # turns out this how it already works!
-        all_mu, all_err = self.emulate(em_params)
+        all_mu, all_cov = self.emulate(em_params)
         # don't need to interpolate!
         if np.all(rpoints == self.rpoints):
-            return all_mu, all_err
+            return all_mu, all_cov
 
         # TODO check rpoints in bounds!
-        print all_mu.shape
+        # TODO is there any reasonable way to interpolate the covariance?
+        all_err = np.zeros_like(all_mu)
+        for idx in xrange(self.y.shape[1]):
+            all_err[:, idx] = np.sqrt(np.diag(all_cov[:, :, idx]))
+
         if len(all_mu.shape) == 1:  # just one calculation
             xi_interpolator = interp1d(self.rpoints, all_mu, kind=kind)
             new_mu = xi_interpolator(rpoints)
@@ -689,7 +811,7 @@ class ExtraCrispy(Emu):
             return new_mu, new_err
 
         new_mu, new_err = [], []
-        for mean, err in zip(all_mu, all_err):
+        for mean, err in izip(all_mu, all_err):
             xi_interpolator = interp1d(self.rpoints, mean, kind=kind)
             interp_mean = xi_interpolator(rpoints)
             new_mu.append(interp_mean)
