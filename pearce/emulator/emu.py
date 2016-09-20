@@ -409,8 +409,8 @@ class Emu(object):
         assert y.shape[0] == cov.shape[0] and cov.shape[1] == cov.shape[0]
         assert y.shape[0] == rpoints.shape[0]
 
-        sampler = mc.EnsembleSampler(nwalkers, self.sampling_ndim, self.lnprob,
-                                      threads=n_cores, args=(y, cov, rpoints))
+        sampler = mc.EnsembleSampler(nwalkers, self.sampling_ndim, lnprob,
+                                      threads=n_cores, args=(self, y, cov, rpoints))
 
         pos0 = np.zeros((nwalkers, self.sampling_ndim))
         # The zip ensures we don't use the params that are only for the emulator
@@ -423,6 +423,69 @@ class Emu(object):
         chain = sampler.chain[:, nburn:, :].reshape((-1, self.sampling_ndim))
 
         return chain
+
+
+def lnprob(theta, **args):
+    '''
+    The total liklihood for an MCMC. Sadly, can't be an instance of the Emu Object.
+    :param theta:
+        Parameters for the proposal
+    :param args:
+        Arguments to pass into the liklihood
+    :return:
+        Log Liklihood of theta, a float.
+    '''
+    lp = lnprior(theta)
+    if not np.isfinite(lp):
+        return -np.inf
+    return lp + lnlike(theta, **args)
+
+
+def lnprior(theta, emu, **args):
+    '''
+    Prior for an MCMC. Currently asserts theta is between the boundaries used to make the emulator.
+    Could do something more clever later.
+    :param theta:
+        The parameters proposed by the sampler.
+    :return:
+        Either 0 or -np.inf, depending if the params are allowed or not.
+    '''
+    return 0 if all(p.low < val < p.high for p, val in izip(emu.ordered_params, theta)) else -np.inf
+
+
+def lnlike(theta, emu, y, cov, rpoints):
+    '''
+    The liklihood of parameters theta given the other parameters and the emulator.
+    :param theta:
+        Proposed parameters.
+    :param y:
+        The measured value of xi to compare to the emulator.
+    :param cov:
+        The covariance matrix of the measured values.
+    :param rpoints:
+        The centers of the rbins for xi.
+    :return:
+        The log liklihood of theta given the measurements and the emulator.
+    '''
+    em_params = {p.name: theta for p in emu.ordered_params}
+
+    # using my own notation
+    y_bar, G = emu.emulate_wrt_r(em_params, rpoints)
+    # should chi2 be calculated in log or linear?
+    # answer: the user is responsible for taking the log before it comes here.
+    # T == cov
+
+    # TG_inv = np.dot(cov, inv(G))
+    # d = np.dot(TG_inv, y_bar)
+    # I_TG_inv = TG_inv[np.diag_indices(TG_inv)] + 1
+    # D = np.dot(I_TG_inv, cov)  # sadly not a faster way to compute D inverse.
+    # delta = d - y
+
+    # TODO you could have the inverse of D passed in, as it is data
+    # For now, it will not be worthwhile.
+    D = 2 * cov
+    delta = y_bar - y
+    chi2 = -0.5 * np.dot(delta, np.dot(inv(D), delta))
 
 
 class OriginalRecipe(Emu):
