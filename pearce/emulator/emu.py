@@ -18,6 +18,9 @@ import emcee as mc
 from .trainingData import PARAMS, GLOBAL_FILENAME
 from .ioHelpers import global_file_reader, xi_file_reader
 
+from guppy import hpy
+import pdb
+
 
 class Emu(object):
     # NOTE I believe that I'll have to subclass for the scale-indepent and original versions.
@@ -83,7 +86,7 @@ class Emu(object):
         # gp = george.GP(kernel, solver=george.HODLRSolver, nleaf=x.shape[0]+1,tol=1e-18)
         self.fixed_params = fixed_params  # remember which params were fixed
 
-        self.gp.compute(self.x, self.yerr)  # NOTE I'm using a modified version of george!
+        self.gp.compute(self.x, self.yerr,sort=False)  # NOTE I'm using a modified version of george!
 
     # Not sure this will work at all in an LHC scheme.
     def get_plot_data(self, em_params, training_dir, independent_variable='xi', fixed_params={}):
@@ -310,68 +313,6 @@ class Emu(object):
 
         return np.array(values)
 
-    def lnprior(self, theta):
-        '''
-        Prior for an MCMC. Currently asserts theta is between the boundaries used to make the emulator.
-        Could do something more clever later.
-        :param theta:
-            The parameters proposed by the sampler.
-        :return:
-            Either 0 or -np.inf, depending if the params are allowed or not.
-        '''
-        return 0 if all(p.low < val < p.high for p, val in izip(self.ordered_params, theta)) else -np.inf
-
-    def lnlike(self, theta, y, cov, rpoints):
-        '''
-        The liklihood of parameters theta given the other parameters and the emulator.
-        :param theta:
-            Proposed parameters.
-        :param y:
-            The measured value of xi to compare to the emulator.
-        :param cov:
-            The covariance matrix of the measured values.
-        :param rpoints:
-            The centers of the rbins for xi.
-        :return:
-            The log liklihood of theta given the measurements and the emulator.
-        '''
-        em_params = {p.name: theta for p in self.ordered_params}
-
-        # using my own notation
-        y_bar, G = self.emulate_wrt_r(em_params, rpoints)
-        # should chi2 be calculated in log or linear?
-        # answer: the user is responsible for taking the log before it comes here.
-        # T == cov
-
-        #TG_inv = np.dot(cov, inv(G))
-        #d = np.dot(TG_inv, y_bar)
-        #I_TG_inv = TG_inv[np.diag_indices(TG_inv)] + 1
-        #D = np.dot(I_TG_inv, cov)  # sadly not a faster way to compute D inverse.
-        #delta = d - y
-
-        # TODO you could have the inverse of D passed in, as it is data
-        # For now, it will not be worthwhile. 
-        D = 2*cov
-        delta = y_bar - y
-        chi2 = -0.5 * np.dot(delta, np.dot(inv(D), delta))
-
-
-
-    def lnprob(self, theta, **args):
-        '''
-        The total liklihood for an MCMC.
-        :param theta:
-            Parameters for the proposal
-        :param args:
-            Arguments to pass into the liklihood
-        :return:
-            Log Liklihood of theta, a float.
-        '''
-        lp = self.lnprior(theta)
-        if not np.isfinite(lp):
-            return -np.inf
-        return lp + self.lnlike(theta, **args)
-
     def run_mcmc(self, y, cov, rpoints, nwalkers=1000, nsteps=100, nburn=20, n_cores='all'):
         '''
         Run an MCMC sampler, using the emulator. Uses emcee to perform sampling.
@@ -409,15 +350,28 @@ class Emu(object):
         assert y.shape[0] == cov.shape[0] and cov.shape[1] == cov.shape[0]
         assert y.shape[0] == rpoints.shape[0]
 
+        hp = hpy()
+        before = hp.heap()
+
         sampler = mc.EnsembleSampler(nwalkers, self.sampling_ndim, lnprob,
                                       threads=n_cores, args=(self, y, cov, rpoints))
+
+        after1 = hp.heap()
 
         pos0 = np.zeros((nwalkers, self.sampling_ndim))
         # The zip ensures we don't use the params that are only for the emulator
         for idx, (p, _) in enumerate(izip(self.ordered_params, xrange(self.sampling_ndim))):
             pos0[:, idx] = np.random.uniform(p.low, p.high, size=nwalkers)
 
+        leftover = after1-before
+        #pdb.set_trace()
+
         sampler.run_mcmc(pos0, nsteps)
+
+        after2 = hp.heap()
+
+        leftover = after2-after1
+        pdb.set_trace()
 
         # Note, still an issue of param label ordering here.
         chain = sampler.chain[:, nburn:, :].reshape((-1, self.sampling_ndim))
@@ -425,7 +379,7 @@ class Emu(object):
         return chain
 
 
-def lnprob(theta, **args):
+def lnprob(theta, *args):
     '''
     The total liklihood for an MCMC. Sadly, can't be an instance of the Emu Object.
     :param theta:
@@ -435,13 +389,14 @@ def lnprob(theta, **args):
     :return:
         Log Liklihood of theta, a float.
     '''
-    lp = lnprior(theta)
+    lp = lnprior(theta, *args)
     if not np.isfinite(lp):
         return -np.inf
-    return lp + lnlike(theta, **args)
+    return lp + lnlike(theta, *args)
 
 
-def lnprior(theta, emu, **args):
+#TODO fix docs here
+def lnprior(theta, emu, *args):
     '''
     Prior for an MCMC. Currently asserts theta is between the boundaries used to make the emulator.
     Could do something more clever later.
@@ -647,8 +602,10 @@ class OriginalRecipe(Emu):
         t_grid = np.meshgrid(*t_list)
         t = np.stack(t_grid).T
         t = t.reshape((-1, self.emulator_ndim))
-        t = np.sort(t.view(','.join(['float64' for _ in xrange(min(t.shape))])),
+        if t.shape[0] != 1:
+            t = np.sort(t.view(','.join(['float64' for _ in xrange(min(t.shape))])),
                     order=['f%d' % i for i in xrange(min(t.shape))], axis=0).view(np.float)
+
         # TODO give some thought to what is the best way to format the output
         # TODO option to return errors or cov?
         mu, cov = self.gp.predict(self.y, t)
@@ -842,8 +799,9 @@ class ExtraCrispy(Emu):
         # t.view(','.join(['float64' for _ in self.ordered_params]))
         # for some reason this one has different requirements than the other.
         # i give up, it's black magic
-        t = np.sort(t.view(','.join(['float64' for _ in xrange(t.shape[0])])),
-                    order=['f%d' % i for i in xrange(t.shape[0])], axis=0).view(np.float)
+        if t.shape[0] != 1:
+            t = np.sort(t.view(','.join(['float64' for _ in xrange(min(t.shape))])),
+                    order=['f%d' % i for i in xrange(min(t.shape))], axis=0).view(np.float)
 
         all_mu = np.zeros((t.shape[0], self.y.shape[1]))  # t down rbins across
         # all_err = np.zeros((t.shape[0], self.y.shape[1]))

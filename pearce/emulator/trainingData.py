@@ -10,7 +10,7 @@ from collections import namedtuple
 import numpy as np
 from .ioHelpers import config_reader
 
-parameter = namedtuple('Parameter', ['name', 'low', 'high'])
+parameter = namedtuple('parameter', ['name', 'low', 'high'])
 
 # global object that defines the names and ordering of the parameters, as well as their boundaries.
 # TODO consider moving?
