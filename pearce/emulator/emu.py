@@ -602,9 +602,10 @@ class OriginalRecipe(Emu):
         t_grid = np.meshgrid(*t_list)
         t = np.stack(t_grid).T
         t = t.reshape((-1, self.emulator_ndim))
+        #TODO this is still broken!
         if t.shape[0] != 1:
-            t = np.sort(t.view(','.join(['float64' for _ in xrange(min(t.shape))])),
-                    order=['f%d' % i for i in xrange(min(t.shape))], axis=0).view(np.float)
+            t = np.sort(t.view(','.join(['float64' for _ in xrange(max(t.shape))])),
+                    order=['f%d' % i for i in xrange(max(t.shape))], axis=0).view(np.float)
 
         # TODO give some thought to what is the best way to format the output
         # TODO option to return errors or cov?
