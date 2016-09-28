@@ -218,59 +218,43 @@ class Emu(object):
         K_inv_full = self.gp.solver.apply_inverse(np.eye(self.gp._alpha.size),
                                                   in_place=True)
 
-        x, y = self.gp._x[:], self.gp._y[:]
+        #TODO deepcopy?
+        x, y, yerr = self.x[:], self.y[:], self.yerr[:]
 
         N = K_inv_full.shape[0]
 
         mus = np.zeros((N, t.shape[0]))
+        t0 = time()
         for idx in xrange(N):
             print idx
-
-            t0 = time()
-            # This operation was really slow. Trying something else.
-            # K_inv_idx_N = np.dot(rotation_matrix, np.dot(K_inv_full, rotation_matrix))
-            # Small
+            x[[N-1, idx]] = x[[idx, N-1]]
+            #y[[N-1, idx], :] = y[[idx, N-1], :]
+            y[[N-1, idx]] = y[[idx, N-1]]
+                                                            
             K_inv_full[[idx, N - 1], :] = K_inv_full[[N - 1, idx], :]
             K_inv_full[:, [idx, N - 1]] = K_inv_full[:, [N - 1, idx]]
-            print time() - t0
-            # swap x and y as well
-            x[[idx, N - 1], :] = x[[N - 1, idx], :]
-            y[[idx, N - 1]] = y[[N - 1, idx]]
+                                                                        
+            K_m_idx_inv = K_inv_full[:N - 1, :][:,:N - 1] \
+                            -np.outer(K_inv_full[N-1,:N-1], K_inv_full[:N-1,N-1])/K_inv_full[N-1,N-1]
+                                                                                                           
+            #alpha_m_idx = [np.dot(K_m_idx_inv, t_y[:N-1, rbin ]-self.gp.mean(t_x[:N-1])) for rbin in xrange(t_y.shape[1]) ]
+            alpha_m_idx = np.dot(K_m_idx_inv, y[:N-1 ]-self.gp.mean(x[:N-1]))
 
-            K_inv_m_idx = K_inv_full[:N - 1, :][:,
-                          :N - 1]  # -np.outer(K_inv_full[N-1,:N-1], K_inv_full[:N-1,N-1])/K_inv_full[N-1,N-1]
-            c = K_inv_full[N - 1, :N - 1]
-            # The subtracction takes a long time
-            K_inv_m_idx -= np.outer(c / K_inv_full[N - 1, N - 1], c)
-            Kxxs = self.gp.kernel.value(t, x[:N - 1])
-            print time() - t0  # slow-ish
-            # TODO currently doesn't work on ExtraCrispy. Could make y an input and it would.
-            # this proudct takes a long time
-            alpha = np.dot(K_inv_m_idx, y[:N - 1])
-            print time() - t0  # slow-ish
-            mus[idx, :] = np.dot(Kxxs, alpha)
+            Kxxs_t = self.gp.kernel.value(t, x[:N-1])
+            #mus[idx, :] = np.array([np.dot(Kxxs_t, alpha_m_idx[rbin])+ self.gp.mean(t) for rbin in xrange(t_y.shape[1]) ])[:,0]
+            mus[idx, :] = np.dot(Kxxs_t, alpha_m_idx)+ self.gp.mean(t)
 
-            print mus[idx, :]
-            print time() - t0
+            print mus[idx]
             print
-            t0 = time()
-            rotation_matrix = np.eye(N)
-            rotation_matrix[idx, idx] = rotation_matrix[N - 1, N - 1] = 0.0
-            rotation_matrix[idx, N - 1] = rotation_matrix[N - 1, idx] = 1.0
-            t_x = np.dot(rotation_matrix, self.gp._x)
-            K = self.gp.kernel.value(t_x[:N - 1], t_x[:N - 1])
-            alpha2 = np.dot(inv(K), np.dot(rotation_matrix, self.gp._y)[:N - 1])
-            Kxxs2 = self.gp.kernel.value(t, t_x[:N - 1])
-            print np.dot(Kxxs2, alpha2)
-            print time() - t0
-
             K_inv_full[[idx, N - 1], :] = K_inv_full[[N - 1, idx], :]
             K_inv_full[:, [idx, N - 1]] = K_inv_full[:, [N - 1, idx]]
-            print time() - t0
-            x[[idx, N - 1], :] = x[[N - 1, idx], :]
-            y[[idx, N - 1]] = y[[N - 1, idx]]
 
-        return (N - 1) / N * np.cov(mus, rowvar=False)
+            x[[N-1, idx]] = x[[idx, N-1]]
+            #y[[N-1, idx],:] = y[[idx, N-1],:]
+            y[[N-1, idx]] = y[[idx, N-1]]
+           
+        print time()-t0 's Total'
+        return (N - 1.0) / N * np.cov(mus, rowvar=False)
 
     def goodness_of_fit(self, truth_dir, N=None, statistic='r2'):
         '''
@@ -615,8 +599,14 @@ class OriginalRecipe(Emu):
         # TODO option to return errors or cov?
         mu, cov = self.gp.predict(self.y, t)
         # errs = np.sqrt(np.diag(cov))
+        print 'Mu'
+        print mu
+        print 'Cov'
+        print np.diag(cov)
 
-        # jk_errs = self._jackknife_errors(t)
+        jk_errs = self._jackknife_errors(t)
+        print 'JK'
+        print np.diag(jk_errs)
         # print jk_errs.shape
 
         # mu = mu.reshape((-1, len(self.rpoints)))
