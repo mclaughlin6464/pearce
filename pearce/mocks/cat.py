@@ -13,8 +13,7 @@ from astropy import cosmology
 from halotools.sim_manager import RockstarHlistReader, CachedHaloCatalog
 from halotools.empirical_models import PrebuiltHodModelFactory
 from halotools.empirical_models import HodModelFactory, TrivialPhaseSpace, NFWPhaseSpace
-from halotools.mock_observables import return_xyz_formatted_array, tpcf, \
-    tpcf_jackknife  # , tpcf_one_two_halo_decomp, wp
+from halotools.mock_observables import * #i'm importing so much this is just easier
 from .customHODModels import RedMagicSats, RedMagicCens, StepFuncCens, StepFuncSats
 
 # try to import corrfunc, determine if it was successful
@@ -25,6 +24,18 @@ try:
 except ImportError:
     CORRFUNC_AVAILABLE = False
 
+def observable(func):
+    '''
+    Decorator for observable methods. Checks that the catalog is properly loaded and calcualted.
+    :param func:
+        Function that calculates an observable on a populated catalog.
+    :return: func
+    '''
+    def _func(self, *args, **kwargs):
+        assert self.populated_once
+        func(self, *args, **kwargs)
+
+    return _func
 
 class Cat(object):
     def __init__(self, simname='cat', loc='', filenames=[], cache_loc='/u/ki/swmclau2/des/halocats/',
@@ -168,6 +179,30 @@ class Cat(object):
         else:
             return None
 
+    def _check_cores(self, n_cores ):
+        '''
+        Helper function that checks that a user's input for the number of cores is sensible,
+        returns modifications and issues warnings as necessary.
+        :param n_cores:
+            User input for number of cores
+        :return:
+            n_cores: A sensible number of cores given context and requirements.
+        '''
+
+        assert n_cores == 'all' or n_cores > 0
+        if type(n_cores) is not str:
+            assert int(n_cores) == n_cores
+
+        max_cores = cpu_count()
+        if n_cores == 'all':
+            return max_cores
+        elif n_cores > max_cores:
+            warnings.warn('n_cores invalid. Changing from %d to maximum %d.' % (n_cores, max_cores))
+            return max_cores
+            # else, we're good!
+        else:
+            return n_cores
+
     def cache(self, scale_factors='all', overwrite=False):
         '''
         Cache a halo catalog in the halotools format, for later use.
@@ -292,15 +327,15 @@ class Cat(object):
             self.model.populate_mock(self.halocat, Num_ptcl_requirement=min_ptcl)
             self.populated_once = True
 
+    @observable
     def calc_number_density(self):
         '''
         Return the number density for a populated box.
         :return: Number density of a populated box.
         '''
-        assert self.populated_once
-
         return len(self.model.mock.galaxy_table['x']) / (self.Lbox ** 3)
 
+    @observable
     def calc_xi(self, rbins, n_cores='all', do_jackknife=True, use_corrfunc=False):
         '''
         Calculate a 3-D correlation function on a populated catalog.
@@ -317,26 +352,15 @@ class Cat(object):
                 xi_cov (if do_jacknife and ! use_corrfunc):
                 (len(rbins), len(rbins)) covariance matrix for xi.
         '''
-        assert self.populated_once
         assert do_jackknife != use_corrfunc  # xor
         if use_corrfunc and not CORRFUNC_AVAILABLE:
             # NOTE just switch to halotools in this case? Or fail?
             raise ImportError("Corrfunc is not available on this machine!")
 
-        assert n_cores == 'all' or n_cores > 0
-        if type(n_cores) is not str:
-            assert int(n_cores) == n_cores
-
-        max_cores = cpu_count()
-        if n_cores == 'all':
-            n_cores = max_cores
-        elif n_cores > max_cores:
-            warnings.warn('n_cores invalid. Changing from %d to maximum %d.' % (n_cores, max_cores))
-            n_cores = max_cores
-        # else, we're good!
+        n_cores = self._check_cores(n_cores)
 
         x, y, z = [self.model.mock.galaxy_table[c] for c in ['x', 'y', 'z']]
-        pos = return_xyz_formatted_array(x, y, z)
+        pos = return_xyz_formatted_array(x, y, z, period=self.Lbox)
 
         if use_corrfunc:
             # write bins to file
@@ -367,8 +391,76 @@ class Cat(object):
             else:
                 xi_all = tpcf(pos * self.h, rbins, period=self.Lbox * self.h, num_threads=n_cores())
 
-        # TODO 1, 2 halo terms? Angular? Probably in other functions
+        # TODO 1, 2 halo terms?
 
         if do_jackknife:
             return xi_all, xi_cov
         return xi_all
+
+    # TODO use Joe's code. Remember to add sensible asserts when I do.
+    # TODO Jackknife? A way to do it without Joe's code?
+    @observable
+    def calc_wp(self,rp_bins,pi_max=40, n_cores='all',RSD=True):
+        '''
+        Calculate the projected correlation on a populated catalog
+        :param rp_bins:
+            Radial bins of rp, distance perpendicular to projection direction.
+        :param pi_max:
+            Maximum distance to integrate to in projection. Default is 40 Mpc/h
+        :param n_cores:
+            Number of cores to use for calculation. Default is 'all' to use all available.
+        :param RSD:
+            Boolean whether or not to apply redshift space distortions. Default is True.
+        :return:
+            wp_all, the projection correlation function.
+        '''
+
+        n_cores = self._check_cores(n_cores)
+
+        x, y, z = [self.model.mock.galaxy_table[c] for c in ['x', 'y', 'z']]
+        if RSD:
+            # for now, hardcode 'z' as the distortion dimension.
+            distortion_dim = 'z'
+            v_distortion_dim = self.model.mock_table['v%s'%distortion_dim]
+            #apply redshift space distortions
+            pos = return_xyz_formatted_array(x,y,z,velocity=v_distortion_dim, \
+                                velocity_distortion_dimension=distortion_dim, period = self.Lbox)
+        else:
+            pos = return_xyz_formatted_array(x, y, z, period=self.Lbox)
+
+        #don't forget little h!!
+        wp_all = wp(pos*self.h, rp_bins, pi_max*self.h, period=self.Lbox*self.h, num_threads=n_cores)
+        return wp_all
+
+    @observable
+    def calc_wt(self,theta_bins, n_cores='all'):
+        '''
+        Calculate the angular correlation function, w(theta), from a populated catalog.
+        :param theta_bins:
+            The bins in theta to use.
+        :param n_cores:
+            Number of cores to use for calculation. Default is 'all' to use all available.
+        :return:
+            wt_all, the angular correlation function.
+        '''
+
+        n_cores = self._check_cores(n_cores)
+
+        pos = np.vstack([self.model.mock.galaxy_table[c] for c in ['x', 'y', 'z']]).T
+        vels = np.vstack([self.model.mock.galaxy_table[c] for c in ['vx', 'vy', 'vz']]).T
+
+        # TODO is the model cosmo same as the one attached to the cat?
+        ra, dec, z = mock_survey.ra_dec_z(pos*self.h, vels*self.h, cosmo=self.model.mock.cosmology)
+        ang_pos = np.vstack((np.degrees(ra), np.degrees(dec) )).T
+
+        n_rands=5
+        rand_pos = np.random.random((pos.shape[0] * n_rands,3)) * self.Lbox * self.h
+        rand_vels = np.zeros((pos.shape[0]*n_rands, 3))
+
+        rand_ra, rand_dec, rand_z = mock_survey.ra_dec_z(rand_pos*self.h, rand_vels*self.h, cosmo=self.model.mock.cosmology)
+        rand_ang_pos = np.vstack((np.degree(rand_ra), np.degree(rand_dec))).T
+
+        #NOTE I can transform coordinates and not have to use randoms at all. Consider?
+        wt_all = angular_tpcf(ang_pos, theta_bins, randoms=rand_ang_pos, num_threads=n_cores)
+        return wt_all
+
