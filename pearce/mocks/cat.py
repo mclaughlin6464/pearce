@@ -24,6 +24,7 @@ try:
 except ImportError:
     CORRFUNC_AVAILABLE = False
 
+# TODO check that a model has been loaded?
 def observable(func):
     '''
     Decorator for observable methods. Checks that the catalog is properly loaded and calcualted.
@@ -32,7 +33,10 @@ def observable(func):
     :return: func
     '''
     def _func(self, *args, **kwargs):
-        assert self.populated_once
+        try:
+            assert self.populated_once
+        except AssertionError:
+            raise AssertionError("The cat must be populated before calculating an observable.")
         func(self, *args, **kwargs)
 
     return _func
