@@ -238,6 +238,11 @@ class Emu(object):
 
         mus = np.zeros((N, t.shape[0]))
         t0 = time()
+
+        ig = self.get_initial_guess('xi', {})
+        a = ig['amp']
+        kernel = a * ExpSquaredKernel(self.metric, ndim=self.emulator_ndim)
+        loo_gp = george.GP(kernel)
         # iterate over training points to leave out
         for idx in xrange(N):
             # print idx
@@ -246,21 +251,26 @@ class Emu(object):
             # y[[N-1, idx], :] = y[[idx, N-1], :]
             y[[N - 1, idx]] = y[[idx, N - 1]]
 
-            K_inv_full[[idx, N - 1], :] = K_inv_full[[N - 1, idx], :]
-            K_inv_full[:, [idx, N - 1]] = K_inv_full[:, [N - 1, idx]]
+            yerr[[N-1, idx]] = yerr[[idx, N-1]]
+
+            #K_inv_full[[idx, N - 1], :] = K_inv_full[[N - 1, idx], :]
+            #K_inv_full[:, [idx, N - 1]] = K_inv_full[:, [N - 1, idx]]
 
             # the inverse of the LOO GP
             # formula found via MATH
-            K_m_idx_inv = K_inv_full[:N - 1, :][:, :N - 1] \
-                          - np.outer(K_inv_full[N - 1, :N - 1], K_inv_full[:N - 1, N - 1]) / K_inv_full[N - 1, N - 1]
+            #K_m_idx_inv = K_inv_full[:N - 1, :][:, :N - 1] \
+            #              - np.outer(K_inv_full[N - 1, :N - 1], K_inv_full[:N - 1, N - 1]) / K_inv_full[N - 1, N - 1]
 
             # alpha_m_idx = [np.dot(K_m_idx_inv, t_y[:N-1, rbin ]-self.gp.mean(t_x[:N-1])) for rbin in xrange(t_y.shape[1]) ]
-            alpha_m_idx = np.dot(K_m_idx_inv, y[:N - 1] - self.gp.mean(x[:N - 1]))
+            #alpha_m_idx = np.dot(K_m_idx_inv, y[:N - 1] - self.gp.mean(x[:N - 1]))
 
-            Kxxs_t = self.gp.kernel.value(t, x[:N - 1])
+            #Kxxs_t = self.gp.kernel.value(t, x[:N - 1])
             # Store the estimate for this LOO GP
             # mus[idx, :] = np.array([np.dot(Kxxs_t, alpha_m_idx[rbin])+ self.gp.mean(t) for rbin in xrange(t_y.shape[1]) ])[:,0]
-            mus[idx, :] = np.dot(Kxxs_t, alpha_m_idx) + self.gp.mean(t)
+            #mus[idx, :] = np.dot(Kxxs_t, alpha_m_idx) + self.gp.mean(t)
+
+            loo_gp.compute(x[:N - 1], yerr[:N - 1])
+            mus[idx, :] = loo_gp.predict(y[:N - 1], t, mean_only=True)
 
             # print mus[idx]
             # print
@@ -269,8 +279,10 @@ class Emu(object):
             # y[[N-1, idx],:] = y[[idx, N-1],:]
             y[[N - 1, idx]] = y[[idx, N - 1]]
 
-            K_inv_full[[idx, N - 1], :] = K_inv_full[[N - 1, idx], :]
-            K_inv_full[:, [idx, N - 1]] = K_inv_full[:, [N - 1, idx]]
+            yerr[[N-1, idx]] = yerr[[idx, N-1]]
+
+            #K_inv_full[[idx, N - 1], :] = K_inv_full[[N - 1, idx], :]
+            #K_inv_full[:, [idx, N - 1]] = K_inv_full[:, [N - 1, idx]]
 
         print time() - t0, 's Total'
         # return the jackknife cov matrix.
