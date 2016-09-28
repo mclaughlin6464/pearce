@@ -225,7 +225,7 @@ class Emu(object):
         :return:
             jk_cov: a covariance matrix with the dimensions of cov.
         '''
-        # from time import time
+        from time import time
 
         # We need to perform one full inverse to start.
         K_inv_full = self.gp.solver.apply_inverse(np.eye(self.gp._alpha.size),
@@ -237,7 +237,7 @@ class Emu(object):
         N = K_inv_full.shape[0]
 
         mus = np.zeros((N, t.shape[0]))
-        # t0 = time()
+        t0 = time()
         # iterate over training points to leave out
         for idx in xrange(N):
             # print idx
@@ -272,7 +272,7 @@ class Emu(object):
             K_inv_full[[idx, N - 1], :] = K_inv_full[[N - 1, idx], :]
             K_inv_full[:, [idx, N - 1]] = K_inv_full[:, [N - 1, idx]]
 
-        # print time() - t0, 's Total'
+        print time() - t0, 's Total'
         # return the jackknife cov matrix.
         return (N - 1.0) / N * np.cov(mus, rowvar=False)
 
@@ -620,7 +620,9 @@ class OriginalRecipe(Emu):
         # TODO option to return errors or cov?
         if jackknife_errors:
             mu = self.gp.predict(self.y, t, mean_only=True)
+            print mu
             cov = self._jackknife_errors(self.y, t)
+            print np.diag(cov)
         else:
             mu, cov = self.gp.predict(self.y, t)
 
@@ -837,7 +839,8 @@ class ExtraCrispy(Emu):
             for i, row in enumerate(c):
                 for j, val in enumerate(row):
                     cov[i*nbins+n, j*nbins+n] = val
-
+        print mu
+        print np.diag(cov)
         return mu, cov
 
     def emulate_wrt_r(self, em_params, rpoints,jackknife_errors=False, kind='slinear'):
