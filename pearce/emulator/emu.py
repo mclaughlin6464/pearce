@@ -21,6 +21,7 @@ from .ioHelpers import global_file_reader, xi_file_reader
 from guppy import hpy
 import pdb
 
+# TODO I think I could implement some of the subclasses as decorators
 
 class Emu(object):
     # NOTE I believe that I'll have to subclass for the scale-indepent and original versions.
@@ -206,54 +207,73 @@ class Emu(object):
     def train(self, **kwargs):
         raise NotImplementedError
 
-    def emulate(self, em_params):
+    def emulate(self, em_params, jackknife_errors=False):
         raise NotImplementedError
 
-    def emulate_wrt_r(self, em_params, rpoints):
+    def emulate_wrt_r(self, em_params, rpoints, jackknife_errors=False):
         raise NotImplementedError
 
-    # TODO docstring, comments
-    def _jackknife_errors(self, t):
-        from time import time
+    def _jackknife_errors(self, y, t):
+        '''
+        Calculate the LOO Jackknife error matrix. This is implemented using the analytic LOO procedure,
+        which is much faster than re-doing an inversion for each sample. May be useful if the GP's matrix is not
+        accurate.
+        :param y:
+            Values of the independent variable for the training points, used in the prediction.
+        :param t:
+            Values of the dependant variables to predict at.
+        :return:
+            jk_cov: a covariance matrix with the dimensions of cov.
+        '''
+        # from time import time
+
+        # We need to perform one full inverse to start.
         K_inv_full = self.gp.solver.apply_inverse(np.eye(self.gp._alpha.size),
                                                   in_place=True)
 
-        #TODO deepcopy?
-        x, y, yerr = self.x[:], self.y[:], self.yerr[:]
+        # TODO deepcopy?
+        x, yerr = self.x[:], self.yerr[:]
 
         N = K_inv_full.shape[0]
 
         mus = np.zeros((N, t.shape[0]))
-        t0 = time()
+        # t0 = time()
+        # iterate over training points to leave out
         for idx in xrange(N):
-            print idx
-            x[[N-1, idx]] = x[[idx, N-1]]
-            #y[[N-1, idx], :] = y[[idx, N-1], :]
-            y[[N-1, idx]] = y[[idx, N-1]]
-                                                            
-            K_inv_full[[idx, N - 1], :] = K_inv_full[[N - 1, idx], :]
-            K_inv_full[:, [idx, N - 1]] = K_inv_full[:, [N - 1, idx]]
-                                                                        
-            K_m_idx_inv = K_inv_full[:N - 1, :][:,:N - 1] \
-                            -np.outer(K_inv_full[N-1,:N-1], K_inv_full[:N-1,N-1])/K_inv_full[N-1,N-1]
-                                                                                                           
-            #alpha_m_idx = [np.dot(K_m_idx_inv, t_y[:N-1, rbin ]-self.gp.mean(t_x[:N-1])) for rbin in xrange(t_y.shape[1]) ]
-            alpha_m_idx = np.dot(K_m_idx_inv, y[:N-1 ]-self.gp.mean(x[:N-1]))
+            # print idx
+            # swap the values of the LOO point and the last point.
+            x[[N - 1, idx]] = x[[idx, N - 1]]
+            # y[[N-1, idx], :] = y[[idx, N-1], :]
+            y[[N - 1, idx]] = y[[idx, N - 1]]
 
-            Kxxs_t = self.gp.kernel.value(t, x[:N-1])
-            #mus[idx, :] = np.array([np.dot(Kxxs_t, alpha_m_idx[rbin])+ self.gp.mean(t) for rbin in xrange(t_y.shape[1]) ])[:,0]
-            mus[idx, :] = np.dot(Kxxs_t, alpha_m_idx)+ self.gp.mean(t)
-
-            print mus[idx]
-            print
             K_inv_full[[idx, N - 1], :] = K_inv_full[[N - 1, idx], :]
             K_inv_full[:, [idx, N - 1]] = K_inv_full[:, [N - 1, idx]]
 
-            x[[N-1, idx]] = x[[idx, N-1]]
-            #y[[N-1, idx],:] = y[[idx, N-1],:]
-            y[[N-1, idx]] = y[[idx, N-1]]
-           
-        print time()-t0,'s Total'
+            # the inverse of the LOO GP
+            # formula found via MATH
+            K_m_idx_inv = K_inv_full[:N - 1, :][:, :N - 1] \
+                          - np.outer(K_inv_full[N - 1, :N - 1], K_inv_full[:N - 1, N - 1]) / K_inv_full[N - 1, N - 1]
+
+            # alpha_m_idx = [np.dot(K_m_idx_inv, t_y[:N-1, rbin ]-self.gp.mean(t_x[:N-1])) for rbin in xrange(t_y.shape[1]) ]
+            alpha_m_idx = np.dot(K_m_idx_inv, y[:N - 1] - self.gp.mean(x[:N - 1]))
+
+            Kxxs_t = self.gp.kernel.value(t, x[:N - 1])
+            # Store the estimate for this LOO GP
+            # mus[idx, :] = np.array([np.dot(Kxxs_t, alpha_m_idx[rbin])+ self.gp.mean(t) for rbin in xrange(t_y.shape[1]) ])[:,0]
+            mus[idx, :] = np.dot(Kxxs_t, alpha_m_idx) + self.gp.mean(t)
+
+            # print mus[idx]
+            # print
+            # restore the original values for the next loop
+            x[[N - 1, idx]] = x[[idx, N - 1]]
+            # y[[N-1, idx],:] = y[[idx, N-1],:]
+            y[[N - 1, idx]] = y[[idx, N - 1]]
+
+            K_inv_full[[idx, N - 1], :] = K_inv_full[[N - 1, idx], :]
+            K_inv_full[:, [idx, N - 1]] = K_inv_full[:, [N - 1, idx]]
+
+        # print time() - t0, 's Total'
+        # return the jackknife cov matrix.
         return (N - 1.0) / N * np.cov(mus, rowvar=False)
 
     def goodness_of_fit(self, truth_dir, N=None, statistic='r2'):
@@ -566,7 +586,7 @@ class OriginalRecipe(Emu):
 
         return results.success
 
-    def emulate(self, em_params):
+    def emulate(self, em_params, jackknife_errors=False):
         '''
         Perform predictions with the emulator.
         :param varied_em_params:
@@ -585,6 +605,7 @@ class OriginalRecipe(Emu):
         t_list = [input_params[p.name] for p in self.ordered_params]
         t_grid = np.meshgrid(*t_list)
         t = np.stack(t_grid).T
+        # TODO george can sort?
         t = t.reshape((-1, self.emulator_ndim))
         #TODO this is still broken!
         if t.shape[0] != 1:
@@ -597,24 +618,18 @@ class OriginalRecipe(Emu):
 
         # TODO give some thought to what is the best way to format the output
         # TODO option to return errors or cov?
-        mu, cov = self.gp.predict(self.y, t)
-        # errs = np.sqrt(np.diag(cov))
-        print 'Mu'
-        print mu
-        print 'Cov'
-        print np.diag(cov)
-
-        jk_errs = self._jackknife_errors(t)
-        print 'JK'
-        print np.diag(jk_errs)
-        # print jk_errs.shape
+        if jackknife_errors:
+            mu = self.gp.predict(self.y, t, mean_only=True)
+            cov = self._jackknife_errors(self.y, t)
+        else:
+            mu, cov = self.gp.predict(self.y, t)
 
         # mu = mu.reshape((-1, len(self.rpoints)))
         # errs = errs.reshape((-1, len(self.rpoints)))
         # Note ordering is unclear if em_params has more than 1 value.
         return mu, cov
 
-    def emulate_wrt_r(self, em_params, rpoints):
+    def emulate_wrt_r(self, em_params, rpoints, jackknife_errors=False):
         '''
         Conveniance function. Add's 'r' to the emulation automatically, as this is the
         most common use case.
@@ -627,7 +642,7 @@ class OriginalRecipe(Emu):
         '''
         vep = dict(em_params)
         vep.update({'r': np.log10(rpoints)})
-        out = self.emulate(vep)
+        out = self.emulate(vep, jackknife_errors)
         return out
     
 class ExtraCrispy(Emu):
@@ -771,7 +786,7 @@ class ExtraCrispy(Emu):
 
         return results.success
 
-    def emulate(self, em_params):
+    def emulate(self, em_params, jackknife_errors =False):
         '''
         Perform predictions with the emulator.
         :param varied_em_params:
@@ -802,7 +817,11 @@ class ExtraCrispy(Emu):
         # all_err = np.zeros((t.shape[0], self.y.shape[1]))
         all_cov = []# np.zeros((t.shape[0], t.shape[0], self.y.shape[1]))
         for idx, (y, y_hat) in enumerate(izip(self.y.T, self.y_hat)):
-            mu, cov = self.gp.predict(y, t)
+            if jackknife_errors:
+                mu = self.gp.predict(y,t, mean_only=True)
+                cov = self._jackknife_errors(y, t)
+            else:
+                mu, cov = self.gp.predict(y, t)
             # mu and cov come out as (1,) arrays.
             all_mu[:, idx] = mu
             # all_err[:, idx] = np.sqrt(np.diag(cov))
@@ -821,7 +840,7 @@ class ExtraCrispy(Emu):
 
         return mu, cov
 
-    def emulate_wrt_r(self, em_params, rpoints, kind='slinear'):
+    def emulate_wrt_r(self, em_params, rpoints,jackknife_errors=False, kind='slinear'):
         '''
         Conveniance function. Add's 'r' to the emulation automatically, as this is the
         most common use case.
@@ -838,7 +857,7 @@ class ExtraCrispy(Emu):
             Off diagonal elements are set to 0.
         '''
         # turns out this how it already works!
-        mu, cov = self.emulate(em_params)
+        mu, cov = self.emulate(em_params, jackknife_errors)
         # don't need to interpolate!
         if np.all(rpoints == self.rpoints):
             return mu, cov
@@ -867,6 +886,4 @@ class ExtraCrispy(Emu):
             new_err.append(interp_err)
         mu = np.array(new_mu).reshape((-1,))
         cov = np.diag(np.array(new_err).reshape((-1,)))
-        return mu, cov  
-
-
+        return mu, cov
