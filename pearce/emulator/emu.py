@@ -253,7 +253,7 @@ class Emu(object):
             #y[[N-1, idx],:] = y[[idx, N-1],:]
             y[[N-1, idx]] = y[[idx, N-1]]
            
-        print time()-t0 's Total'
+        print time()-t0,'s Total'
         return (N - 1.0) / N * np.cov(mus, rowvar=False)
 
     def goodness_of_fit(self, truth_dir, N=None, statistic='r2'):
