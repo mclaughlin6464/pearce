@@ -225,68 +225,60 @@ class Emu(object):
         :return:
             jk_cov: a covariance matrix with the dimensions of cov.
         '''
-        from time import time
+        #from time import time
 
         # We need to perform one full inverse to start.
         K_inv_full = self.gp.solver.apply_inverse(np.eye(self.gp._alpha.size),
                                                   in_place=True)
 
         # TODO deepcopy?
-        x, yerr = self.x[:], self.yerr[:]
+        x = self.x[:]
 
         N = K_inv_full.shape[0]
 
         mus = np.zeros((N, t.shape[0]))
-        t0 = time()
+        #t0 = time()
 
-        ig = self.get_initial_guess('xi', {})
-        a = ig['amp']
-        kernel = a * ExpSquaredKernel(self.metric, ndim=self.emulator_ndim)
-        loo_gp = george.GP(kernel)
         # iterate over training points to leave out
         for idx in xrange(N):
             # print idx
+
             # swap the values of the LOO point and the last point.
             x[[N - 1, idx]] = x[[idx, N - 1]]
-            # y[[N-1, idx], :] = y[[idx, N-1], :]
             y[[N - 1, idx]] = y[[idx, N - 1]]
 
-            yerr[[N-1, idx]] = yerr[[idx, N-1]]
-
-            #K_inv_full[[idx, N - 1], :] = K_inv_full[[N - 1, idx], :]
-            #K_inv_full[:, [idx, N - 1]] = K_inv_full[:, [N - 1, idx]]
+            K_inv_full[[idx, N - 1], :] = K_inv_full[[N - 1, idx], :]
+            K_inv_full[:, [idx, N - 1]] = K_inv_full[:, [N - 1, idx]]
 
             # the inverse of the LOO GP
             # formula found via MATH
-            #K_m_idx_inv = K_inv_full[:N - 1, :][:, :N - 1] \
-            #              - np.outer(K_inv_full[N - 1, :N - 1], K_inv_full[:N - 1, N - 1]) / K_inv_full[N - 1, N - 1]
+            K_m_idx_inv = K_inv_full[:N - 1, :][:, :N - 1] \
+                          - np.outer(K_inv_full[N - 1, :N - 1], K_inv_full[:N - 1, N - 1]) / K_inv_full[N - 1, N - 1]
 
-            # alpha_m_idx = [np.dot(K_m_idx_inv, t_y[:N-1, rbin ]-self.gp.mean(t_x[:N-1])) for rbin in xrange(t_y.shape[1]) ]
-            #alpha_m_idx = np.dot(K_m_idx_inv, y[:N - 1] - self.gp.mean(x[:N - 1]))
+            alpha_m_idx = np.dot(K_m_idx_inv, y[:N - 1] - self.gp.mean(x[:N - 1]))
 
-            #Kxxs_t = self.gp.kernel.value(t, x[:N - 1])
+            Kxxs_t = self.gp.kernel.value(t, x[:N - 1])
+
             # Store the estimate for this LOO GP
-            # mus[idx, :] = np.array([np.dot(Kxxs_t, alpha_m_idx[rbin])+ self.gp.mean(t) for rbin in xrange(t_y.shape[1]) ])[:,0]
-            #mus[idx, :] = np.dot(Kxxs_t, alpha_m_idx) + self.gp.mean(t)
-
-            loo_gp.compute(x[:N - 1], yerr[:N - 1])
-            mus[idx, :] = loo_gp.predict(y[:N - 1], t, mean_only=True)
+            mus[idx, :] = np.dot(Kxxs_t, alpha_m_idx) + self.gp.mean(t)
 
             # print mus[idx]
             # print
+
             # restore the original values for the next loop
             x[[N - 1, idx]] = x[[idx, N - 1]]
-            # y[[N-1, idx],:] = y[[idx, N-1],:]
             y[[N - 1, idx]] = y[[idx, N - 1]]
 
-            yerr[[N-1, idx]] = yerr[[idx, N-1]]
+            K_inv_full[[idx, N - 1], :] = K_inv_full[[N - 1, idx], :]
+            K_inv_full[:, [idx, N - 1]] = K_inv_full[:, [N - 1, idx]]
 
-            #K_inv_full[[idx, N - 1], :] = K_inv_full[[N - 1, idx], :]
-            #K_inv_full[:, [idx, N - 1]] = K_inv_full[:, [N - 1, idx]]
-
-        print time() - t0, 's Total'
+        #print time() - t0, 's Total'
         # return the jackknife cov matrix.
-        return (N - 1.0) / N * np.cov(mus, rowvar=False)
+        cov = (N - 1.0) / N * np.cov(mus, rowvar=False)
+        if mus.shape[1] ==1 :
+            return np.array([[cov]]) #returns float in this case
+        else:
+            return cov
 
     def goodness_of_fit(self, truth_dir, N=None, statistic='r2'):
         '''
@@ -502,6 +494,8 @@ class OriginalRecipe(Emu):
         for idx, (corr_file, cov_file) in enumerate(izip(corr_files, cov_files)):
             params, xi, cov = xi_file_reader(corr_file, cov_file)
 
+            cov*=1e4
+
             # skip values that aren't where we've fixed them to be.
             # It'd be nice to do this before the file I/O. Not possible without putting all info in the filename.
             # or, a more nuanced file structure
@@ -632,9 +626,7 @@ class OriginalRecipe(Emu):
         # TODO option to return errors or cov?
         if jackknife_errors:
             mu = self.gp.predict(self.y, t, mean_only=True)
-            print mu
             cov = self._jackknife_errors(self.y, t)
-            print np.diag(cov)
         else:
             mu, cov = self.gp.predict(self.y, t)
 
@@ -701,6 +693,9 @@ class ExtraCrispy(Emu):
         num_used = 0
         for idx, (corr_file, cov_file) in enumerate(izip(corr_files, cov_files)):
             params, xi, cov = xi_file_reader(corr_file, cov_file)
+
+            cov*=1e4
+            print 'sup'
 
             # skip values that aren't where we've fixed them to be.
             # It'd be nice to do this before the file I/O. Not possible without putting all info in the filename.
@@ -851,8 +846,6 @@ class ExtraCrispy(Emu):
             for i, row in enumerate(c):
                 for j, val in enumerate(row):
                     cov[i*nbins+n, j*nbins+n] = val
-        print mu
-        print np.diag(cov)
         return mu, cov
 
     def emulate_wrt_r(self, em_params, rpoints,jackknife_errors=False, kind='slinear'):
