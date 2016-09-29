@@ -427,7 +427,7 @@ class Cat(object):
         if RSD:
             # for now, hardcode 'z' as the distortion dimension.
             distortion_dim = 'z'
-            v_distortion_dim = self.model.mock_table['v%s'%distortion_dim]
+            v_distortion_dim = self.moel.mock.galaxy_table['v%s'%distortion_dim]
             #apply redshift space distortions
             pos = return_xyz_formatted_array(x,y,z,velocity=v_distortion_dim, \
                                 velocity_distortion_dimension=distortion_dim, period = self.Lbox)
