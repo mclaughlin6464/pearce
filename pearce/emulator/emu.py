@@ -819,6 +819,8 @@ class ExtraCrispy(Emu):
         t_list = [input_params[p.name] for p in self.ordered_params]
         t_grid = np.meshgrid(*t_list)
         t = np.stack(t_grid).T
+        # TODO this won't work for fixed parameters, need len(input_params) instead
+        # should add a fixed_param dim
         t = t.reshape((-1, self.emulator_ndim))
         # t.view(','.join(['float64' for _ in self.ordered_params]))
         # for some reason this one has different requirements than the other.
