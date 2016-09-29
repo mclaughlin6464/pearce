@@ -456,7 +456,7 @@ class Cat(object):
         vels = np.vstack([self.model.mock.galaxy_table[c] for c in ['vx', 'vy', 'vz']]).T
 
         # TODO is the model cosmo same as the one attached to the cat?
-        ra, dec, z = mock_survey.ra_dec_z(pos*self.h, vels*self.h, cosmo=self.halocat.cosmology)
+        ra, dec, z = mock_survey.ra_dec_z(pos*self.h, vels*self.h, cosmo=self.cosmology)
         ang_pos = np.vstack((np.degrees(ra), np.degrees(dec) )).T
 
         n_rands=5
