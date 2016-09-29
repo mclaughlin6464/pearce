@@ -39,7 +39,7 @@ def observable(func):
             assert self.populated_once
         except AssertionError:
             raise AssertionError("The cat must have a loaded model and catalog and be populated before calculating an observable.")
-        func(self, *args, **kwargs)
+        return func(self, *args, **kwargs)
 
     return _func
 
