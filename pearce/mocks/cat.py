@@ -34,9 +34,11 @@ def observable(func):
     '''
     def _func(self, *args, **kwargs):
         try:
+            assert self.halocat is not None
+            assert self.model is not None
             assert self.populated_once
         except AssertionError:
-            raise AssertionError("The cat must be populated before calculating an observable.")
+            raise AssertionError("The cat must have a loaded model and catalog and be populated before calculating an observable.")
         func(self, *args, **kwargs)
 
     return _func
