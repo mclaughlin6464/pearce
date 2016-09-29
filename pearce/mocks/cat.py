@@ -456,14 +456,14 @@ class Cat(object):
         vels = np.vstack([self.model.mock.galaxy_table[c] for c in ['vx', 'vy', 'vz']]).T
 
         # TODO is the model cosmo same as the one attached to the cat?
-        ra, dec, z = mock_survey.ra_dec_z(pos*self.h, vels*self.h, cosmo=self.model.mock.cosmology)
+        ra, dec, z = mock_survey.ra_dec_z(pos*self.h, vels*self.h, cosmo=self.halocat.cosmo)
         ang_pos = np.vstack((np.degrees(ra), np.degrees(dec) )).T
 
         n_rands=5
         rand_pos = np.random.random((pos.shape[0] * n_rands,3)) * self.Lbox * self.h
         rand_vels = np.zeros((pos.shape[0]*n_rands, 3))
 
-        rand_ra, rand_dec, rand_z = mock_survey.ra_dec_z(rand_pos*self.h, rand_vels*self.h, cosmo=self.model.mock.cosmology)
+        rand_ra, rand_dec, rand_z = mock_survey.ra_dec_z(rand_pos*self.h, rand_vels*self.h, cosmo=self.halocat.cosmo)
         rand_ang_pos = np.vstack((np.degree(rand_ra), np.degree(rand_dec))).T
 
         #NOTE I can transform coordinates and not have to use randoms at all. Consider?
