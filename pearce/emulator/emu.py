@@ -494,8 +494,6 @@ class OriginalRecipe(Emu):
         for idx, (corr_file, cov_file) in enumerate(izip(corr_files, cov_files)):
             params, xi, cov = xi_file_reader(corr_file, cov_file)
 
-            cov*=1e4
-
             # skip values that aren't where we've fixed them to be.
             # It'd be nice to do this before the file I/O. Not possible without putting all info in the filename.
             # or, a more nuanced file structure
@@ -693,9 +691,6 @@ class ExtraCrispy(Emu):
         num_used = 0
         for idx, (corr_file, cov_file) in enumerate(izip(corr_files, cov_files)):
             params, xi, cov = xi_file_reader(corr_file, cov_file)
-
-            cov*=1e4
-            print 'sup'
 
             # skip values that aren't where we've fixed them to be.
             # It'd be nice to do this before the file I/O. Not possible without putting all info in the filename.
