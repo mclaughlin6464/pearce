@@ -609,12 +609,12 @@ class OriginalRecipe(Emu):
         input_params = {}
         input_params.update(self.fixed_params)
         input_params.update(em_params)
-        assert len(input_params) == self.emulator_ndim  # check dimenstionality
+        assert len(input_params) == self.emulator_ndim+self.fixed_ndim  # check dimenstionality
         for i in input_params:
             assert any(i == p.name for p in self.ordered_params)
 
         # i'd like to remove 'r'. possibly requiring a passed in param?
-        t_list = [input_params[p.name] for p in self.ordered_params]
+        t_list = [input_params[p.name] for p in self.ordered_params if p.name in em_params]
         t_grid = np.meshgrid(*t_list)
         t = np.stack(t_grid).T
         # TODO george can sort?
@@ -752,6 +752,7 @@ class ExtraCrispy(Emu):
         # a reshape may be faster.
         zeros_slice = np.all(x != 0.0, axis=1)
         # set the results of these calculations.
+        self.fixed_ndim = len(self.fixed_params)
         self.emulator_ndim = ndim  # the number of parameters for the emulator different than a sampler, in some cases
         self.sampling_ndim = ndim  # TODO not sure if this is the best design choice.
         self.x = x[zeros_slice]
@@ -811,15 +812,15 @@ class ExtraCrispy(Emu):
         input_params = {}
         input_params.update(self.fixed_params)
         input_params.update(em_params)
-        assert len(input_params) == self.emulator_ndim  # check dimenstionality
+        assert len(input_params) == self.emulator_ndim+self.fixed_ndim  # check dimenstionality
         for i in input_params:
             assert any(i == p.name for p in self.ordered_params)
 
         # i'd like to remove 'r'. possibly requiring a passed in param?
-        t_list = [input_params[p.name] for p in self.ordered_params]
+        #TODO won't work for fixed params; should be em params only. f
+        t_list = [input_params[p.name] for p in self.ordered_params if p.name in em_params]
         t_grid = np.meshgrid(*t_list)
         t = np.stack(t_grid).T
-        # TODO this won't work for fixed parameters, need len(input_params) instead
         # should add a fixed_param dim
         t = t.reshape((-1, self.emulator_ndim))
         # t.view(','.join(['float64' for _ in self.ordered_params]))
