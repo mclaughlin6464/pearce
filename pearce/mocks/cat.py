@@ -457,7 +457,7 @@ class Cat(object):
 
         # TODO is the model cosmo same as the one attached to the cat?
         ra, dec, z = mock_survey.ra_dec_z(pos*self.h, vels*self.h, cosmo=self.cosmology)
-        ang_pos = np.vstack((np.degreess(ra), np.degreess(dec) )).T
+        ang_pos = np.vstack((np.degrees(ra), np.degrees(dec) )).T
 
         n_rands=5
         rand_pos = np.random.random((pos.shape[0] * n_rands,3)) * self.Lbox * self.h
