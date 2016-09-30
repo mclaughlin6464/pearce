@@ -546,7 +546,7 @@ class OriginalRecipe(Emu):
         # a reshape may be faster.
         zeros_slice = np.all(x != 0.0, axis=1)
         # set the results of these calculations.
-        self.fixed_ndim = len(self.fixed_params)
+        self.fixed_ndim = len(fixed_params)
         self.emulator_ndim = ndim  # The number of params for the emulator is different than those in sampling.
         self.sampling_ndim = ndim - 1
         self.x = x[zeros_slice]
@@ -743,7 +743,7 @@ class ExtraCrispy(Emu):
         # a reshape may be faster.
         zeros_slice = np.all(x != 0.0, axis=1)
         # set the results of these calculations.
-        self.fixed_ndim = len(self.fixed_params)
+        self.fixed_ndim = len(fixed_params)
         self.emulator_ndim = ndim  # the number of parameters for the emulator different than a sampler, in some cases
         self.sampling_ndim = ndim  # TODO not sure if this is the best design choice.
         self.x = x[zeros_slice]
