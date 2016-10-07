@@ -18,9 +18,6 @@ import emcee as mc
 from .trainingData import PARAMS, GLOBAL_FILENAME
 from .ioHelpers import global_file_reader, xi_file_reader
 
-from guppy import hpy
-import pdb
-
 # TODO I think I could implement some of the subclasses as decorators
 
 class Emu(object):
@@ -70,7 +67,7 @@ class Emu(object):
         else:
             ig = metric  # use the user's initial guesses
 
-        self.metric = []
+        self.metric = [ig['amp']]
         for p in self.ordered_params:
             if p.name in fixed_params:
                 continue
@@ -81,8 +78,8 @@ class Emu(object):
 
         self.metric = np.array(self.metric)
 
-        a = ig['amp']
-        kernel = a * ExpSquaredKernel(self.metric, ndim=self.emulator_ndim)
+        a = self.metric[0] 
+        kernel = a * ExpSquaredKernel(self.metric[1:], ndim=self.emulator_ndim)
         self.gp = george.GP(kernel)
         # gp = george.GP(kernel, solver=george.HODLRSolver, nleaf=x.shape[0]+1,tol=1e-18)
         self.fixed_params = fixed_params  # remember which params were fixed
@@ -358,28 +355,16 @@ class Emu(object):
         assert y.shape[0] == cov.shape[0] and cov.shape[1] == cov.shape[0]
         assert y.shape[0] == rpoints.shape[0]
 
-        hp = hpy()
-        before = hp.heap()
 
         sampler = mc.EnsembleSampler(nwalkers, self.sampling_ndim, lnprob,
                                       threads=n_cores, args=(self, y, cov, rpoints))
-
-        after1 = hp.heap()
 
         pos0 = np.zeros((nwalkers, self.sampling_ndim))
         # The zip ensures we don't use the params that are only for the emulator
         for idx, (p, _) in enumerate(izip(self.ordered_params, xrange(self.sampling_ndim))):
             pos0[:, idx] = np.random.uniform(p.low, p.high, size=nwalkers)
 
-        leftover = after1-before
-        #pdb.set_trace()
-
         sampler.run_mcmc(pos0, nsteps)
-
-        after2 = hp.heap()
-
-        leftover = after2-after1
-        pdb.set_trace()
 
         # Note, still an issue of param label ordering here.
         chain = sampler.chain[:, nburn:, :].reshape((-1, self.sampling_ndim))
@@ -413,7 +398,7 @@ def lnprior(theta, emu, *args):
     :return:
         Either 0 or -np.inf, depending if the params are allowed or not.
     '''
-    return 0 if all(p.low < val < p.high for p, val in izip(emu.ordered_params, theta)) else -np.inf
+    return 0 if all(p.low < t < p.high for p, t in izip(emu.ordered_params, theta)) else -np.inf
 
 
 def lnlike(theta, emu, y, cov, rpoints):
@@ -430,7 +415,7 @@ def lnlike(theta, emu, y, cov, rpoints):
     :return:
         The log liklihood of theta given the measurements and the emulator.
     '''
-    em_params = {p.name: theta for p in emu.ordered_params}
+    em_params = {p.name: t for p,t in zip(emu.ordered_params, theta)}
 
     # using my own notation
     y_bar, G = emu.emulate_wrt_r(em_params, rpoints)
@@ -446,9 +431,10 @@ def lnlike(theta, emu, y, cov, rpoints):
 
     # TODO you could have the inverse of D passed in, as it is data
     # For now, it will not be worthwhile.
-    D = 2 * cov
+    D = G + cov
     delta = y_bar - y
     chi2 = -0.5 * np.dot(delta, np.dot(inv(D), delta))
+    return chi2
 
 
 class OriginalRecipe(Emu):
@@ -584,6 +570,7 @@ class OriginalRecipe(Emu):
         results = op.minimize(nll, p0, jac=grad_nll, **kwargs)
         # results = op.minimize(nll, p0, jac=grad_nll, method='TNC', bounds =\
         #   [(np.log(0.01), np.log(10)) for i in xrange(ndim+1)],options={'maxiter':50})
+        print results
 
         self.gp.kernel[:] = results.x
         self.gp.recompute()
@@ -633,7 +620,7 @@ class OriginalRecipe(Emu):
         # errs = errs.reshape((-1, len(self.rpoints)))
         # Note ordering is unclear if em_params has more than 1 value.
         return mu, cov
-
+    #TODO It's not clear to the use if rpoints should be log or not!
     def emulate_wrt_r(self, em_params, rpoints, jackknife_errors=False):
         '''
         Conveniance function. Add's 'r' to the emulation automatically, as this is the
@@ -824,6 +811,7 @@ class ExtraCrispy(Emu):
         all_mu = np.zeros((t.shape[0], self.y.shape[1]))  # t down rbins across
         # all_err = np.zeros((t.shape[0], self.y.shape[1]))
         all_cov = []# np.zeros((t.shape[0], t.shape[0], self.y.shape[1]))
+
         for idx, (y, y_hat) in enumerate(izip(self.y.T, self.y_hat)):
             if jackknife_errors:
                 mu = self.gp.predict(y,t, mean_only=True)

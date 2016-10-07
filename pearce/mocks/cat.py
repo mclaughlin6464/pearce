@@ -342,7 +342,7 @@ class Cat(object):
         return len(self.model.mock.galaxy_table['x']) / (self.Lbox ** 3)
 
     @observable
-    def calc_xi(self, rbins, n_cores='all', do_jackknife=True, use_corrfunc=False):
+    def calc_xi(self, rbins, n_cores='all', do_jackknife=True, use_corrfunc=False, jk_args={}):
         '''
         Calculate a 3-D correlation function on a populated catalog.
         :param rbins:
@@ -386,16 +386,20 @@ class Cat(object):
         else:
             if do_jackknife:
                 np.random.seed(int(time()))
-                # TODO customize these?
-                n_rands = 5
-                n_sub = 5
+                if not jk_args: 
+                    # TODO customize these?
+                    n_rands = 5
+                    n_sub = 5
+                else:
+                    n_rands = jk_args['n_rands']
+                    n_sub = jk_args['n_sub']
 
                 randoms = np.random.random((pos.shape[0] * n_rands,
                                             3)) * self.Lbox * self.h  # Solution to NaNs: Just fuck me up with randoms
                 xi_all, xi_cov = tpcf_jackknife(pos * self.h, randoms, rbins, period=self.Lbox * self.h,
-                                                num_threads=n_cores, Nsub=n_sub)
+                                                num_threads=n_cores, Nsub=n_sub, estimator='Landy-Szalay')
             else:
-                xi_all = tpcf(pos * self.h, rbins, period=self.Lbox * self.h, num_threads=n_cores())
+                xi_all = tpcf(pos * self.h, rbins, period=self.Lbox * self.h, num_threads=n_cores(), estimator='Landy-Szalay')
 
         # TODO 1, 2 halo terms?
 
