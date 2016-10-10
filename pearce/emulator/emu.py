@@ -362,7 +362,8 @@ class Emu(object):
         pos0 = np.zeros((nwalkers, self.sampling_ndim))
         # The zip ensures we don't use the params that are only for the emulator
         for idx, (p, _) in enumerate(izip(self.ordered_params, xrange(self.sampling_ndim))):
-            pos0[:, idx] = np.random.uniform(p.low, p.high, size=nwalkers)
+            #pos0[:, idx] = np.random.uniform(p.low, p.high, size=nwalkers)
+            pos0[:, idx] = np.random.normal(loc = (p.high+p.low)/2, scale = (p.high+p.low)/10, size = nwalkers)
 
         sampler.run_mcmc(pos0, nsteps)
 

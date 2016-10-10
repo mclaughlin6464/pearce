@@ -6,10 +6,10 @@ from os import path
 
 training_dir = '/u/ki/swmclau2/des/PearceLHC/'
 
-emu = ExtraCrispy(training_dir)
-#or_params = PARAMS[:]
-#or_params.append(parameter('r', 0,1))
-#emu = OriginalRecipe(training_dir, or_params)
+#emu = ExtraCrispy(training_dir)
+or_params = PARAMS[:]
+or_params.append(parameter('r', 0,1))
+emu = OriginalRecipe(training_dir, or_params)
 
 save_dir = '/u/ki/swmclau2/des/EmulatorMCMC/'
 #true_rpoints = np.log10(np.loadtxt(path.join(save_dir, 'rpoints.npy')))
@@ -25,7 +25,7 @@ true_y = np.log10(y)
 #true_rpoints = true_rpoints[1:]
 #true_cov = true_cov[1:,:][:,1:]
 
-chain = emu.run_mcmc(true_y, true_cov, true_rpoints, nwalkers = 1000, nsteps= 200,nburn = 50)
+chain = emu.run_mcmc(true_y, true_cov, true_rpoints, nwalkers = 2000, nsteps= 200,nburn = 50)
 
 print chain.mean(axis=0)
 
