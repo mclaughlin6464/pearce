@@ -195,7 +195,6 @@ def training_config_reader(filename):
         n_jobs = int(config['n_jobs'])
         max_time = int(config['max_time'])
         outputdir = config['outputdir']
-
         rbins_str = config['rbins']
         # need to do a little work to get this right
         rbins = [float(r.strip()) for r in rbins_str.strip('[ ]').split(',')]
@@ -213,7 +212,7 @@ def training_config_reader(filename):
         cosmo_params['simname']
         cosmo_params['scale_factor'] = float(cosmo_params['scale_factor'].strip())
 
-        for cp, t in zip(['Lbox', 'npart'], [float, int]):
+        for cp, t in zip(['Lbox', 'npart','n_repops'], [float, int,int]):
             try:
                 cosmo_params[cp] = t(cosmo_params[cp])
             except KeyError:

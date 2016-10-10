@@ -57,6 +57,12 @@ def calc_training_points(hod_params, rbins, cosmo_params, dirname, job_id):
     else:
         cat.load(cosmo_params['scale_factor'])
 
+    #Number of repopulations to do
+    n_repops=1
+    if 'n_repops' in cosmo_params:
+        n_repops = int(cosmo_params['n_repops'])
+        assert n_repops > 1
+
     for id, hod in enumerate(hod_params):
         #construct a dictionary for the parameters
         # Could store the param ordering in the file so it doesn't need to be imported.
@@ -64,7 +70,21 @@ def calc_training_points(hod_params, rbins, cosmo_params, dirname, job_id):
         #Populating the same cat over and over is faster than making a new one over and over!
         cat.populate(hod_dict)
         #TODO pass in do_jackknife, use_corrfunc?
-        xi, xi_cov = cat.calc_xi(rbins)
+        if n_repops ==1:
+            xi, xi_cov = cat.calc_xi(rbins)
+        else: #loop over xi
+            xi_repops = np.zeros((n_repops, rbins.shape[0]-1))
+            xi_cov_repops = np.zeros((n_repops, rbins.shape[0]-1,rbins.shape[0]-1))
+
+            for repop in xrange(n_repops):
+                xi_i, xi_cov_i = cat.calc_xi(rbins)
+                xi_repops[repop, :] = xi_i
+                xi_cov_repops[repop, :, :] = xi_cov_i
+                # TODO std from this, or avearge over jackknife mats?
+
+            xi = np.mean(xi_repops, axis=0)
+            xi_cov = np.mean(xi_cov_repops)
+
         # Consider storing them all and writing them all at once. May be faster.
         # Writing the hod params as a header. Could possibly recover them from the same file I used to read these in.
         # However, I think storing them in teh same place is easier.
