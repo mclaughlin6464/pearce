@@ -24,7 +24,6 @@ try:
 except ImportError:
     CORRFUNC_AVAILABLE = False
 
-# TODO check that a model has been loaded?
 def observable(func):
     '''
     Decorator for observable methods. Checks that the catalog is properly loaded and calcualted.

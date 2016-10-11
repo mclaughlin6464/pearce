@@ -86,15 +86,6 @@ def makeFHC(N=4):
     return points[idxs, :]
     # return points
 
-
-
-
-# cosmo params required:
-# simname
-# Lbox, npart
-# redshift/scale_factor
-# system
-
 def make_kils_command(jobname, max_time, outputdir, queue='bulletmpi'):
     '''
     Return a list of strings that comprise a bash command to call trainingHelper.py on the cluster.
@@ -159,7 +150,7 @@ def make_sherlock_command(jobname, max_time, outputdir, queue=None):
 
     sbatch_header = '\n#SBATCH '.join(sbatch_header)
 
-    call_str = ['python', path.join(path.dirname(__file__), 'trainingData.py'),
+    call_str = ['python', path.join(path.dirname(__file__), 'trainingHelper.py'),
                 path.join(outputdir, param_file)]
 
     call_str = ' '.join(call_str)
@@ -170,19 +161,13 @@ def make_sherlock_command(jobname, max_time, outputdir, queue=None):
     return 'sbatch %s' % (path.join(outputdir, 'tmp.sbatch'))
 
 
-# make_traing_data parameters
-# method, n_points
-# system, n_jobs
-# rbins, cosmology info
-# outputdir, max_time
-
 def training_config_reader(filename):
     '''
     Reads specific details of the config file for this usage.
     :param filename:
         Config filename
     :return:
-        method, n_points, system, n_jobs, max_time, outputdir, rbins, cosmo_params
+        method, n_points, system, n_jobs, max_time, outputdir, bins, cosmo_params
         Config parameters defined explicitly elsewhere.
     '''
     config = config_reader(filename)
@@ -195,14 +180,14 @@ def training_config_reader(filename):
         n_jobs = int(config['n_jobs'])
         max_time = int(config['max_time'])
         outputdir = config['outputdir']
-        rbins_str = config['rbins']
+        bins_str = config['bins']
         # need to do a little work to get this right
-        rbins = [float(r.strip()) for r in rbins_str.strip('[ ]').split(',')]
+        bins = [float(r.strip()) for r in bins_str.strip('[ ]').split(',')]
 
         # cosmology information assumed to be in the remaining ones!
         #Delete the ones we've removed.
         for key in ['method', 'n_points', 'system', 'n_jobs', 'max_time',
-                    'outputdir', 'rbins']:
+                    'outputdir', 'bins']:
             del config[key]
 
         cosmo_params = config
@@ -222,7 +207,7 @@ def training_config_reader(filename):
     except KeyError:
         raise KeyError("The config file %s is missing a parameter." % filename)
 
-    return method, n_points, system, n_jobs, max_time, outputdir, rbins, cosmo_params
+    return method, n_points, system, n_jobs, max_time, outputdir, bins, cosmo_params
 
 
 def make_training_data(config_filename):
@@ -235,7 +220,7 @@ def make_training_data(config_filename):
         None.
     '''
 
-    method, n_points, system, n_jobs, max_time, outputdir, rbins, cosmo_params = \
+    method, n_points, system, n_jobs, max_time, outputdir, bins, cosmo_params = \
         training_config_reader(config_filename)
 
     # determine the specific functions needed for this setup
@@ -258,7 +243,7 @@ def make_training_data(config_filename):
     header_start = ['Sampling Method: %s'%method, 'Cosmology Params:']
     header_start.extend('%s:%s' % (key, str(val)) for key, val in cosmo_params.iteritems())
     header = '\n'.join(header_start)
-    np.savetxt(path.join(outputdir, GLOBAL_FILENAME), rbins, header=header)
+    np.savetxt(path.join(outputdir, GLOBAL_FILENAME), bins, header=header)
 
     # call each job individually
     points_per_job = int(points.shape[0] / n_jobs)
