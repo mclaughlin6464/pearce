@@ -76,6 +76,8 @@ def calc_training_points(hod_params, bins, cosmo_params, dirname, job_id):
             # TODO I don't hink bins should be in this, but check
             if any(arg in cosmo_params for arg in args):
                 kwargs = {arg: cosmo_params[arg] for arg in args if arg in cosmo_params}
+                if n_repops > 1: #don't do jackknife
+                    kwargs['do_jackknife']=False
                 _calc_observable = calc_observable #might not have to do this, but play it safe.
                 calc_observable = lambda bins: _calc_observable(bins, **kwargs)#make it so kwargs are default.
 
@@ -95,16 +97,15 @@ def calc_training_points(hod_params, bins, cosmo_params, dirname, job_id):
             obs_val, obs_cov = calc_observable(bins)
         else: #do several repopulations
             obs_repops = np.zeros((n_repops, bins.shape[0]-1))
-            obs_cov_repops = np.zeros((n_repops, bins.shape[0]-1,bins.shape[0]-1))
 
             for repop in xrange(n_repops):
-                obs_i, obs_cov_i = calc_observable(bins)
+                obs_i = calc_observable(bins)
                 obs_repops[repop, :] = obs_i
-                obs_cov_repops[repop, :, :] = obs_cov_i
                 # TODO std from this, or avearge over jackknife mats?
 
             obs_val = np.mean(obs_repops, axis=0)
-            obs_cov = np.mean(obs_cov_repops)
+            obs_err = np.std(obs_repops, axis=0)/np.sqrt(n_repops)#error on mean # TODO make sure is right?
+            obs_cov = np.diag(obs_err)
 
         # Consider storing them all and writing them all at once. May be faster.
         # Writing the hod params as a header. Could possibly recover them from the same file I used to read these in.

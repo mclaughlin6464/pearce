@@ -340,6 +340,7 @@ class Cat(object):
         '''
         return len(self.model.mock.galaxy_table['x']) / (self.Lbox ** 3)
 
+    #TODO do_jackknife to cov?
     @observable
     def calc_xi(self, rbins, n_cores='all', do_jackknife=True, use_corrfunc=False, jk_args={}):
         '''
@@ -409,7 +410,7 @@ class Cat(object):
     # TODO use Joe's code. Remember to add sensible asserts when I do.
     # TODO Jackknife? A way to do it without Joe's code?
     @observable
-    def calc_wp(self,rp_bins,pi_max=40, n_cores='all',RSD=True):
+    def calc_wp(self,rp_bins,pi_max=40,do_jackknife=True, n_cores='all',RSD=True):
         '''
         Calculate the projected correlation on a populated catalog
         :param rp_bins:
@@ -442,7 +443,7 @@ class Cat(object):
         return wp_all
 
     @observable
-    def calc_wt(self,theta_bins, n_cores='all'):
+    def calc_wt(self,theta_bins,do_jackknife=True, n_cores='all'):
         '''
         Calculate the angular correlation function, w(theta), from a populated catalog.
         :param theta_bins:
