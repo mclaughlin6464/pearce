@@ -119,8 +119,8 @@ def calc_training_points(hod_params, bins, cosmo_params, dirname, job_id):
         header_start.extend('%s:%.3f' % (key, val) for key, val in hod_dict.iteritems())
         header = '\n'.join(header_start)
         #TODO change file naming system;
-        np.savetxt(path.join(dirname, '%s_job%03d_HOD%03d.npy'%(obs, job_id, id) ), obs_val, header=header)
-        np.savetxt(path.join(dirname, '%s_cov_job%03d_HOD%03d.npy'%(obs,job_id, id) ), obs_cov, header=header)
+        np.savetxt(path.join(dirname, 'obs_job%03d_HOD%03d.npy'%(job_id, id) ), obs_val, header=header)
+        np.savetxt(path.join(dirname, 'cov_job%03d_HOD%03d.npy'%(job_id, id) ), obs_cov, header=header)
 
 if __name__ == '__main__':
     import argparse

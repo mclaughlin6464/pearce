@@ -17,9 +17,7 @@ from george.kernels import *
 import emcee as mc
 
 from .trainingData import PARAMS, GLOBAL_FILENAME
-from .ioHelpers import global_file_reader, xi_file_reader
-
-# TODO I think I could implement some of the subclasses as decorators
+from .ioHelpers import global_file_reader, obs_file_reader
 
 class Emu(object):
     # NOTE I believe that I'll have to subclass for the scale-indepent and original versions.
@@ -110,25 +108,24 @@ class Emu(object):
             raise ValueError('The data in training_dir is form a Latin Hypercube. \
                                         It is not possible to get plot data from this data. ')
 
-        # TODO change iv and how files are accessed and named.
-        corr_files = sorted(glob(path.join(training_dir, 'xi*.npy')))
+        obs_files = sorted(glob(path.join(training_dir, 'obs*.npy')))
         cov_files = sorted(
-            glob(path.join(training_dir, '*cov*.npy')))  # since they're sorted, they'll be paired up by params.
-        rpoints = (rbins[:-1] + rbins[1:]) / 2
-        nbins = rpoints.shape[0]
+            glob(path.join(training_dir, 'cov*.npy')))  # since they're sorted, they'll be paired up by params.
+        bin_centers = (rbins[:-1] + rbins[1:]) / 2
+        nbins = bin_centers.shape[0]
 
-        npoints = len(corr_files)  # each file contains NBINS points in r, and each file is a 6-d point
+        npoints = len(obs_files)  # each file contains NBINS points in r, and each file is a 6-d point
 
-        log_r = np.zeros((npoints, nbins))
+        log_bin_centers = np.zeros((npoints, nbins))
         y = np.zeros((npoints, nbins))
         y_err = np.zeros((npoints, nbins))
 
         warned = False
         num_skipped = 0
         num_used = 0
-        for idx, (corr_file, cov_file) in enumerate(izip(corr_files, cov_files)):
+        for idx, (obs_file, cov_file) in enumerate(izip(obs_files, cov_files)):
             # TODO
-            params, xi, cov = xi_file_reader(corr_file, cov_file)
+            params, obs, cov = obs_file_reader(obs_file, cov_file)
 
             # skip values that aren't where we've fixed them to be.
             # It'd be nice to do this before the file I/O. Not possible without putting all info in the filename.
@@ -153,7 +150,7 @@ class Emu(object):
             # if any(params[key] != val for key, val in em_params.iteritems()):
             #    continue
 
-            if np.any(np.isnan(cov)) or np.any(np.isnan(xi)):
+            if np.any(np.isnan(cov)) or np.any(np.isnan(obs)):
                 if not warned:
                     warnings.warn('WARNING: NaN detected. Skipping point in %s' % cov_file)
                     warned = True
@@ -162,24 +159,24 @@ class Emu(object):
 
             num_used += 1
 
-            log_r[idx] = np.log10(rpoints)
+            log_bin_centers[idx] = np.log10(bin_centers)
             #TODO
             if independent_variable == 'xi':
-                y[idx] = np.log10(xi)
+                y[idx] = np.log10(obs)
                 # Approximately true, may need to revisit
                 # yerr[idx * NBINS:(idx + 1) * NBINS] = np.sqrt(np.diag(cov)) / (xi * np.log(10))
                 y_err[idx] = np.sqrt(np.diag(cov)) / (
-                    xi * np.log(10))  # I think this is right, extrapolating from the above.
+                    obs * np.log(10))  # I think this is right, extrapolating from the above.
             else:  # r2xi
-                y[idx] = xi * rpoints * rpoints
-                y_err[idx] = np.sqrt(np.diag(cov)) * rpoints  # I think this is right, extrapolating from the above.
+                y[idx] = obs * bin_centers * bin_centers
+                y_err[idx] = np.sqrt(np.diag(cov)) * bin_centers  # I think this is right, extrapolating from the above.
 
         # remove rows that were skipped due to the fixed thing
         # NOTE: HACK
         # a reshape may be faster.
         zeros_slice = np.all(y != 0.0, axis=1)
 
-        return log_r[zeros_slice], y[zeros_slice], y_err[zeros_slice]
+        return log_bin_centers[zeros_slice], y[zeros_slice], y_err[zeros_slice]
 
     def get_initial_guess(self, independent_variable, fixed_params):
         '''
@@ -212,7 +209,7 @@ class Emu(object):
     def emulate(self, em_params, jackknife_errors=False):
         raise NotImplementedError
 
-    def emulate_wrt_r(self, em_params, rpoints, jackknife_errors=False):
+    def emulate_wrt_r(self, em_params, bin_centers, jackknife_errors=False):
         raise NotImplementedError
 
     def _jackknife_errors(self, y, t):
@@ -297,7 +294,7 @@ class Emu(object):
         assert statistic in {'r2', 'rmsfd'}
 
         corr_files = sorted(glob(path.join(truth_dir, '*corr*.npy')))
-        cov_files = sorted(glob(path.join(truth_dir, '*cov*.npy')))
+        cov_files = sorted(glob(path.join(truth_dir, 'cov*.npy')))
 
         np.random.seed(int(time()))
 
@@ -308,22 +305,21 @@ class Emu(object):
 
         values = []
         rbins, _, _ = global_file_reader(path.join(truth_dir, GLOBAL_FILENAME))
-        r_centers = (rbins[:1] + rbins[:-1]) / 2
+        bin_centers = (rbins[:1] + rbins[:-1]) / 2
         for idx in idxs:
-            params, true_xi, _ = xi_file_reader(corr_files[idx], cov_files[idx])
-            pred_log_xi, _ = self.emulate_wrt_r(params, np.log10(r_centers))
+            params, true_obs, _ = obs_file_reader(corr_files[idx], cov_files[idx])
+            pred_log_obs, _ = self.emulate_wrt_r(params, np.log10(bin_centers))
 
             if statistic == 'rmsfd':
-                values.append(np.sqrt(np.mean(((pred_log_xi - np.log10(true_xi)) ** 2) / (np.log10(true_xi) ** 2))))
+                values.append(np.sqrt(np.mean(((pred_log_obs - np.log10(true_obs)) ** 2) / (np.log10(true_obs) ** 2))))
             else:  # r2
-                SSR = np.sum((pred_log_xi - np.log10(true_xi)) ** 2)
-                SST = np.sum((np.log10(true_xi) - np.log10(true_xi).mean()) ** 2)
+                SSR = np.sum((pred_log_obs - np.log10(true_obs)) ** 2)
+                SST = np.sum((np.log10(true_obs) - np.log10(true_obs).mean()) ** 2)
 
                 values.append(1 - SSR / SST)
 
         return np.array(values)
-    # TODO change rpoitns to bin_centers or something
-    def run_mcmc(self, y, cov, rpoints, nwalkers=1000, nsteps=100, nburn=20, n_cores='all'):
+    def run_mcmc(self, y, cov, bin_centers, nwalkers=1000, nsteps=100, nburn=20, n_cores='all'):
         '''
         Run an MCMC sampler, using the emulator. Uses emcee to perform sampling.
         :param y:
@@ -331,7 +327,7 @@ class Emu(object):
             log space, others in linear. Make sure y is in the same space!
         :param cov:
             The measurement covariance matrix of y
-        :param rpoints:
+        :param bin_centers:
             The centers of the bins y is measured in (radial or angular).
         :param nwalkers:
             Optional. Number of walkers for emcee. Default is 1000.
@@ -358,11 +354,11 @@ class Emu(object):
             # else, we're good!
 
         assert y.shape[0] == cov.shape[0] and cov.shape[1] == cov.shape[0]
-        assert y.shape[0] == rpoints.shape[0]
+        assert y.shape[0] == bin_centers.shape[0]
 
 
         sampler = mc.EnsembleSampler(nwalkers, self.sampling_ndim, lnprob,
-                                      threads=n_cores, args=(self, y, cov, rpoints))
+                                      threads=n_cores, args=(self, y, cov, bin_centers))
 
         pos0 = np.zeros((nwalkers, self.sampling_ndim))
         # The zip ensures we don't use the params that are only for the emulator
@@ -377,7 +373,9 @@ class Emu(object):
 
         return chain
 
-
+#These functions cannot be instance methods
+#Emcee throws a few when trying to compile the liklihood functions that are attached
+# to the object calling it
 def lnprob(theta, *args):
     '''
     The total liklihood for an MCMC. Sadly, can't be an instance of the Emu Object.
@@ -393,30 +391,31 @@ def lnprob(theta, *args):
         return -np.inf
     return lp + lnlike(theta, *args)
 
-
-#TODO fix docs here
 def lnprior(theta, emu, *args):
     '''
     Prior for an MCMC. Currently asserts theta is between the boundaries used to make the emulator.
     Could do something more clever later.
     :param theta:
         The parameters proposed by the sampler.
+    :param emu:
+        The emulator object. Needs to be accessed to get the priors.
     :return:
         Either 0 or -np.inf, depending if the params are allowed or not.
     '''
     return 0 if all(p.low < t < p.high for p, t in izip(emu.ordered_params, theta)) else -np.inf
 
-#TODO change rpoints to bin_centers or something
-def lnlike(theta, emu, y, cov, rpoints):
+def lnlike(theta, emu, y, cov, bin_centers):
     '''
     The liklihood of parameters theta given the other parameters and the emulator.
     :param theta:
         Proposed parameters.
+    :param emu:
+        The emulator object. Used to perform the emulation.
     :param y:
         The measured value of the observable to compare to the emulator.
     :param cov:
         The covariance matrix of the measured values.
-    :param rpoints:
+    :param bin_centers:
         The centers of the bins y is measured in, angular or radial.
     :return:
         The log liklihood of theta given the measurements and the emulator.
@@ -424,25 +423,15 @@ def lnlike(theta, emu, y, cov, rpoints):
     em_params = {p.name: t for p,t in zip(emu.ordered_params, theta)}
 
     # using my own notation
-    y_bar, G = emu.emulate_wrt_r(em_params, rpoints)
+    y_bar, G = emu.emulate_wrt_r(em_params, bin_centers)
     # should chi2 be calculated in log or linear?
     # answer: the user is responsible for taking the log before it comes here.
-    # T == cov
 
-    # TG_inv = np.dot(cov, inv(G))
-    # d = np.dot(TG_inv, y_bar)
-    # I_TG_inv = TG_inv[np.diag_indices(TG_inv)] + 1
-    # D = np.dot(I_TG_inv, cov)  # sadly not a faster way to compute D inverse.
-    # delta = d - y
-
-    # TODO you could have the inverse of D passed in, as it is data
-    # For now, it will not be worthwhile.
     D = G + cov
     delta = y_bar - y
     chi2 = -0.5 * np.dot(delta, np.dot(inv(D), delta))
     return chi2
 
-# TODO update iv
 class OriginalRecipe(Emu):
     '''Emulator that emulates with bins as an implicit parameter. '''
     def get_training_data(self, training_dir, independent_variable, fixed_params):
@@ -462,14 +451,13 @@ class OriginalRecipe(Emu):
         if not fixed_params and method == 'LHC':
             raise ValueError('Fixed parameters is not empty, but the data in training_dir is form a Latin Hypercube. \
                                 Cannot performs slices on a LHC.')
-        # TODO change filenames
-        corr_files = sorted(glob(path.join(training_dir, 'xi*.npy')))
+        obs_files = sorted(glob(path.join(training_dir, 'obs*.npy')))
         cov_files = sorted(
             glob(path.join(training_dir, 'cov*.npy')))  # since they're sorted, they'll be paired up by params.
-        self.rpoints = (rbins[:-1] + rbins[1:]) / 2
-        nbins = self.rpoints.shape[0]
+        self.bin_centers = (rbins[:-1] + rbins[1:]) / 2
+        nbins = self.bin_centers.shape[0]
         # HERE
-        npoints = len(corr_files) * nbins  # each file contains NBINS points in r, and each file is a 6-d point
+        npoints = len(obs_files) * nbins  # each file contains NBINS points in r, and each file is a 6-d point
 
         # HERE
         varied_params = set([p.name for p in self.ordered_params]) - set(fixed_params.keys())
@@ -484,9 +472,8 @@ class OriginalRecipe(Emu):
         warned = False
         num_skipped = 0
         num_used = 0
-        for idx, (corr_file, cov_file) in enumerate(izip(corr_files, cov_files)):
-            # TODO chagne this funciton and outputs
-            params, xi, cov = xi_file_reader(corr_file, cov_file)
+        for idx, (obs_file, cov_file) in enumerate(izip(obs_files, cov_files)):
+            params, obs, cov = obs_file_reader(obs_file, cov_file)
 
             # skip values that aren't where we've fixed them to be.
             # It'd be nice to do this before the file I/O. Not possible without putting all info in the filename.
@@ -495,7 +482,7 @@ class OriginalRecipe(Emu):
             if any(params[key] != val for key, val in fixed_params.iteritems()):
                 continue
 
-            if np.any(np.isnan(cov)) or np.any(np.isnan(xi)):
+            if np.any(np.isnan(cov)) or np.any(np.isnan(obs)):
                 if not warned:
                     warnings.warn('WARNING: NaN detected. Skipping point in %s' % cov_file)
                     warned = True
@@ -510,8 +497,9 @@ class OriginalRecipe(Emu):
             for p in self.ordered_params:
                 if p.name in fixed_params:
                     continue
+                #TODO change 'r' to something else.
                 if p.name == 'r':
-                    file_params.append(np.log10(self.rpoints))
+                    file_params.append(np.log10(self.bin_centers))
                 else:
                     file_params.append(np.ones((nbins,)) * params[p.name])
 
@@ -525,13 +513,13 @@ class OriginalRecipe(Emu):
             '''
             # TODO here
             if independent_variable == 'xi':
-                y[idx * nbins:(idx + 1) * nbins] = np.log10(xi)
+                y[idx * nbins:(idx + 1) * nbins] = np.log10(obs)
                 # Approximately true, may need to revisit
-                yerr[idx * nbins:(idx + 1) * nbins] = np.sqrt(np.diag(cov)) / (xi * np.log(10))
+                yerr[idx * nbins:(idx + 1) * nbins] = np.sqrt(np.diag(cov)) / (obs * np.log(10))
                 # ycovs.append(cov / (np.outer(xi, xi) * np.log(10) ** 2))  # I think this is right, extrapolating from the above.
             else:  # r2xi
-                y[idx * nbins:(idx + 1) * nbins] = xi * self.rpoints * self.rpoints
-                yerr[idx * nbins:(idx + 1) * nbins] = np.diag(cov) * self.rpoints * self.rpoints
+                y[idx * nbins:(idx + 1) * nbins] = obs * self.bin_centers * self.bin_centers
+                yerr[idx * nbins:(idx + 1) * nbins] = np.diag(cov) * self.bin_centers * self.bin_centers
 
         # ycov = block_diag(*ycovs)
         # ycov = np.sqrt(np.diag(ycov))
@@ -608,7 +596,7 @@ class OriginalRecipe(Emu):
         t = np.stack(t_grid).T
         # TODO george can sort?
         t = t.reshape((-1, self.emulator_ndim))
-        #TODO this is still broken!
+
         if t.shape[0] != 1:
             try:
                 t = np.sort(t.view(','.join(['float64' for _ in xrange(min(t.shape))])),
@@ -617,32 +605,31 @@ class OriginalRecipe(Emu):
                 t = np.sort(t.view(','.join(['float64' for _ in xrange(max(t.shape))])),
                     order=['f%d' % i for i in xrange(max(t.shape))], axis=0).view(np.float)
 
-        # TODO give some thought to what is the best way to format the output
-        # TODO option to return errors or cov?
         if jackknife_errors:
             mu = self.gp.predict(self.y, t, mean_only=True)
             cov = self._jackknife_errors(self.y, t)
         else:
             mu, cov = self.gp.predict(self.y, t)
 
-        # mu = mu.reshape((-1, len(self.rpoints)))
-        # errs = errs.reshape((-1, len(self.rpoints)))
+        # mu = mu.reshape((-1, len(self.bin_centers)))
+        # errs = errs.reshape((-1, len(self.bin_centers)))
         # Note ordering is unclear if em_params has more than 1 value.
         return mu, cov
-    #TODO It's not clear to the use if rpoints should be log or not!
-    def emulate_wrt_r(self, em_params, rpoints, jackknife_errors=False):
+    #TODO It's not clear to the user if bin_centers should be log or not!
+    def emulate_wrt_r(self, em_params, bin_centers, jackknife_errors=False):
         '''
         Conveniance function. Add's 'r' to the emulation automatically, as this is the
         most common use case.
         :param em_params:
             Dictionary of what values to predict at for each param. Values can be array
             or float.
-        :param rpoints:
-            Points in 'r' to predict at, for each point in HOD-space.
+        :param bin_centers:
+            Centers of bins to predict at, for each point in HOD-space.
         :return:
         '''
         vep = dict(em_params)
-        vep.update({'r': np.log10(rpoints)})
+        # TODO change 'r' to something more general
+        vep.update({'r': np.log10(bin_centers)})
         out = self.emulate(vep, jackknife_errors)
         return out
     
@@ -666,14 +653,13 @@ class ExtraCrispy(Emu):
         if not fixed_params and method == 'LHC':
             raise ValueError('Fixed parameters is not empty, but the data in training_dir is form a Latin Hypercube. \
                                 Cannot performs slices on a LHC.')
-        #TODO update filenames
-        corr_files = sorted(glob(path.join(training_dir, 'xi*.npy')))
+        obs_files = sorted(glob(path.join(training_dir, 'obs*.npy')))
         cov_files = sorted(
-            glob(path.join(training_dir, '*cov*.npy')))  # since they're sorted, they'll be paired up by params.
-        self.rpoints = (rbins[:-1] + rbins[1:]) / 2
-        nbins = self.rpoints.shape[0]
+            glob(path.join(training_dir, 'cov*.npy')))  # since they're sorted, they'll be paired up by params.
+        self.bin_centers = (rbins[:-1] + rbins[1:]) / 2
+        nbins = self.bin_centers.shape[0]
         # HERE
-        npoints = len(corr_files)  # each file contains NBINS points in r, and each file is a 6-d point
+        npoints = len(obs_files)  # each file contains NBINS points in r, and each file is a 6-d point
 
         # HERE
         varied_params = set(self.ordered_params) - set(fixed_params.keys())
@@ -688,9 +674,9 @@ class ExtraCrispy(Emu):
         warned = False
         num_skipped = 0
         num_used = 0
-        for idx, (corr_file, cov_file) in enumerate(izip(corr_files, cov_files)):
+        for idx, (obs_file, cov_file) in enumerate(izip(obs_files, cov_files)):
             #TODO change funciton and return
-            params, xi, cov = xi_file_reader(corr_file, cov_file)
+            params, obs, cov = obs_file_reader(obs_file, cov_file)
 
             # skip values that aren't where we've fixed them to be.
             # It'd be nice to do this before the file I/O. Not possible without putting all info in the filename.
@@ -699,7 +685,7 @@ class ExtraCrispy(Emu):
             if any(params[key] != val for key, val in fixed_params.iteritems()):
                 continue
 
-            if np.any(np.isnan(cov)) or np.any(np.isnan(xi)):
+            if np.any(np.isnan(cov)) or np.any(np.isnan(obs)):
                 if not warned:
                     warnings.warn('WARNING: NaN detected. Skipping point in %s' % cov_file)
                     warned = True
@@ -714,26 +700,26 @@ class ExtraCrispy(Emu):
             for p in self.ordered_params:
                 if p.name in fixed_params:
                     continue
-                # HERE
                 file_params.append(params[p.name])
 
             x[idx, :] = np.stack(file_params).T
             # TODO helper function that handles this part
             # TODO the time has come to do something smarter for bias... I will ignore for now.
-            # TODO change names here
             '''
             if independent_variable == 'bias':
                 y[idx * NBINS:(idx + 1) * NBINS] = xi / xi_mm
                 ycovs.append(cov / np.outer(xi_mm, xi_mm))
             '''
+            # TODO change names here
+
             if independent_variable == 'xi':
-                y[idx, :] = np.log10(xi)
+                y[idx, :] = np.log10(obs)
                 # Approximately true, may need to revisit
                 # yerr[idx, :] = np.sqrt(np.diag(cov)) / (xi * np.log(10))
                 # ycovs.append(cov / (np.outer(xi, xi) * np.log(10) ** 2))  # I think this is right, extrapolating from the above.
             else:  # r2xi
-                y[idx, :] = xi * self.rpoints * self.rpoints
-                # yerr[idx, :] = cov * np.outer(self.rpoints, self.rpoints)
+                y[idx, :] = obs * self.bin_centers * self.bin_centers
+                # yerr[idx, :] = cov * np.outer(self.bin_centers, self.bin_centers)
 
         # ycov = block_diag(*ycovs)
         # ycov = np.sqrt(np.diag(ycov))
@@ -808,7 +794,6 @@ class ExtraCrispy(Emu):
             assert any(i == p.name for p in self.ordered_params)
 
         # i'd like to remove 'r'. possibly requiring a passed in param?
-        #TODO won't work for fixed params; should be em params only. f
         t_list = [input_params[p.name] for p in self.ordered_params if p.name in em_params]
         t_grid = np.meshgrid(*t_list)
         t = np.stack(t_grid).T
@@ -848,49 +833,49 @@ class ExtraCrispy(Emu):
                     cov[i*nbins+n, j*nbins+n] = val
         return mu, cov
 
-    def emulate_wrt_r(self, em_params, rpoints,jackknife_errors=False, kind='slinear'):
+    def emulate_wrt_r(self, em_params, bin_centers,jackknife_errors=False, kind='slinear'):
         '''
         Conveniance function. Add's 'r' to the emulation automatically, as this is the
         most common use case.
         :param em_params:
             Dictionary of what values to predict at for each param. Values can be array
             or float.
-        :param rpoints:
-            Points in 'r' to predict at, for each point in HOD-space.
+        :param bin_centers:
+            Centers of scale bins to predict at, for each point in HOD-space.
         :param kind:
             Kind of interpolation to do, is necessary. Default is slinear.
         :return:
-            Mu and Cov, the predicted mu and covariance at em_params and rpoints. If rpoints
-            is not equal to the rpoints in the training data, the mean is interpolated as is the variance.
+            Mu and Cov, the predicted mu and covariance at em_params and bin_centers. If bin_centers
+            is not equal to the bin_centers in the training data, the mean is interpolated as is the variance.
             Off diagonal elements are set to 0.
         '''
         # turns out this how it already works!
         mu, cov = self.emulate(em_params, jackknife_errors)
         # don't need to interpolate!
-        if np.all(rpoints == self.rpoints):
+        if np.all(bin_centers == self.bin_centers):
             return mu, cov
 
-        # TODO check rpoints in bounds!
+        # TODO check bin_centers in bounds!
         # TODO is there any reasonable way to interpolate the covariance?
         all_err= np.sqrt(np.diag(cov))
 
-        all_mu = mu.reshape((-1, len(self.rpoints)))
-        all_err = all_err.reshape((-1, len(self.rpoints)))
+        all_mu = mu.reshape((-1, len(self.bin_centers)))
+        all_err = all_err.reshape((-1, len(self.bin_centers)))
 
         if len(all_mu.shape) == 1:  # just one calculation
-            xi_interpolator = interp1d(self.rpoints, all_mu, kind=kind)
-            new_mu = xi_interpolator(rpoints)
-            err_interp = interp1d(self.rpoints, all_err, kind=kind)
-            new_err = err_interp(rpoints)
+            xi_interpolator = interp1d(self.bin_centers, all_mu, kind=kind)
+            new_mu = xi_interpolator(bin_centers)
+            err_interp = interp1d(self.bin_centers, all_err, kind=kind)
+            new_err = err_interp(bin_centers)
             return new_mu, new_err
 
         new_mu, new_err = [], []
         for mean, err in izip(all_mu, all_err):
-            xi_interpolator = interp1d(self.rpoints, mean, kind=kind)
-            interp_mean = xi_interpolator(rpoints)
+            xi_interpolator = interp1d(self.bin_centers, mean, kind=kind)
+            interp_mean = xi_interpolator(bin_centers)
             new_mu.append(interp_mean)
-            err_interp = interp1d(self.rpoints, err, kind=kind)
-            interp_err = err_interp(rpoints)
+            err_interp = interp1d(self.bin_centers, err, kind=kind)
+            interp_err = err_interp(bin_centers)
             new_err.append(interp_err)
         mu = np.array(new_mu).reshape((-1,))
         cov = np.diag(np.array(new_err).reshape((-1,)))

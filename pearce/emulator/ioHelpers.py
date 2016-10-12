@@ -7,8 +7,7 @@ from os import path
 import numpy as np
 
 
-# TODO change to obs in title
-def xi_file_reader(corr_file, cov_file=None):
+def obs_file_reader(corr_file, cov_file=None):
     '''
     A helper function to parse the training data files.
     :param corr_file:
@@ -20,14 +19,11 @@ def xi_file_reader(corr_file, cov_file=None):
     '''
 
     assert path.exists(corr_file)
-    # TODO change to obs
-    xi = np.loadtxt(corr_file)  # not sure if this will work, might nead to transpose
+    obs = np.loadtxt(corr_file)  # not sure if this will work, might nead to transpose
     params = {}
     with open(corr_file) as f:
         for i, line in enumerate(f):
-            # TODO skip an additional line, added obs.
-            # TODO read observable.
-            if line[0] != '#' or i < 2:
+            if line[0] != '#' or i < 3:
                 continue  # only looking at comments, and first two lines don't have params. Note: Does have cosmo!
             splitLine = line.strip('# \n').split(':')  # split into key val pair
             params[splitLine[0]] = float(splitLine[1])
@@ -36,20 +32,19 @@ def xi_file_reader(corr_file, cov_file=None):
         assert path.exists(cov_file)
         cov = np.loadtxt(cov_file)
 
-        return params, xi, cov
-    return params, xi
+        return params, obs, cov
+    return params, obs
 
 
-# TODO change RBINS to bins
 def global_file_reader(global_filename):
     '''
     Helper function, useful for reading the information in the global file.
     :param global_filename:
         Path+filename for the global file.
     :return:
-        rbins, cosmo_params
+        bins, cosmo_params
     '''
-    rbins = np.loadtxt(global_filename)
+    bins = np.loadtxt(global_filename)
     # cosmology parameters are stored in the global header
     cosmo_params = {}
     with open(global_filename) as f:
@@ -65,7 +60,7 @@ def global_file_reader(global_filename):
             except ValueError:
                 cosmo_params[splitLine[0]] = splitLine[1]
 
-    return rbins, cosmo_params, method
+    return bins, cosmo_params, method
 
 
 # Could use ConfigParser maybe
