@@ -1,10 +1,11 @@
 #!/bin/bash
 '''Contains several helper functions for emulator file IO. For most part, these are very general
 and useful in multiple cases. More specific, one-use functions are generally left where they are.'''
-#TODO FOR GOD SAKES DECIDE ON CAMELCASE V UNDERSCORES YOU MADMAN
+# TODO FOR GOD SAKES DECIDE ON CAMELCASE V UNDERSCORES YOU MADMAN
 
 from os import path
 import numpy as np
+
 
 # TODO change to obs in title
 def xi_file_reader(corr_file, cov_file=None):
@@ -38,7 +39,8 @@ def xi_file_reader(corr_file, cov_file=None):
         return params, xi, cov
     return params, xi
 
-#TODO change RBINS to bins
+
+# TODO change RBINS to bins
 def global_file_reader(global_filename):
     '''
     Helper function, useful for reading the information in the global file.
@@ -63,8 +65,8 @@ def global_file_reader(global_filename):
             except ValueError:
                 cosmo_params[splitLine[0]] = splitLine[1]
 
-
     return rbins, cosmo_params, method
+
 
 # Could use ConfigParser maybe
 def config_reader(filename):
