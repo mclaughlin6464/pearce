@@ -7,6 +7,7 @@ from os import path
 from itertools import izip
 from multiprocessing import cpu_count
 import warnings
+import inspect
 from time import time
 import numpy as np
 from astropy import cosmology
@@ -39,6 +40,9 @@ def observable(func):
         except AssertionError:
             raise AssertionError("The cat must have a loaded model and catalog and be populated before calculating an observable.")
         return func(self, *args, **kwargs)
+
+    #store the arguments, as the decorator destroys the spec
+    _func.args = inspect.getargspec(func)[0]
 
     return _func
 
@@ -358,7 +362,7 @@ class Cat(object):
                 xi_cov (if do_jacknife and ! use_corrfunc):
                 (len(rbins), len(rbins)) covariance matrix for xi.
         '''
-        assert do_jackknife != use_corrfunc  # xor
+        assert not (do_jackknife and use_corrfunc) # can't both be true. 
         if use_corrfunc and not CORRFUNC_AVAILABLE:
             # NOTE just switch to halotools in this case? Or fail?
             raise ImportError("Corrfunc is not available on this machine!")
@@ -399,7 +403,7 @@ class Cat(object):
                 xi_all, xi_cov = tpcf_jackknife(pos * self.h, randoms, rbins, period=self.Lbox * self.h,
                                                 num_threads=n_cores, Nsub=n_sub, estimator='Landy-Szalay')
             else:
-                xi_all = tpcf(pos * self.h, rbins, period=self.Lbox * self.h, num_threads=n_cores(), estimator='Landy-Szalay')
+                xi_all = tpcf(pos * self.h, rbins, period=self.Lbox * self.h, num_threads=n_cores, estimator='Landy-Szalay')
 
         # TODO 1, 2 halo terms?
 
