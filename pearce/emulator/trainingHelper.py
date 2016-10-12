@@ -35,10 +35,10 @@ def load_training_params(param_file):
 
 def calc_training_points(hod_params, bins, cosmo_params, dirname, job_id):
     '''
-    given an array of hod parameters (and a few other things) populate a catalog and calculate xi at those points.
+    given an array of hod parameters (and a few other things) populate a catalog and calculate an observable at those points.
     :param hod_params:
         An array of hod parameter points. Each row represents a "point" in HOD space. This function iterates over those
-        points anc calculates xi at each of them.
+        points anc calculates the observable at each of them.
     :param bins:
         Radial (or angular) bins for the observable calculation.
     :param cosmo_params:
@@ -75,20 +75,21 @@ def calc_training_points(hod_params, bins, cosmo_params, dirname, job_id):
             calc_observable = getattr(cat, 'calc_%s'%cosmo_params['obs'])
             #check to see if there are kwargs for calc_observable
             args = calc_observable.args #get function args
-            # TODO I don't hink bins should be in this, but check
             kwargs = {}
             #cosmo_params may have args for our function.
             if any(arg in cosmo_params for arg in args):
                 kwargs.update({arg: cosmo_params[arg] for arg in args if arg in cosmo_params})
-            if n_repops > 1: #don't do jackknife
+            if n_repops > 1: #don't do jackknife in this case
+                if 'do_jackknife' in cosmo_params and cosmo_params['do_jackknife']:
+                    warnings.warn('WARNING: Cannot perform jackknife with n_repops>1. Turning off jackknife.')
                 kwargs['do_jackknife']=False
             if kwargs: #if there are kwargs to pass in.
                 _calc_observable = calc_observable #might not have to do this, but play it safe.
                 calc_observable = lambda bins: _calc_observable(bins, **kwargs)#make it so kwargs are default.
 
             obs = cosmo_params['obs']
+
         except AttributeError:
-            raise
             warnings.warn('WARNING: Observable %s invalid; using default %s'%(cosmo_params['obs'], obs))
             calc_observable = cat.calc_xi
 
@@ -114,9 +115,10 @@ def calc_training_points(hod_params, bins, cosmo_params, dirname, job_id):
         # Consider storing them all and writing them all at once. May be faster.
         # Writing the hod params as a header. Could possibly recover them from the same file I used to read these in.
         # However, I think storing them in teh same place is easier.
-        header_start = ['Cosmology: %s' % cosmo_params['simname'], 'Params for HOD:']
+        header_start = ['Cosmology: %s' % cosmo_params['simname'],'Observable: %s' % obs, 'Params for HOD:']
         header_start.extend('%s:%.3f' % (key, val) for key, val in hod_dict.iteritems())
         header = '\n'.join(header_start)
+        #TODO change file naming system;
         np.savetxt(path.join(dirname, '%s_job%03d_HOD%03d.npy'%(obs, job_id, id) ), obs_val, header=header)
         np.savetxt(path.join(dirname, '%s_cov_job%03d_HOD%03d.npy'%(obs,job_id, id) ), obs_cov, header=header)
 

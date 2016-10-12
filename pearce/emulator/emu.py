@@ -7,6 +7,7 @@ import warnings
 from glob import glob
 from itertools import izip
 from multiprocessing import cpu_count
+
 import numpy as np
 import scipy.optimize as op
 from scipy.linalg import inv
@@ -109,6 +110,7 @@ class Emu(object):
             raise ValueError('The data in training_dir is form a Latin Hypercube. \
                                         It is not possible to get plot data from this data. ')
 
+        # TODO change iv and how files are accessed and named.
         corr_files = sorted(glob(path.join(training_dir, 'xi*.npy')))
         cov_files = sorted(
             glob(path.join(training_dir, '*cov*.npy')))  # since they're sorted, they'll be paired up by params.
@@ -125,6 +127,7 @@ class Emu(object):
         num_skipped = 0
         num_used = 0
         for idx, (corr_file, cov_file) in enumerate(izip(corr_files, cov_files)):
+            # TODO
             params, xi, cov = xi_file_reader(corr_file, cov_file)
 
             # skip values that aren't where we've fixed them to be.
@@ -160,6 +163,7 @@ class Emu(object):
             num_used += 1
 
             log_r[idx] = np.log10(rpoints)
+            #TODO
             if independent_variable == 'xi':
                 y[idx] = np.log10(xi)
                 # Approximately true, may need to revisit
@@ -187,6 +191,7 @@ class Emu(object):
             Parameters to hold fixed; only return guess for parameters that are not fixed.
         :return: initial_guesses, a dictionary of the guess for each parameter
         '''
+        #TODO
         if independent_variable == 'xi':
             ig = {'amp': 0.481, 'logMmin': 0.1349, 'sigma_logM': 0.089,
                   'logM0': 2.0, 'logM1': 0.204, 'alpha': 0.039,
@@ -317,7 +322,7 @@ class Emu(object):
                 values.append(1 - SSR / SST)
 
         return np.array(values)
-
+    # TODO change rpoitns to bin_centers or something
     def run_mcmc(self, y, cov, rpoints, nwalkers=1000, nsteps=100, nburn=20, n_cores='all'):
         '''
         Run an MCMC sampler, using the emulator. Uses emcee to perform sampling.
@@ -325,9 +330,9 @@ class Emu(object):
             A true y value to recover the parameters of theta. NOTE: The emulator emulates some indepedant variables in 
             log space, others in linear. Make sure y is in the same space!
         :param cov:
-            The measurement covariance matrix of xi
+            The measurement covariance matrix of y
         :param rpoints:
-            The centers of the radial bins of xi.
+            The centers of the bins y is measured in (radial or angular).
         :param nwalkers:
             Optional. Number of walkers for emcee. Default is 1000.
         :param nsteps:
@@ -401,18 +406,18 @@ def lnprior(theta, emu, *args):
     '''
     return 0 if all(p.low < t < p.high for p, t in izip(emu.ordered_params, theta)) else -np.inf
 
-
+#TODO change rpoints to bin_centers or something
 def lnlike(theta, emu, y, cov, rpoints):
     '''
     The liklihood of parameters theta given the other parameters and the emulator.
     :param theta:
         Proposed parameters.
     :param y:
-        The measured value of xi to compare to the emulator.
+        The measured value of the observable to compare to the emulator.
     :param cov:
         The covariance matrix of the measured values.
     :param rpoints:
-        The centers of the rbins for xi.
+        The centers of the bins y is measured in, angular or radial.
     :return:
         The log liklihood of theta given the measurements and the emulator.
     '''
@@ -437,8 +442,9 @@ def lnlike(theta, emu, y, cov, rpoints):
     chi2 = -0.5 * np.dot(delta, np.dot(inv(D), delta))
     return chi2
 
-
+# TODO update iv
 class OriginalRecipe(Emu):
+    '''Emulator that emulates with bins as an implicit parameter. '''
     def get_training_data(self, training_dir, independent_variable, fixed_params):
         '''
         Read the training data for the emulator and attach it to the object.
@@ -456,7 +462,7 @@ class OriginalRecipe(Emu):
         if not fixed_params and method == 'LHC':
             raise ValueError('Fixed parameters is not empty, but the data in training_dir is form a Latin Hypercube. \
                                 Cannot performs slices on a LHC.')
-
+        # TODO change filenames
         corr_files = sorted(glob(path.join(training_dir, 'xi*.npy')))
         cov_files = sorted(
             glob(path.join(training_dir, 'cov*.npy')))  # since they're sorted, they'll be paired up by params.
@@ -479,6 +485,7 @@ class OriginalRecipe(Emu):
         num_skipped = 0
         num_used = 0
         for idx, (corr_file, cov_file) in enumerate(izip(corr_files, cov_files)):
+            # TODO chagne this funciton and outputs
             params, xi, cov = xi_file_reader(corr_file, cov_file)
 
             # skip values that aren't where we've fixed them to be.
@@ -516,6 +523,7 @@ class OriginalRecipe(Emu):
                 y[idx * NBINS:(idx + 1) * NBINS] = xi / xi_mm
                 ycovs.append(cov / np.outer(xi_mm, xi_mm))
             '''
+            # TODO here
             if independent_variable == 'xi':
                 y[idx * nbins:(idx + 1) * nbins] = np.log10(xi)
                 # Approximately true, may need to revisit
@@ -639,6 +647,8 @@ class OriginalRecipe(Emu):
         return out
     
 class ExtraCrispy(Emu):
+    '''Emulator that emulates with bins as an implicit parameter. '''
+
     def get_training_data(self, training_dir, independent_variable, fixed_params):
         '''
         Read the training data for the emulator and attach it to the object.
@@ -656,7 +666,7 @@ class ExtraCrispy(Emu):
         if not fixed_params and method == 'LHC':
             raise ValueError('Fixed parameters is not empty, but the data in training_dir is form a Latin Hypercube. \
                                 Cannot performs slices on a LHC.')
-
+        #TODO update filenames
         corr_files = sorted(glob(path.join(training_dir, 'xi*.npy')))
         cov_files = sorted(
             glob(path.join(training_dir, '*cov*.npy')))  # since they're sorted, they'll be paired up by params.
@@ -679,6 +689,7 @@ class ExtraCrispy(Emu):
         num_skipped = 0
         num_used = 0
         for idx, (corr_file, cov_file) in enumerate(izip(corr_files, cov_files)):
+            #TODO change funciton and return
             params, xi, cov = xi_file_reader(corr_file, cov_file)
 
             # skip values that aren't where we've fixed them to be.
@@ -709,6 +720,7 @@ class ExtraCrispy(Emu):
             x[idx, :] = np.stack(file_params).T
             # TODO helper function that handles this part
             # TODO the time has come to do something smarter for bias... I will ignore for now.
+            # TODO change names here
             '''
             if independent_variable == 'bias':
                 y[idx * NBINS:(idx + 1) * NBINS] = xi / xi_mm

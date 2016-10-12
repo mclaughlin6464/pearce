@@ -44,7 +44,7 @@ def low_dim_train(training_dir, ordered_params, independent_variable, n_params =
     n_max = 20#
 
     for pc in param_combinations:
-        print pc
+        print pc.name
         #for each combination, also train for each combination of unique values
         #we're being very thorough
         #these are unique values of the params were holding fixed, those not in pc

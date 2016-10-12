@@ -6,6 +6,7 @@ and useful in multiple cases. More specific, one-use functions are generally lef
 from os import path
 import numpy as np
 
+# TODO change to obs in title
 def xi_file_reader(corr_file, cov_file=None):
     '''
     A helper function to parse the training data files.
@@ -18,10 +19,13 @@ def xi_file_reader(corr_file, cov_file=None):
     '''
 
     assert path.exists(corr_file)
+    # TODO change to obs
     xi = np.loadtxt(corr_file)  # not sure if this will work, might nead to transpose
     params = {}
     with open(corr_file) as f:
         for i, line in enumerate(f):
+            # TODO skip an additional line, added obs.
+            # TODO read observable.
             if line[0] != '#' or i < 2:
                 continue  # only looking at comments, and first two lines don't have params. Note: Does have cosmo!
             splitLine = line.strip('# \n').split(':')  # split into key val pair
@@ -34,6 +38,7 @@ def xi_file_reader(corr_file, cov_file=None):
         return params, xi, cov
     return params, xi
 
+#TODO change RBINS to bins
 def global_file_reader(global_filename):
     '''
     Helper function, useful for reading the information in the global file.

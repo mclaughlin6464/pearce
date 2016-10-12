@@ -1,5 +1,5 @@
 #!/bin/bash
-'''This file samples points in the parameter space, and sends off jobs to perform the calculation of xi at those
+'''This file samples points in the parameter space, and sends off jobs to perform the calculation of an observable at those
 points in parameter space. '''
 
 from time import time
@@ -212,7 +212,7 @@ def training_config_reader(filename):
 
 def make_training_data(config_filename):
     '''
-    "Main" function. Take a config file as input and send off jobs to compute xi
+    "Main" function. Take a config file as input and send off jobs to compute an observable
     at various points in HOD parameter space.
     :param config_filename:
         Config file.
