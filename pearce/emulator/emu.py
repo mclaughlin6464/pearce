@@ -25,7 +25,7 @@ class Emu(object):
     # have to copy a lot of it to the subclass
 
     # TODO load initial guesses from file.
-    def __init__(self, training_dir, params=PARAMS, independent_variable='xi', fixed_params={}, metric={}):
+    def __init__(self, training_dir, params=PARAMS, independent_variable=None, fixed_params={}, metric={}):
 
         '''
         # TODO change name of type
@@ -38,7 +38,7 @@ class Emu(object):
         if independent_variable == 'bias':
             raise NotImplementedError("I have to work on how to do xi_mm first.")
 
-        assert independent_variable in {'xi', 'r2xi'}  # no bias for now.
+        assert independent_variable in {None,'r2'}  # no bias for now.
 
         self.ordered_params = params
 
@@ -49,6 +49,38 @@ class Emu(object):
     def get_training_data(self, training_dir, independent_variable, fixed_params):
         '''Implemented in subclasses. '''
         raise NotImplementedError
+
+    def _iv_transform(self, independent_variable, obs, cov):
+        '''
+        Independent variable tranform. Helper function that consolidates this operation all in one place.
+        :param independent_variable:
+            Which iv to transform to. Current optins are None (just take log) and r2.
+        :param obs:
+            Observable to transform (xi, wprp, etc.)
+        :param cov:
+            Covariance of obs
+        :return:
+            y, yerr the transformed iv's for the emulator
+        '''
+        if independent_variable is None:
+            y = np.log10(obs)
+            # Approximately true, may need to revisit
+            # yerr[idx * NBINS:(idx + 1) * NBINS] = np.sqrt(np.diag(cov)) / (xi * np.log(10))
+            y_err = np.sqrt(np.diag(cov)) / (
+                obs * np.log(10))  # I think this is right, extrapolating from the above.
+        elif independent_variable=='r2':  # r2
+            y = obs * self.bin_centers * self.bin_centers
+            y_err = np.sqrt(np.diag(cov)) * self.bin_centers  # I think this is right, extrapolating from the above.
+        else:
+            raise ValueError('Invalid independent variable %s'%independent_variable)
+
+        '''
+        if independent_variable == 'bias':
+            y[idx * NBINS:(idx + 1) * NBINS] = xi / xi_mm
+            ycovs.append(cov / np.outer(xi_mm, xi_mm))
+        '''
+
+        return y, y_err
 
     def build_emulator(self, independent_variable, fixed_params, metric={}):
         '''
@@ -102,7 +134,7 @@ class Emu(object):
         '''
         assert len(em_params) + len(fixed_params) - len(self.ordered_params) <= 1  # can exclude r
 
-        rbins, cosmo_params, method = global_file_reader(path.join(training_dir, GLOBAL_FILENAME))
+        bins, cosmo_params,obs, method = global_file_reader(path.join(training_dir, GLOBAL_FILENAME))
 
         if method == 'LHC':
             raise ValueError('The data in training_dir is form a Latin Hypercube. \
@@ -111,20 +143,19 @@ class Emu(object):
         obs_files = sorted(glob(path.join(training_dir, 'obs*.npy')))
         cov_files = sorted(
             glob(path.join(training_dir, 'cov*.npy')))  # since they're sorted, they'll be paired up by params.
-        bin_centers = (rbins[:-1] + rbins[1:]) / 2
+        bin_centers = (bins[:-1] + bins[1:]) / 2
         nbins = bin_centers.shape[0]
 
         npoints = len(obs_files)  # each file contains NBINS points in r, and each file is a 6-d point
 
         log_bin_centers = np.zeros((npoints, nbins))
         y = np.zeros((npoints, nbins))
-        y_err = np.zeros((npoints, nbins))
+        yerr = np.zeros((npoints, nbins))
 
         warned = False
         num_skipped = 0
         num_used = 0
         for idx, (obs_file, cov_file) in enumerate(izip(obs_files, cov_files)):
-            # TODO
             params, obs, cov = obs_file_reader(obs_file, cov_file)
 
             # skip values that aren't where we've fixed them to be.
@@ -160,23 +191,14 @@ class Emu(object):
             num_used += 1
 
             log_bin_centers[idx] = np.log10(bin_centers)
-            #TODO
-            if independent_variable == 'xi':
-                y[idx] = np.log10(obs)
-                # Approximately true, may need to revisit
-                # yerr[idx * NBINS:(idx + 1) * NBINS] = np.sqrt(np.diag(cov)) / (xi * np.log(10))
-                y_err[idx] = np.sqrt(np.diag(cov)) / (
-                    obs * np.log(10))  # I think this is right, extrapolating from the above.
-            else:  # r2xi
-                y[idx] = obs * bin_centers * bin_centers
-                y_err[idx] = np.sqrt(np.diag(cov)) * bin_centers  # I think this is right, extrapolating from the above.
+            y[idx], yerr[idx] = self._iv_transform(independent_variable,obs, cov)
 
         # remove rows that were skipped due to the fixed thing
         # NOTE: HACK
         # a reshape may be faster.
         zeros_slice = np.all(y != 0.0, axis=1)
 
-        return log_bin_centers[zeros_slice], y[zeros_slice], y_err[zeros_slice]
+        return log_bin_centers[zeros_slice], y[zeros_slice], yerr[zeros_slice]
 
     def get_initial_guess(self, independent_variable, fixed_params):
         '''
@@ -188,14 +210,20 @@ class Emu(object):
             Parameters to hold fixed; only return guess for parameters that are not fixed.
         :return: initial_guesses, a dictionary of the guess for each parameter
         '''
-        #TODO
-        if independent_variable == 'xi':
-            ig = {'amp': 0.481, 'logMmin': 0.1349, 'sigma_logM': 0.089,
+
+        #default
+        ig = {'amp': 1}
+        ig.update({p.name: 0.1 for p in self.ordered_params})
+
+        if self.obs == 'xi':
+            if independent_variable is None:
+                ig = {'amp': 0.481, 'logMmin': 0.1349, 'sigma_logM': 0.089,
                   'logM0': 2.0, 'logM1': 0.204, 'alpha': 0.039,
                   'f_c': 0.041, 'r': 0.040}
-        else:  # independent_variable == 'r2xi':
-            ig = {'amp': 1}
-            ig.update({p.name: 0.1 for p in self.ordered_params})
+            else:
+                pass
+        else:
+            pass #no other guesses saved yet.
 
         # remove entries for variables that are being held fixed.
         for key in fixed_params.iterkeys():
@@ -304,8 +332,8 @@ class Emu(object):
             idxs = np.random.choice(len(corr_files), N, replace=False)
 
         values = []
-        rbins, _, _ = global_file_reader(path.join(truth_dir, GLOBAL_FILENAME))
-        bin_centers = (rbins[:1] + rbins[:-1]) / 2
+        bins, _, _, _ = global_file_reader(path.join(truth_dir, GLOBAL_FILENAME))
+        bin_centers = (bins[:1] + bins[:-1]) / 2
         for idx in idxs:
             params, true_obs, _ = obs_file_reader(corr_files[idx], cov_files[idx])
             pred_log_obs, _ = self.emulate_wrt_r(params, np.log10(bin_centers))
@@ -319,6 +347,7 @@ class Emu(object):
                 values.append(1 - SSR / SST)
 
         return np.array(values)
+
     def run_mcmc(self, y, cov, bin_centers, nwalkers=1000, nsteps=100, nburn=20, n_cores='all'):
         '''
         Run an MCMC sampler, using the emulator. Uses emcee to perform sampling.
@@ -446,24 +475,24 @@ class OriginalRecipe(Emu):
         :return: None
         '''
 
-        rbins, cosmo_params, method = global_file_reader(path.join(training_dir, GLOBAL_FILENAME))
+        bins, cosmo_params, obs, method = global_file_reader(path.join(training_dir, GLOBAL_FILENAME))
 
         if not fixed_params and method == 'LHC':
             raise ValueError('Fixed parameters is not empty, but the data in training_dir is form a Latin Hypercube. \
                                 Cannot performs slices on a LHC.')
+
+        self.obs = obs
+
         obs_files = sorted(glob(path.join(training_dir, 'obs*.npy')))
         cov_files = sorted(
             glob(path.join(training_dir, 'cov*.npy')))  # since they're sorted, they'll be paired up by params.
-        self.bin_centers = (rbins[:-1] + rbins[1:]) / 2
+        self.bin_centers = (bins[:-1] + bins[1:]) / 2
         nbins = self.bin_centers.shape[0]
-        # HERE
+
         npoints = len(obs_files) * nbins  # each file contains NBINS points in r, and each file is a 6-d point
 
-        # HERE
         varied_params = set([p.name for p in self.ordered_params]) - set(fixed_params.keys())
         ndim = len(varied_params)  # lest we forget r
-
-        # not sure about this.
 
         x = np.zeros((npoints, ndim))
         y = np.zeros((npoints,))
@@ -504,22 +533,9 @@ class OriginalRecipe(Emu):
                     file_params.append(np.ones((nbins,)) * params[p.name])
 
             x[idx * nbins:(idx + 1) * nbins, :] = np.stack(file_params).T
-            # TODO helper function that handles this part
             # TODO the time has come to do something smarter for bias... I will ignore for now.
-            '''
-            if independent_variable == 'bias':
-                y[idx * NBINS:(idx + 1) * NBINS] = xi / xi_mm
-                ycovs.append(cov / np.outer(xi_mm, xi_mm))
-            '''
-            # TODO here
-            if independent_variable == 'xi':
-                y[idx * nbins:(idx + 1) * nbins] = np.log10(obs)
-                # Approximately true, may need to revisit
-                yerr[idx * nbins:(idx + 1) * nbins] = np.sqrt(np.diag(cov)) / (obs * np.log(10))
-                # ycovs.append(cov / (np.outer(xi, xi) * np.log(10) ** 2))  # I think this is right, extrapolating from the above.
-            else:  # r2xi
-                y[idx * nbins:(idx + 1) * nbins] = obs * self.bin_centers * self.bin_centers
-                yerr[idx * nbins:(idx + 1) * nbins] = np.diag(cov) * self.bin_centers * self.bin_centers
+
+            y[idx], yerr[idx] = self._iv_transform(independent_variable,obs, cov)
 
         # ycov = block_diag(*ycovs)
         # ycov = np.sqrt(np.diag(ycov))
@@ -648,15 +664,18 @@ class ExtraCrispy(Emu):
         :return: None
         '''
 
-        rbins, cosmo_params, method = global_file_reader(path.join(training_dir, GLOBAL_FILENAME))
+        bins, cosmo_params,obs, method = global_file_reader(path.join(training_dir, GLOBAL_FILENAME))
 
         if not fixed_params and method == 'LHC':
             raise ValueError('Fixed parameters is not empty, but the data in training_dir is form a Latin Hypercube. \
                                 Cannot performs slices on a LHC.')
+
+        self.obs = obs
+
         obs_files = sorted(glob(path.join(training_dir, 'obs*.npy')))
         cov_files = sorted(
             glob(path.join(training_dir, 'cov*.npy')))  # since they're sorted, they'll be paired up by params.
-        self.bin_centers = (rbins[:-1] + rbins[1:]) / 2
+        self.bin_centers = (bins[:-1] + bins[1:]) / 2
         nbins = self.bin_centers.shape[0]
         # HERE
         npoints = len(obs_files)  # each file contains NBINS points in r, and each file is a 6-d point
@@ -703,23 +722,8 @@ class ExtraCrispy(Emu):
                 file_params.append(params[p.name])
 
             x[idx, :] = np.stack(file_params).T
-            # TODO helper function that handles this part
-            # TODO the time has come to do something smarter for bias... I will ignore for now.
-            '''
-            if independent_variable == 'bias':
-                y[idx * NBINS:(idx + 1) * NBINS] = xi / xi_mm
-                ycovs.append(cov / np.outer(xi_mm, xi_mm))
-            '''
-            # TODO change names here
 
-            if independent_variable == 'xi':
-                y[idx, :] = np.log10(obs)
-                # Approximately true, may need to revisit
-                # yerr[idx, :] = np.sqrt(np.diag(cov)) / (xi * np.log(10))
-                # ycovs.append(cov / (np.outer(xi, xi) * np.log(10) ** 2))  # I think this is right, extrapolating from the above.
-            else:  # r2xi
-                y[idx, :] = obs * self.bin_centers * self.bin_centers
-                # yerr[idx, :] = cov * np.outer(self.bin_centers, self.bin_centers)
+            y[idx], _ = self._iv_transform(independent_variable, obs, cov)
 
         # ycov = block_diag(*ycovs)
         # ycov = np.sqrt(np.diag(ycov))
@@ -806,7 +810,7 @@ class ExtraCrispy(Emu):
             t = np.sort(t.view(','.join(['float64' for _ in xrange(min(t.shape))])),
                     order=['f%d' % i for i in xrange(min(t.shape))], axis=0).view(np.float)
 
-        all_mu = np.zeros((t.shape[0], self.y.shape[1]))  # t down rbins across
+        all_mu = np.zeros((t.shape[0], self.y.shape[1]))  # t down nbins across
         # all_err = np.zeros((t.shape[0], self.y.shape[1]))
         all_cov = []# np.zeros((t.shape[0], t.shape[0], self.y.shape[1]))
 

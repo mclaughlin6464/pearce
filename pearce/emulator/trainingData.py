@@ -167,7 +167,7 @@ def training_config_reader(filename):
     :param filename:
         Config filename
     :return:
-        method, n_points, system, n_jobs, max_time, outputdir, bins, cosmo_params
+        method,obs n_points, system, n_jobs, max_time, outputdir, bins, cosmo_params
         Config parameters defined explicitly elsewhere.
     '''
     config = config_reader(filename)
@@ -175,6 +175,7 @@ def training_config_reader(filename):
     # I'm not sure I want to do that.
     try:
         method = config['method']
+        obs = config['obs']
         n_points = int(config['n_points'])
         system = config['system']
         n_jobs = int(config['n_jobs'])
@@ -207,7 +208,7 @@ def training_config_reader(filename):
     except KeyError:
         raise KeyError("The config file %s is missing a parameter." % filename)
 
-    return method, n_points, system, n_jobs, max_time, outputdir, bins, cosmo_params
+    return method,obs, n_points, system, n_jobs, max_time, outputdir, bins, cosmo_params
 
 
 def make_training_data(config_filename):
@@ -220,7 +221,7 @@ def make_training_data(config_filename):
         None.
     '''
 
-    method, n_points, system, n_jobs, max_time, outputdir, bins, cosmo_params = \
+    method,obs, n_points, system, n_jobs, max_time, outputdir, bins, cosmo_params = \
         training_config_reader(config_filename)
 
     # determine the specific functions needed for this setup
@@ -240,7 +241,7 @@ def make_training_data(config_filename):
 
     # write the global file used by all params
     # TODO Write system (maybe) and method (definetly) to file!
-    header_start = ['Sampling Method: %s'%method, 'Cosmology Params:']
+    header_start = ['Sampling Method: %s'%method,'Observable: %s'%obs, 'Cosmology Params:']
     header_start.extend('%s:%s' % (key, str(val)) for key, val in cosmo_params.iteritems())
     header = '\n'.join(header_start)
     np.savetxt(path.join(outputdir, GLOBAL_FILENAME), bins, header=header)

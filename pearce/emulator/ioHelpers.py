@@ -42,7 +42,7 @@ def global_file_reader(global_filename):
     :param global_filename:
         Path+filename for the global file.
     :return:
-        bins, cosmo_params
+        bins, cosmo_params, obs, method
     '''
     bins = np.loadtxt(global_filename)
     # cosmology parameters are stored in the global header
@@ -52,7 +52,10 @@ def global_file_reader(global_filename):
             if i == 0:
                 splitLine = line.strip('# \n').split(':')  # split into key val pair
                 method = splitLine[1]
-            elif line[0] != '#' or i < 2:
+            elif i == 1:
+                splitLine = line.strip('# \n').split(':')  # split into key val pair
+                obs = splitLine[1]
+            elif line[0] != '#' or i < 3:
                 continue  # only looking at comments, and first two lines don't have params. Note: Does have cosmo!
             splitLine = line.strip('# \n').split(':')  # split into key val pair
             try:
@@ -60,7 +63,7 @@ def global_file_reader(global_filename):
             except ValueError:
                 cosmo_params[splitLine[0]] = splitLine[1]
 
-    return bins, cosmo_params, method
+    return bins, cosmo_params,obs, method
 
 
 # Could use ConfigParser maybe

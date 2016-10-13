@@ -23,17 +23,17 @@ def load_training_params(param_file):
     :param param_file:
         The file where the parameters are stored. The output directory is the same directory as the paramfile, and
         the radial bins are stored in the same directory as well.
-    :return: bins, parameters, cosmology info, output directory, and job_id.
+    :return: hod parameters, bins, obs, cosmo paraemters, job id
     '''
     hod_params = np.loadtxt(param_file)
     dirname = path.dirname(param_file)
-    bins, cosmo_params, _ = global_file_reader(path.join(dirname, GLOBAL_FILENAME))
+    bins, cosmo_params, obs, _ = global_file_reader(path.join(dirname, GLOBAL_FILENAME))
 
     job_id = int(param_file.split('.')[0][-3:]) #last 3 digits of paramfile is a unique id.
 
-    return hod_params, bins, cosmo_params, dirname, job_id
+    return hod_params, bins,obs, cosmo_params, dirname, job_id
 
-def calc_training_points(hod_params, bins, cosmo_params, dirname, job_id):
+def calc_training_points(hod_params, bins,obs, cosmo_params, dirname, job_id):
     '''
     given an array of hod parameters (and a few other things) populate a catalog and calculate an observable at those points.
     :param hod_params:
@@ -66,13 +66,17 @@ def calc_training_points(hod_params, bins, cosmo_params, dirname, job_id):
         assert n_repops > 1
 
     #check if we should use a non-default observable.
-    obs = 'xi'
     calc_observable = cat.calc_xi
 
-    if 'obs' in cosmo_params:
+    if obs!='xi': #if the observable we're after is different than the default.
         try:
             #get the function to calculate the observable
             calc_observable = getattr(cat, 'calc_%s'%cosmo_params['obs'])
+        except AttributeError:
+            warnings.warn('WARNING: Observable %s invalid; using default %s' % (cosmo_params['obs'], obs))
+            calc_observable = cat.calc_xi
+            obs = 'xi'
+        else:
             #check to see if there are kwargs for calc_observable
             args = calc_observable.args #get function args
             kwargs = {}
@@ -86,12 +90,6 @@ def calc_training_points(hod_params, bins, cosmo_params, dirname, job_id):
             if kwargs: #if there are kwargs to pass in.
                 _calc_observable = calc_observable #might not have to do this, but play it safe.
                 calc_observable = lambda bins: _calc_observable(bins, **kwargs)#make it so kwargs are default.
-
-            obs = cosmo_params['obs']
-
-        except AttributeError:
-            warnings.warn('WARNING: Observable %s invalid; using default %s'%(cosmo_params['obs'], obs))
-            calc_observable = cat.calc_xi
 
     for id, hod in enumerate(hod_params):
         #construct a dictionary for the parameters
@@ -130,5 +128,5 @@ if __name__ == '__main__':
 
     args = vars(parser.parse_args())
 
-    hod_params, bins, cosmo_params, dirname, job_id = load_training_params(args['param_file'])
-    calc_training_points(hod_params, bins, cosmo_params, dirname, job_id)
+    hod_params, bins,obs, cosmo_params, dirname, job_id = load_training_params(args['param_file'])
+    calc_training_points(hod_params, bins,obs, cosmo_params, dirname, job_id)
