@@ -71,44 +71,44 @@ def calc_training_points(hod_params, bins,obs, cosmo_params, dirname, job_id):
     if obs!='xi': #if the observable we're after is different than the default.
         try:
             #get the function to calculate the observable
-            calc_observable = getattr(cat, 'calc_%s'%cosmo_params['obs'])
+            calc_observable = getattr(cat, 'calc_%s'%obs)
         except AttributeError:
-            warnings.warn('WARNING: Observable %s invalid; using default %s' % (cosmo_params['obs'], obs))
+            warnings.warn('WARNING: Observable %s invalid; using default xi' % (obs))
             calc_observable = cat.calc_xi
             obs = 'xi'
-        else:
-            #check to see if there are kwargs for calc_observable
-            args = calc_observable.args #get function args
-            kwargs = {}
-            #cosmo_params may have args for our function.
-            if any(arg in cosmo_params for arg in args):
-                kwargs.update({arg: cosmo_params[arg] for arg in args if arg in cosmo_params})
-            if n_repops > 1: #don't do jackknife in this case
-                if 'do_jackknife' in cosmo_params and cosmo_params['do_jackknife']:
-                    warnings.warn('WARNING: Cannot perform jackknife with n_repops>1. Turning off jackknife.')
-                kwargs['do_jackknife']=False
-            if kwargs: #if there are kwargs to pass in.
-                _calc_observable = calc_observable #might not have to do this, but play it safe.
-                calc_observable = lambda bins: _calc_observable(bins, **kwargs)#make it so kwargs are default.
+
+    #check to see if there are kwargs for calc_observable
+    args = calc_observable.args #get function args
+    kwargs = {}
+    #cosmo_params may have args for our function.
+    if any(arg in cosmo_params for arg in args):
+        kwargs.update({arg: cosmo_params[arg] for arg in args if arg in cosmo_params})
+    if n_repops > 1: #don't do jackknife in this case
+        if 'do_jackknife' in cosmo_params and cosmo_params['do_jackknife']:
+            warnings.warn('WARNING: Cannot perform jackknife with n_repops>1. Turning off jackknife.')
+        kwargs['do_jackknife']=False
+    if kwargs: #if there are kwargs to pass in.
+        _calc_observable = calc_observable #might not have to do this, but play it safe.
+        calc_observable = lambda bins: _calc_observable(bins, **kwargs)#make it so kwargs are default.
 
     for id, hod in enumerate(hod_params):
         #construct a dictionary for the parameters
         # Could store the param ordering in the file so it doesn't need to be imported.
         hod_dict = {p.name: val for p, val in zip(PARAMS, hod)}
         #Populating the same cat over and over is faster than making a new one over and over!
-        cat.populate(hod_dict)
         if n_repops ==1:
+            cat.populate(hod_dict)
             obs_val, obs_cov = calc_observable(bins)
         else: #do several repopulations
             obs_repops = np.zeros((n_repops, bins.shape[0]-1))
 
             for repop in xrange(n_repops):
+                cat.populate(hod_dict)
                 obs_i = calc_observable(bins)
                 obs_repops[repop, :] = obs_i
 
             obs_val = np.mean(obs_repops, axis=0)
-            obs_err = np.std(obs_repops, axis=0)/np.sqrt(n_repops)#error on mean # TODO make sure is right?
-            obs_cov = np.diag(obs_err)
+            obs_cov = np.cov(obs_repops, rowvar=False)/np.sqrt(n_repops)#error on mean # TODO make sure is right?
 
         # Consider storing them all and writing them all at once. May be faster.
         # Writing the hod params as a header. Could possibly recover them from the same file I used to read these in.

@@ -51,17 +51,19 @@ def global_file_reader(global_filename):
         for i, line in enumerate(f):
             if i == 0:
                 splitLine = line.strip('# \n').split(':')  # split into key val pair
-                method = splitLine[1]
+                method = splitLine[1].strip()
+                continue
             elif i == 1:
                 splitLine = line.strip('# \n').split(':')  # split into key val pair
-                obs = splitLine[1]
+                obs = splitLine[1].strip()
+                continue
             elif line[0] != '#' or i < 3:
                 continue  # only looking at comments, and first two lines don't have params. Note: Does have cosmo!
             splitLine = line.strip('# \n').split(':')  # split into key val pair
             try:
                 cosmo_params[splitLine[0]] = float(splitLine[1])
             except ValueError:
-                cosmo_params[splitLine[0]] = splitLine[1]
+                cosmo_params[splitLine[0]] = splitLine[1].strip()
 
     return bins, cosmo_params,obs, method
 

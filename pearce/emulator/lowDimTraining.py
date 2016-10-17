@@ -7,7 +7,7 @@ from itertools import combinations, product
 from collections import defaultdict
 import numpy as np
 from .emu import OriginalRecipe, ExtraCrispy
-from .ioHelpers import xi_file_reader
+from .ioHelpers import obs_file_reader
 
 #TODO does this need to be in a separate file here? Can I attach it to emu?
 def low_dim_train(training_dir, ordered_params, independent_variable, n_params = 3, emu_type = 'OriginalRecipe'):
@@ -28,6 +28,7 @@ def low_dim_train(training_dir, ordered_params, independent_variable, n_params =
 
     emu_obj = OriginalRecipe if emu_type == 'OriginalRecipe' else ExtraCrispy
 
+    #TODO change 'r' to something more general
     if ordered_params[-1].name == 'r':
         #we don' do combinations in 'r'
         varied_params = ordered_params[:-1]
@@ -44,7 +45,6 @@ def low_dim_train(training_dir, ordered_params, independent_variable, n_params =
     n_max = 20#
 
     for pc in param_combinations:
-        print pc.name
         #for each combination, also train for each combination of unique values
         #we're being very thorough
         #these are unique values of the params were holding fixed, those not in pc
@@ -104,9 +104,9 @@ def get_unique_values(training_dir):
         the parameters in the training file.
     '''
     unique_values = defaultdict(set)
-    corr_files = glob(path.join(training_dir, 'xi*.npy'))
-    for corr_file in corr_files:
-        params, _ = xi_file_reader(corr_file)
+    obs_files = glob(path.join(training_dir, 'obs*.npy'))
+    for obs_file in obs_files:
+        params, _ = obs_file_reader(obs_file)
         for key, val in params.iteritems():
             unique_values[key].add(val)
 

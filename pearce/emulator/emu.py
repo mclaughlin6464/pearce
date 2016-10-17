@@ -82,6 +82,44 @@ class Emu(object):
 
         return y, y_err
 
+    def _sort_params(self, t, argsort=False):
+        '''
+        Sort the parameters in a defined away given the orderering.
+        :param t:
+            Parameter vector to sort. Should have dims (N, N_params) and be in the order
+            defined by ordered_params
+        :param argsort:
+            If true, return indicies that would sort the array rather than the sorted array itself.
+            Default is False.
+        :return:
+            If not argsort, returns the sorted array by column and row. 
+            If argsort, return the indicies that would sort the array.
+        '''
+        if t.shape[0] == 1:
+            if argsort:
+                return np.array([0])
+            return t #a row array is already sorted!
+        
+        if argsort: #returns indicies that would sort the array
+            #weird try structure because this view is very tempermental!
+            try:
+                idxs = np.argsort(t.view(','.join(['float64' for _ in xrange(min(t.shape))])),
+                    order=['f%d' % i for i in xrange(min(t.shape))], axis=0)
+            except ValueError: #sort with other side
+                idxs = np.argsort(t.view(','.join(['float64' for _ in xrange(max(t.shape))])),
+                    order=['f%d' % i for i in xrange(max(t.shape))], axis=0)
+
+            return idxs[:,0]
+
+        try:
+            t = np.sort(t.view(','.join(['float64' for _ in xrange(min(t.shape))])),
+                order=['f%d' % i for i in xrange(min(t.shape))], axis=0).view(np.float)
+        except ValueError: #sort with other side
+            t = np.sort(t.view(','.join(['float64' for _ in xrange(max(t.shape))])),
+                order=['f%d' % i for i in xrange(max(t.shape))], axis=0).view(np.float)
+
+        return t
+
     def build_emulator(self, independent_variable, fixed_params, metric={}):
         '''
         Initialization of the emulator from recovered training data.
@@ -118,7 +156,7 @@ class Emu(object):
         self.gp.compute(self.x, self.yerr,sort=False)  # NOTE I'm using a modified version of george!
 
     # Not sure this will work at all in an LHC scheme.
-    def get_plot_data(self, em_params, training_dir, independent_variable='xi', fixed_params={}):
+    def get_plot_data(self, em_params, training_dir, independent_variable=None, fixed_params={}):
         '''
         Similar function to get_training_data. However, returns values for plotting comparisons to the emulator.
         :param em_params:
@@ -152,6 +190,8 @@ class Emu(object):
         y = np.zeros((npoints, nbins))
         yerr = np.zeros((npoints, nbins))
 
+        x = np.zeros((npoints,len(em_params))) 
+
         warned = False
         num_skipped = 0
         num_used = 0
@@ -165,6 +205,8 @@ class Emu(object):
             if any(params[key] != val for key, val in fixed_params.iteritems()):
                 continue
 
+            #same as the above for emulation params
+            #more complex since em_params can have a float or array
             to_continue = True
             for key, val in em_params.iteritems():
                 if type(val) is type(y):
@@ -178,9 +220,6 @@ class Emu(object):
             if to_continue:
                 continue
 
-            # if any(params[key] != val for key, val in em_params.iteritems()):
-            #    continue
-
             if np.any(np.isnan(cov)) or np.any(np.isnan(obs)):
                 if not warned:
                     warnings.warn('WARNING: NaN detected. Skipping point in %s' % cov_file)
@@ -193,12 +232,18 @@ class Emu(object):
             log_bin_centers[idx] = np.log10(bin_centers)
             y[idx], yerr[idx] = self._iv_transform(independent_variable,obs, cov)
 
+            x[idx] =  np.array([params[p.name] for p in self.ordered_params if p.name in params])
+
         # remove rows that were skipped due to the fixed thing
         # NOTE: HACK
         # a reshape may be faster.
         zeros_slice = np.all(y != 0.0, axis=1)
 
-        return log_bin_centers[zeros_slice], y[zeros_slice], yerr[zeros_slice]
+        print x[zeros_slice].shape
+
+        sort_idxs = self._sort_params(x[zeros_slice], argsort=True)
+
+        return log_bin_centers[zeros_slice][sort_idxs], y[zeros_slice][sort_idxs], yerr[zeros_slice][sort_idxs]
 
     def get_initial_guess(self, independent_variable, fixed_params):
         '''
@@ -222,6 +267,11 @@ class Emu(object):
                   'f_c': 0.041, 'r': 0.040}
             else:
                 pass
+        elif self.obs == 'wp':
+            if independent_variable is None:
+                ig = {'logMmin': 1.7348042925, 'f_c': 0.327508062386, 'logM0':15.8416094906,
+                        'sigma_logM':5.36288382789, 'alpha': 3.63498762588, 'r': 0.306139450843,
+                        'logM1': 1.66509412286, 'amp': 1.18212664544}
         else:
             pass #no other guesses saved yet.
 
@@ -316,35 +366,42 @@ class Emu(object):
             Number of points to use to calculate G.O.F. measures. "None" tests against all values in truth_dir. If N
             is less than the number of points, N are randomly selected.
         :param statistic:
-            What G.O.F. statistic to calculate. Default is R2. Other option is rmsfd.
+            What G.O.F. statistic to calculate. Default is R2. Other options are rmsfd, abs(olute), and rel(ative).
         :return: values, a numpy arrray of the calculated statistics at each of the N training opints.
         '''
-        assert statistic in {'r2', 'rmsfd'}
+        assert statistic in {'r2', 'rmsfd','abs','rel'}
 
-        corr_files = sorted(glob(path.join(truth_dir, '*corr*.npy')))
+        obs_files = sorted(glob(path.join(truth_dir, 'obs*.npy')))
         cov_files = sorted(glob(path.join(truth_dir, 'cov*.npy')))
 
         np.random.seed(int(time()))
 
         if N is None:
-            idxs = np.arange(len(corr_files))
+            idxs = np.arange(len(obs_files))
         else:
-            idxs = np.random.choice(len(corr_files), N, replace=False)
+            idxs = np.random.choice(len(obs_files), N, replace=False)
 
         values = []
         bins, _, _, _ = global_file_reader(path.join(truth_dir, GLOBAL_FILENAME))
-        bin_centers = (bins[:1] + bins[:-1]) / 2
+        bin_centers = (bins[1:] + bins[:-1]) / 2
         for idx in idxs:
-            params, true_obs, _ = obs_file_reader(corr_files[idx], cov_files[idx])
-            pred_log_obs, _ = self.emulate_wrt_r(params, np.log10(bin_centers))
+            params, true_obs, _ = obs_file_reader(obs_files[idx], cov_files[idx])
+            pred_log_obs, _ = self.emulate_wrt_r(params, bin_centers)
 
             if statistic == 'rmsfd':
                 values.append(np.sqrt(np.mean(((pred_log_obs - np.log10(true_obs)) ** 2) / (np.log10(true_obs) ** 2))))
-            else:  # r2
+            elif statistic == 'r2':  # r2
                 SSR = np.sum((pred_log_obs - np.log10(true_obs)) ** 2)
                 SST = np.sum((np.log10(true_obs) - np.log10(true_obs).mean()) ** 2)
 
                 values.append(1 - SSR / SST)
+
+            elif statistic == 'abs':
+                values.append((pred_log_obs - np.log10(true_obs)) )
+                #values.append((10**pred_log_obs - true_obs) )
+            else: #'rel'
+                values.append(((pred_log_obs - np.log10(true_obs)) )/np.log10(true_obs) )
+                #values.append((10**pred_log_obs - true_obs )/true_obs )
 
         return np.array(values)
 
@@ -477,7 +534,7 @@ class OriginalRecipe(Emu):
 
         bins, cosmo_params, obs, method = global_file_reader(path.join(training_dir, GLOBAL_FILENAME))
 
-        if not fixed_params and method == 'LHC':
+        if fixed_params and method == 'LHC':
             raise ValueError('Fixed parameters is not empty, but the data in training_dir is form a Latin Hypercube. \
                                 Cannot performs slices on a LHC.')
 
@@ -535,7 +592,7 @@ class OriginalRecipe(Emu):
             x[idx * nbins:(idx + 1) * nbins, :] = np.stack(file_params).T
             # TODO the time has come to do something smarter for bias... I will ignore for now.
 
-            y[idx], yerr[idx] = self._iv_transform(independent_variable,obs, cov)
+            y[idx * nbins:(idx + 1) * nbins], yerr[idx * nbins:(idx + 1) * nbins] = self._iv_transform(independent_variable,obs, cov)
 
         # ycov = block_diag(*ycovs)
         # ycov = np.sqrt(np.diag(ycov))
@@ -613,13 +670,7 @@ class OriginalRecipe(Emu):
         # TODO george can sort?
         t = t.reshape((-1, self.emulator_ndim))
 
-        if t.shape[0] != 1:
-            try:
-                t = np.sort(t.view(','.join(['float64' for _ in xrange(min(t.shape))])),
-                    order=['f%d' % i for i in xrange(min(t.shape))], axis=0).view(np.float)
-            except ValueError: #sort with other side
-                t = np.sort(t.view(','.join(['float64' for _ in xrange(max(t.shape))])),
-                    order=['f%d' % i for i in xrange(max(t.shape))], axis=0).view(np.float)
+        t = self._sort_params(t)
 
         if jackknife_errors:
             mu = self.gp.predict(self.y, t, mean_only=True)
@@ -666,7 +717,7 @@ class ExtraCrispy(Emu):
 
         bins, cosmo_params,obs, method = global_file_reader(path.join(training_dir, GLOBAL_FILENAME))
 
-        if not fixed_params and method == 'LHC':
+        if fixed_params and method == 'LHC':
             raise ValueError('Fixed parameters is not empty, but the data in training_dir is form a Latin Hypercube. \
                                 Cannot performs slices on a LHC.')
 
@@ -803,12 +854,7 @@ class ExtraCrispy(Emu):
         t = np.stack(t_grid).T
         # should add a fixed_param dim
         t = t.reshape((-1, self.emulator_ndim))
-        # t.view(','.join(['float64' for _ in self.ordered_params]))
-        # for some reason this one has different requirements than the other.
-        # i give up, it's black magic
-        if t.shape[0] != 1:
-            t = np.sort(t.view(','.join(['float64' for _ in xrange(min(t.shape))])),
-                    order=['f%d' % i for i in xrange(min(t.shape))], axis=0).view(np.float)
+        t = self._sort_params(t)
 
         all_mu = np.zeros((t.shape[0], self.y.shape[1]))  # t down nbins across
         # all_err = np.zeros((t.shape[0], self.y.shape[1]))

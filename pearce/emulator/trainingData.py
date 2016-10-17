@@ -174,20 +174,20 @@ def training_config_reader(filename):
     # I could make some of these have defaults with get()
     # I'm not sure I want to do that.
     try:
-        method = config['method']
-        obs = config['obs']
+        method = config['method'].strip()
+        obs = config['obs'].strip()
         n_points = int(config['n_points'])
         system = config['system']
         n_jobs = int(config['n_jobs'])
         max_time = int(config['max_time'])
-        outputdir = config['outputdir']
+        outputdir = config['outputdir'].strip()
         bins_str = config['bins']
         # need to do a little work to get this right
         bins = [float(r.strip()) for r in bins_str.strip('[ ]').split(',')]
 
         # cosmology information assumed to be in the remaining ones!
         #Delete the ones we've removed.
-        for key in ['method', 'n_points', 'system', 'n_jobs', 'max_time',
+        for key in ['method','obs', 'n_points', 'system', 'n_jobs', 'max_time',
                     'outputdir', 'bins']:
             del config[key]
 
