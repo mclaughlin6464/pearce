@@ -5,7 +5,9 @@ from os import path
 from glob import glob
 from itertools import combinations, product
 from collections import defaultdict
+
 import numpy as np
+
 from .emu import OriginalRecipe, ExtraCrispy
 from .ioHelpers import obs_file_reader
 

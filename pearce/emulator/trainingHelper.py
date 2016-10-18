@@ -12,9 +12,9 @@ import numpy as np
 #Not happy about this, look into a change.
 
 sys.path.append('..')
-from pearce.emulator.trainingData import PARAMS, GLOBAL_FILENAME
-from pearce.emulator.ioHelpers import global_file_reader
-from pearce.mocks.kittens import cat_dict
+from pearce.emulator import PARAMS, GLOBAL_FILENAME
+from pearce.emulator import global_file_reader
+from pearce.mocks import cat_dict
 
 # TODO to ioHelpers?
 def load_training_params(param_file):

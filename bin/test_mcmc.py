@@ -1,6 +1,5 @@
 #!/bin/bash
-from pearce.emulator.emu import OriginalRecipe, ExtraCrispy 
-from pearce.emulator.trainingData import parameter, PARAMS
+from pearce.emulator import OriginalRecipe, ExtraCrispy, parameter, PARAMS
 import numpy as np
 from os import path
 

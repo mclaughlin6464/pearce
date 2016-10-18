@@ -3,7 +3,7 @@
 
 import numpy as np
 from halotools.empirical_models import Zheng07Cens, Zheng07Sats
-
+from halotools.empirical_models import HeavisideAssembias
 
 class RedMagicCens(Zheng07Cens):
     '''Tweak of the Zheng model to add a new parameter, f_c, denoting a modified central fraction.'''
@@ -20,6 +20,15 @@ class RedMagicCens(Zheng07Cens):
         '''See Zheng07 for details.'''
         return self.param_dict['f_c'] * super(RedMagicCens, self).mean_occupation(**kwargs)
 
+class AssembiasRedMagicCens(RedMagicCens, HeavisideAssembias):
+    '''RedMagic Cens with Assembly bias'''
+    def __init__(self, **kwargs):
+        '''See halotools docs for more info. '''
+        super(RedMagicCens, self).__init__(**kwargs)
+        HeavisideAssembias.__init__(self,
+            lower_assembias_bound=self._lower_occupation_bound,
+            upper_assembias_bound=self._upper_occupation_bound,
+            method_name_to_decorate='mean_occupation', **kwargs)
 
 class RedMagicSats(Zheng07Sats):
     '''Tweak of Zheng model to add a new parameter, f_c, denoting a modified central fraction.'''
@@ -40,6 +49,16 @@ class RedMagicSats(Zheng07Sats):
             f_c = self.param_dict['f_c']
 
         return super(RedMagicSats, self).mean_occupation(**kwargs) / f_c
+
+class AssembiasRedMagicSats(RedMagicSats, HeavisideAssembias):
+    '''RedMagic Cens with Assembly bias'''
+    def __init__(self, **kwargs):
+        '''See halotools docs for more info. '''
+        super(RedMagicSats, self).__init__(**kwargs)
+        HeavisideAssembias.__init__(self,
+            lower_assembias_bound=self._lower_occupation_bound,
+            upper_assembias_bound=self._upper_occupation_bound,
+            method_name_to_decorate='mean_occupation', **kwargs)
 
 
 class StepFuncCens(Zheng07Cens):

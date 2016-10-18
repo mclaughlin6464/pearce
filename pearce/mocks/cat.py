@@ -9,13 +9,15 @@ from multiprocessing import cpu_count
 import warnings
 import inspect
 from time import time
+
 import numpy as np
 from astropy import cosmology
 from halotools.sim_manager import RockstarHlistReader, CachedHaloCatalog
 from halotools.empirical_models import PrebuiltHodModelFactory
 from halotools.empirical_models import HodModelFactory, TrivialPhaseSpace, NFWPhaseSpace
 from halotools.mock_observables import * #i'm importing so much this is just easier
-from .customHODModels import RedMagicSats, RedMagicCens, StepFuncCens, StepFuncSats
+
+from .customHODModels import *
 
 # try to import corrfunc, determine if it was successful
 try:
@@ -281,18 +283,29 @@ class Cat(object):
         '''
 
         if check_sf:
-            a = self._return_nearest_sf(scale_factor, tol)
+            a = self._return_nearest_sf(scale_factor)
             if a is None:
                 raise ValueError('Scale factor %.3f not within given tolerance.' % scale_factor)
         else:
             a = scale_factor#YOLO
         z = 1.0/a-1
 
-        assert HOD in {'redMagic', 'stepFunc', 'zheng07', 'leauthaud11', 'tinker13', 'hearin15'}
+        assert HOD in {'redMagic','abRedMagic','stepFunc', 'zheng07', 'leauthaud11', 'tinker13', 'hearin15'}
 
+        #TODO could compactify this a bit, esp if I add anymore custom models.
         if HOD == 'redMagic':
             cens_occ = RedMagicCens(redshift=z)
             sats_occ = RedMagicSats(redshift=z, cenocc_model=cens_occ)
+
+            self.model = HodModelFactory(
+                centrals_occupation=cens_occ,
+                centrals_profile=TrivialPhaseSpace(redshift=z),
+                satellites_occupation=sats_occ,
+                satellites_profile=NFWPhaseSpace(redshift=z))
+
+        elif HOD == 'abRedMagic':
+            cens_occ = AssembiasRedMagicCens(redshift=z)
+            sats_occ = AssembiasRedMagicSats(redshift=z, cenocc_model=cens_occ)
 
             self.model = HodModelFactory(
                 centrals_occupation=cens_occ,
