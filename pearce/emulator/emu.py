@@ -318,7 +318,6 @@ class Emu(object):
 
         # iterate over training points to leave out
         for idx in xrange(N):
-            # print idx
 
             # swap the values of the LOO point and the last point.
             x[[N - 1, idx]] = x[[idx, N - 1]]
