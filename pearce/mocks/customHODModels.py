@@ -24,7 +24,7 @@ class AssembiasRedMagicCens(RedMagicCens, HeavisideAssembias):
     '''RedMagic Cens with Assembly bias'''
     def __init__(self, **kwargs):
         '''See halotools docs for more info. '''
-        super(RedMagicCens, self).__init__(**kwargs)
+        super(AssembiasRedMagicCens, self).__init__(**kwargs)
         HeavisideAssembias.__init__(self,
             lower_assembias_bound=self._lower_occupation_bound,
             upper_assembias_bound=self._upper_occupation_bound,
@@ -54,7 +54,7 @@ class AssembiasRedMagicSats(RedMagicSats, HeavisideAssembias):
     '''RedMagic Cens with Assembly bias'''
     def __init__(self, **kwargs):
         '''See halotools docs for more info. '''
-        super(RedMagicSats, self).__init__(**kwargs)
+        super(AssembiasRedMagicSats, self).__init__(**kwargs)
         HeavisideAssembias.__init__(self,
             lower_assembias_bound=self._lower_occupation_bound,
             upper_assembias_bound=self._upper_occupation_bound,

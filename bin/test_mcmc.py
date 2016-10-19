@@ -24,7 +24,7 @@ true_y = np.log10(y)
 #true_rpoints = true_rpoints[1:]
 #true_cov = true_cov[1:,:][:,1:]
 
-chain = emu.run_mcmc(true_y, true_cov, true_rpoints, nwalkers = 1000, nsteps= 100,nburn = 25)
+chain = emu.run_mcmc(true_y, true_cov, true_rpoints, nwalkers = 200, nsteps= 50,nburn = 25)
 
 print chain.mean(axis=0)
 
