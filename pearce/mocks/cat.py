@@ -21,7 +21,7 @@ from .customHODModels import *
 
 # try to import corrfunc, determine if it was successful
 try:
-    from Corrfunc._countpairs import counpairs_xi
+    from Corrfunc.theory import xi, wp
 
     CORRFUNC_AVAILABLE = True
 except ImportError:
@@ -35,6 +35,11 @@ def observable(func):
     :return: func
     '''
     def _func(self, *args, **kwargs):
+
+        if 'use_corrfunc' in kwargs and (kwargs['use_corrfunc'] and not CORRFUNC_AVAILABLE):
+            # NOTE just switch to halotools in this case? Or fail?
+            raise ImportError("Corrfunc is not available on this machine!")
+
         try:
             assert self.halocat is not None
             assert self.model is not None
@@ -376,9 +381,6 @@ class Cat(object):
                 (len(rbins), len(rbins)) covariance matrix for xi.
         '''
         assert not (do_jackknife and use_corrfunc) # can't both be true. 
-        if use_corrfunc and not CORRFUNC_AVAILABLE:
-            # NOTE just switch to halotools in this case? Or fail?
-            raise ImportError("Corrfunc is not available on this machine!")
 
         n_cores = self._check_cores(n_cores)
 
@@ -386,6 +388,7 @@ class Cat(object):
         pos = return_xyz_formatted_array(x, y, z, period=self.Lbox)
 
         if use_corrfunc:
+            '''
             # write bins to file
             # unforunately how corrfunc has to work
             # TODO A custom binfile, or one that's already written?
@@ -399,6 +402,13 @@ class Cat(object):
                                    x.astype('float32') * self.h, y.astype('float32') * self.h,
                                    z.astype('float32') * self.h)
             xi_all = np.array(xi_all, dtype='float64')[:, 3]
+            '''
+            out = xi(self.model.mock.Lbox * self.h, n_cores,rbins,
+                                   x.astype('float32') * self.h, y.astype('float32') * self.h,
+                                   z.astype('float32') * self.h)
+
+            xi_all = out[4] #returns a lot of irrelevant info
+            # TODO jackknife with corrfunc?
 
         else:
             if do_jackknife:
@@ -427,7 +437,7 @@ class Cat(object):
     # TODO use Joe's code. Remember to add sensible asserts when I do.
     # TODO Jackknife? A way to do it without Joe's code?
     @observable
-    def calc_wp(self,rp_bins,pi_max=40,do_jackknife=True, n_cores='all',RSD=True):
+    def calc_wp(self,rp_bins,pi_max=40,do_jackknife=True, use_corrfunc=False, n_cores='all',RSD=True):
         '''
         Calculate the projected correlation on a populated catalog
         :param rp_bins:
@@ -442,6 +452,7 @@ class Cat(object):
             wp_all, the projection correlation function.
         '''
 
+        #could move these last parts ot the decorator or a helper. Ah well.
         n_cores = self._check_cores(n_cores)
 
         x, y, z = [self.model.mock.galaxy_table[c] for c in ['x', 'y', 'z']]
@@ -456,7 +467,14 @@ class Cat(object):
             pos = return_xyz_formatted_array(x, y, z, period=self.Lbox)
 
         #don't forget little h!!
-        wp_all = wp(pos*self.h, rp_bins, pi_max*self.h, period=self.Lbox*self.h, num_threads=n_cores)
+        if use_corrfunc:
+            out = xi(self.model.mock.Lbox * self.h,pi_max*self.h, n_cores, rp_bins,
+                     x.astype('float32') * self.h, y.astype('float32') * self.h,
+                     z.astype('float32') * self.h)
+
+            wp_all = out[4]  # returns a lot of irrelevant info
+        else:
+            wp_all = wp(pos*self.h, rp_bins, pi_max*self.h, period=self.Lbox*self.h, num_threads=n_cores)
         return wp_all
 
     @observable
