@@ -14,44 +14,68 @@ from scipy.linalg import inv
 from scipy.interpolate import interp1d
 import george
 from george.kernels import *
+from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
+from sklearn.svm import SVR
+from sklearn.kernel_ridge import KernelRidge
 import emcee as mc
 
 from .trainingData import GLOBAL_FILENAME
 from .ioHelpers import global_file_reader, obs_file_reader, parameter
 
+#TODO abstract base classes? Depends on what methods need to be subclassed.
+#TODO methods I think need to be reordered
 
 class Emu(object):
-    # TODO load initial guesses from file.
-    def __init__(self, training_dir, params=None, independent_variable=None, fixed_params={}, metric={}):
+    #TODO docstrings? here and init.
+    valid_methods = {'gp', 'svr', 'gbdt', 'rf', 'krr'}  # could add more, coud even check if they exist in sklearn
 
-        '''
-        # TODO change name of type
-        self.type = type
-        try:
-            assert self.type in {'original_recipe', 'extra_crispy'}
-        except AssertionError:
-            raise AssertionError('Type %s not valid for Emu.'%self.type)
-        '''
+    def __init__(self, training_dir,method = 'gp',hyperparams={}, params=None, fixed_params={}, independent_variable=None):
+
+        assert method in self.valid_methods
+
         if independent_variable == 'bias':
             raise NotImplementedError("I have to work on how to do xi_mm first.")
-
         assert independent_variable in {None, 'r2'}  # no bias for now.
 
         # TODO I hate the assembly bias parameter keys. It'd be nice if the use could pass in something
         # else and I make a change
-
         # use default if needed
         if params is None:
             from .ioHelpers import DEFAULT_PARAMS as params
 
+        self.method=method
+        self.independent_variable = independent_variable
         self.ordered_params = params
 
-        self.get_training_data(training_dir, independent_variable, fixed_params)
-        self.build_emulator(independent_variable, fixed_params, metric)
+        self.get_training_data(training_dir,fixed_params)
+        self.build_emulator(hyperparams, fixed_params)
 
     # I can get LHC from the training data. If any coordinate equals any other in its column we know!
-    def get_training_data(self, training_dir, independent_variable, fixed_params):
-        '''Implemented in subclasses. '''
+    def get_training_data(self, training_dir, fixed_params):
+        '''
+        Read the training data for the emulator and attach it to the object.
+        :param training_dir:
+            Directory where training data from trainginData is stored.
+        :param fixed_params:
+            Parameters to hold fixed. Only available if data in training_dir is a full hypercube, not a latin hypercube.
+        :return: None
+        '''
+        x, y, yerr = self.load_data(training_dir, fixed_params, self.independent_variable)
+
+        self.x = x
+        self.y = y
+        self.yerr = yerr
+        self.y_hat = np.zeros(self.y.shape[1]) if len(y.shape)>1 else 0# self.y.mean(axis = 0)
+        self.y -= self.y_hat
+
+        ndim = self.x.shape[1]
+        self.fixed_ndim = len(fixed_params)
+        self.emulator_ndim = ndim  # The number of params for the emulator is different than those in sampling.
+        self.sampling_ndim = ndim - 1
+
+    #@abstractMethod
+    def load_data(self, data_dir, fixed_params, independent_variable):
+        '''Implemented in subclasses'''
         raise NotImplementedError
 
     def _iv_transform(self, independent_variable, obs, cov):
@@ -124,42 +148,108 @@ class Emu(object):
 
         return t
 
-    def build_emulator(self, independent_variable, fixed_params, metric={}):
+    def build_emulator(self,hyperparams, fixed_params):
         '''
-        Initialization of the emulator from recovered training data.
-        :param independent_variable:
-            independent_variable to emulate.
+        Initialization of the emulator from recovered training data. Calls submethods depending on "method"
+        :param method:
+            The machine learning method to use.
+.       :param hyperparams
+            A dictionary of hyperparameter kwargs for the emulator
         :param fixed_params:
             Parameterst to hold fixed in teh training data
-        :param metric:
-            Optional. Define a metric instead of the ones that are built in.
         :return: None
         '''
+
+        self.fixed_params = fixed_params  # remember which params were fixed
+
+        if self.method == 'gp':
+            self._build_gp(hyperparams)
+        else: #an sklearn method
+            self._build_skl(hyperparams)
+
+    #TODO unserscore?
+    def get_initial_guess(self, independent_variable, fixed_params):
+        '''
+        Return the initial guess for the emulator, based on what the iv is. Guesses are learned from
+        previous experiments.
+        :param independent_variable:
+            Which variable to return the guesses for.
+        :param fixed_params:
+            Parameters to hold fixed; only return guess for parameters that are not fixed.
+        :return: initial_guesses, a dictionary of the guess for each parameter
+        '''
+
+        # default
+        ig = {'amp': 1}
+        ig.update({p.name: 0.1 for p in self.ordered_params})
+
+        if self.obs == 'xi':
+            if independent_variable is None:
+                ig = {'amp': 0.481, 'logMmin': 0.1349, 'sigma_logM': 0.089,
+                      'logM0': 2.0, 'logM1': 0.204, 'alpha': 0.039,
+                      'f_c': 0.041, 'r': 0.040}
+            else:
+                pass
+        elif self.obs == 'wp':
+            if independent_variable is None:
+                ig = {'logMmin': 1.7348042925, 'f_c': 0.327508062386, 'logM0': 15.8416094906,
+                      'sigma_logM': 5.36288382789, 'alpha': 3.63498762588, 'r': 0.306139450843,
+                      'logM1': 1.66509412286, 'amp': 1.18212664544}
+        else:
+            pass  # no other guesses saved yet.
+
+        # remove entries for variables that are being held fixed.
+        for key in fixed_params.iterkeys():
+            del ig[key]
+
+        return ig
+
+    def _make_kernel(self,metric):
+        """
+        Helper method to build a george kernel for GP's and kernel-based regressions.
+        :param metric:
+            Hyperparams for kernel determining relative length scales and amplitudes
+        :return:
+            A george ExpSquredKernel object with this metric
+        """
+
         if not metric:
-            ig = self.get_initial_guess(independent_variable, fixed_params)
+            ig = self.get_initial_guess(self.independent_variable, self.fixed_params)
         else:
             ig = metric  # use the user's initial guesses
 
-        self.metric = [ig['amp']]
+        #TODO does this need to be attached? is it ever used again
+        metric = [ig['amp']]
         for p in self.ordered_params:
-            if p.name in fixed_params:
+            if p.name in self.fixed_params:
                 continue
             try:
                 self.metric.append(ig[p.name])
             except KeyError:
                 raise KeyError('Key %s was not in the metric.' % p.name)
 
-        self.metric = np.array(self.metric)
+        metric = np.array(metric)
 
-        a = self.metric[0]
-        kernel = a * ExpSquaredKernel(self.metric[1:], ndim=self.emulator_ndim)
-        self.gp = george.GP(kernel)
-        # gp = george.GP(kernel, solver=george.HODLRSolver, nleaf=x.shape[0]+1,tol=1e-18)
-        self.fixed_params = fixed_params  # remember which params were fixed
+        a = metric[0]
+        #TODO other kernels?
+        return a * ExpSquaredKernel(metric[1:], ndim=self.emulator_ndim)
 
-        self.gp.compute(self.x, self.yerr, sort=False)  # NOTE I'm using a modified version of george!
+    #@abstractMethod
+    def _build_gp(self,hyperparams):
+        """
+        Implemented in subclasses
+        """
+        raise NotImplementedError
+
+    #@abstractMethod
+    def _build_skl(self,hyperparams):
+        """
+        Implemented in subclasses
+        """
+        raise NotImplementedError
 
     # Not sure this will work at all in an LHC scheme.
+    #TODO can i use load_data here?
     def get_plot_data(self, em_params, training_dir, independent_variable=None, fixed_params={}):
         '''
         Similar function to get_training_data. However, returns values for plotting comparisons to the emulator.
@@ -249,51 +339,18 @@ class Emu(object):
 
         return log_bin_centers[zeros_slice][sort_idxs], y[zeros_slice][sort_idxs], yerr[zeros_slice][sort_idxs]
 
-    def get_initial_guess(self, independent_variable, fixed_params):
-        '''
-        Return the initial guess for the emulator, based on what the iv is. Guesses are learned from
-        previous experiments.
-        :param independent_variable:
-            Which variable to return the guesses for.
-        :param fixed_params:
-            Parameters to hold fixed; only return guess for parameters that are not fixed.
-        :return: initial_guesses, a dictionary of the guess for each parameter
-        '''
-
-        # default
-        ig = {'amp': 1}
-        ig.update({p.name: 0.1 for p in self.ordered_params})
-
-        if self.obs == 'xi':
-            if independent_variable is None:
-                ig = {'amp': 0.481, 'logMmin': 0.1349, 'sigma_logM': 0.089,
-                      'logM0': 2.0, 'logM1': 0.204, 'alpha': 0.039,
-                      'f_c': 0.041, 'r': 0.040}
-            else:
-                pass
-        elif self.obs == 'wp':
-            if independent_variable is None:
-                ig = {'logMmin': 1.7348042925, 'f_c': 0.327508062386, 'logM0': 15.8416094906,
-                      'sigma_logM': 5.36288382789, 'alpha': 3.63498762588, 'r': 0.306139450843,
-                      'logM1': 1.66509412286, 'amp': 1.18212664544}
-        else:
-            pass  # no other guesses saved yet.
-
-        # remove entries for variables that are being held fixed.
-        for key in fixed_params.iterkeys():
-            del ig[key]
-
-        return ig
-
-    def train(self, **kwargs):
+    def train_metric(self, **kwargs):
+        raise NotImplementedError
+    #TODO remove jackknife errors?
+    def emulate(self, em_params, gp_errs=False):
         raise NotImplementedError
 
-    def emulate(self, em_params, jackknife_errors=False):
+    def emulate_wrt_r(self, em_params, bin_centers, gp_err=False):
         raise NotImplementedError
 
-    def emulate_wrt_r(self, em_params, bin_centers, jackknife_errors=False):
-        raise NotImplementedError
-
+    #TODO this feature is not super useful anymore, and also is poorly defined w.r.t non gp methods.
+    #did a lot of work on it tho, maybe i'll leave it around...?
+    #TODO change name to LOO
     def _jackknife_errors(self, y, t):
         '''
         Calculate the LOO Jackknife error matrix. This is implemented using the analytic LOO procedure,
@@ -373,39 +430,55 @@ class Emu(object):
         '''
         assert statistic in {'r2', 'rmsfd', 'abs', 'rel'}
 
-        obs_files = sorted(glob(path.join(truth_dir, 'obs*.npy')))
-        cov_files = sorted(glob(path.join(truth_dir, 'cov*.npy')))
+        x, y = self.load_data(truth_dir, self.fixed_ndim, self.independent_variable)
 
         np.random.seed(int(time()))
 
-        if N is None:
-            idxs = np.arange(len(obs_files))
-        else:
-            idxs = np.random.choice(len(obs_files), N, replace=False)
+        if N is not None:
+            idxs = np.random.choice(x.shape[0], N, replace=False)
 
-        values = []
+            x, y = x[idxs], y[idxs]
+
+        log_y = np.log10(y)
+
         bins, _, _, _ = global_file_reader(path.join(truth_dir, GLOBAL_FILENAME))
         bin_centers = (bins[1:] + bins[:-1]) / 2
-        for idx in idxs:
-            params, true_obs, _ = obs_file_reader(obs_files[idx], cov_files[idx])
-            pred_log_obs, _ = self.emulate_wrt_r(params, bin_centers)
+        params = {p.name: x[:, i] for p, i in zip(self.ordered_params, xrange(x.shape[1])) if
+                  p.name not in self.fixed_params}
 
-            if statistic == 'rmsfd':
-                values.append(np.sqrt(np.mean(((pred_log_obs - np.log10(true_obs)) ** 2) / (np.log10(true_obs) ** 2))))
-            elif statistic == 'r2':  # r2
-                SSR = np.sum((pred_log_obs - np.log10(true_obs)) ** 2)
-                SST = np.sum((np.log10(true_obs) - np.log10(true_obs).mean()) ** 2)
+        pred_log_y = self.emulate_wrt_r(params, bin_centers)
 
-                values.append(1 - SSR / SST)
+        if statistic == 'rmsfd':
+            return np.sqrt(np.mean(( ((pred_log_y - log_y) ** 2) / (log_y ** 2)), axis=0) )
 
-            elif statistic == 'abs':
-                values.append((pred_log_obs - np.log10(true_obs)))
-                # values.append((10**pred_log_obs - true_obs) )
-            else:  # 'rel'
-                values.append(((pred_log_obs - np.log10(true_obs))) / np.log10(true_obs))
-                # values.append((10**pred_log_obs - true_obs )/true_obs )
+        elif statistic == 'rms':
+            return np.sqrt(np.mean(( (pred_log_y - log_y) ** 2), axis=0) )
 
-        return np.array(values)
+        #TODO sklearn methods can do this themselves. But i've already tone the prediction!
+        elif statistic == 'r2':  # r2
+            SSR = np.sum((pred_log_y - log_y) ** 2, axis=0)
+            SST = np.sum((log_y - log_y.mean(axis=0)) ** 2, axis = 0)
+
+            return 1 - SSR / SST
+
+        elif statistic == 'abs':
+            return np.mean( (pred_log_y - log_y), axis = 0)
+        else:  # 'rel'
+            return np.mean( (pred_log_y- log_y ) / log_y, axis = 0)
+
+    def estimate_uncertainty(self, truth_dir, N=None):
+        '''
+        Estimate the uncertainty of the emulator by comparing to a "test" box of true values.
+        :param truth_dir:
+            Name of a directory of true test values, of the same format as the train_dir
+        :param N:
+            Number of points to compare to. If None (default) will use all points. Else will select random sample.
+        :return:
+            covariance matrix with dim n_binsxn_bins. Will only have diagonal elemtns of est. uncertainties.
+        '''
+        rms_err = self.goodness_of_fit(truth_dir, N, statistic='rms')
+
+        return np.diag(rms_err)
 
     def run_mcmc(self, y, cov, bin_centers, nwalkers=1000, nsteps=100, nburn=20, n_cores='all'):
         '''
@@ -526,29 +599,29 @@ def lnlike(theta, emu, y, cov, bin_centers):
 class OriginalRecipe(Emu):
     '''Emulator that emulates with bins as an implicit parameter. '''
 
-    def get_training_data(self, training_dir, independent_variable, fixed_params):
+    def load_data(self, data_dir, fixed_params, independent_variable):
         '''
-        Read the training data for the emulator and attach it to the object.
-        :param training_dir:
-            Directory where training data from trainginData is stored.
-        :param independent_variable:
-            Independant variable to emulate. Options are xi, r2xi, and bias (eventually).
+        Read data in the format compatible with this object and return it
+        :param data_dir:
+            Directory where data from trainingData is stored
         :param fixed_params:
-            Parameters to hold fixed. Only available if data in training_dir is a full hypercube, not a latin hypercube.
+            Parameters to hold fixed. Only available if data in data_dir is a full hypercube, not a latin hypercube
+        :param independent_variable:
+            Independant variable to emulate. Options are xi, r2xi, and bias (eventually)..
         :return: None
         '''
 
-        bins, cosmo_params, obs, method = global_file_reader(path.join(training_dir, GLOBAL_FILENAME))
+        bins, cosmo_params, obs, method = global_file_reader(path.join(data_dir, GLOBAL_FILENAME))
 
         if fixed_params and method == 'LHC':
-            raise ValueError('Fixed parameters is not empty, but the data in training_dir is form a Latin Hypercube. \
+            raise ValueError('Fixed parameters is not empty, but the data in data_dir is form a Latin Hypercube. \
                                 Cannot performs slices on a LHC.')
 
         self.obs = obs
 
-        obs_files = sorted(glob(path.join(training_dir, 'obs*.npy')))
+        obs_files = sorted(glob(path.join(data_dir, 'obs*.npy')))
         cov_files = sorted(
-            glob(path.join(training_dir, 'cov*.npy')))  # since they're sorted, they'll be paired up by params.
+            glob(path.join(data_dir, 'cov*.npy')))  # since they're sorted, they'll be paired up by params.
         self.bin_centers = (bins[:-1] + bins[1:]) / 2
         nbins = self.bin_centers.shape[0]
 
@@ -609,30 +682,67 @@ class OriginalRecipe(Emu):
         # a reshape may be faster.
         zeros_slice = np.all(x != 0.0, axis=1)
         # set the results of these calculations.
-        self.fixed_ndim = len(fixed_params)
-        self.emulator_ndim = ndim  # The number of params for the emulator is different than those in sampling.
-        self.sampling_ndim = ndim - 1
-        self.x = x[zeros_slice]
-        self.y = y[zeros_slice]
-        self.yerr = yerr[zeros_slice]
 
-        self.y_hat = 0  # self.y.mean()
-        self.y -= self.y_hat  # mean-subtract.
+        return x[zeros_slice], y[zeros_slice], yerr[zeros_slice]
 
-    def train(self, **kwargs):
+    def _build_gp(self, hyperparams):
         '''
-            Train the emulator. Has a spotty record of working. Better luck may be had with the NAMEME code.
-            :param kwargs:
-                Kwargs that will be passed into the scipy.optimize.minimize
-            :return: success: True if the training was successful.
-            '''
+        Initialize the GP emulator.
+        :param hyperparams:
+            Key word parameters for the emulator
+        :return: None
+        '''
+        # TODO load in george and sklearn here, or globally?
+        metric = hyperparams['metric'] if 'metric' in hyperparams else {}
+        kernel = self._make_kernel(metric)
+        # TODO is it confusing for this to have the same name as the sklearn object with a different API?
+        # maybe it should be a property? or private?
+        self.emulator = george.GP(kernel)
+        # gp = george.GP(kernel, solver=george.HODLRSolver, nleaf=x.shape[0]+1,tol=1e-18)
+
+        self.emulator.compute(self.x, self.yerr, sort=False)  # NOTE I'm using a modified version of george!
+
+    def _build_skl(self, hyperparams):
+        """
+        Build a scikit learn emulator
+        :param hyperparams:
+            Key word parameters for the emulator
+        :return: None
+        """
+        skl_methods = {'gbdt': GradientBoostingRegressor, 'rf': RandomForestRegressor, \
+                       'svr': SVR, 'krr': KernelRidge}
+
+        if self.method in {'svr', 'krr'}:  # kernel based method
+            metric = hyperparams['metric'] if 'metric' in hyperparams else {}
+            kernel = self._make_kernel(metric)
+            if 'metric' in hyperparams:
+                del hyperparams['metric']
+            if self.method == 'svr':  # slight difference in these, sadly
+                hyperparams['kernel'] = kernel.value
+            else:  # krr
+                hyperparams['kernel'] = lambda x1, x2: kernel.value(np.array([x1]), np.array([x2]))
+
+        self.emulator = skl_methods[self.method](**hyperparams)
+        self.emulator.fit(self.x, self.y)
+
+    def train_metric(self, **kwargs):
+        '''
+        Train the metric parameters of the GP. Has a spotty record of working.
+        Best used as used in lowDimTraining.
+        If attempted to be used with an emulator that is not GP, will raise an error.
+        :param kwargs:
+            Kwargs that will be passed into the scipy.optimize.minimize
+        :return: success: True if the training was successful.
+        '''
+
+        assert self.method == 'gp'
 
         # move these outside? hm.
         def nll(p):
             # Update the kernel parameters and compute the likelihood.
             # params are log(a) and log(m)
-            self.gp.kernel[:] = p
-            ll = self.gp.lnlikelihood(self.y, quiet=True)
+            self.emulator.kernel[:] = p
+            ll = self.emulator.lnlikelihood(self.y, quiet=True)
 
             # The scipy optimizer doesn't play well with infinities.
             return -ll if np.isfinite(ll) else 1e25
@@ -640,29 +750,36 @@ class OriginalRecipe(Emu):
         # And the gradient of the objective function.
         def grad_nll(p):
             # Update the kernel parameters and compute the likelihood.
-            self.gp.kernel[:] = p
-            return -self.gp.grad_lnlikelihood(self.y, quiet=True)
+            self.emulator.kernel[:] = p
+            return -self.emulator.grad_lnlikelihood(self.y, quiet=True)
 
-        p0 = self.gp.kernel.vector
+        p0 = self.emulator.kernel.vector
         results = op.minimize(nll, p0, jac=grad_nll, **kwargs)
         # results = op.minimize(nll, p0, jac=grad_nll, method='TNC', bounds =\
         #   [(np.log(0.01), np.log(10)) for i in xrange(ndim+1)],options={'maxiter':50})
         print results
 
-        self.gp.kernel[:] = results.x
-        self.gp.recompute()
-        self.metric = np.exp(results.x)
+        self.emulator.kernel[:] = results.x
+        self.emulator.recompute()
+        #self.metric = np.exp(results.x)
 
         return results.success
 
-    def emulate(self, em_params, jackknife_errors=False):
+    def emulate(self, em_params, gp_errs = False):
         '''
         Perform predictions with the emulator.
-        :param varied_em_params:
+        :param em_params:
             Dictionary of what values to predict at for each param. Values can be
             an array or a float.
+        :param gp_errs:
+            Boolean, decide whether or not to return the errors from the gp prediction. Default is False.
+            Will throw error if method is not gp.
         :return: mu, cov. The predicted value and the covariance matrix for the predictions
         '''
+
+        if gp_errs:
+            assert self.method == 'gp' #only has meaning for gp's
+
         input_params = {}
         input_params.update(self.fixed_params)
         input_params.update(em_params)
@@ -679,19 +796,13 @@ class OriginalRecipe(Emu):
 
         t = self._sort_params(t)
 
-        if jackknife_errors:
-            mu = self.gp.predict(self.y, t, mean_only=True)
-            cov = self._jackknife_errors(self.y, t)
+        if self.method == 'gp':
+            return self.emulator.predict(self.y, t, mean_only = not gp_errs)
         else:
-            mu, cov = self.gp.predict(self.y, t)
-
-        # mu = mu.reshape((-1, len(self.bin_centers)))
-        # errs = errs.reshape((-1, len(self.bin_centers)))
-        # Note ordering is unclear if em_params has more than 1 value.
-        return mu, cov
+            return self.emulator.predict(t)
 
     # TODO It's not clear to the user if bin_centers should be log or not!
-    def emulate_wrt_r(self, em_params, bin_centers, jackknife_errors=False):
+    def emulate_wrt_r(self, em_params, bin_centers, gp_errs=False):
         '''
         Conveniance function. Add's 'r' to the emulation automatically, as this is the
         most common use case.
@@ -705,36 +816,36 @@ class OriginalRecipe(Emu):
         vep = dict(em_params)
         # TODO change 'r' to something more general
         vep.update({'r': np.log10(bin_centers)})
-        out = self.emulate(vep, jackknife_errors)
+        out = self.emulate(vep, gp_errs)
         return out
 
 
 class ExtraCrispy(Emu):
     '''Emulator that emulates with bins as an implicit parameter. '''
 
-    def get_training_data(self, training_dir, independent_variable, fixed_params):
+    def load_data(self, data_dir, fixed_params, independent_variable):
         '''
         Read the training data for the emulator and attach it to the object.
-        :param training_dir:
+        :param data_dir:
             Directory where training data from trainginData is stored.
         :param independent_variable:
             Independant variable to emulate. Options are xi, r2xi, and bias (eventually).
         :param fixed_params:
-            Parameters to hold fixed. Only available if data in training_dir is a full hypercube, not a latin hypercube.
+            Parameters to hold fixed. Only available if data in data_dir is a full hypercube, not a latin hypercube.
         :return: None
         '''
 
-        bins, cosmo_params, obs, method = global_file_reader(path.join(training_dir, GLOBAL_FILENAME))
+        bins, cosmo_params, obs, method = global_file_reader(path.join(data_dir, GLOBAL_FILENAME))
 
         if fixed_params and method == 'LHC':
-            raise ValueError('Fixed parameters is not empty, but the data in training_dir is form a Latin Hypercube. \
+            raise ValueError('Fixed parameters is not empty, but the data in data_dir is form a Latin Hypercube. \
                                 Cannot performs slices on a LHC.')
 
         self.obs = obs
 
-        obs_files = sorted(glob(path.join(training_dir, 'obs*.npy')))
+        obs_files = sorted(glob(path.join(data_dir, 'obs*.npy')))
         cov_files = sorted(
-            glob(path.join(training_dir, 'cov*.npy')))  # since they're sorted, they'll be paired up by params.
+            glob(path.join(data_dir, 'cov*.npy')))  # since they're sorted, they'll be paired up by params.
         self.bin_centers = (bins[:-1] + bins[1:]) / 2
         nbins = self.bin_centers.shape[0]
         # HERE
@@ -792,20 +903,11 @@ class ExtraCrispy(Emu):
         # NOTE: HACK
         # a reshape may be faster.
         zeros_slice = np.all(x != 0.0, axis=1)
-        # set the results of these calculations.
-        self.fixed_ndim = len(fixed_params)
-        self.emulator_ndim = ndim  # the number of parameters for the emulator different than a sampler, in some cases
-        self.sampling_ndim = ndim  # TODO not sure if this is the best design choice.
-        self.x = x[zeros_slice]
-        self.y = y[zeros_slice, :]
-        self.yerr = np.zeros((self.x.shape[0],))  # We don't use errors for extra crispy!
-        # self.yerr = yerr[zeros_slice]
 
-        self.y_hat = np.zeros((self.y.shape[1],))  # self.y.mean(axis=0)
-        self.y -= self.y_hat  # mean-subtract.
+        return x[zeros_slice], y[zeros_slice, :], np.zeros((x.shape[0], ))
 
     # TODO train isn't the best word here, since I used "training data" for another purpose
-    def train(self, **kwargs):
+    def train_metric(self, **kwargs):
         '''
         Train the emulator. Has a spotty record of working. Better luck may be had with the NAMEME code.
         :param kwargs:
@@ -817,9 +919,9 @@ class ExtraCrispy(Emu):
         def nll(p):
             # Update the kernel parameters and compute the likelihood.
             # params are log(a) and log(m)
-            self.gp.kernel[:] = p
+            self.emulator.kernel[:] = p
             # check this has the right direction
-            ll = np.sum(self.gp.lnlikelihood(y, quiet=True) for y in self.y)
+            ll = np.sum(self.emulator.lnlikelihood(y, quiet=True) for y in self.y)
 
             # The scipy optimizer doesn't play well with infinities.
             return -ll if np.isfinite(ll) else 1e25
@@ -827,22 +929,21 @@ class ExtraCrispy(Emu):
         # And the gradient of the objective function.
         def grad_nll(p):
             # Update the kernel parameters and compute the likelihood.
-            self.gp.kernel[:] = p
+            self.emulator.kernel[:] = p
             # mean or sum?
-            return -np.mean(self.gp.grad_lnlikelihood(y, quiet=True) for y in self.y)
+            return -np.mean(self.emulator.grad_lnlikelihood(y, quiet=True) for y in self.y)
 
-        p0 = self.gp.kernel.vector
+        p0 = self.emulator.kernel.vector
         results = op.minimize(nll, p0, jac=grad_nll, **kwargs)
         # results = op.minimize(nll, p0, jac=grad_nll, method='TNC', bounds =\
         #   [(np.log(0.01), np.log(10)) for i in xrange(ndim+1)],options={'maxiter':50})
 
-        self.gp.kernel[:] = results.x
-        self.gp.recompute()
-        self.metric = np.exp(results.x)
+        self.emulator.kernel[:] = results.x
+        self.emulator.recompute()
 
         return results.success
 
-    def emulate(self, em_params, jackknife_errors=False):
+    def emulate(self, em_params, gp_errs=False):
         '''
         Perform predictions with the emulator.
         :param varied_em_params:
@@ -850,6 +951,9 @@ class ExtraCrispy(Emu):
             an array or a float.
         :return: mu, cov. The predicted value and the covariance matrix for the predictions
         '''
+        if gp_errs:
+            assert self.method == 'gp'
+
         input_params = {}
         input_params.update(self.fixed_params)
         input_params.update(em_params)
@@ -870,11 +974,11 @@ class ExtraCrispy(Emu):
         all_cov = []  # np.zeros((t.shape[0], t.shape[0], self.y.shape[1]))
 
         for idx, (y, y_hat) in enumerate(izip(self.y.T, self.y_hat)):
-            if jackknife_errors:
+            if self.method == 'gp':
                 mu = self.gp.predict(y, t, mean_only=True)
                 cov = self._jackknife_errors(y, t)
             else:
-                mu, cov = self.gp.predict(y, t)
+                mu = self.emulator.predict(t)
             # mu and cov come out as (1,) arrays.
             all_mu[:, idx] = mu
             # all_err[:, idx] = np.sqrt(np.diag(cov))
