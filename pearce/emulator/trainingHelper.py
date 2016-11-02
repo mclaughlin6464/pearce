@@ -4,7 +4,7 @@
 from os import path
 import sys
 import warnings
-import inspect
+import cPickle as pickle
 import numpy as np
 #from trainingData import PARAMS, GLOBAL_FILENAME
 #from ioHelpers import global_file_reader
@@ -12,8 +12,7 @@ import numpy as np
 #Not happy about this, look into a change.
 
 sys.path.append('..')
-from pearce.emulator import PARAMS, GLOBAL_FILENAME
-from pearce.emulator import global_file_reader
+from pearce.emulator import GLOBAL_FILENAME, PARAMS_FILENAME, global_file_reader, parameter
 from pearce.mocks import cat_dict
 
 # TODO to ioHelpers?
@@ -28,12 +27,13 @@ def load_training_params(param_file):
     hod_params = np.loadtxt(param_file)
     dirname = path.dirname(param_file)
     bins, cosmo_params, obs, _ = global_file_reader(path.join(dirname, GLOBAL_FILENAME))
+    ordered_params = pickle.load(path.join(dirname, PARAMS_FILENAME))
 
     job_id = int(param_file.split('.')[0][-3:]) #last 3 digits of paramfile is a unique id.
 
-    return hod_params, bins,obs, cosmo_params, dirname, job_id
+    return hod_params, bins,obs, cosmo_params,ordered_params, dirname, job_id
 
-def calc_training_points(hod_params, bins,obs, cosmo_params, dirname, job_id):
+def calc_training_points(hod_params, bins,obs, cosmo_params,ordered_params, dirname, job_id):
     '''
     given an array of hod parameters (and a few other things) populate a catalog and calculate an observable at those points.
     :param hod_params:
@@ -54,6 +54,7 @@ def calc_training_points(hod_params, bins,obs, cosmo_params, dirname, job_id):
     #Could add a **kwargs to load to shorten this.
     #That makes things a little messier though IMO
     # TODO tol?
+    # TODO check that if 'HOD' is not an assembias one, and assembias params are passed in, throw an error.
     if 'HOD' in cosmo_params:
         cat.load(cosmo_params['scale_factor'], cosmo_params['HOD'])
     else:
@@ -94,7 +95,7 @@ def calc_training_points(hod_params, bins,obs, cosmo_params, dirname, job_id):
     for id, hod in enumerate(hod_params):
         #construct a dictionary for the parameters
         # Could store the param ordering in the file so it doesn't need to be imported.
-        hod_dict = {p.name: val for p, val in zip(PARAMS, hod)}
+        hod_dict = {p.name: val for p, val in zip(ordered_params, hod)}
         #Populating the same cat over and over is faster than making a new one over and over!
         if n_repops ==1:
             cat.populate(hod_dict)
@@ -128,5 +129,5 @@ if __name__ == '__main__':
 
     args = vars(parser.parse_args())
 
-    hod_params, bins,obs, cosmo_params, dirname, job_id = load_training_params(args['param_file'])
-    calc_training_points(hod_params, bins,obs, cosmo_params, dirname, job_id)
+    hod_params, bins,obs, cosmo_params, ordered_params, dirname, job_id = load_training_params(args['param_file'])
+    calc_training_points(hod_params, bins,obs, cosmo_params,ordered_params, dirname, job_id)

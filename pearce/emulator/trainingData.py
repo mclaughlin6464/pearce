@@ -6,29 +6,23 @@ from time import time
 from os import path
 from subprocess import call
 from itertools import izip
-from collections import namedtuple
+import warnings
+import cPickle as pickle
+
 import numpy as np
+
 from .ioHelpers import config_reader
-
-parameter = namedtuple('parameter', ['name', 'low', 'high'])
-
-# global object that defines the names and ordering of the parameters, as well as their boundaries.
-# TODO consider moving?
-# TODO reading in bounds/params from config
-PARAMS = [parameter('logMmin', 11.7, 12.5),
-          parameter('sigma_logM', 0.2, 0.7),
-          parameter('logM0', 10, 13),
-          parameter('logM1', 13.1, 14.3),
-          parameter('alpha', 0.75, 1.25),
-          parameter('f_c', 0.1, 0.5)]
 
 # I initially had the global_filename be variable. Howerver, I couldn't find a reason one would change it!
 GLOBAL_FILENAME = 'global_file.npy'
+PARAMS_FILENAME = 'params.pkl'
 
 # I think that it's better to have this param global, as it prevents there from being any conflicts.
-
-def makeLHC(N=500):
+def makeLHC(ordered_params, N=500):
     '''Return a vector of points in parameter space that defines a latin hypercube.
+    :param ordered_params:
+        list of "parameter" named tuple objects that define the ordering, name, and ranges of parameters
+        used in the trianing data.
     :param N:
         Number of points per dimension in the hypercube. Default is 500.
     :return
@@ -38,25 +32,28 @@ def makeLHC(N=500):
 
     points = []
     # by linspacing each parameter and shuffling, I ensure there is only one point in each row, in each dimension.
-    for p in PARAMS:
+    for p in ordered_params:
         point = np.linspace(p.low, p.high, num=N)
         np.random.shuffle(point)  # makes the cube random.
         points.append(point)
     return np.stack(points).T
 
 
-def makeFHC(N=4):
+def makeFHC(ordered_params, N=4):
     '''
     Return a vector of points in parameter space that defines a afull hyper cube.
+    :param ordered_params:
+        list of "parameter" named tuple objects that define the ordering, name, and ranges of parameters
+        used in the trianing data.
     :param N:
         Number of points per dimension. Can be an integer or list. If it's a number, it will be the same
-        across each dimension. If a list, defines points per dimension in the same ordering as PARAMS.
+        across each dimension. If a list, defines points per dimension in the same ordering as ordered_params.
     :return:
         A full hyper cube sample in HOD space in a numpy array.
     '''
 
     if type(N) is int:
-        N = [N for i in xrange(len(PARAMS))]
+        N = [N for i in xrange(len(ordered_params))]
 
     assert type(N) is list
 
@@ -64,15 +61,15 @@ def makeFHC(N=4):
     # TODO check if n_total is 1.
 
     grid_points = np.meshgrid(*[np.linspace(param.low, param.high, n) \
-                               for n, param in izip(N, PARAMS)])
+                               for n, param in izip(N, ordered_params)])
     points = np.stack(grid_points).T
-    points = points.reshape((-1, len(PARAMS)))
+    points = points.reshape((-1, len(ordered_params)))
 
     # Not sure the change i've made is right yet.
-    # points = np.zeros((n_total, len(PARAMS)))
+    # points = np.zeros((n_total, len(ordered_params)))
     # n_segment = n_total  # could use the same variable, but this is clearer
     # # For each param, assign the values such that it fills out the cube.
-    # for i, (n, param) in enumerate(izip(N, PARAMS)):
+    # for i, (n, param) in enumerate(izip(N, ordered_params)):
     #     values = np.linspace(param.low, param.high, n)
     #     n_segment /= n
     #     for j, p in enumerate(points):
@@ -210,8 +207,7 @@ def training_config_reader(filename):
 
     return method,obs, n_points, system, n_jobs, max_time, outputdir, bins, cosmo_params
 
-
-def make_training_data(config_filename):
+def make_training_data(config_filename, ordered_params=None):
     '''
     "Main" function. Take a config file as input and send off jobs to compute an observable
     at various points in HOD parameter space.
@@ -224,11 +220,15 @@ def make_training_data(config_filename):
     method,obs, n_points, system, n_jobs, max_time, outputdir, bins, cosmo_params = \
         training_config_reader(config_filename)
 
+    if ordered_params is None:
+        from .ioHelpers import DEFAULT_PARAMS as ordered_params
+        warnings.warn("Using default ordered parameters.")
+
     # determine the specific functions needed for this setup
     if method == 'LHC':
-        points = makeLHC(n_points)
+        points = makeLHC(ordered_params, n_points)
     elif method == 'FHC':
-        points = makeFHC(n_points)
+        points = makeFHC(ordered_params, n_points)
     else:
         raise ValueError('Invalid method for making training data: %s' % method)
 
@@ -245,6 +245,8 @@ def make_training_data(config_filename):
     header_start.extend('%s:%s' % (key, str(val)) for key, val in cosmo_params.iteritems())
     header = '\n'.join(header_start)
     np.savetxt(path.join(outputdir, GLOBAL_FILENAME), bins, header=header)
+    #Writing ordering to file.
+    pickle.dump(ordered_params, path.join(outputdir, PARAMS_FILENAME))
 
     # call each job individually
     points_per_job = int(points.shape[0] / n_jobs)

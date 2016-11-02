@@ -5,7 +5,19 @@ and useful in multiple cases. More specific, one-use functions are generally lef
 
 from os import path
 import numpy as np
+from collections import namedtuple
 
+parameter = namedtuple('parameter', ['name', 'low', 'high'])
+
+# global object that defines the names and ordering of the parameters, as well as their boundaries.
+# TODO reading in bounds/params from config
+# TODO add assembias params
+DEFAULT_PARAMS = [parameter('logMmin', 11.7, 12.5),
+          parameter('sigma_logM', 0.2, 0.7),
+          parameter('logM0', 10, 13),
+          parameter('logM1', 13.1, 14.3),
+          parameter('alpha', 0.75, 1.25),
+          parameter('f_c', 0.1, 0.5)]
 
 def obs_file_reader(corr_file, cov_file=None):
     '''

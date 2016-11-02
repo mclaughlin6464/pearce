@@ -274,6 +274,7 @@ class Cat(object):
         self.halocat = CachedHaloCatalog(simname=self.simname, halo_finder=self.halo_finder,
                                          version_name=self.version_name, redshift=z)
 
+    # TODO not sure if assembias should be boolean, or keep it as separate HODs?
     def load_model(self, scale_factor, HOD='redMagic', check_sf=True):
         '''
         Load an HOD model. Not reccomended to be used separately from the load function. It
@@ -309,6 +310,7 @@ class Cat(object):
                 satellites_profile=NFWPhaseSpace(redshift=z))
 
         elif HOD == 'abRedMagic':
+
             cens_occ = AssembiasRedMagicCens(redshift=z)
             sats_occ = AssembiasRedMagicSats(redshift=z, cenocc_model=cens_occ)
 
@@ -330,6 +332,16 @@ class Cat(object):
 
         else:
             self.model = PrebuiltHodModelFactory(HOD)
+
+    def get_assembias_key(self, gal_type):
+        '''
+        Helper function to get the key of the assembly bias strength keys, as they are obscure to access.
+        :param gal_type:
+            Galaxy type to get Assembias strength. Options are 'centrals' and 'satellites'.
+        :return:
+        '''
+        assert gal_type in {'centrals', 'satellites'}
+        return self.model.input_model_dictionary['%s_occupation'%gal_type]._get_assembias_param_dict_key(0)
 
 
     def populate(self, params={}, min_ptcl=200):

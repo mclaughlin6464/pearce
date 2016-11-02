@@ -16,16 +16,14 @@ import george
 from george.kernels import *
 import emcee as mc
 
-from .trainingData import PARAMS, GLOBAL_FILENAME
-from .ioHelpers import global_file_reader, obs_file_reader
+from .trainingData import GLOBAL_FILENAME
+from .ioHelpers import global_file_reader, obs_file_reader, parameter
 
 class Emu(object):
-    # NOTE I believe that I'll have to subclass for the scale-indepent and original versions.
-    # I'm going to write the original up so I can understand how I want this to work in particular, and may
-    # have to copy a lot of it to the subclass
+
 
     # TODO load initial guesses from file.
-    def __init__(self, training_dir, params=PARAMS, independent_variable=None, fixed_params={}, metric={}):
+    def __init__(self, training_dir, params=None, independent_variable=None, fixed_params={}, metric={}):
 
         '''
         # TODO change name of type
@@ -39,6 +37,13 @@ class Emu(object):
             raise NotImplementedError("I have to work on how to do xi_mm first.")
 
         assert independent_variable in {None,'r2'}  # no bias for now.
+
+        #TODO I hate the assembly bias parameter keys. It'd be nice if the use could pass in something
+        #else and I make a change
+
+        #use default if needed
+        if params is None:
+            from .ioHelpers import DEFAULT_PARAMS as params
 
         self.ordered_params = params
 
@@ -659,7 +664,7 @@ class OriginalRecipe(Emu):
         input_params.update(self.fixed_params)
         input_params.update(em_params)
         assert len(input_params) == self.emulator_ndim+self.fixed_ndim  # check dimenstionality
-        for i in input_params:
+        for i in input_params: #check that the names in input params are all defined in the ordering.
             assert any(i == p.name for p in self.ordered_params)
 
         # i'd like to remove 'r'. possibly requiring a passed in param?
@@ -744,7 +749,7 @@ class ExtraCrispy(Emu):
         num_skipped = 0
         num_used = 0
         for idx, (obs_file, cov_file) in enumerate(izip(obs_files, cov_files)):
-            #TODO change funciton and return
+
             params, obs, cov = obs_file_reader(obs_file, cov_file)
 
             # skip values that aren't where we've fixed them to be.
