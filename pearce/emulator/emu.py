@@ -43,15 +43,17 @@ class Emu(object):
         if params is None:
             from .ioHelpers import DEFAULT_PARAMS as params
 
-        self.method=method
-        self.independent_variable = independent_variable
+        self.method = method
+        #TODO store hyperparams?
         self.ordered_params = params
+        self.fixed_params = fixed_params
+        self.independent_variable = independent_variable
 
-        self.get_training_data(training_dir,fixed_params)
-        self.build_emulator(hyperparams, fixed_params)
+        self.get_training_data(training_dir)
+        self.build_emulator(hyperparams)
 
     # I can get LHC from the training data. If any coordinate equals any other in its column we know!
-    def get_training_data(self, training_dir, fixed_params):
+    def get_training_data(self, training_dir):
         '''
         Read the training data for the emulator and attach it to the object.
         :param training_dir:
@@ -60,7 +62,7 @@ class Emu(object):
             Parameters to hold fixed. Only available if data in training_dir is a full hypercube, not a latin hypercube.
         :return: None
         '''
-        x, y, yerr = self.load_data(training_dir, fixed_params, self.independent_variable)
+        x, y, yerr = self.load_data(training_dir, self.fixed_params, self.independent_variable)
 
         self.x = x
         self.y = y
@@ -69,7 +71,7 @@ class Emu(object):
         self.y -= self.y_hat
 
         ndim = self.x.shape[1]
-        self.fixed_ndim = len(fixed_params)
+        self.fixed_ndim = len(self.fixed_params)
         self.emulator_ndim = ndim  # The number of params for the emulator is different than those in sampling.
         self.sampling_ndim = ndim - 1
 
@@ -148,7 +150,7 @@ class Emu(object):
 
         return t
 
-    def build_emulator(self,hyperparams, fixed_params):
+    def build_emulator(self,hyperparams):
         '''
         Initialization of the emulator from recovered training data. Calls submethods depending on "method"
         :param method:
@@ -160,15 +162,27 @@ class Emu(object):
         :return: None
         '''
 
-        self.fixed_params = fixed_params  # remember which params were fixed
-
         if self.method == 'gp':
             self._build_gp(hyperparams)
         else: #an sklearn method
             self._build_skl(hyperparams)
 
-    #TODO unserscore?
-    def get_initial_guess(self, independent_variable, fixed_params):
+    # @abstractMethod
+    def _build_gp(self, hyperparams):
+        """
+        Implemented in subclasses
+        """
+        raise NotImplementedError
+
+    # @abstractMethod
+    def _build_skl(self, hyperparams):
+        """
+        Implemented in subclasses
+        """
+        raise NotImplementedError
+
+    #TODO undserscore?
+    def get_initial_guess(self, independent_variable):
         '''
         Return the initial guess for the emulator, based on what the iv is. Guesses are learned from
         previous experiments.
@@ -233,20 +247,6 @@ class Emu(object):
         a = metric[0]
         #TODO other kernels?
         return a * ExpSquaredKernel(metric[1:], ndim=self.emulator_ndim)
-
-    #@abstractMethod
-    def _build_gp(self,hyperparams):
-        """
-        Implemented in subclasses
-        """
-        raise NotImplementedError
-
-    #@abstractMethod
-    def _build_skl(self,hyperparams):
-        """
-        Implemented in subclasses
-        """
-        raise NotImplementedError
 
     # Not sure this will work at all in an LHC scheme.
     #TODO can i use load_data here?
@@ -341,7 +341,7 @@ class Emu(object):
 
     def train_metric(self, **kwargs):
         raise NotImplementedError
-    #TODO remove jackknife errors?
+
     def emulate(self, em_params, gp_errs=False):
         raise NotImplementedError
 
@@ -351,6 +351,7 @@ class Emu(object):
     #TODO this feature is not super useful anymore, and also is poorly defined w.r.t non gp methods.
     #did a lot of work on it tho, maybe i'll leave it around...?
     #TODO change name to LOO
+    #TODO will break with the way I'm changing EC.
     def _jackknife_errors(self, y, t):
         '''
         Calculate the LOO Jackknife error matrix. This is implemented using the analytic LOO procedure,
@@ -365,8 +366,15 @@ class Emu(object):
         '''
         # from time import time
 
+        assert self.method == 'gp'
+
+        if isinstance(self, ExtraCrispy):
+            emulator = self.emulators[0] #hack for EC, do somethign smarter later
+        else:
+            emulator = self.emulator
+
         # We need to perform one full inverse to start.
-        K_inv_full = self.gp.solver.apply_inverse(np.eye(self.gp._alpha.size),
+        K_inv_full = emulator.solver.apply_inverse(np.eye(emulator._alpha.size),
                                                   in_place=True)
 
         # TODO deepcopy?
@@ -391,12 +399,12 @@ class Emu(object):
             K_m_idx_inv = K_inv_full[:N - 1, :][:, :N - 1] \
                           - np.outer(K_inv_full[N - 1, :N - 1], K_inv_full[:N - 1, N - 1]) / K_inv_full[N - 1, N - 1]
 
-            alpha_m_idx = np.dot(K_m_idx_inv, y[:N - 1] - self.gp.mean(x[:N - 1]))
+            alpha_m_idx = np.dot(K_m_idx_inv, y[:N - 1] - emulator.mean(x[:N - 1]))
 
-            Kxxs_t = self.gp.kernel.value(t, x[:N - 1])
+            Kxxs_t = emulator.kernel.value(t, x[:N - 1])
 
             # Store the estimate for this LOO GP
-            mus[idx, :] = np.dot(Kxxs_t, alpha_m_idx) + self.gp.mean(t)
+            mus[idx, :] = np.dot(Kxxs_t, alpha_m_idx) + emulator.mean(t)
 
             # print mus[idx]
             # print
@@ -429,12 +437,13 @@ class Emu(object):
         :return: values, a numpy arrray of the calculated statistics at each of the N training opints.
         '''
         assert statistic in {'r2', 'rmsfd', 'abs', 'rel'}
+        assert N > 0 and int(N) == N
 
-        x, y = self.load_data(truth_dir, self.fixed_ndim, self.independent_variable)
+        x, y = self.load_data(truth_dir, self.fixed_params, self.independent_variable)
 
         np.random.seed(int(time()))
 
-        if N is not None:
+        if N is not None: #make a random choice
             idxs = np.random.choice(x.shape[0], N, replace=False)
 
             x, y = x[idxs], y[idxs]
@@ -446,6 +455,7 @@ class Emu(object):
         params = {p.name: x[:, i] for p, i in zip(self.ordered_params, xrange(x.shape[1])) if
                   p.name not in self.fixed_params}
 
+        #probably should consider not having wrt r here.
         pred_log_y = self.emulate_wrt_r(params, bin_centers)
 
         if statistic == 'rmsfd':
@@ -692,7 +702,7 @@ class OriginalRecipe(Emu):
             Key word parameters for the emulator
         :return: None
         '''
-        # TODO load in george and sklearn here, or globally?
+        #TODO could use more of the hyperparams...
         metric = hyperparams['metric'] if 'metric' in hyperparams else {}
         kernel = self._make_kernel(metric)
         # TODO is it confusing for this to have the same name as the sklearn object with a different API?
@@ -735,6 +745,7 @@ class OriginalRecipe(Emu):
         :return: success: True if the training was successful.
         '''
 
+        #TODO kernel based methods may want to use this...
         assert self.method == 'gp'
 
         # move these outside? hm.
@@ -848,10 +859,8 @@ class ExtraCrispy(Emu):
             glob(path.join(data_dir, 'cov*.npy')))  # since they're sorted, they'll be paired up by params.
         self.bin_centers = (bins[:-1] + bins[1:]) / 2
         nbins = self.bin_centers.shape[0]
-        # HERE
         npoints = len(obs_files)  # each file contains NBINS points in r, and each file is a 6-d point
 
-        # HERE
         varied_params = set(self.ordered_params) - set(fixed_params.keys())
         ndim = len(varied_params)  # lest we forget r
 
@@ -859,7 +868,7 @@ class ExtraCrispy(Emu):
 
         x = np.zeros((npoints, ndim))
         y = np.zeros((npoints, nbins))
-        # yerr = np.zeros((npoints, nbins))
+        yerr = np.zeros((npoints, nbins))
 
         warned = False
         num_skipped = 0
@@ -894,7 +903,7 @@ class ExtraCrispy(Emu):
 
             x[idx, :] = np.stack(file_params).T
 
-            y[idx], _ = self._iv_transform(independent_variable, obs, cov)
+            y[idx], yerr[idx] = self._iv_transform(independent_variable, obs, cov)
 
         # ycov = block_diag(*ycovs)
         # ycov = np.sqrt(np.diag(ycov))
@@ -904,9 +913,58 @@ class ExtraCrispy(Emu):
         # a reshape may be faster.
         zeros_slice = np.all(x != 0.0, axis=1)
 
-        return x[zeros_slice], y[zeros_slice, :], np.zeros((x.shape[0], ))
+        return x[zeros_slice], y[zeros_slice, :], yerr[zeros_slice, :]
 
-    # TODO train isn't the best word here, since I used "training data" for another purpose
+    def _build_gp(self, hyperparams):
+        '''
+        Initialize the GP emulator.
+        :param hyperparams:
+            Key word parameters for the emulator
+        :return: None
+        '''
+        #TODO could use more of the hyperparams...
+        metric = hyperparams['metric'] if 'metric' in hyperparams else {}
+        kernel = self._make_kernel(metric)
+        # TODO is it confusing for this to have the same name as the sklearn object with a different API?
+        # maybe it should be a property? or private?
+        emulator = george.GP(kernel)
+        # gp = george.GP(kernel, solver=george.HODLRSolver, nleaf=x.shape[0]+1,tol=1e-18)
+
+        emulator.compute(self.x, np.zeros_like(self.yerr), sort=False)  # NOTE I'm using a modified version of george!
+
+        #For EC, i'm storing an emulator per bin.
+        #I'll have to thikn about how to differ the hyperparams.
+        #For now, it'll replicate the same behavior as before.
+        #TODO not happy, in general, EC has "emulators" not "emulator" like the others.
+        #Arguement would be this should be all abstracted out from the user.
+        self.emulators = [emulator for i in xrange(self.yerr.shape[1])]
+
+    def _build_skl(self, hyperparams):
+        """
+        Build a scikit learn emulator
+        :param hyperparams:
+            Key word parameters for the emulator
+        :return: None
+        """
+        skl_methods = {'gbdt': GradientBoostingRegressor, 'rf': RandomForestRegressor, \
+                       'svr': SVR, 'krr': KernelRidge}
+
+        #Same kernel concerns as above.
+        if self.method in {'svr', 'krr'}:  # kernel based method
+            metric = hyperparams['metric'] if 'metric' in hyperparams else {}
+            kernel = self._make_kernel(metric)
+            if 'metric' in hyperparams:
+                del hyperparams['metric']
+            if self.method == 'svr':  # slight difference in these, sadly
+                hyperparams['kernel'] = kernel.value
+            else:  # krr
+                hyperparams['kernel'] = lambda x1, x2: kernel.value(np.array([x1]), np.array([x2]))
+
+
+        self.emulators = [skl_methods[self.method](**hyperparams) for i in xrange(self.yerr.shape[1]) ]
+        for y, emulator in zip(self.y.T, self.emulators):
+            emulator.fit(self.x, y)
+
     def train_metric(self, **kwargs):
         '''
         Train the emulator. Has a spotty record of working. Better luck may be had with the NAMEME code.
@@ -915,13 +973,18 @@ class ExtraCrispy(Emu):
         :return: success: True if the training was successful.
         '''
 
+        assert self.method == 'gp'
+
+        #emulators is a list containing refernces to the same object. this should still work!
+        emulator = self.emulators[0]
+
         # move these outside? hm.
         def nll(p):
             # Update the kernel parameters and compute the likelihood.
             # params are log(a) and log(m)
-            self.emulator.kernel[:] = p
+            emulator.kernel[:] = p
             # check this has the right direction
-            ll = np.sum(self.emulator.lnlikelihood(y, quiet=True) for y in self.y)
+            ll = np.sum(emulator.lnlikelihood(y, quiet=True) for y in self.y)
 
             # The scipy optimizer doesn't play well with infinities.
             return -ll if np.isfinite(ll) else 1e25
@@ -929,17 +992,17 @@ class ExtraCrispy(Emu):
         # And the gradient of the objective function.
         def grad_nll(p):
             # Update the kernel parameters and compute the likelihood.
-            self.emulator.kernel[:] = p
+            emulator.kernel[:] = p
             # mean or sum?
-            return -np.mean(self.emulator.grad_lnlikelihood(y, quiet=True) for y in self.y)
+            return -np.mean(emulator.grad_lnlikelihood(y, quiet=True) for y in self.y)
 
-        p0 = self.emulator.kernel.vector
+        p0 = emulator.kernel.vector
         results = op.minimize(nll, p0, jac=grad_nll, **kwargs)
         # results = op.minimize(nll, p0, jac=grad_nll, method='TNC', bounds =\
         #   [(np.log(0.01), np.log(10)) for i in xrange(ndim+1)],options={'maxiter':50})
 
-        self.emulator.kernel[:] = results.x
-        self.emulator.recompute()
+        emulator.kernel[:] = results.x
+        emulator.recompute()
 
         return results.success
 
@@ -973,20 +1036,26 @@ class ExtraCrispy(Emu):
         # all_err = np.zeros((t.shape[0], self.y.shape[1]))
         all_cov = []  # np.zeros((t.shape[0], t.shape[0], self.y.shape[1]))
 
-        for idx, (y, y_hat) in enumerate(izip(self.y.T, self.y_hat)):
+        for idx, (y, y_hat, emulator) in enumerate(izip(self.y.T, self.y_hat, self.emulators)):
             if self.method == 'gp':
-                mu = self.gp.predict(y, t, mean_only=True)
-                cov = self._jackknife_errors(y, t)
+                 out = emulator.predict(y, t, mean_only=not gp_errs)
+                 if gp_errs:
+                    mu, cov = out
+                    all_cov.append(cov)
+                 else:
+                     mu = out
             else:
-                mu = self.emulator.predict(t)
+                mu = emulator.predict(t)
             # mu and cov come out as (1,) arrays.
-            all_mu[:, idx] = mu
+            all_mu[:, idx] = mu + y_hat
             # all_err[:, idx] = np.sqrt(np.diag(cov))
             # all_cov[:, :, idx] = cov
-            all_cov.append(cov)
 
         # Reshape to be consistent with my otehr implementation
         mu = all_mu.reshape((-1,))
+        if not gp_errs:
+            return mu
+
         cov = np.zeros((mu.shape[0], mu.shape[0]))
         nbins = self.y.shape[1]
         # This seems pretty inefficient; i'd like a more elegant way to do this.
