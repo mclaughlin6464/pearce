@@ -437,9 +437,10 @@ class Emu(object):
         :return: values, a numpy arrray of the calculated statistics at each of the N training opints.
         '''
         assert statistic in {'r2', 'rmsfd', 'abs', 'rel'}
-        assert N > 0 and int(N) == N
+        if N is not None:
+            assert N > 0 and int(N) == N
 
-        x, y = self.load_data(truth_dir, self.fixed_params, self.independent_variable)
+        x, y, _ = self.load_data(truth_dir, self.fixed_params, self.independent_variable)
 
         np.random.seed(int(time()))
 
@@ -1065,7 +1066,7 @@ class ExtraCrispy(Emu):
                     cov[i * nbins + n, j * nbins + n] = val
         return mu, cov
 
-    def emulate_wrt_r(self, em_params, bin_centers, jackknife_errors=False, kind='slinear'):
+    def emulate_wrt_r(self, em_params, bin_centers, gp_errs=False, kind='slinear'):
         '''
         Conveniance function. Add's 'r' to the emulation automatically, as this is the
         most common use case.
@@ -1082,10 +1083,17 @@ class ExtraCrispy(Emu):
             Off diagonal elements are set to 0.
         '''
         # turns out this how it already works!
-        mu, cov = self.emulate(em_params, jackknife_errors)
+        out  = self.emulate(em_params, gp_errs)
         # don't need to interpolate!
         if np.all(bin_centers == self.bin_centers):
-            return mu, cov
+            return out 
+
+        if gp_errs:
+            mu, cov = out
+        else:
+            mu = out
+            #I'm a bad, lazy man
+            cov = np.zeros((mu.shape[0], mu.shape[0]))
 
         # TODO check bin_centers in bounds!
         # TODO is there any reasonable way to interpolate the covariance?
@@ -1099,7 +1107,9 @@ class ExtraCrispy(Emu):
             new_mu = xi_interpolator(bin_centers)
             err_interp = interp1d(self.bin_centers, all_err, kind=kind)
             new_err = err_interp(bin_centers)
-            return new_mu, new_err
+            if gp_errs:
+                return new_mu, new_err
+            return new_mu
 
         new_mu, new_err = [], []
         for mean, err in izip(all_mu, all_err):
@@ -1111,4 +1121,6 @@ class ExtraCrispy(Emu):
             new_err.append(interp_err)
         mu = np.array(new_mu).reshape((-1,))
         cov = np.diag(np.array(new_err).reshape((-1,)))
-        return mu, cov
+        if gp_errs:
+            return mu, cov
+        return mu
