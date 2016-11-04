@@ -59,11 +59,13 @@ class Emu(object):
 
     ###Data Loading and Manipulation####################################################################################
 
-    def get_data(self, data_dir, fixed_params, independent_variable):
+    def get_data(self, data_dir,em_params, fixed_params, independent_variable):
         '''
         Read data in the format compatible with this object and return it
         :param data_dir:
             Directory where data from trainingData is stored
+        :param em_params:
+            Parameters held fixed by the emulator. Slightly different than fixed_params, used for plotting.
         :param fixed_params:
             Parameters to hold fixed. Only available if data in data_dir is a full hypercube, not a latin hypercube
         :param independent_variable:
@@ -71,7 +73,10 @@ class Emu(object):
         :return: None
         '''
 
-        assert len(fixed_params) - len(self.ordered_params) <= 1  # can exclude r
+        input_params = {}
+        input_params.update(em_params)
+        input_params.update(fixed_params)
+        assert len(input_params) - len(self.ordered_params) <= 1  # can exclude r
 
         bins, cosmo_params, obs, sampling_method = global_file_reader(path.join(data_dir, GLOBAL_FILENAME))
 
@@ -109,7 +114,7 @@ class Emu(object):
             # Note is is complex because fixed_params can have floats or arrays of floats.
             # TODO check if a fixed_param is not one of the options i.e. typo
             to_continue = True
-            for key, val in fixed_params.iteritems():
+            for key, val in input_params.iteritems():
                 if type(val) is type(y):
                     if np.all(np.abs(params[key] - val) > 1e-3):
                         break
@@ -134,7 +139,7 @@ class Emu(object):
             file_params = []
             # NOTE could do a param ordering here
             for p in self.ordered_params:
-                if p.name in fixed_params:
+                if p.name in fixed_params:#may need to be input_params
                     continue
                 # TODO change 'r' to something else.
                 if p.name == 'r':
@@ -179,8 +184,7 @@ class Emu(object):
         plot_params.update(em_params)
 
         x, y, yerr = self.get_data(training_dir, plot_params, independent_variable)
-        print x.shape
-        print x.dtype
+
         sort_idxs = self._sort_params(x, argsort=True)
 
         log_bin_centers = np.log10(self.bin_centers)
@@ -321,7 +325,7 @@ class Emu(object):
             pass  # no other guesses saved yet.
 
         # remove entries for variables that are being held fixed.
-        for key in fixed_params.iterkeys():
+        for key in self.fixed_params.iterkeys():
             del ig[key]
 
         return ig
