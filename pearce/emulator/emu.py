@@ -405,7 +405,8 @@ class Emu(object):
 
         bins, _, _, _ = global_file_reader(path.join(truth_dir, GLOBAL_FILENAME))
         bin_centers = (bins[1:] + bins[:-1]) / 2
-        params = {p.name: x[:, i] for p, i in zip(self.ordered_params, xrange(x.shape[1])) if
+        #looks gross, but gets down to uniques. Kinda wasteful as it'll be tiled in a bit, but c'est la vie
+        params = {p.name: sorted(list(set(x[:, i]))) for p, i in zip(self.ordered_params, xrange(x.shape[1])) if
                   p.name not in self.fixed_params}
 
         # probably should consider not having wrt r here.
