@@ -179,6 +179,8 @@ class Emu(object):
         plot_params.update(em_params)
 
         x, y, yerr = self.get_data(training_dir, plot_params, independent_variable)
+        print x.shape
+        print x.dtype
         sort_idxs = self._sort_params(x, argsort=True)
 
         log_bin_centers = np.log10(self.bin_centers)
