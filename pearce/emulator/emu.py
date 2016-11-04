@@ -1025,4 +1025,3 @@ class ExtraCrispy(Emu):
         emulator.recompute()
 
         return results.success
->>>>>>> 2854856440a1b1773dea890f3d70923de1704cf2
