@@ -1,35 +1,40 @@
 #!/bin/bash
 '''The Emu object esentially wraps the George gaussian process code. It handles building, training, and predicting.'''
 
-from os import path
-from time import time
 import warnings
 from glob import glob
 from itertools import izip
 from multiprocessing import cpu_count
+from os import path
+from time import time
+from abc import ABCMeta, abstractmethod
 
+import emcee as mc
+import george
 import numpy as np
 import scipy.optimize as op
-from scipy.linalg import inv
-from scipy.interpolate import interp1d
-import george
 from george.kernels import *
+from scipy.interpolate import interp1d
+from scipy.linalg import inv
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
-from sklearn.svm import SVR
 from sklearn.kernel_ridge import KernelRidge
-import emcee as mc
+from sklearn.svm import SVR
 
+from .ioHelpers import global_file_reader, obs_file_reader
 from .trainingData import GLOBAL_FILENAME
-from .ioHelpers import global_file_reader, obs_file_reader, parameter
 
-#TODO abstract base classes? Depends on what methods need to be subclassed.
-#TODO methods I think need to be reordered
+
+# TODO abstract base classes? Depends on what methods need to be subclassed.
+# TODO methods I think need to be reordered
 
 class Emu(object):
-    #TODO docstrings? here and init.
+    # TODO docstrings? here and init.
+
+    __metaclass__ = ABCMeta
     valid_methods = {'gp', 'svr', 'gbdt', 'rf', 'krr'}  # could add more, coud even check if they exist in sklearn
 
-    def __init__(self, training_dir,method = 'gp',hyperparams={}, params=None, fixed_params={}, independent_variable=None):
+    def __init__(self, training_dir, method='gp', hyperparams={}, params=None, fixed_params={},
+                 independent_variable=None):
 
         assert method in self.valid_methods
 
@@ -44,41 +49,147 @@ class Emu(object):
             from .ioHelpers import DEFAULT_PARAMS as params
 
         self.method = method
-        #TODO store hyperparams?
+        # TODO store hyperparams?
         self.ordered_params = params
         self.fixed_params = fixed_params
         self.independent_variable = independent_variable
 
-        self.get_training_data(training_dir)
+        self.load_training_data(training_dir)
         self.build_emulator(hyperparams)
 
-    # I can get LHC from the training data. If any coordinate equals any other in its column we know!
-    def get_training_data(self, training_dir):
+    ###Data Loading and Manipulation####################################################################################
+
+    def get_data(self, data_dir, fixed_params, independent_variable):
         '''
-        Read the training data for the emulator and attach it to the object.
-        :param training_dir:
-            Directory where training data from trainginData is stored.
+        Read data in the format compatible with this object and return it
+        :param data_dir:
+            Directory where data from trainingData is stored
         :param fixed_params:
-            Parameters to hold fixed. Only available if data in training_dir is a full hypercube, not a latin hypercube.
+            Parameters to hold fixed. Only available if data in data_dir is a full hypercube, not a latin hypercube
+        :param independent_variable:
+            Independant variable to emulate. Options are xi, r2xi, and bias (eventually)..
         :return: None
         '''
-        x, y, yerr = self.load_data(training_dir, self.fixed_params, self.independent_variable)
 
-        self.x = x
-        self.y = y
-        self.yerr = yerr
-        self.y_hat = np.zeros(self.y.shape[1]) if len(y.shape)>1 else 0# self.y.mean(axis = 0)
-        self.y -= self.y_hat
+        assert len(fixed_params) - len(self.ordered_params) <= 1  # can exclude r
 
-        ndim = self.x.shape[1]
-        self.fixed_ndim = len(self.fixed_params)
-        self.emulator_ndim = ndim  # The number of params for the emulator is different than those in sampling.
-        self.sampling_ndim = ndim - 1
+        bins, cosmo_params, obs, sampling_method = global_file_reader(path.join(data_dir, GLOBAL_FILENAME))
 
-    #@abstractMethod
-    def load_data(self, data_dir, fixed_params, independent_variable):
-        '''Implemented in subclasses'''
-        raise NotImplementedError
+        # Not sure if I need a flag here for plot_data; I thnk it's always used with a fixed_params so should be fine.
+        if fixed_params and sampling_method == 'LHC':
+            raise ValueError('Fixed parameters is not empty, but the data in data_dir is form a Latin Hypercube. \
+                                Cannot performs slices on a LHC.')
+
+        self.obs = obs
+
+        obs_files = sorted(glob(path.join(data_dir, 'obs*.npy')))
+        cov_files = sorted(
+            glob(path.join(data_dir, 'cov*.npy')))  # since they're sorted, they'll be paired up by params.
+        self.bin_centers = (bins[:-1] + bins[1:]) / 2
+        nbins = self.bin_centers.shape[0]
+
+        npoints = len(obs_files) * nbins  # each file contains NBINS points in r, and each file is a 6-d point
+
+        varied_params = set([p.name for p in self.ordered_params]) - set(fixed_params.keys())
+        ndim = len(varied_params)  # lest we forget r
+
+        x = np.zeros((npoints, ndim))
+        y = np.zeros((npoints,))
+        yerr = np.zeros((npoints,))
+
+        warned = False
+        num_skipped = 0
+        num_used = 0
+        for idx, (obs_file, cov_file) in enumerate(izip(obs_files, cov_files)):
+            params, obs, cov = obs_file_reader(obs_file, cov_file)
+
+            # skip values that aren't where we've fixed them to be.
+            # It'd be nice to do this before the file I/O. Not possible without putting all info in the filename.
+            # or, a more nuanced file structure
+            # Note is is complex because fixed_params can have floats or arrays of floats.
+            # TODO check if a fixed_param is not one of the options i.e. typo
+            to_continue = True
+            for key, val in fixed_params.iteritems():
+                if type(val) is type(y):
+                    if np.all(np.abs(params[key] - val) > 1e-3):
+                        break
+                elif np.abs(params[key] - val) > 1e-3:
+                    break
+            else:
+                to_continue = False  # no break
+
+            if to_continue:
+                continue
+
+            if np.any(np.isnan(cov)) or np.any(np.isnan(obs)):
+                if not warned:
+                    warnings.warn('WARNING: NaN detected. Skipping point in %s' % cov_file)
+                    warned = True
+                num_skipped += 1
+                continue
+
+            num_used += 1
+
+            # doing some shuffling and stacking
+            file_params = []
+            # NOTE could do a param ordering here
+            for p in self.ordered_params:
+                if p.name in fixed_params:
+                    continue
+                # TODO change 'r' to something else.
+                if p.name == 'r':
+                    file_params.append(np.log10(self.bin_centers))
+                else:
+                    file_params.append(np.ones((nbins,)) * params[p.name])
+
+            x[idx * nbins:(idx + 1) * nbins, :] = np.stack(file_params).T
+            # TODO the time has come to do something smarter for bias... I will ignore for now.
+
+            y[idx * nbins:(idx + 1) * nbins], yerr[idx * nbins:(idx + 1) * nbins] = self._iv_transform(
+                independent_variable, obs, cov)
+
+        # ycov = block_diag(*ycovs)
+        # ycov = np.sqrt(np.diag(ycov))
+
+        # remove rows that were skipped due to the fixed thing
+        # NOTE: HACK
+        # a reshape may be faster.
+        zeros_slice = np.all(x != 0.0, axis=1)
+        # set the results of these calculations.
+
+        return x[zeros_slice], y[zeros_slice], yerr[zeros_slice]
+
+    def get_plot_data(self, em_params, training_dir, independent_variable=None, fixed_params={}):
+        '''
+        Similar function to load_training_data. However, returns values for plotting comparisons to the emulator.
+        :param em_params:
+            Similar to fixed params. A dictionary of values held fixed in the emulator, as opposed to fixed_params
+            which are values held fixed in the training data.
+        :param training_dir:
+            Directory where training data from trainginData is stored.
+        :param independent_variable:
+            Independant variable to emulate. Options are xi, r2xi, and bias (eventually).
+        :param fixed_params:
+            Parameters to hold fixed. Only available if data in training_dir is a full hypercube, not a latin hypercube.
+        :return: log_r, y, yerr for the independent variable at the points specified by fixed nad em params.
+        '''
+
+        plot_params = {}
+        plot_params.update(fixed_params)
+        plot_params.update(em_params)
+
+        x, y, yerr = self.get_data(training_dir, plot_params, independent_variable)
+        sort_idxs = self._sort_params(x, argsort=True)
+
+        log_bin_centers = np.log10(self.bin_centers)
+        # repeat for each row of y
+        log_bin_centers = np.tile(log_bin_centers, sort_idxs.shape[0])
+
+        return log_bin_centers, y[sort_idxs], yerr[sort_idxs]
+
+    @abstractmethod
+    def load_training_data(self, training_dir):
+        pass
 
     def _iv_transform(self, independent_variable, obs, cov):
         '''
@@ -150,7 +261,9 @@ class Emu(object):
 
         return t
 
-    def build_emulator(self,hyperparams):
+    ###Emulator Building and Training###################################################################################
+
+    def build_emulator(self, hyperparams):
         '''
         Initialization of the emulator from recovered training data. Calls submethods depending on "method"
         :param method:
@@ -164,25 +277,18 @@ class Emu(object):
 
         if self.method == 'gp':
             self._build_gp(hyperparams)
-        else: #an sklearn method
+        else:  # an sklearn method
             self._build_skl(hyperparams)
 
-    # @abstractMethod
+    @abstractmethod
     def _build_gp(self, hyperparams):
-        """
-        Implemented in subclasses
-        """
-        raise NotImplementedError
+        pass
 
-    # @abstractMethod
+    @abstractmethod
     def _build_skl(self, hyperparams):
-        """
-        Implemented in subclasses
-        """
-        raise NotImplementedError
+        pass
 
-    #TODO undserscore?
-    def get_initial_guess(self, independent_variable):
+    def _get_initial_guess(self, independent_variable):
         '''
         Return the initial guess for the emulator, based on what the iv is. Guesses are learned from
         previous experiments.
@@ -218,7 +324,7 @@ class Emu(object):
 
         return ig
 
-    def _make_kernel(self,metric):
+    def _make_kernel(self, metric):
         """
         Helper method to build a george kernel for GP's and kernel-based regressions.
         :param metric:
@@ -228,11 +334,11 @@ class Emu(object):
         """
 
         if not metric:
-            ig = self.get_initial_guess(self.independent_variable, self.fixed_params)
+            ig = self._get_initial_guess(self.independent_variable, self.fixed_params)
         else:
             ig = metric  # use the user's initial guesses
 
-        #TODO does this need to be attached? is it ever used again
+        # TODO does this need to be attached? is it ever used again
         metric = [ig['amp']]
         for p in self.ordered_params:
             if p.name in self.fixed_params:
@@ -245,114 +351,92 @@ class Emu(object):
         metric = np.array(metric)
 
         a = metric[0]
-        #TODO other kernels?
+        # TODO other kernels?
         return a * ExpSquaredKernel(metric[1:], ndim=self.emulator_ndim)
 
-    # Not sure this will work at all in an LHC scheme.
-    #TODO can i use load_data here?
-    def get_plot_data(self, em_params, training_dir, independent_variable=None, fixed_params={}):
+    ###Emulation and methods that Utilize it############################################################################
+    @abstractmethod
+    def emulate(self, em_params, gp_errs=False):
+        pass
+
+    @abstractmethod
+    def emulate_wrt_r(self, em_params, bin_centers, gp_err=False):
+        pass
+
+    def estimate_uncertainty(self, truth_dir, N=None):
         '''
-        Similar function to get_training_data. However, returns values for plotting comparisons to the emulator.
-        :param em_params:
-            Similar to fixed params. A dictionary of values held fixed in the emulator, as opposed to fixed_params
-            which are values held fixed in the training data.
-        :param training_dir:
-            Directory where training data from trainginData is stored.
-        :param independent_variable:
-            Independant variable to emulate. Options are xi, r2xi, and bias (eventually).
-        :param fixed_params:
-            Parameters to hold fixed. Only available if data in training_dir is a full hypercube, not a latin hypercube.
-        :return: log_r, y, yerr for the independent variable at the points specified by fixed nad em params.
+        Estimate the uncertainty of the emulator by comparing to a "test" box of true values.
+        :param truth_dir:
+            Name of a directory of true test values, of the same format as the train_dir
+        :param N:
+            Number of points to compare to. If None (default) will use all points. Else will select random sample.
+        :return:
+            covariance matrix with dim n_binsxn_bins. Will only have diagonal elemtns of est. uncertainties.
         '''
-        assert len(em_params) + len(fixed_params) - len(self.ordered_params) <= 1  # can exclude r
+        rms_err = self.goodness_of_fit(truth_dir, N, statistic='rms')
 
-        bins, cosmo_params, obs, method = global_file_reader(path.join(training_dir, GLOBAL_FILENAME))
+        return np.diag(rms_err)
 
-        if method == 'LHC':
-            raise ValueError('The data in training_dir is form a Latin Hypercube. \
-                                        It is not possible to get plot data from this data. ')
+    def goodness_of_fit(self, truth_dir, N=None, statistic='r2'):
+        '''
+        Calculate the goodness of fit of an emulator as compared to some validation data.
+        :param truth_dir:
+            Directory structured similary to the training data, but NOT used for training.
+        :param N:
+            Number of points to use to calculate G.O.F. measures. "None" tests against all values in truth_dir. If N
+            is less than the number of points, N are randomly selected.
+        :param statistic:
+            What G.O.F. statistic to calculate. Default is R2. Other options are rmsfd, abs(olute), and rel(ative).
+        :return: values, a numpy arrray of the calculated statistics at each of the N training opints.
+        '''
+        assert statistic in {'r2', 'rmsfd', 'abs', 'rel'}
+        assert N > 0 and int(N) == N
 
-        obs_files = sorted(glob(path.join(training_dir, 'obs*.npy')))
-        cov_files = sorted(
-            glob(path.join(training_dir, 'cov*.npy')))  # since they're sorted, they'll be paired up by params.
-        bin_centers = (bins[:-1] + bins[1:]) / 2
-        nbins = bin_centers.shape[0]
+        x, y = self.get_data(truth_dir, self.fixed_params, self.independent_variable)
 
-        npoints = len(obs_files)  # each file contains NBINS points in r, and each file is a 6-d point
+        np.random.seed(int(time()))
 
-        log_bin_centers = np.zeros((npoints, nbins))
-        y = np.zeros((npoints, nbins))
-        yerr = np.zeros((npoints, nbins))
+        if N is not None:  # make a random choice
+            idxs = np.random.choice(x.shape[0], N, replace=False)
 
-        x = np.zeros((npoints, len(em_params)))
+            x, y = x[idxs], y[idxs]
 
-        warned = False
-        num_skipped = 0
-        num_used = 0
-        for idx, (obs_file, cov_file) in enumerate(izip(obs_files, cov_files)):
-            params, obs, cov = obs_file_reader(obs_file, cov_file)
+        log_y = np.log10(y)
 
-            # skip values that aren't where we've fixed them to be.
-            # It'd be nice to do this before the file I/O. Not possible without putting all info in the filename.
-            # or, a more nuanced file structure
-            # TODO check if a fixed_param is not one of the options
-            if any(params[key] != val for key, val in fixed_params.iteritems()):
-                continue
+        bins, _, _, _ = global_file_reader(path.join(truth_dir, GLOBAL_FILENAME))
+        bin_centers = (bins[1:] + bins[:-1]) / 2
+        #looks gross, but gets down to uniques. Kinda wasteful as it'll be tiled in a bit, but c'est la vie
+        params = {p.name: sorted(list(set(x[:, i]))) for p, i in zip(self.ordered_params, xrange(x.shape[1])) if
+                  p.name not in self.fixed_params}
 
-            # same as the above for emulation params
-            # more complex since em_params can have a float or array
-            to_continue = True
-            for key, val in em_params.iteritems():
-                if type(val) is type(y):
-                    if np.all(np.abs(params[key] - val) > 1e-3):
-                        break
-                elif np.abs(params[key] - val) > 1e-3:
-                    break
-            else:
-                to_continue = False  # no break
+        # probably should consider not having wrt r here.
+        pred_log_y = self.emulate_wrt_r(params, bin_centers)
 
-            if to_continue:
-                continue
+        if statistic == 'rmsfd':
+            return np.sqrt(np.mean((((pred_log_y - log_y) ** 2) / (log_y ** 2)), axis=0))
 
-            if np.any(np.isnan(cov)) or np.any(np.isnan(obs)):
-                if not warned:
-                    warnings.warn('WARNING: NaN detected. Skipping point in %s' % cov_file)
-                    warned = True
-                num_skipped += 1
-                continue
+        elif statistic == 'rms':
+            return np.sqrt(np.mean(((pred_log_y - log_y) ** 2), axis=0))
 
-            num_used += 1
+        # TODO sklearn methods can do this themselves. But i've already tone the prediction!
+        elif statistic == 'r2':  # r2
+            SSR = np.sum((pred_log_y - log_y) ** 2, axis=0)
+            SST = np.sum((log_y - log_y.mean(axis=0)) ** 2, axis=0)
 
-            log_bin_centers[idx] = np.log10(bin_centers)
-            y[idx], yerr[idx] = self._iv_transform(independent_variable, obs, cov)
+            return 1 - SSR / SST
 
-            x[idx] = np.array([params[p.name] for p in self.ordered_params if p.name in params])
+        elif statistic == 'abs':
+            return np.mean((pred_log_y - log_y), axis=0)
+        else:  # 'rel'
+            return np.mean((pred_log_y - log_y) / log_y, axis=0)
 
-        # remove rows that were skipped due to the fixed thing
-        # NOTE: HACK
-        # a reshape may be faster.
-        zeros_slice = np.all(y != 0.0, axis=1)
-
-        print x[zeros_slice].shape
-
-        sort_idxs = self._sort_params(x[zeros_slice], argsort=True)
-
-        return log_bin_centers[zeros_slice][sort_idxs], y[zeros_slice][sort_idxs], yerr[zeros_slice][sort_idxs]
-
+    @abstractmethod
     def train_metric(self, **kwargs):
         raise NotImplementedError
 
-    def emulate(self, em_params, gp_errs=False):
-        raise NotImplementedError
-
-    def emulate_wrt_r(self, em_params, bin_centers, gp_err=False):
-        raise NotImplementedError
-
-    #TODO this feature is not super useful anymore, and also is poorly defined w.r.t non gp methods.
-    #did a lot of work on it tho, maybe i'll leave it around...?
-    #TODO change name to LOO
-    #TODO will break with the way I'm changing EC.
-    def _jackknife_errors(self, y, t):
+    # TODO this feature is not super useful anymore, and also is poorly defined w.r.t non gp methods.
+    # did a lot of work on it tho, maybe i'll leave it around...?
+    def _loo_errors(self, y, t):
         '''
         Calculate the LOO Jackknife error matrix. This is implemented using the analytic LOO procedure,
         which is much faster than re-doing an inversion for each sample. May be useful if the GP's matrix is not
@@ -369,13 +453,13 @@ class Emu(object):
         assert self.method == 'gp'
 
         if isinstance(self, ExtraCrispy):
-            emulator = self.emulators[0] #hack for EC, do somethign smarter later
+            emulator = self.emulators[0]  # hack for EC, do somethign smarter later
         else:
             emulator = self.emulator
 
         # We need to perform one full inverse to start.
         K_inv_full = emulator.solver.apply_inverse(np.eye(emulator._alpha.size),
-                                                  in_place=True)
+                                                   in_place=True)
 
         # TODO deepcopy?
         x = self.x[:]
@@ -423,73 +507,6 @@ class Emu(object):
             return np.array([[cov]])  # returns float in this case
         else:
             return cov
-
-    def goodness_of_fit(self, truth_dir, N=None, statistic='r2'):
-        '''
-        Calculate the goodness of fit of an emulator as compared to some validation data.
-        :param truth_dir:
-            Directory structured similary to the training data, but NOT used for training.
-        :param N:
-            Number of points to use to calculate G.O.F. measures. "None" tests against all values in truth_dir. If N
-            is less than the number of points, N are randomly selected.
-        :param statistic:
-            What G.O.F. statistic to calculate. Default is R2. Other options are rmsfd, abs(olute), and rel(ative).
-        :return: values, a numpy arrray of the calculated statistics at each of the N training opints.
-        '''
-        assert statistic in {'r2', 'rmsfd', 'abs', 'rel'}
-        if N is not None:
-            assert N > 0 and int(N) == N
-
-        x, y, _ = self.load_data(truth_dir, self.fixed_params, self.independent_variable)
-
-        np.random.seed(int(time()))
-
-        if N is not None: #make a random choice
-            idxs = np.random.choice(x.shape[0], N, replace=False)
-
-            x, y = x[idxs], y[idxs]
-
-        log_y = np.log10(y)
-
-        bins, _, _, _ = global_file_reader(path.join(truth_dir, GLOBAL_FILENAME))
-        bin_centers = (bins[1:] + bins[:-1]) / 2
-        params = {p.name: x[:, i] for p, i in zip(self.ordered_params, xrange(x.shape[1])) if
-                  p.name not in self.fixed_params}
-
-        #probably should consider not having wrt r here.
-        pred_log_y = self.emulate_wrt_r(params, bin_centers)
-
-        if statistic == 'rmsfd':
-            return np.sqrt(np.mean(( ((pred_log_y - log_y) ** 2) / (log_y ** 2)), axis=0) )
-
-        elif statistic == 'rms':
-            return np.sqrt(np.mean(( (pred_log_y - log_y) ** 2), axis=0) )
-
-        #TODO sklearn methods can do this themselves. But i've already tone the prediction!
-        elif statistic == 'r2':  # r2
-            SSR = np.sum((pred_log_y - log_y) ** 2, axis=0)
-            SST = np.sum((log_y - log_y.mean(axis=0)) ** 2, axis = 0)
-
-            return 1 - SSR / SST
-
-        elif statistic == 'abs':
-            return np.mean( (pred_log_y - log_y), axis = 0)
-        else:  # 'rel'
-            return np.mean( (pred_log_y- log_y ) / log_y, axis = 0)
-
-    def estimate_uncertainty(self, truth_dir, N=None):
-        '''
-        Estimate the uncertainty of the emulator by comparing to a "test" box of true values.
-        :param truth_dir:
-            Name of a directory of true test values, of the same format as the train_dir
-        :param N:
-            Number of points to compare to. If None (default) will use all points. Else will select random sample.
-        :return:
-            covariance matrix with dim n_binsxn_bins. Will only have diagonal elemtns of est. uncertainties.
-        '''
-        rms_err = self.goodness_of_fit(truth_dir, N, statistic='rms')
-
-        return np.diag(rms_err)
 
     def run_mcmc(self, y, cov, bin_centers, nwalkers=1000, nsteps=100, nburn=20, n_cores='all'):
         '''
@@ -610,91 +627,27 @@ def lnlike(theta, emu, y, cov, bin_centers):
 class OriginalRecipe(Emu):
     '''Emulator that emulates with bins as an implicit parameter. '''
 
-    def load_data(self, data_dir, fixed_params, independent_variable):
+    def load_training_data(self, training_dir):
         '''
-        Read data in the format compatible with this object and return it
-        :param data_dir:
-            Directory where data from trainingData is stored
+        Read the training data for the emulator and attach it to the object.
+        :param training_dir:
+            Directory where training data from trainginData is stored.
         :param fixed_params:
-            Parameters to hold fixed. Only available if data in data_dir is a full hypercube, not a latin hypercube
-        :param independent_variable:
-            Independant variable to emulate. Options are xi, r2xi, and bias (eventually)..
+            Parameters to hold fixed. Only available if data in training_dir is a full hypercube, not a latin hypercube.
         :return: None
         '''
+        x, y, yerr = self.get_data(training_dir, self.fixed_params, self.independent_variable)
 
-        bins, cosmo_params, obs, method = global_file_reader(path.join(data_dir, GLOBAL_FILENAME))
+        self.x = x
+        self.y = y
+        self.yerr = yerr
+        self.y_hat = np.zeros(self.y.shape[1]) if len(y.shape) > 1 else 0  # self.y.mean(axis = 0)
+        self.y -= self.y_hat
 
-        if fixed_params and method == 'LHC':
-            raise ValueError('Fixed parameters is not empty, but the data in data_dir is form a Latin Hypercube. \
-                                Cannot performs slices on a LHC.')
-
-        self.obs = obs
-
-        obs_files = sorted(glob(path.join(data_dir, 'obs*.npy')))
-        cov_files = sorted(
-            glob(path.join(data_dir, 'cov*.npy')))  # since they're sorted, they'll be paired up by params.
-        self.bin_centers = (bins[:-1] + bins[1:]) / 2
-        nbins = self.bin_centers.shape[0]
-
-        npoints = len(obs_files) * nbins  # each file contains NBINS points in r, and each file is a 6-d point
-
-        varied_params = set([p.name for p in self.ordered_params]) - set(fixed_params.keys())
-        ndim = len(varied_params)  # lest we forget r
-
-        x = np.zeros((npoints, ndim))
-        y = np.zeros((npoints,))
-        yerr = np.zeros((npoints,))
-
-        warned = False
-        num_skipped = 0
-        num_used = 0
-        for idx, (obs_file, cov_file) in enumerate(izip(obs_files, cov_files)):
-            params, obs, cov = obs_file_reader(obs_file, cov_file)
-
-            # skip values that aren't where we've fixed them to be.
-            # It'd be nice to do this before the file I/O. Not possible without putting all info in the filename.
-            # or, a more nuanced file structure
-            # TODO check if a fixed_param is not one of the options i.e. typo
-            if any(params[key] != val for key, val in fixed_params.iteritems()):
-                continue
-
-            if np.any(np.isnan(cov)) or np.any(np.isnan(obs)):
-                if not warned:
-                    warnings.warn('WARNING: NaN detected. Skipping point in %s' % cov_file)
-                    warned = True
-                num_skipped += 1
-                continue
-
-            num_used += 1
-
-            # doing some shuffling and stacking
-            file_params = []
-            # NOTE could do a param ordering here
-            for p in self.ordered_params:
-                if p.name in fixed_params:
-                    continue
-                # TODO change 'r' to something else.
-                if p.name == 'r':
-                    file_params.append(np.log10(self.bin_centers))
-                else:
-                    file_params.append(np.ones((nbins,)) * params[p.name])
-
-            x[idx * nbins:(idx + 1) * nbins, :] = np.stack(file_params).T
-            # TODO the time has come to do something smarter for bias... I will ignore for now.
-
-            y[idx * nbins:(idx + 1) * nbins], yerr[idx * nbins:(idx + 1) * nbins] = self._iv_transform(
-                independent_variable, obs, cov)
-
-        # ycov = block_diag(*ycovs)
-        # ycov = np.sqrt(np.diag(ycov))
-
-        # remove rows that were skipped due to the fixed thing
-        # NOTE: HACK
-        # a reshape may be faster.
-        zeros_slice = np.all(x != 0.0, axis=1)
-        # set the results of these calculations.
-
-        return x[zeros_slice], y[zeros_slice], yerr[zeros_slice]
+        ndim = self.x.shape[1]
+        self.fixed_ndim = len(self.fixed_params)
+        self.emulator_ndim = ndim  # The number of params for the emulator is different than those in sampling.
+        self.sampling_ndim = ndim - 1
 
     def _build_gp(self, hyperparams):
         '''
@@ -703,7 +656,7 @@ class OriginalRecipe(Emu):
             Key word parameters for the emulator
         :return: None
         '''
-        #TODO could use more of the hyperparams...
+        # TODO could use more of the hyperparams...
         metric = hyperparams['metric'] if 'metric' in hyperparams else {}
         kernel = self._make_kernel(metric)
         # TODO is it confusing for this to have the same name as the sklearn object with a different API?
@@ -736,6 +689,60 @@ class OriginalRecipe(Emu):
         self.emulator = skl_methods[self.method](**hyperparams)
         self.emulator.fit(self.x, self.y)
 
+    def emulate(self, em_params, gp_errs=False):
+        '''
+        Perform predictions with the emulator.
+        :param em_params:
+            Dictionary of what values to predict at for each param. Values can be
+            an array or a float.
+        :param gp_errs:
+            Boolean, decide whether or not to return the errors from the gp prediction. Default is False.
+            Will throw error if method is not gp.
+        :return: mu, cov. The predicted value and the covariance matrix for the predictions
+        '''
+
+        if gp_errs:
+            assert self.method == 'gp'  # only has meaning for gp's
+
+        input_params = {}
+        input_params.update(self.fixed_params)
+        input_params.update(em_params)
+        assert len(input_params) == self.emulator_ndim + self.fixed_ndim  # check dimenstionality
+        for i in input_params:  # check that the names in input params are all defined in the ordering.
+            assert any(i == p.name for p in self.ordered_params)
+
+        # i'd like to remove 'r'. possibly requiring a passed in param?
+        t_list = [input_params[p.name] for p in self.ordered_params if p.name in em_params]
+        t_grid = np.meshgrid(*t_list)
+        t = np.stack(t_grid).T
+        # TODO george can sort?
+        t = t.reshape((-1, self.emulator_ndim))
+
+        t = self._sort_params(t)
+
+        if self.method == 'gp':
+            return self.emulator.predict(self.y, t, mean_only=not gp_errs)
+        else:
+            return self.emulator.predict(t)
+
+    # TODO It's not clear to the user if bin_centers should be log or not!
+    def emulate_wrt_r(self, em_params, bin_centers, gp_errs=False):
+        '''
+        Conveniance function. Add's 'r' to the emulation automatically, as this is the
+        most common use case.
+        :param em_params:
+            Dictionary of what values to predict at for each param. Values can be array
+            or float.
+        :param bin_centers:
+            Centers of bins to predict at, for each point in HOD-space.
+        :return:
+        '''
+        vep = dict(em_params)
+        # TODO change 'r' to something more general
+        vep.update({'r': np.log10(bin_centers)})
+        out = self.emulate(vep, gp_errs)
+        return out
+
     def train_metric(self, **kwargs):
         '''
         Train the metric parameters of the GP. Has a spotty record of working.
@@ -746,7 +753,7 @@ class OriginalRecipe(Emu):
         :return: success: True if the training was successful.
         '''
 
-        #TODO kernel based methods may want to use this...
+        # TODO kernel based methods may want to use this...
         assert self.method == 'gp'
 
         # move these outside? hm.
@@ -773,148 +780,40 @@ class OriginalRecipe(Emu):
 
         self.emulator.kernel[:] = results.x
         self.emulator.recompute()
-        #self.metric = np.exp(results.x)
+        # self.metric = np.exp(results.x)
 
         return results.success
-
-    def emulate(self, em_params, gp_errs = False):
-        '''
-        Perform predictions with the emulator.
-        :param em_params:
-            Dictionary of what values to predict at for each param. Values can be
-            an array or a float.
-        :param gp_errs:
-            Boolean, decide whether or not to return the errors from the gp prediction. Default is False.
-            Will throw error if method is not gp.
-        :return: mu, cov. The predicted value and the covariance matrix for the predictions
-        '''
-
-        if gp_errs:
-            assert self.method == 'gp' #only has meaning for gp's
-
-        input_params = {}
-        input_params.update(self.fixed_params)
-        input_params.update(em_params)
-        assert len(input_params) == self.emulator_ndim + self.fixed_ndim  # check dimenstionality
-        for i in input_params:  # check that the names in input params are all defined in the ordering.
-            assert any(i == p.name for p in self.ordered_params)
-
-        # i'd like to remove 'r'. possibly requiring a passed in param?
-        t_list = [input_params[p.name] for p in self.ordered_params if p.name in em_params]
-        t_grid = np.meshgrid(*t_list)
-        t = np.stack(t_grid).T
-        # TODO george can sort?
-        t = t.reshape((-1, self.emulator_ndim))
-
-        t = self._sort_params(t)
-
-        if self.method == 'gp':
-            return self.emulator.predict(self.y, t, mean_only = not gp_errs)
-        else:
-            return self.emulator.predict(t)
-
-    # TODO It's not clear to the user if bin_centers should be log or not!
-    def emulate_wrt_r(self, em_params, bin_centers, gp_errs=False):
-        '''
-        Conveniance function. Add's 'r' to the emulation automatically, as this is the
-        most common use case.
-        :param em_params:
-            Dictionary of what values to predict at for each param. Values can be array
-            or float.
-        :param bin_centers:
-            Centers of bins to predict at, for each point in HOD-space.
-        :return:
-        '''
-        vep = dict(em_params)
-        # TODO change 'r' to something more general
-        vep.update({'r': np.log10(bin_centers)})
-        out = self.emulate(vep, gp_errs)
-        return out
 
 
 class ExtraCrispy(Emu):
     '''Emulator that emulates with bins as an implicit parameter. '''
 
-    def load_data(self, data_dir, fixed_params, independent_variable):
+    def load_training_data(self, training_dir):
         '''
         Read the training data for the emulator and attach it to the object.
-        :param data_dir:
+        :param training_dir:
             Directory where training data from trainginData is stored.
-        :param independent_variable:
-            Independant variable to emulate. Options are xi, r2xi, and bias (eventually).
         :param fixed_params:
-            Parameters to hold fixed. Only available if data in data_dir is a full hypercube, not a latin hypercube.
+            Parameters to hold fixed. Only available if data in training_dir is a full hypercube, not a latin hypercube.
         :return: None
         '''
+        x, y, _ = self.get_data(training_dir, self.fixed_params, self.independent_variable)
+        # now, need to do some shuffling to get these right.
+        # NOTE this involves creating a large array and slicing it down, essentially. Not the most efficient.
+        # Possibly more efficient would be to load in the format we do here, and then do the transform on that.
+        # However, the one in the superclass is the "standard" approach.
 
-        bins, cosmo_params, obs, method = global_file_reader(path.join(data_dir, GLOBAL_FILENAME))
+        nbins = len(self.bin_centers)
+        self.x = x[0:-1:nbins, :-1]
+        self.y = y.reshape((-1, nbins))
+        self.yerr = np.zeros_like(self.y)
+        self.y_hat = np.zeros(self.y.shape[1]) if len(y.shape) > 1 else 0  # self.y.mean(axis = 0)
+        self.y -= self.y_hat
 
-        if fixed_params and method == 'LHC':
-            raise ValueError('Fixed parameters is not empty, but the data in data_dir is form a Latin Hypercube. \
-                                Cannot performs slices on a LHC.')
-
-        self.obs = obs
-
-        obs_files = sorted(glob(path.join(data_dir, 'obs*.npy')))
-        cov_files = sorted(
-            glob(path.join(data_dir, 'cov*.npy')))  # since they're sorted, they'll be paired up by params.
-        self.bin_centers = (bins[:-1] + bins[1:]) / 2
-        nbins = self.bin_centers.shape[0]
-        npoints = len(obs_files)  # each file contains NBINS points in r, and each file is a 6-d point
-
-        varied_params = set(self.ordered_params) - set(fixed_params.keys())
-        ndim = len(varied_params)  # lest we forget r
-
-        # not sure about this.
-
-        x = np.zeros((npoints, ndim))
-        y = np.zeros((npoints, nbins))
-        yerr = np.zeros((npoints, nbins))
-
-        warned = False
-        num_skipped = 0
-        num_used = 0
-        for idx, (obs_file, cov_file) in enumerate(izip(obs_files, cov_files)):
-
-            params, obs, cov = obs_file_reader(obs_file, cov_file)
-
-            # skip values that aren't where we've fixed them to be.
-            # It'd be nice to do this before the file I/O. Not possible without putting all info in the filename.
-            # or, a more nuanced file structure
-            # TODO check if a fixed_param is not one of the options i.e. typo
-            if any(params[key] != val for key, val in fixed_params.iteritems()):
-                continue
-
-            if np.any(np.isnan(cov)) or np.any(np.isnan(obs)):
-                if not warned:
-                    warnings.warn('WARNING: NaN detected. Skipping point in %s' % cov_file)
-                    warned = True
-                num_skipped += 1
-                continue
-
-            num_used += 1
-
-            # doing some shuffling and stacking
-            file_params = []
-            # NOTE could do a param ordering here
-            for p in self.ordered_params:
-                if p.name in fixed_params:
-                    continue
-                file_params.append(params[p.name])
-
-            x[idx, :] = np.stack(file_params).T
-
-            y[idx], yerr[idx] = self._iv_transform(independent_variable, obs, cov)
-
-        # ycov = block_diag(*ycovs)
-        # ycov = np.sqrt(np.diag(ycov))
-
-        # remove rows that were skipped due to the fixed thing
-        # NOTE: HACK
-        # a reshape may be faster.
-        zeros_slice = np.all(x != 0.0, axis=1)
-
-        return x[zeros_slice], y[zeros_slice, :], yerr[zeros_slice, :]
+        ndim = self.x.shape[1]
+        self.fixed_ndim = len(self.fixed_params)
+        self.emulator_ndim = ndim  # The number of params for the emulator is different than those in sampling.
+        self.sampling_ndim = ndim - 1
 
     def _build_gp(self, hyperparams):
         '''
@@ -923,7 +822,7 @@ class ExtraCrispy(Emu):
             Key word parameters for the emulator
         :return: None
         '''
-        #TODO could use more of the hyperparams...
+        # TODO could use more of the hyperparams...
         metric = hyperparams['metric'] if 'metric' in hyperparams else {}
         kernel = self._make_kernel(metric)
         # TODO is it confusing for this to have the same name as the sklearn object with a different API?
@@ -933,11 +832,11 @@ class ExtraCrispy(Emu):
 
         emulator.compute(self.x, np.zeros_like(self.yerr), sort=False)  # NOTE I'm using a modified version of george!
 
-        #For EC, i'm storing an emulator per bin.
-        #I'll have to thikn about how to differ the hyperparams.
-        #For now, it'll replicate the same behavior as before.
-        #TODO not happy, in general, EC has "emulators" not "emulator" like the others.
-        #Arguement would be this should be all abstracted out from the user.
+        # For EC, i'm storing an emulator per bin.
+        # I'll have to thikn about how to differ the hyperparams.
+        # For now, it'll replicate the same behavior as before.
+        # TODO not happy, in general, EC has "emulators" not "emulator" like the others.
+        # Arguement would be this should be all abstracted out from the user.
         self.emulators = [emulator for i in xrange(self.yerr.shape[1])]
 
     def _build_skl(self, hyperparams):
@@ -950,7 +849,7 @@ class ExtraCrispy(Emu):
         skl_methods = {'gbdt': GradientBoostingRegressor, 'rf': RandomForestRegressor, \
                        'svr': SVR, 'krr': KernelRidge}
 
-        #Same kernel concerns as above.
+        # Same kernel concerns as above.
         if self.method in {'svr', 'krr'}:  # kernel based method
             metric = hyperparams['metric'] if 'metric' in hyperparams else {}
             kernel = self._make_kernel(metric)
@@ -961,51 +860,9 @@ class ExtraCrispy(Emu):
             else:  # krr
                 hyperparams['kernel'] = lambda x1, x2: kernel.value(np.array([x1]), np.array([x2]))
 
-
-        self.emulators = [skl_methods[self.method](**hyperparams) for i in xrange(self.yerr.shape[1]) ]
+        self.emulators = [skl_methods[self.method](**hyperparams) for i in xrange(self.yerr.shape[1])]
         for y, emulator in zip(self.y.T, self.emulators):
             emulator.fit(self.x, y)
-
-    def train_metric(self, **kwargs):
-        '''
-        Train the emulator. Has a spotty record of working. Better luck may be had with the NAMEME code.
-        :param kwargs:
-            Kwargs that will be passed into the scipy.optimize.minimize
-        :return: success: True if the training was successful.
-        '''
-
-        assert self.method == 'gp'
-
-        #emulators is a list containing refernces to the same object. this should still work!
-        emulator = self.emulators[0]
-
-        # move these outside? hm.
-        def nll(p):
-            # Update the kernel parameters and compute the likelihood.
-            # params are log(a) and log(m)
-            emulator.kernel[:] = p
-            # check this has the right direction
-            ll = np.sum(emulator.lnlikelihood(y, quiet=True) for y in self.y)
-
-            # The scipy optimizer doesn't play well with infinities.
-            return -ll if np.isfinite(ll) else 1e25
-
-        # And the gradient of the objective function.
-        def grad_nll(p):
-            # Update the kernel parameters and compute the likelihood.
-            emulator.kernel[:] = p
-            # mean or sum?
-            return -np.mean(emulator.grad_lnlikelihood(y, quiet=True) for y in self.y)
-
-        p0 = emulator.kernel.vector
-        results = op.minimize(nll, p0, jac=grad_nll, **kwargs)
-        # results = op.minimize(nll, p0, jac=grad_nll, method='TNC', bounds =\
-        #   [(np.log(0.01), np.log(10)) for i in xrange(ndim+1)],options={'maxiter':50})
-
-        emulator.kernel[:] = results.x
-        emulator.recompute()
-
-        return results.success
 
     def emulate(self, em_params, gp_errs=False):
         '''
@@ -1039,12 +896,12 @@ class ExtraCrispy(Emu):
 
         for idx, (y, y_hat, emulator) in enumerate(izip(self.y.T, self.y_hat, self.emulators)):
             if self.method == 'gp':
-                 out = emulator.predict(y, t, mean_only=not gp_errs)
-                 if gp_errs:
+                out = emulator.predict(y, t, mean_only=not gp_errs)
+                if gp_errs:
                     mu, cov = out
                     all_cov.append(cov)
-                 else:
-                     mu = out
+                else:
+                    mu = out
             else:
                 mu = emulator.predict(t)
             # mu and cov come out as (1,) arrays.
@@ -1121,6 +978,51 @@ class ExtraCrispy(Emu):
             new_err.append(interp_err)
         mu = np.array(new_mu).reshape((-1,))
         cov = np.diag(np.array(new_err).reshape((-1,)))
+
         if gp_errs:
             return mu, cov
         return mu
+
+    #TODO I could probably make this learn the metric for each individual emulator
+    #TODO could make this learn the metric for other kernel based emulators...
+    def train_metric(self, **kwargs):
+        '''
+        Train the emulator. Has a spotty record of working. Better luck may be had with the NAMEME code.
+        :param kwargs:
+            Kwargs that will be passed into the scipy.optimize.minimize
+        :return: success: True if the training was successful.
+        '''
+
+        assert self.method == 'gp'
+
+        # emulators is a list containing refernces to the same object. this should still work!
+        emulator = self.emulators[0]
+
+        # move these outside? hm.
+        def nll(p):
+            # Update the kernel parameters and compute the likelihood.
+            # params are log(a) and log(m)
+            emulator.kernel[:] = p
+            # check this has the right direction
+            ll = np.sum(emulator.lnlikelihood(y, quiet=True) for y in self.y)
+
+            # The scipy optimizer doesn't play well with infinities.
+            return -ll if np.isfinite(ll) else 1e25
+
+        # And the gradient of the objective function.
+        def grad_nll(p):
+            # Update the kernel parameters and compute the likelihood.
+            emulator.kernel[:] = p
+            # mean or sum?
+            return -np.mean(emulator.grad_lnlikelihood(y, quiet=True) for y in self.y)
+
+        p0 = emulator.kernel.vector
+        results = op.minimize(nll, p0, jac=grad_nll, **kwargs)
+        # results = op.minimize(nll, p0, jac=grad_nll, method='TNC', bounds =\
+        #   [(np.log(0.01), np.log(10)) for i in xrange(ndim+1)],options={'maxiter':50})
+
+        emulator.kernel[:] = results.x
+        emulator.recompute()
+
+        return results.success
+>>>>>>> 2854856440a1b1773dea890f3d70923de1704cf2
