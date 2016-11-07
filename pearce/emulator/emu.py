@@ -93,8 +93,8 @@ class Emu(object):
         self.bin_centers = (bins[:-1] + bins[1:]) / 2
         nbins = self.bin_centers.shape[0]
 
-        if self.ordered_params[-1].name != 'r':
-            nbins=1
+        #if self.ordered_params[-1].name != 'r':
+        #   nbins=1
 
         npoints = len(obs_files)*nbins # each file contains NBINS points in r, and each file is a 6-d point
         #if self.ordered_params[-1].name == 'r':
@@ -143,25 +143,18 @@ class Emu(object):
             # doing some shuffling and stacking
             file_params = []
             # NOTE could do a param ordering here
-            #if self.ordered_params[-1].name == 'r': #add 'r' to the end
             for p in self.ordered_params:
                 if p.name in fixed_params:#may need to be input_params
                     continue
                 # TODO change 'r' to something else.
                 if p.name == 'r':
                     file_params.append(np.log10(self.bin_centers))
-                elif nbins == 1:
-                    file_params.append(params[p.name])
                 else:
                     file_params.append(np.ones((nbins,)) * params[p.name])
-        #else:
-            #    for p in self.ordered_params:
-            #        if p.name in fixed_params:
-            #            continue
-            #        file_params.append(params[p.name])
 
+            # There is an open question how to handle the fact that x is repeated in the EC case.
+            # will punt for now.
             x[idx * nbins:(idx + 1) * nbins, :] = np.stack(file_params).T
-            # TODO the time has come to do something smarter for bias... I will ignore for now.
 
             y[idx * nbins:(idx + 1) * nbins], yerr[idx * nbins:(idx + 1) * nbins] = self._iv_transform(
                 independent_variable, obs, cov)
@@ -444,6 +437,15 @@ class Emu(object):
 
         x, y , _ = self.get_data(truth_dir,{}, self.fixed_params, self.independent_variable)
 
+        bins, _, _, _ = global_file_reader(path.join(truth_dir, GLOBAL_FILENAME))
+        bin_centers = (bins[1:]-bins[:-1])/2
+        nbins = len(bin_centers)
+
+        #this hack is not a futureproff test!
+        if self.ordered_params[-1] != 'r':
+            x = x[0:-1:nbins, :]
+            y = y.reshape((-1, nbins))
+
         np.random.seed(int(time()))
 
         if N is not None:  # make a random choice
@@ -452,6 +454,16 @@ class Emu(object):
             x, y = x[idxs], y[idxs]
 
         pred_y = self._emulate_helper(x, False)
+
+        #have to inerpolate...
+        if self.ordered_params[-1] != 'r' and bin_centers != self.bin_centers:
+            pred_y = pred_y.reshape((-1, nbins))
+            new_mu = []
+            for mean in pred_y:
+                xi_interpolator = interp1d(self.bin_centers, mean, kind='slinear')
+                interp_mean = xi_interpolator(bin_centers)
+                new_mu.append(interp_mean)
+            pred_y = np.array(new_mu)
 
         if statistic == 'rmsfd':
             return np.sqrt(np.mean((((pred_y - y) ** 2) / (y ** 2)), axis=0))
@@ -824,7 +836,7 @@ class ExtraCrispy(Emu):
         # However, the one in the superclass is the "standard" approach.
 
         nbins = len(self.bin_centers)
-        self.x = x#[0:-1:nbins, :]
+        self.x = x[0:-1:nbins, :]
         self.y = y.reshape((-1, nbins))
         self.yerr = np.zeros_like(self.y)
         self.y_hat = np.zeros(self.y.shape[1]) if len(self.y.shape) > 1 else 0  # self.y.mean(axis = 0)
