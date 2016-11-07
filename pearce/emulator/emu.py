@@ -150,6 +150,8 @@ class Emu(object):
                 # TODO change 'r' to something else.
                 if p.name == 'r':
                     file_params.append(np.log10(self.bin_centers))
+                elif nbins == 1:
+                    file_params.append(params[p.name])
                 else:
                     file_params.append(np.ones((nbins,)) * params[p.name])
         #else:
