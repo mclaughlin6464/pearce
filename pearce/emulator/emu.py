@@ -93,7 +93,7 @@ class Emu(object):
         self.bin_centers = (bins[:-1] + bins[1:]) / 2
         nbins = self.bin_centers.shape[0]
 
-        if self.ordered_params[-1].name == 'r':
+        if self.ordered_params[-1].name != 'r':
             nbins=1
 
         npoints = len(obs_files)*nbins # each file contains NBINS points in r, and each file is a 6-d point
