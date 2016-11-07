@@ -93,7 +93,12 @@ class Emu(object):
         self.bin_centers = (bins[:-1] + bins[1:]) / 2
         nbins = self.bin_centers.shape[0]
 
-        npoints = len(obs_files) * nbins  # each file contains NBINS points in r, and each file is a 6-d point
+        if self.ordered_params[-1].name == 'r':
+            nbins=1
+
+        npoints = len(obs_files)*nbins # each file contains NBINS points in r, and each file is a 6-d point
+        #if self.ordered_params[-1].name == 'r':
+        #    npoints*=nbins #account for 'r'
 
         varied_params = set([p.name for p in self.ordered_params]) - set(fixed_params.keys())
         ndim = len(varied_params)  # lest we forget r
@@ -138,6 +143,7 @@ class Emu(object):
             # doing some shuffling and stacking
             file_params = []
             # NOTE could do a param ordering here
+            #if self.ordered_params[-1].name == 'r': #add 'r' to the end
             for p in self.ordered_params:
                 if p.name in fixed_params:#may need to be input_params
                     continue
@@ -146,6 +152,11 @@ class Emu(object):
                     file_params.append(np.log10(self.bin_centers))
                 else:
                     file_params.append(np.ones((nbins,)) * params[p.name])
+        #else:
+            #    for p in self.ordered_params:
+            #        if p.name in fixed_params:
+            #            continue
+            #        file_params.append(params[p.name])
 
             x[idx * nbins:(idx + 1) * nbins, :] = np.stack(file_params).T
             # TODO the time has come to do something smarter for bias... I will ignore for now.
@@ -392,7 +403,7 @@ class Emu(object):
         return self._emulate_helper(t, gp_errs)
 
     @abstractmethod
-    def _emulate_helpter(self, t, gp_errs=False):
+    def _emulate_helper(self, t, gp_errs=False):
         pass
 
     @abstractmethod
@@ -438,31 +449,29 @@ class Emu(object):
 
             x, y = x[idxs], y[idxs]
 
-        log_y = np.log10(y)
-
-        pred_log_y = self._emulate_helper(x, False)
+        pred_y = self._emulate_helper(x, False)
 
         if statistic == 'rmsfd':
-            return np.sqrt(np.mean((((pred_log_y - log_y) ** 2) / (log_y ** 2)), axis=0))
+            return np.sqrt(np.mean((((pred_y - y) ** 2) / (y ** 2)), axis=0))
 
         elif statistic == 'rms':
-            return np.sqrt(np.mean(((pred_log_y - log_y) ** 2), axis=0))
+            return np.sqrt(np.mean(((pred_y - y) ** 2), axis=0))
 
         # TODO sklearn methods can do this themselves. But i've already tone the prediction!
         elif statistic == 'r2':  # r2
-            SSR = np.sum((pred_log_y - log_y) ** 2, axis=0)
-            SST = np.sum((log_y - log_y.mean(axis=0)) ** 2, axis=0)
+            SSR = np.sum((pred_y - y) ** 2, axis=0)
+            SST = np.sum((y - y.mean(axis=0)) ** 2, axis=0)
 
             return 1 - SSR / SST
 
         elif statistic == 'abs':
-            return np.mean((pred_log_y - log_y), axis=0)
+            return np.mean((pred_y - y), axis=0)
         else:  # 'rel'
-            return np.mean((pred_log_y - log_y) / log_y, axis=0)
+            return np.mean((pred_y - y) / y, axis=0)
 
     @abstractmethod
     def train_metric(self, **kwargs):
-        raise NotImplementedError
+        pass
 
     # TODO this feature is not super useful anymore, and also is poorly defined w.r.t non gp methods.
     # did a lot of work on it tho, maybe i'll leave it around...?
@@ -813,7 +822,7 @@ class ExtraCrispy(Emu):
         # However, the one in the superclass is the "standard" approach.
 
         nbins = len(self.bin_centers)
-        self.x = x[0:-1:nbins, :]
+        self.x = x#[0:-1:nbins, :]
         self.y = y.reshape((-1, nbins))
         self.yerr = np.zeros_like(self.y)
         self.y_hat = np.zeros(self.y.shape[1]) if len(self.y.shape) > 1 else 0  # self.y.mean(axis = 0)
@@ -873,7 +882,7 @@ class ExtraCrispy(Emu):
         for y, emulator in zip(self.y.T, self.emulators):
             emulator.fit(self.x, y)
 
-    def _emulate_helpter(self, t, gp_errs=False):
+    def _emulate_helper(self, t, gp_errs=False):
         """
         Helper function that takes a dependent variable matrix and makes a prediction.
         :param t:
