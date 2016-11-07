@@ -179,17 +179,14 @@ class Emu(object):
         :return: log_r, y, yerr for the independent variable at the points specified by fixed nad em params.
         '''
 
-        plot_params = {}
-        plot_params.update(fixed_params)
-        plot_params.update(em_params)
+        x, y, yerr = self.get_data(training_dir, em_params, fixed_params, independent_variable)
 
-        x, y, yerr = self.get_data(training_dir, plot_params, independent_variable)
 
         sort_idxs = self._sort_params(x, argsort=True)
 
         log_bin_centers = np.log10(self.bin_centers)
         # repeat for each row of y
-        log_bin_centers = np.tile(log_bin_centers, sort_idxs.shape[0])
+        log_bin_centers = np.tile(log_bin_centers, sort_idxs.shape[0]/len(self.bin_centers))
 
         return log_bin_centers, y[sort_idxs], yerr[sort_idxs]
 
@@ -396,9 +393,10 @@ class Emu(object):
         :return: values, a numpy arrray of the calculated statistics at each of the N training opints.
         '''
         assert statistic in {'r2', 'rmsfd', 'abs', 'rel'}
-        assert N > 0 and int(N) == N
+        if N is not None:
+            assert N > 0 and int(N) == N
 
-        x, y = self.get_data(truth_dir, self.fixed_params, self.independent_variable)
+        x, y , _ = self.get_data(truth_dir,{}, self.fixed_params, self.independent_variable)
 
         np.random.seed(int(time()))
 
@@ -414,6 +412,8 @@ class Emu(object):
         #looks gross, but gets down to uniques. Kinda wasteful as it'll be tiled in a bit, but c'est la vie
         params = {p.name: sorted(list(set(x[:, i]))) for p, i in zip(self.ordered_params, xrange(x.shape[1])) if
                   p.name not in self.fixed_params}
+
+            del params['r']
 
         # probably should consider not having wrt r here.
         pred_log_y = self.emulate_wrt_r(params, bin_centers)
@@ -642,7 +642,7 @@ class OriginalRecipe(Emu):
             Parameters to hold fixed. Only available if data in training_dir is a full hypercube, not a latin hypercube.
         :return: None
         '''
-        x, y, yerr = self.get_data(training_dir, self.fixed_params, self.independent_variable)
+        x, y, yerr = self.get_data(training_dir,{}, self.fixed_params, self.independent_variable)
 
         self.x = x
         self.y = y
@@ -803,17 +803,17 @@ class ExtraCrispy(Emu):
             Parameters to hold fixed. Only available if data in training_dir is a full hypercube, not a latin hypercube.
         :return: None
         '''
-        x, y, _ = self.get_data(training_dir, self.fixed_params, self.independent_variable)
+        x, y, _ = self.get_data(training_dir, {}, self.fixed_params, self.independent_variable)
         # now, need to do some shuffling to get these right.
         # NOTE this involves creating a large array and slicing it down, essentially. Not the most efficient.
         # Possibly more efficient would be to load in the format we do here, and then do the transform on that.
         # However, the one in the superclass is the "standard" approach.
 
         nbins = len(self.bin_centers)
-        self.x = x[0:-1:nbins, :-1]
+        self.x = x[0:-1:nbins, :]
         self.y = y.reshape((-1, nbins))
         self.yerr = np.zeros_like(self.y)
-        self.y_hat = np.zeros(self.y.shape[1]) if len(y.shape) > 1 else 0  # self.y.mean(axis = 0)
+        self.y_hat = np.zeros(self.y.shape[1]) if len(self.y.shape) > 1 else 0  # self.y.mean(axis = 0)
         self.y -= self.y_hat
 
         ndim = self.x.shape[1]
