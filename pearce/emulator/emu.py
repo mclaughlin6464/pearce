@@ -358,8 +358,41 @@ class Emu(object):
         return a * ExpSquaredKernel(metric[1:], ndim=self.emulator_ndim)
 
     ###Emulation and methods that Utilize it############################################################################
-    @abstractmethod
     def emulate(self, em_params, gp_errs=False):
+        '''
+        Perform predictions with the emulator.
+        :param em_params:
+            Dictionary of what values to predict at for each param. Values can be
+            an array or a float.
+        :param gp_errs:
+            Boolean, decide whether or not to return the errors from the gp prediction. Default is False.
+            Will throw error if method is not gp.
+        :return: mu, cov. The predicted value and the covariance matrix for the predictions
+        '''
+
+        if gp_errs:
+            assert self.method == 'gp'  # only has meaning for gp's
+
+        input_params = {}
+        input_params.update(self.fixed_params)
+        input_params.update(em_params)
+        assert len(input_params) == self.emulator_ndim + self.fixed_ndim  # check dimenstionality
+        for i in input_params:  # check that the names in input params are all defined in the ordering.
+            assert any(i == p.name for p in self.ordered_params)
+
+        # i'd like to remove 'r'. possibly requiring a passed in param?
+        t_list = [input_params[p.name] for p in self.ordered_params if p.name in em_params]
+        t_grid = np.meshgrid(*t_list)
+        t = np.stack(t_grid).T
+        # TODO george can sort?
+        t = t.reshape((-1, self.emulator_ndim))
+
+        t = self._sort_params(t)
+
+        return self._emulate_helper(t, gp_errs)
+
+    @abstractmethod
+    def _emulate_helpter(self, t, gp_errs=False):
         pass
 
     @abstractmethod
@@ -407,16 +440,7 @@ class Emu(object):
 
         log_y = np.log10(y)
 
-        bins, _, _, _ = global_file_reader(path.join(truth_dir, GLOBAL_FILENAME))
-        bin_centers = (bins[1:] + bins[:-1]) / 2
-        #looks gross, but gets down to uniques. Kinda wasteful as it'll be tiled in a bit, but c'est la vie
-        params = {p.name: sorted(list(set(x[:, i]))) for p, i in zip(self.ordered_params, xrange(x.shape[1])) if
-                  p.name not in self.fixed_params}
-
-            del params['r']
-
-        # probably should consider not having wrt r here.
-        pred_log_y = self.emulate_wrt_r(params, bin_centers)
+        pred_log_y = self._emulate_helper(x, False)
 
         if statistic == 'rmsfd':
             return np.sqrt(np.mean((((pred_log_y - log_y) ** 2) / (log_y ** 2)), axis=0))
@@ -695,37 +719,16 @@ class OriginalRecipe(Emu):
         self.emulator = skl_methods[self.method](**hyperparams)
         self.emulator.fit(self.x, self.y)
 
-    def emulate(self, em_params, gp_errs=False):
-        '''
-        Perform predictions with the emulator.
-        :param em_params:
-            Dictionary of what values to predict at for each param. Values can be
-            an array or a float.
+    def _emulate_helper(self, t, gp_errs):
+        """
+        Helper function that takes a dependent variable matrix and makes a prediction.
+        :param t:
+            Dependent variable matrix. Assumed to be in the order defined by ordered_params
         :param gp_errs:
-            Boolean, decide whether or not to return the errors from the gp prediction. Default is False.
-            Will throw error if method is not gp.
-        :return: mu, cov. The predicted value and the covariance matrix for the predictions
-        '''
-
-        if gp_errs:
-            assert self.method == 'gp'  # only has meaning for gp's
-
-        input_params = {}
-        input_params.update(self.fixed_params)
-        input_params.update(em_params)
-        assert len(input_params) == self.emulator_ndim + self.fixed_ndim  # check dimenstionality
-        for i in input_params:  # check that the names in input params are all defined in the ordering.
-            assert any(i == p.name for p in self.ordered_params)
-
-        # i'd like to remove 'r'. possibly requiring a passed in param?
-        t_list = [input_params[p.name] for p in self.ordered_params if p.name in em_params]
-        t_grid = np.meshgrid(*t_list)
-        t = np.stack(t_grid).T
-        # TODO george can sort?
-        t = t.reshape((-1, self.emulator_ndim))
-
-        t = self._sort_params(t)
-
+            Whether or not to return errors in the gp case
+        :return:
+            mu, cov (if gp_errs True). Predicted value for dependetn variable t.
+        """
         if self.method == 'gp':
             return self.emulator.predict(self.y, t, mean_only=not gp_errs)
         else:
@@ -870,32 +873,16 @@ class ExtraCrispy(Emu):
         for y, emulator in zip(self.y.T, self.emulators):
             emulator.fit(self.x, y)
 
-    def emulate(self, em_params, gp_errs=False):
-        '''
-        Perform predictions with the emulator.
-        :param varied_em_params:
-            Dictionary of what values to predict at for each param. Values can be
-            an array or a float.
-        :return: mu, cov. The predicted value and the covariance matrix for the predictions
-        '''
-        if gp_errs:
-            assert self.method == 'gp'
-
-        input_params = {}
-        input_params.update(self.fixed_params)
-        input_params.update(em_params)
-        assert len(input_params) == self.emulator_ndim + self.fixed_ndim  # check dimenstionality
-        for i in input_params:
-            assert any(i == p.name for p in self.ordered_params)
-
-        # i'd like to remove 'r'. possibly requiring a passed in param?
-        t_list = [input_params[p.name] for p in self.ordered_params if p.name in em_params]
-        t_grid = np.meshgrid(*t_list)
-        t = np.stack(t_grid).T
-        # should add a fixed_param dim
-        t = t.reshape((-1, self.emulator_ndim))
-        t = self._sort_params(t)
-
+    def _emulate_helpter(self, t, gp_errs=False):
+        """
+        Helper function that takes a dependent variable matrix and makes a prediction.
+        :param t:
+            Dependent variable matrix. Assumed to be in the order defined by ordered_params
+        :param gp_errs:
+            Whether or not to return errors in the gp case
+        :return:
+            mu, cov (if gp_errs True). Predicted value for dependetn variable t.
+        """
         all_mu = np.zeros((t.shape[0], self.y.shape[1]))  # t down nbins across
         # all_err = np.zeros((t.shape[0], self.y.shape[1]))
         all_cov = []  # np.zeros((t.shape[0], t.shape[0], self.y.shape[1]))
