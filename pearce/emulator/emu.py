@@ -1,5 +1,5 @@
 #!/bin/bash
-'''The Emu object esentially wraps the George gaussian process code. It handles building, training, and predicting.'''
+"""The Emu object esentially wraps the George gaussian process code. It handles building, training, and predicting."""
 
 import warnings
 from glob import glob
@@ -60,7 +60,7 @@ class Emu(object):
     ###Data Loading and Manipulation####################################################################################
 
     def get_data(self, data_dir,em_params, fixed_params, independent_variable):
-        '''
+        """
         Read data in the format compatible with this object and return it
         :param data_dir:
             Directory where data from trainingData is stored
@@ -71,7 +71,7 @@ class Emu(object):
         :param independent_variable:
             Independant variable to emulate. Options are xi, r2xi, and bias (eventually)..
         :return: None
-        '''
+        """
 
         input_params = {}
         input_params.update(em_params)
@@ -171,7 +171,7 @@ class Emu(object):
         return x[zeros_slice], y[zeros_slice], yerr[zeros_slice]
 
     def get_plot_data(self, em_params, training_dir, independent_variable=None, fixed_params={}):
-        '''
+        """
         Similar function to load_training_data. However, returns values for plotting comparisons to the emulator.
         :param em_params:
             Similar to fixed params. A dictionary of values held fixed in the emulator, as opposed to fixed_params
@@ -183,7 +183,7 @@ class Emu(object):
         :param fixed_params:
             Parameters to hold fixed. Only available if data in training_dir is a full hypercube, not a latin hypercube.
         :return: log_r, y, yerr for the independent variable at the points specified by fixed nad em params.
-        '''
+        """
 
         x, y, yerr = self.get_data(training_dir, em_params, fixed_params, independent_variable)
 
@@ -201,7 +201,7 @@ class Emu(object):
         pass
 
     def _iv_transform(self, independent_variable, obs, cov):
-        '''
+        """
         Independent variable tranform. Helper function that consolidates this operation all in one place.
         :param independent_variable:
             Which iv to transform to. Current optins are None (just take log) and r2.
@@ -211,7 +211,7 @@ class Emu(object):
             Covariance of obs
         :return:
             y, yerr the transformed iv's for the emulator
-        '''
+        """
         if independent_variable is None:
             y = np.log10(obs)
             # Approximately true, may need to revisit
@@ -224,16 +224,16 @@ class Emu(object):
         else:
             raise ValueError('Invalid independent variable %s' % independent_variable)
 
-        '''
+        """
         if independent_variable == 'bias':
             y[idx * NBINS:(idx + 1) * NBINS] = xi / xi_mm
             ycovs.append(cov / np.outer(xi_mm, xi_mm))
-        '''
+        """
 
         return y, y_err
 
     def _sort_params(self, t, argsort=False):
-        '''
+        """
         Sort the parameters in a defined away given the orderering.
         :param t:
             Parameter vector to sort. Should have dims (N, N_params) and be in the order
@@ -244,7 +244,7 @@ class Emu(object):
         :return:
             If not argsort, returns the sorted array by column and row. 
             If argsort, return the indicies that would sort the array.
-        '''
+        """
         if t.shape[0] == 1:
             if argsort:
                 return np.array([0])
@@ -273,7 +273,7 @@ class Emu(object):
     ###Emulator Building and Training###################################################################################
 
     def build_emulator(self, hyperparams):
-        '''
+        """
         Initialization of the emulator from recovered training data. Calls submethods depending on "method"
         :param method:
             The machine learning method to use.
@@ -282,7 +282,7 @@ class Emu(object):
         :param fixed_params:
             Parameterst to hold fixed in teh training data
         :return: None
-        '''
+        """
 
         if self.method == 'gp':
             self._build_gp(hyperparams)
@@ -298,7 +298,7 @@ class Emu(object):
         pass
 
     def _get_initial_guess(self, independent_variable):
-        '''
+        """
         Return the initial guess for the emulator, based on what the iv is. Guesses are learned from
         previous experiments.
         :param independent_variable:
@@ -306,7 +306,7 @@ class Emu(object):
         :param fixed_params:
             Parameters to hold fixed; only return guess for parameters that are not fixed.
         :return: initial_guesses, a dictionary of the guess for each parameter
-        '''
+        """
 
         # default
         ig = {'amp': 1}
@@ -365,7 +365,7 @@ class Emu(object):
 
     ###Emulation and methods that Utilize it############################################################################
     def emulate(self, em_params, gp_errs=False):
-        '''
+        """
         Perform predictions with the emulator.
         :param em_params:
             Dictionary of what values to predict at for each param. Values can be
@@ -374,7 +374,7 @@ class Emu(object):
             Boolean, decide whether or not to return the errors from the gp prediction. Default is False.
             Will throw error if method is not gp.
         :return: mu, cov. The predicted value and the covariance matrix for the predictions
-        '''
+        """
 
         if gp_errs:
             assert self.method == 'gp'  # only has meaning for gp's
@@ -406,7 +406,7 @@ class Emu(object):
         pass
 
     def estimate_uncertainty(self, truth_dir, N=None):
-        '''
+        """
         Estimate the uncertainty of the emulator by comparing to a "test" box of true values.
         :param truth_dir:
             Name of a directory of true test values, of the same format as the train_dir
@@ -414,13 +414,13 @@ class Emu(object):
             Number of points to compare to. If None (default) will use all points. Else will select random sample.
         :return:
             covariance matrix with dim n_binsxn_bins. Will only have diagonal elemtns of est. uncertainties.
-        '''
+        """
         rms_err = self.goodness_of_fit(truth_dir, N, statistic='rms')
 
         return np.diag(rms_err**2)
 
     def goodness_of_fit(self, truth_dir, N=None, statistic='r2'):
-        '''
+        """
         Calculate the goodness of fit of an emulator as compared to some validation data.
         :param truth_dir:
             Directory structured similary to the training data, but NOT used for training.
@@ -430,7 +430,7 @@ class Emu(object):
         :param statistic:
             What G.O.F. statistic to calculate. Default is R2. Other options are rmsfd, abs(olute), and rel(ative).
         :return: values, a numpy arrray of the calculated statistics at each of the N training opints.
-        '''
+        """
         assert statistic in {'r2', 'rms','rmsfd', 'abs', 'rel'}
         if N is not None:
             assert N > 0 and int(N) == N
@@ -497,7 +497,7 @@ class Emu(object):
     # TODO this feature is not super useful anymore, and also is poorly defined w.r.t non gp methods.
     # did a lot of work on it tho, maybe i'll leave it around...?
     def _loo_errors(self, y, t):
-        '''
+        """
         Calculate the LOO Jackknife error matrix. This is implemented using the analytic LOO procedure,
         which is much faster than re-doing an inversion for each sample. May be useful if the GP's matrix is not
         accurate.
@@ -507,7 +507,7 @@ class Emu(object):
             Values of the dependant variables to predict at.
         :return:
             jk_cov: a covariance matrix with the dimensions of cov.
-        '''
+        """
         # from time import time
 
         assert self.method == 'gp'
@@ -569,7 +569,7 @@ class Emu(object):
             return cov
 
     def run_mcmc(self, y, cov, bin_centers, nwalkers=1000, nsteps=100, nburn=20, n_cores='all'):
-        '''
+        """
         Run an MCMC sampler, using the emulator. Uses emcee to perform sampling.
         :param y:
             A true y value to recover the parameters of theta. NOTE: The emulator emulates some indepedant variables in 
@@ -588,7 +588,7 @@ class Emu(object):
             Number of cores, either an iteger or 'all'. Default is 'all'.
         :return:
             chain, a numpy array of the sample chain.
-        '''
+        """
 
         assert n_cores == 'all' or n_cores > 0
         if type(n_cores) is not str:
@@ -626,7 +626,7 @@ class Emu(object):
 # Emcee throws a few when trying to compile the liklihood functions that are attached
 # to the object calling it
 def lnprob(theta, *args):
-    '''
+    """
     The total liklihood for an MCMC. Sadly, can't be an instance of the Emu Object.
     :param theta:
         Parameters for the proposal
@@ -634,7 +634,7 @@ def lnprob(theta, *args):
         Arguments to pass into the liklihood
     :return:
         Log Liklihood of theta, a float.
-    '''
+    """
     lp = lnprior(theta, *args)
     if not np.isfinite(lp):
         return -np.inf
@@ -642,7 +642,7 @@ def lnprob(theta, *args):
 
 
 def lnprior(theta, emu, *args):
-    '''
+    """
     Prior for an MCMC. Currently asserts theta is between the boundaries used to make the emulator.
     Could do something more clever later.
     :param theta:
@@ -651,12 +651,12 @@ def lnprior(theta, emu, *args):
         The emulator object. Needs to be accessed to get the priors.
     :return:
         Either 0 or -np.inf, depending if the params are allowed or not.
-    '''
+    """
     return 0 if all(p.low < t < p.high for p, t in izip(emu.ordered_params, theta)) else -np.inf
 
 
 def lnlike(theta, emu, y, cov, bin_centers):
-    '''
+    """
     The liklihood of parameters theta given the other parameters and the emulator.
     :param theta:
         Proposed parameters.
@@ -670,7 +670,7 @@ def lnlike(theta, emu, y, cov, bin_centers):
         The centers of the bins y is measured in, angular or radial.
     :return:
         The log liklihood of theta given the measurements and the emulator.
-    '''
+    """
     em_params = {p.name: t for p, t in zip(emu.ordered_params, theta)}
 
     # using my own notation
@@ -685,17 +685,17 @@ def lnlike(theta, emu, y, cov, bin_centers):
 
 
 class OriginalRecipe(Emu):
-    '''Emulator that emulates with bins as an implicit parameter. '''
+    """Emulator that emulates with bins as an implicit parameter. """
 
     def load_training_data(self, training_dir):
-        '''
+        """
         Read the training data for the emulator and attach it to the object.
         :param training_dir:
             Directory where training data from trainginData is stored. May also be a list of several points.
         :param fixed_params:
             Parameters to hold fixed. Only available if data in training_dir is a full hypercube, not a latin hypercube.
         :return: None
-        '''
+        """
         if type(training_dir) is not list:
             training_dir = [training_dir]
 
@@ -720,12 +720,12 @@ class OriginalRecipe(Emu):
         self.sampling_ndim = ndim - 1
 
     def _build_gp(self, hyperparams):
-        '''
+        """
         Initialize the GP emulator.
         :param hyperparams:
             Key word parameters for the emulator
         :return: None
-        '''
+        """
         # TODO could use more of the hyperparams...
         metric = hyperparams['metric'] if 'metric' in hyperparams else {}
         kernel = self._make_kernel(metric)
@@ -776,7 +776,7 @@ class OriginalRecipe(Emu):
 
     # TODO It's not clear to the user if bin_centers should be log or not!
     def emulate_wrt_r(self, em_params, bin_centers, gp_errs=False):
-        '''
+        """
         Conveniance function. Add's 'r' to the emulation automatically, as this is the
         most common use case.
         :param em_params:
@@ -785,7 +785,7 @@ class OriginalRecipe(Emu):
         :param bin_centers:
             Centers of bins to predict at, for each point in HOD-space.
         :return:
-        '''
+        """
         vep = dict(em_params)
         # TODO change 'r' to something more general
         vep.update({'r': np.log10(bin_centers)})
@@ -793,14 +793,14 @@ class OriginalRecipe(Emu):
         return out
 
     def train_metric(self, **kwargs):
-        '''
+        """
         Train the metric parameters of the GP. Has a spotty record of working.
         Best used as used in lowDimTraining.
         If attempted to be used with an emulator that is not GP, will raise an error.
         :param kwargs:
             Kwargs that will be passed into the scipy.optimize.minimize
         :return: success: True if the training was successful.
-        '''
+        """
 
         # TODO kernel based methods may want to use this...
         assert self.method == 'gp'
@@ -835,17 +835,17 @@ class OriginalRecipe(Emu):
 
 
 class ExtraCrispy(Emu):
-    '''Emulator that emulates with bins as an implicit parameter. '''
+    """Emulator that emulates with bins as an implicit parameter. """
 
     def load_training_data(self, training_dir):
-        '''
+        """
         Read the training data for the emulator and attach it to the object.
         :param training_dir:
             Directory where training data from trainginData is stored.
         :param fixed_params:
             Parameters to hold fixed. Only available if data in training_dir is a full hypercube, not a latin hypercube.
         :return: None
-        '''
+        """
         if type(training_dir) is not list:
             training_dir = [training_dir]
 
@@ -873,12 +873,12 @@ class ExtraCrispy(Emu):
         self.sampling_ndim = ndim - 1
 
     def _build_gp(self, hyperparams):
-        '''
+        """
         Initialize the GP emulator.
         :param hyperparams:
             Key word parameters for the emulator
         :return: None
-        '''
+        """
         # TODO could use more of the hyperparams...
         metric = hyperparams['metric'] if 'metric' in hyperparams else {}
         kernel = self._make_kernel(metric)
@@ -965,7 +965,7 @@ class ExtraCrispy(Emu):
         return mu, cov
 
     def emulate_wrt_r(self, em_params, bin_centers, gp_errs=False, kind='slinear'):
-        '''
+        """
         Conveniance function. Add's 'r' to the emulation automatically, as this is the
         most common use case.
         :param em_params:
@@ -979,7 +979,7 @@ class ExtraCrispy(Emu):
             Mu and Cov, the predicted mu and covariance at em_params and bin_centers. If bin_centers
             is not equal to the bin_centers in the training data, the mean is interpolated as is the variance.
             Off diagonal elements are set to 0.
-        '''
+        """
         # turns out this how it already works!
         out  = self.emulate(em_params, gp_errs)
         # don't need to interpolate!
@@ -1027,12 +1027,12 @@ class ExtraCrispy(Emu):
     #TODO I could probably make this learn the metric for each individual emulator
     #TODO could make this learn the metric for other kernel based emulators...
     def train_metric(self, **kwargs):
-        '''
+        """
         Train the emulator. Has a spotty record of working. Better luck may be had with the NAMEME code.
         :param kwargs:
             Kwargs that will be passed into the scipy.optimize.minimize
         :return: success: True if the training was successful.
-        '''
+        """
 
         assert self.method == 'gp'
 
