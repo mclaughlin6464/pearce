@@ -343,7 +343,7 @@ class Emu(object):
         """
 
         if not metric:
-            ig = self._get_initial_guess(self.independent_variable, self.fixed_params)
+            ig = self._get_initial_guess(self.independent_variable)
         else:
             ig = metric  # use the user's initial guesses
 
@@ -353,7 +353,7 @@ class Emu(object):
             if p.name in self.fixed_params:
                 continue
             try:
-                self.metric.append(ig[p.name])
+                metric.append(ig[p.name])
             except KeyError:
                 raise KeyError('Key %s was not in the metric.' % p.name)
 
@@ -417,7 +417,7 @@ class Emu(object):
         '''
         rms_err = self.goodness_of_fit(truth_dir, N, statistic='rms')
 
-        return np.diag(rms_err)
+        return np.diag(rms_err**2)
 
     def goodness_of_fit(self, truth_dir, N=None, statistic='r2'):
         '''
@@ -431,20 +431,21 @@ class Emu(object):
             What G.O.F. statistic to calculate. Default is R2. Other options are rmsfd, abs(olute), and rel(ative).
         :return: values, a numpy arrray of the calculated statistics at each of the N training opints.
         '''
-        assert statistic in {'r2', 'rmsfd', 'abs', 'rel'}
+        assert statistic in {'r2', 'rms','rmsfd', 'abs', 'rel'}
         if N is not None:
             assert N > 0 and int(N) == N
 
         x, y , _ = self.get_data(truth_dir,{}, self.fixed_params, self.independent_variable)
 
         bins, _, _, _ = global_file_reader(path.join(truth_dir, GLOBAL_FILENAME))
-        bin_centers = (bins[1:]-bins[:-1])/2
+        bin_centers = (bins[1:]+bins[:-1])/2
         nbins = len(bin_centers)
 
         #this hack is not a futureproff test!
-        if self.ordered_params[-1] != 'r':
+        if self.ordered_params[-1].name != 'r':
             x = x[0:-1:nbins, :]
-            y = y.reshape((-1, nbins))
+
+        y = y.reshape((-1, nbins))
 
         np.random.seed(int(time()))
 
@@ -454,16 +455,20 @@ class Emu(object):
             x, y = x[idxs], y[idxs]
 
         pred_y = self._emulate_helper(x, False)
+        pred_y = pred_y.reshape((-1, nbins))
 
         #have to inerpolate...
-        if self.ordered_params[-1] != 'r' and bin_centers != self.bin_centers:
-            pred_y = pred_y.reshape((-1, nbins))
-            new_mu = []
-            for mean in pred_y:
-                xi_interpolator = interp1d(self.bin_centers, mean, kind='slinear')
-                interp_mean = xi_interpolator(bin_centers)
-                new_mu.append(interp_mean)
-            pred_y = np.array(new_mu)
+        if self.ordered_params[-1].name != 'r': 
+
+            if not np.all(bin_centers == self.bin_centers):
+                bin_centers = bin_centers[self.bin_centers[0] <= bin_centers <=self.bin_centers[-1]]
+                new_mu = []
+                for mean in pred_y:
+                    xi_interpolator = interp1d(self.bin_centers, mean, kind='slinear')
+                    interp_mean = xi_interpolator(bin_centers)
+                    new_mu.append(interp_mean)
+                pred_y = np.array(new_mu)
+                y = y[:, self.bin_centers[0] <= bin_centers <=self.bin_centers[-1]] 
 
         if statistic == 'rmsfd':
             return np.sqrt(np.mean((((pred_y - y) ** 2) / (y ** 2)), axis=0))
@@ -479,9 +484,11 @@ class Emu(object):
             return 1 - SSR / SST
 
         elif statistic == 'abs':
-            return np.mean((pred_y - y), axis=0)
+            return pred_y-y
+            #return np.mean((pred_y - y), axis=0)
         else:  # 'rel'
-            return np.mean((pred_y - y) / y, axis=0)
+            return (pred_y-y)/y
+            #return np.mean((pred_y - y) / y, axis=0)
 
     @abstractmethod
     def train_metric(self, **kwargs):
@@ -684,16 +691,26 @@ class OriginalRecipe(Emu):
         '''
         Read the training data for the emulator and attach it to the object.
         :param training_dir:
-            Directory where training data from trainginData is stored.
+            Directory where training data from trainginData is stored. May also be a list of several points.
         :param fixed_params:
             Parameters to hold fixed. Only available if data in training_dir is a full hypercube, not a latin hypercube.
         :return: None
         '''
-        x, y, yerr = self.get_data(training_dir,{}, self.fixed_params, self.independent_variable)
+        if type(training_dir) is not list:
+            training_dir = [training_dir]
 
-        self.x = x
-        self.y = y
-        self.yerr = yerr
+        xs, ys, yerrs = [], [], []
+        for td in training_dir:
+            x, y, yerr = self.get_data(td,{}, self.fixed_params, self.independent_variable)
+            xs.append(x)
+            ys.append(y)
+            yerrs.append(yerr)
+
+        self.x = np.vstack(xs)
+        #hstack for 1-D
+        self.y = np.hstack(ys)
+        self.yerr = np.hstack(yerrs)
+
         self.y_hat = np.zeros(self.y.shape[1]) if len(y.shape) > 1 else 0  # self.y.mean(axis = 0)
         self.y -= self.y_hat
 
@@ -829,15 +846,23 @@ class ExtraCrispy(Emu):
             Parameters to hold fixed. Only available if data in training_dir is a full hypercube, not a latin hypercube.
         :return: None
         '''
-        x, y, _ = self.get_data(training_dir, {}, self.fixed_params, self.independent_variable)
+        if type(training_dir) is not list:
+            training_dir = [training_dir]
+
+        xs, ys = [], []
+        for td in training_dir:
+            x, y, _ = self.get_data(td,{}, self.fixed_params, self.independent_variable)
+            xs.append(x)
+            ys.append(y)
+
         # now, need to do some shuffling to get these right.
         # NOTE this involves creating a large array and slicing it down, essentially. Not the most efficient.
         # Possibly more efficient would be to load in the format we do here, and then do the transform on that.
         # However, the one in the superclass is the "standard" approach.
 
         nbins = len(self.bin_centers)
-        self.x = x[0:-1:nbins, :]
-        self.y = y.reshape((-1, nbins))
+        self.x = np.vstack(xs)[0:-1:nbins, :]
+        self.y = np.hstack(ys).reshape((-1, nbins))
         self.yerr = np.zeros_like(self.y)
         self.y_hat = np.zeros(self.y.shape[1]) if len(self.y.shape) > 1 else 0  # self.y.mean(axis = 0)
         self.y -= self.y_hat
@@ -862,7 +887,7 @@ class ExtraCrispy(Emu):
         emulator = george.GP(kernel)
         # gp = george.GP(kernel, solver=george.HODLRSolver, nleaf=x.shape[0]+1,tol=1e-18)
 
-        emulator.compute(self.x, np.zeros_like(self.yerr), sort=False)  # NOTE I'm using a modified version of george!
+        emulator.compute(self.x, np.zeros((self.x.shape[0],)), sort=False)  # NOTE I'm using a modified version of george!
 
         # For EC, i'm storing an emulator per bin.
         # I'll have to thikn about how to differ the hyperparams.
