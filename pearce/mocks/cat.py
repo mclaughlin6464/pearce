@@ -259,7 +259,7 @@ class Cat(object):
         :param snapdir:
             Gadget snapshot corresponding with this rockstar file.
         :param radius:
-            Radius (in Mpc) around which to search for particles to estimate locas density. Default is 5 Mpc.
+            Radius (in Mpc/h) around which to search for particles to estimate locas density. Default is 5 Mpc.
         :return: None
         """
         #doing imports here since these are both files i've stolen from Yao
@@ -280,10 +280,15 @@ class Cat(object):
             all_particles[-particles.shape[0]:, :] = particles
 
         #all_pos *= h
-        densities = np.zeros(reader.halo_table['x'].shape)
+        #TODO not entirely sure if i'm applying little h correctly
+        #densities = np.ones(reader.halo_table['x'].shape)/(4*np.pi/(3*self.h**2)*radius**3)
+        densities = np.ones(reader.halo_table['x'].shape)/(4*np.pi/3*radius**3)
         with fast3tree(all_particles) as tree:
             for idx, halo_pos in enumerate(izip(reader.halo_table['x'],reader.halo_table['y'],reader.halo_table['z'])):
                 particle_idxs = tree.query_radius(halo_pos, radius)
+                densities[idx]*=reader.particle_mass*len(particle_idxs)
+
+        reader.halo_table['halo_local_density'] = densities
 
 
     def load(self, scale_factor, HOD='redMagic', tol=0.05):
@@ -421,6 +426,7 @@ class Cat(object):
         Return the number density for a populated box.
         :return: Number density of a populated box.
         '''
+        #TODO I think i'm missing little h's here
         return len(self.model.mock.galaxy_table['x']) / (self.Lbox ** 3)
 
     #TODO do_jackknife to cov?
