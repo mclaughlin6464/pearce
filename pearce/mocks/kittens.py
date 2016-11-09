@@ -102,6 +102,8 @@ class Chinchilla(Cat):
             assert system in locations
             loc = locations[system]
             columns_to_keep = HLIST_COLS
+            gadget_loc = ''
+
             #may also work for 1050 too.
             pmass = 1.44390e+08*((Lbox / 125.0) ** 3) * ((1024.0/npart)** 3)
 
@@ -117,9 +119,10 @@ class Chinchilla(Cat):
             #add a subdirectory
             loc += 'c%d-%d/' % (int(Lbox), int(npart))
 
-            if system=='ki-ls':  # differences in how the files are stored.
+            if system == 'ki-ls': # differences in how the files are stored
+                gadget_loc = loc
                 loc += '/rockstar/hlists/'
-
+                gadget_loc+='/output/'
 
             tmp_fnames = glob(loc + 'hlist_*.list')  # snag all the hlists
             tmp_fnames = [fname[len(loc):] for fname in tmp_fnames]  # just want the names in the dir
@@ -135,7 +138,7 @@ class Chinchilla(Cat):
 
         super(Chinchilla, self).__init__(simname=simname, loc=loc, columns_to_keep = columns_to_keep,
                                          version_name=version_name, Lbox=Lbox,
-                                         pmass=pmass, cosmo=cosmo, **new_kwargs)
+                                         pmass=pmass, cosmo=cosmo,gadget_loc=gadget_loc, **new_kwargs)
         #Chinchillas also have to be cached differently.
         cache_locs = {'ki-ls':'/u/ki/swmclau2/des/halocats/hlist_%.2f.list.%s_%s.hdf5',
                       'sherlock':'/scratch/users/swmclau2/halocats/hlist_%.2f.list.%s_%s.hdf5' }

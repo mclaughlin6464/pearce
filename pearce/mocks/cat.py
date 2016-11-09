@@ -9,8 +9,8 @@ from multiprocessing import cpu_count
 import warnings
 import inspect
 from time import time
+from glob import glob
 
-import numpy as np
 from astropy import cosmology
 from halotools.sim_manager import RockstarHlistReader, CachedHaloCatalog
 from halotools.empirical_models import PrebuiltHodModelFactory
@@ -56,7 +56,7 @@ def observable(func):
 class Cat(object):
     def __init__(self, simname='cat', loc='', filenames=[], cache_loc='/u/ki/swmclau2/des/halocats/',
                  columns_to_keep={}, halo_finder='rockstar', version_name='most_recent',
-                 Lbox=1.0, pmass=1.0, scale_factors=[], cosmo=cosmology.WMAP5,
+                 Lbox=1.0, pmass=1.0, scale_factors=[], cosmo=cosmology.WMAP5, gadget_loc='',
                  **kwargs):
 
         # TODO need both loc and filenames?
@@ -110,6 +110,8 @@ class Cat(object):
 
         self.cosmology = cosmo  # default cosmology
         self.h = self.cosmology.H(0).value / 100.0
+
+        self.gadget_loc = gadget_loc #location of original gadget files.
 
         # TODO Well this makes me think loc doesn't do anything...
         # I use it in the subclasses though. Doesn't mean I need it here though.
@@ -219,7 +221,7 @@ class Cat(object):
         else:
             return n_cores
 
-    def cache(self, scale_factors='all', overwrite=False):
+    def cache(self, scale_factors='all', overwrite=False, add_local_density= False):
         '''
         Cache a halo catalog in the halotools format, for later use.
         :param scale_factors:
@@ -228,14 +230,61 @@ class Cat(object):
             Overwrite the file currently on disk, if it exists. Default is false.
         :return: None
         '''
-        for a, z, fname, cache_fnames in izip(self.scale_factors, self.redshifts, self.filenames, self.cache_filenames):
+        try:
+            assert not add_local_density or self.gadget_loc #gadget loc must be nonzero here!
+        except:
+            raise AssertionError('Cannot add local density without gadget location for %s'%self.simname)
+
+        if add_local_density:
+            snapdirs = glob(path.join(self.gadget_loc, 'snapdir*'))
+        else:
+            snapdirs = ['' for i in self.scale_factors]
+
+        for a, z, fname, cache_fnames, snapdir in izip(self.scale_factors, self.redshifts, self.filenames, self.cache_filenames, snapdirs):
             # TODO get right reader for each halofinder.
             if scale_factors != 'all' and a not in scale_factors:
                 continue
             reader = RockstarHlistReader(fname, self.columns_to_keep, cache_fnames, self.simname,
                                          self.halo_finder, z, self.version_name, self.Lbox, self.pmass,
                                          overwrite=overwrite)
+            if add_local_density:
+                self.add_local_density(reader, snapdir) # TODO how to add radius?
             reader.read_halocat(self.columns_to_convert, write_to_disk=True)
+
+    def add_local_density(self, reader,snapdir, radius = 5):
+        """
+        Calculates the local density around each halo and adds it to the halo table, to be cached.
+        :param reader:
+            A RockstartHlistReader object from Halotools.
+        :param snapdir:
+            Gadget snapshot corresponding with this rockstar file.
+        :param radius:
+            Radius (in Mpc) around which to search for particles to estimate locas density. Default is 5 Mpc.
+        :return: None
+        """
+        #doing imports here since these are both files i've stolen from Yao
+        #Possible this will be slow
+        from .readGadgetSnapshot import readGadgetSnapshot
+        from fast3tree import fast3tree
+        all_particles = np.array([], dtype='float32')
+        # TODO should fail gracefully if memory is exceeded or if p is too small.
+        for file in glob(path.join(snapdir, 'snapshot*')):
+            # TODO should find out which is "fast" axis and use that.
+            # Numpy uses fortran ordering.
+            particles = readGadgetSnapshot(file, read_pos=True)[1]  # Think this returns some type of tuple; should check
+            #particles = particles[np.random.rand(particles.shape[0]) < p]  # downsample
+            if particles.shape[0] == 0:
+                continue
+
+            all_particles = np.resize(all_particles, (all_particles.shape[0] + particles.shape[0], 3))
+            all_particles[-particles.shape[0]:, :] = particles
+
+        #all_pos *= h
+        densities = np.zeros(reader.halo_table['x'].shape)
+        with fast3tree(all_particles) as tree:
+            for idx, halo_pos in enumerate(izip(reader.halo_table['x'],reader.halo_table['y'],reader.halo_table['z'])):
+                particle_idxs = tree.query_radius(halo_pos, radius)
+
 
     def load(self, scale_factor, HOD='redMagic', tol=0.05):
         '''
