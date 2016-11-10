@@ -247,9 +247,13 @@ class Cat(object):
             reader = RockstarHlistReader(fname, self.columns_to_keep, cache_fnames, self.simname,
                                          self.halo_finder, z, self.version_name, self.Lbox, self.pmass,
                                          overwrite=overwrite)
+            reader.read_halocat(self.columns_to_convert)
             if add_local_density:
                 self.add_local_density(reader, snapdir) # TODO how to add radius?
-            reader.read_halocat(self.columns_to_convert, write_to_disk=True)
+
+            reader.write_to_disk() #do these after so we have a halo table to work off of
+            reader.update_cache_log()
+
 
     def add_local_density(self, reader,snapdir, radius = 5):
         """
