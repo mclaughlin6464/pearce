@@ -244,6 +244,8 @@ class Cat(object):
             # TODO get right reader for each halofinder.
             if scale_factors != 'all' and a not in scale_factors:
                 continue
+
+            print cache_fnames
             reader = RockstarHlistReader(fname, self.columns_to_keep, cache_fnames, self.simname,
                                          self.halo_finder, z, self.version_name, self.Lbox, self.pmass,
                                          overwrite=overwrite)
@@ -271,12 +273,13 @@ class Cat(object):
         from .readGadgetSnapshot import readGadgetSnapshot
         from fast3tree import fast3tree
         all_particles = np.array([], dtype='float32')
+        p = 1e-4
         # TODO should fail gracefully if memory is exceeded or if p is too small.
         for file in glob(path.join(snapdir, 'snapshot*')):
             # TODO should find out which is "fast" axis and use that.
             # Numpy uses fortran ordering.
             particles = readGadgetSnapshot(file, read_pos=True)[1]  # Think this returns some type of tuple; should check
-            #particles = particles[np.random.rand(particles.shape[0]) < p]  # downsample
+            particles = particles[np.random.rand(particles.shape[0]) < p]  # downsample
             if particles.shape[0] == 0:
                 continue
 
@@ -286,7 +289,7 @@ class Cat(object):
         #all_pos *= h
         #TODO not entirely sure if i'm applying little h correctly
         #densities = np.ones(reader.halo_table['x'].shape)/(4*np.pi/(3*self.h**2)*radius**3)
-        densities = np.ones(reader.halo_table['x'].shape)/(4*np.pi/3*radius**3)
+        densities = np.ones(reader.halo_table['x'].shape)/(p*4*np.pi/3*radius**3)
         with fast3tree(all_particles) as tree:
             for idx, halo_pos in enumerate(izip(reader.halo_table['x'],reader.halo_table['y'],reader.halo_table['z'])):
                 particle_idxs = tree.query_radius(halo_pos, radius)
