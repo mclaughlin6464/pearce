@@ -270,19 +270,15 @@ class Cat(object):
         #Possible this will be slow
         from time import time
         t0 = time()
-        print snapdir 
         from .readGadgetSnapshot import readGadgetSnapshot
         from fast3tree import fast3tree
-        p = 0.01
+        p = 1e-4 
         all_particles = np.array([], dtype='float32')
         # TODO should fail gracefully if memory is exceeded or if p is too small.
         t1 = time()
         for file in glob(path.join(snapdir, 'snapshot*')):
             # TODO should find out which is "fast" axis and use that.
             # Numpy uses fortran ordering.
-            print file
-            print time()-t1, 's', time()-t0, 's' 
-            t1 = time()
             particles = readGadgetSnapshot(file, read_pos=True)[1]  # Think this returns some type of tuple; should check
             particles = particles[np.random.rand(particles.shape[0]) < p]  # downsample
             if particles.shape[0] == 0:
@@ -293,18 +289,21 @@ class Cat(object):
 
         print 'All done', time()-t0, 's' 
 
+        print all_particles.shape
+
         #all_pos *= h
         #TODO not entirely sure if i'm applying little h correctly
         #densities = np.ones(reader.halo_table['x'].shape)/(4*np.pi/(3*self.h**2)*radius**3)
-        densities = np.ones(reader.halo_table['x'].shape)/(4*np.pi/3*radius**3)
+        densities = np.ones(reader.halo_table['halo_x'].shape)/(4*np.pi/3*radius**3)
         with fast3tree(all_particles) as tree:
-            print 'Tree built.', time()-t0, 's'
-            for idx, halo_pos in enumerate(izip(reader.halo_table['x'],reader.halo_table['y'],reader.halo_table['z'])):
-                print idx, time()-t0, 's'
+            for idx, halo_pos in enumerate(izip(reader.halo_table['halo_x'],reader.halo_table['halo_y'],reader.halo_table['halo_z'])):
+                #print idx, time()-t0, 's'
                 particle_idxs = tree.query_radius(halo_pos, radius)
                 densities[idx]*=reader.particle_mass*len(particle_idxs)
 
         reader.halo_table['halo_local_density'] = densities
+        print densities.mean()
+        print 'Done'
 
 
     def load(self, scale_factor, HOD='redMagic', tol=0.05):
