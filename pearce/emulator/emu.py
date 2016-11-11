@@ -77,98 +77,130 @@ class Emu(object):
         input_params.update(em_params)
         input_params.update(fixed_params)
         assert len(input_params) - len(self.ordered_params) <= 1  # can exclude r
+        #HERE can we exclude z too, somehow?
+        sub_dirs = glob(path.join(data_dir, 'a_*'))
+        sub_dirs_as = np.array(float(fname[-5:]) for fname in sub_dirs)
 
-        bins, cosmo_params, obs, sampling_method = global_file_reader(path.join(data_dir, GLOBAL_FILENAME))
+        if 'z' in fixed_params: #don't have to look in dirs that aren't fixed.
+            zs = fixed_params['z']
+            if type(zs) is float:
+                zs = [zs]
+            sub_dirs = []
+            _sub_dirs_as = []
+            for z in zs:
+                input_a = 1/(1+z)
+                idx = np.argmin(np.abs(sub_dirs_as-input_a))
+                a = sub_dirs_as[idx]
+                if np.abs(a-input_a) > 0.05: #tolerance
+                    raise IOError('No subfolder within tolerance of %.3f'%z)
+                sub_dirs.append(path.join(data_dir, 'a_%.3f'%a))
+                _sub_dirs_as.append(a)
+            sub_dirs_as = _sub_dirs_as
 
-        # Not sure if I need a flag here for plot_data; I thnk it's always used with a fixed_params so should be fine.
-        if fixed_params and sampling_method == 'LHC':
-            raise ValueError('Fixed parameters is not empty, but the data in data_dir is form a Latin Hypercube. \
-                                Cannot performs slices on a LHC.')
 
-        self.obs = obs
+        all_x, all_y, all_yerr = [], [], []
 
-        obs_files = sorted(glob(path.join(data_dir, 'obs*.npy')))
-        cov_files = sorted(
-            glob(path.join(data_dir, 'cov*.npy')))  # since they're sorted, they'll be paired up by params.
-        self.bin_centers = (bins[:-1] + bins[1:]) / 2
-        nbins = self.bin_centers.shape[0]
+        for sub_dir, a  in zip(sub_dirs, sub_dirs_as):
 
-        #if self.ordered_params[-1].name != 'r':
-        #   nbins=1
+            z = 1.0/a-1.0
 
-        npoints = len(obs_files)*nbins # each file contains NBINS points in r, and each file is a 6-d point
-        #if self.ordered_params[-1].name == 'r':
-        #    npoints*=nbins #account for 'r'
+            bins, cosmo_params, obs, sampling_method = global_file_reader(path.join(sub_dir, GLOBAL_FILENAME))
 
-        varied_params = set([p.name for p in self.ordered_params]) - set(fixed_params.keys())
-        ndim = len(varied_params)  # lest we forget r
+            # Not sure if I need a flag here for plot_data; I thnk it's always used with a fixed_params so should be fine.
+            if fixed_params and sampling_method == 'LHC':
+                if fixed_params.keys() == ['z']:#allowed:
+                    pass
 
-        x = np.zeros((npoints, ndim))
-        y = np.zeros((npoints,))
-        yerr = np.zeros((npoints,))
+                raise ValueError('Fixed parameters is not empty, but the data in data_dir is form a Latin Hypercube. \
+                                    Cannot performs slices on a LHC.')
 
-        warned = False
-        num_skipped = 0
-        num_used = 0
-        for idx, (obs_file, cov_file) in enumerate(izip(obs_files, cov_files)):
-            params, obs, cov = obs_file_reader(obs_file, cov_file)
+            self.obs = obs
 
-            # skip values that aren't where we've fixed them to be.
-            # It'd be nice to do this before the file I/O. Not possible without putting all info in the filename.
-            # or, a more nuanced file structure
-            # Note is is complex because fixed_params can have floats or arrays of floats.
-            # TODO check if a fixed_param is not one of the options i.e. typo
-            to_continue = True
-            for key, val in input_params.iteritems():
-                if type(val) is type(y):
-                    if np.all(np.abs(params[key] - val) > 1e-3):
+            obs_files = sorted(glob(path.join(sub_dir, 'obs*.npy')))
+            cov_files = sorted(
+                glob(path.join(sub_dir, 'cov*.npy')))  # since they're sorted, they'll be paired up by params.
+            self.bin_centers = (bins[:-1] + bins[1:]) / 2
+            nbins = self.bin_centers.shape[0]
+
+            #if self.ordered_params[-1].name != 'r':
+            #   nbins=1
+
+            npoints = len(obs_files)*nbins # each file contains NBINS points in r, and each file is a 6-d point
+            #if self.ordered_params[-1].name == 'r':
+            #    npoints*=nbins #account for 'r'
+
+            varied_params = set([p.name for p in self.ordered_params]) - set(fixed_params.keys())
+            ndim = len(varied_params)  # lest we forget r
+
+            x = np.zeros((npoints, ndim))
+            y = np.zeros((npoints,))
+            yerr = np.zeros((npoints,))
+
+            warned = False
+            num_skipped = 0
+            num_used = 0
+            for idx, (obs_file, cov_file) in enumerate(izip(obs_files, cov_files)):
+                params, obs, cov = obs_file_reader(obs_file, cov_file)
+
+                # skip values that aren't where we've fixed them to be.
+                # It'd be nice to do this before the file I/O. Not possible without putting all info in the filename.
+                # or, a more nuanced file structure
+                # Note is is complex because fixed_params can have floats or arrays of floats.
+                # TODO check if a fixed_param is not one of the options i.e. typo
+                to_continue = True
+                for key, val in input_params.iteritems():
+                    if type(val) is type(y):
+                        if np.all(np.abs(params[key] - val) > 1e-3):
+                            break
+                    elif np.abs(params[key] - val) > 1e-3:
                         break
-                elif np.abs(params[key] - val) > 1e-3:
-                    break
-            else:
-                to_continue = False  # no break
-
-            if to_continue:
-                continue
-
-            if np.any(np.isnan(cov)) or np.any(np.isnan(obs)):
-                if not warned:
-                    warnings.warn('WARNING: NaN detected. Skipping point in %s' % cov_file)
-                    warned = True
-                num_skipped += 1
-                continue
-
-            num_used += 1
-
-            # doing some shuffling and stacking
-            file_params = []
-            # NOTE could do a param ordering here
-            for p in self.ordered_params:
-                if p.name in fixed_params:#may need to be input_params
-                    continue
-                # TODO change 'r' to something else.
-                if p.name == 'r':
-                    file_params.append(np.log10(self.bin_centers))
                 else:
-                    file_params.append(np.ones((nbins,)) * params[p.name])
+                    to_continue = False  # no break
 
-            # There is an open question how to handle the fact that x is repeated in the EC case.
-            # will punt for now.
-            x[idx * nbins:(idx + 1) * nbins, :] = np.stack(file_params).T
+                if to_continue:
+                    continue
 
-            y[idx * nbins:(idx + 1) * nbins], yerr[idx * nbins:(idx + 1) * nbins] = self._iv_transform(
-                independent_variable, obs, cov)
+                if np.any(np.isnan(cov)) or np.any(np.isnan(obs)):
+                    if not warned:
+                        warnings.warn('WARNING: NaN detected. Skipping point in %s' % cov_file)
+                        warned = True
+                    num_skipped += 1
+                    continue
 
-        # ycov = block_diag(*ycovs)
-        # ycov = np.sqrt(np.diag(ycov))
+                num_used += 1
 
-        # remove rows that were skipped due to the fixed thing
-        # NOTE: HACK
-        # a reshape may be faster.
-        zeros_slice = np.all(x != 0.0, axis=1)
-        # set the results of these calculations.
+                # doing some shuffling and stacking
+                file_params = []
+                # NOTE could do a param ordering here
+                for p in self.ordered_params:
+                    if p.name in fixed_params:#may need to be input_params
+                        continue
+                    # TODO change 'r' to something else.
+                    if p.name == 'r':
+                        file_params.append(np.log10(self.bin_centers))
+                    else:
+                        file_params.append(np.ones((nbins,)) * params[p.name])
 
-        return x[zeros_slice], y[zeros_slice], yerr[zeros_slice]
+                # There is an open question how to handle the fact that x is repeated in the EC case.
+                # will punt for now.
+                x[idx * nbins:(idx + 1) * nbins, :] = np.stack(file_params).T
+
+                y[idx * nbins:(idx + 1) * nbins], yerr[idx * nbins:(idx + 1) * nbins] = self._iv_transform(
+                    independent_variable, obs, cov)
+
+                # ycov = block_diag(*ycovs)
+                # ycov = np.sqrt(np.diag(ycov))
+
+                # remove rows that were skipped due to the fixed thing
+                # NOTE: HACK
+                # a reshape may be faster.
+                zeros_slice = np.all(x != 0.0, axis=1)
+                # set the results of these calculations.
+
+                #return x[zeros_slice], y[zeros_slice], yerr[zeros_slice]
+                all_x.append(x[zeros_slice])
+                all_y.append(y[zeros_slice])
+                all_yerr.append(yerr[zeros_slice])
 
     def get_plot_data(self, em_params, training_dir, independent_variable=None, fixed_params={}):
         """
