@@ -28,7 +28,9 @@ class AssembiasRedMagicCens(RedMagicCens, HeavisideAssembias):
         HeavisideAssembias.__init__(self,
             lower_assembias_bound=self._lower_occupation_bound,
             upper_assembias_bound=self._upper_occupation_bound,
-            method_name_to_decorate='mean_occupation', **kwargs)
+            method_name_to_decorate='mean_occupation', 
+            sec_haloprop_key = 'halo_local_density', #TODO I'm hardcoding this in. Need error handling and also an option to change!  
+            **kwargs)
 
 class RedMagicSats(Zheng07Sats):
     '''Tweak of Zheng model to add a new parameter, f_c, denoting a modified central fraction.'''
@@ -58,7 +60,9 @@ class AssembiasRedMagicSats(RedMagicSats, HeavisideAssembias):
         HeavisideAssembias.__init__(self,
             lower_assembias_bound=self._lower_occupation_bound,
             upper_assembias_bound=self._upper_occupation_bound,
-            method_name_to_decorate='mean_occupation', **kwargs)
+            method_name_to_decorate='mean_occupation',  
+            sec_haloprop_key = 'halo_local_density', #TODO I'm hardcoding this in. Need error handling and also an option to change!  
+            **kwargs)
 
 
 class StepFuncCens(Zheng07Cens):
