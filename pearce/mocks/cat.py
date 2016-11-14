@@ -273,13 +273,13 @@ class Cat(object):
         from .readGadgetSnapshot import readGadgetSnapshot
         from fast3tree import fast3tree
         all_particles = np.array([], dtype='float32')
-        p = 1e-4
+        #p = 1e-4
         # TODO should fail gracefully if memory is exceeded or if p is too small.
         for file in glob(path.join(snapdir, 'snapshot*')):
             # TODO should find out which is "fast" axis and use that.
             # Numpy uses fortran ordering.
             particles = readGadgetSnapshot(file, read_pos=True)[1]  # Think this returns some type of tuple; should check
-            particles = particles[np.random.rand(particles.shape[0]) < p]  # downsample
+            #particles = particles[np.random.rand(particles.shape[0]) < p]  # downsample
             if particles.shape[0] == 0:
                 continue
 

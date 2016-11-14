@@ -237,6 +237,22 @@ def make_training_data(config_filename, ordered_params=None):
     else: #a list
         assert all(min(a-scale_factors) < 0.05 for a in scale_factors)
 
+    # determine the specific functions needed for this setup
+    # same points for each redshift
+    if method == 'LHC':
+        points = makeLHC(ordered_params, n_points)
+    elif method == 'FHC':
+        points = makeFHC(ordered_params, n_points)
+    else:
+        raise ValueError('Invalid method for making training data: %s' % method)
+
+    if system == 'ki-ls':
+        make_command = make_kils_command
+    elif system == 'sherlock':
+        make_command = make_sherlock_command
+    else:
+        raise ValueError('Invalid system for making training data: %s' % system)
+
     n_jobs_per_a = np.ceil(float(n_jobs)/len(scale_factors))
 
     for a in scale_factors:
@@ -249,21 +265,6 @@ def make_training_data(config_filename, ordered_params=None):
         if ordered_params is None:
             from .ioHelpers import DEFAULT_PARAMS as ordered_params
             warnings.warn("Using default ordered parameters.")
-
-        # determine the specific functions needed for this setup
-        if method == 'LHC':
-            points = makeLHC(ordered_params, n_points)
-        elif method == 'FHC':
-            points = makeFHC(ordered_params, n_points)
-        else:
-            raise ValueError('Invalid method for making training data: %s' % method)
-
-        if system == 'ki-ls':
-            make_command = make_kils_command
-        elif system == 'sherlock':
-            make_command = make_sherlock_command
-        else:
-            raise ValueError('Invalid system for making training data: %s' % system)
 
         # write the global file used by all params
         # TODO Write system (maybe) and method (definetly) to file!
