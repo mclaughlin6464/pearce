@@ -112,6 +112,8 @@ class Cat(object):
         self.h = self.cosmology.H(0).value / 100.0
 
         self.gadget_loc = gadget_loc #location of original gadget files.
+        self.snapdirs = glob(path.join(self.gadget_loc, 'snapdir*'))
+
 
         # TODO Well this makes me think loc doesn't do anything...
         # I use it in the subclasses though. Doesn't mean I need it here though.
@@ -237,6 +239,7 @@ class Cat(object):
 
         if add_local_density:
             snapdirs = glob(path.join(self.gadget_loc, 'snapdir*'))
+            #TODO this doen'st work for less than all sfs!
         else:
             snapdirs = ['' for i in self.scale_factors]
 
@@ -272,7 +275,7 @@ class Cat(object):
         t0 = time()
         from .readGadgetSnapshot import readGadgetSnapshot
         from fast3tree import fast3tree
-        #p = 1e-4 
+        p = 1e-2 
         all_particles = np.array([], dtype='float32')
         # TODO should fail gracefully if memory is exceeded or if p is too small.
         t1 = time()
@@ -280,7 +283,7 @@ class Cat(object):
             # TODO should find out which is "fast" axis and use that.
             # Numpy uses fortran ordering.
             particles = readGadgetSnapshot(file, read_pos=True)[1]  # Think this returns some type of tuple; should check
-            #particles = particles[np.random.rand(particles.shape[0]) < p]  # downsample
+            particles = particles[np.random.rand(particles.shape[0]) < p]  # downsample
             if particles.shape[0] == 0:
                 continue
 
@@ -294,7 +297,7 @@ class Cat(object):
         #all_pos *= h
         #TODO not entirely sure if i'm applying little h correctly
         #densities = np.ones(reader.halo_table['x'].shape)/(4*np.pi/(3*self.h**2)*radius**3)
-        densities = np.ones(reader.halo_table['halo_x'].shape)/(4*np.pi/3*radius**3)
+        densities = np.ones(reader.halo_table['halo_x'].shape)/(p*4*np.pi/3*radius**3)
         with fast3tree(all_particles) as tree:
             for idx, halo_pos in enumerate(izip(reader.halo_table['halo_x'],reader.halo_table['halo_y'],reader.halo_table['halo_z'])):
                 #print idx, time()-t0, 's'
