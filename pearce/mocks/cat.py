@@ -15,7 +15,7 @@ from astropy import cosmology
 from halotools.sim_manager import RockstarHlistReader, CachedHaloCatalog
 from halotools.empirical_models import PrebuiltHodModelFactory
 from halotools.empirical_models import HodModelFactory, TrivialPhaseSpace, NFWPhaseSpace
-from halotools.mock_observables import * #i'm importing so much this is just easier
+from halotools.mock_observables import *  # i'm importing so much this is just easier
 
 from .customHODModels import *
 
@@ -27,6 +27,7 @@ try:
 except ImportError:
     CORRFUNC_AVAILABLE = False
 
+
 def observable(func):
     '''
     Decorator for observable methods. Checks that the catalog is properly loaded and calcualted.
@@ -34,6 +35,7 @@ def observable(func):
         Function that calculates an observable on a populated catalog.
     :return: func
     '''
+
     def _func(self, *args, **kwargs):
 
         if 'use_corrfunc' in kwargs and (kwargs['use_corrfunc'] and not CORRFUNC_AVAILABLE):
@@ -45,13 +47,15 @@ def observable(func):
             assert self.model is not None
             assert self.populated_once
         except AssertionError:
-            raise AssertionError("The cat must have a loaded model and catalog and be populated before calculating an observable.")
+            raise AssertionError(
+                "The cat must have a loaded model and catalog and be populated before calculating an observable.")
         return func(self, *args, **kwargs)
 
-    #store the arguments, as the decorator destroys the spec
+    # store the arguments, as the decorator destroys the spec
     _func.args = inspect.getargspec(func)[0]
 
     return _func
+
 
 class Cat(object):
     def __init__(self, simname='cat', loc='', filenames=[], cache_loc='/u/ki/swmclau2/des/halocats/',
@@ -111,7 +115,7 @@ class Cat(object):
         self.cosmology = cosmo  # default cosmology
         self.h = self.cosmology.H(0).value / 100.0
 
-        self.gadget_loc = gadget_loc #location of original gadget files.
+        self.gadget_loc = gadget_loc  # location of original gadget files.
 
         # TODO Well this makes me think loc doesn't do anything...
         # I use it in the subclasses though. Doesn't mean I need it here though.
@@ -157,7 +161,7 @@ class Cat(object):
         '''If the user passes in a scale factor or filename, we have to do some cropping to ensure they align.
         Used by subclasses during initialization.'''
 
-        sf_idxs = [] #store the indicies, as they have applications elsewhere
+        sf_idxs = []  # store the indicies, as they have applications elsewhere
 
         if 'filenames' in user_kwargs and 'scale_factors' in user_kwargs:
             assert len(user_kwargs['filenames']) == len(user_kwargs['scale_factors'])
@@ -168,7 +172,7 @@ class Cat(object):
         elif 'scale_factors' in user_kwargs:
             user_kwargs['filenames'] = []
             for a in user_kwargs['scale_factors']:
-                idx = tmp_scale_factors.index(a) #will raise an error if it's not there
+                idx = tmp_scale_factors.index(a)  # will raise an error if it's not there
                 sf_idxs.append(idx)
                 user_kwargs['filenames'].append(tmp_fnames[idx])  # get teh matching scale factor
         elif 'filenames' in user_kwargs:
@@ -236,7 +240,7 @@ class Cat(object):
         else:
             return None
 
-    def _check_cores(self, n_cores ):
+    def _check_cores(self, n_cores):
         '''
         Helper function that checks that a user's input for the number of cores is sensible,
         returns modifications and issues warnings as necessary.
@@ -260,7 +264,7 @@ class Cat(object):
         else:
             return n_cores
 
-    def cache(self, scale_factors='all', overwrite=False, add_local_density= False):
+    def cache(self, scale_factors='all', overwrite=False, add_local_density=False):
         '''
         Cache a halo catalog in the halotools format, for later use.
         :param scale_factors:
@@ -270,16 +274,17 @@ class Cat(object):
         :return: None
         '''
         try:
-            assert not add_local_density or self.gadget_loc #gadget loc must be nonzero here!
+            assert not add_local_density or self.gadget_loc  # gadget loc must be nonzero here!
         except:
-            raise AssertionError('Cannot add local density without gadget location for %s'%self.simname)
+            raise AssertionError('Cannot add local density without gadget location for %s' % self.simname)
 
         if add_local_density:
             snapdirs = glob(path.join(self.gadget_loc, 'snapdir*'))[self.sf_idxs]
         else:
             snapdirs = ['' for i in self.scale_factors]
 
-        for a, z, fname, cache_fnames, snapdir in izip(self.scale_factors, self.redshifts, self.filenames, self.cache_filenames, snapdirs):
+        for a, z, fname, cache_fnames, snapdir in izip(self.scale_factors, self.redshifts, self.filenames,
+                                                       self.cache_filenames, snapdirs):
             # TODO get right reader for each halofinder.
             if scale_factors != 'all' and a not in scale_factors:
                 continue
@@ -288,13 +293,12 @@ class Cat(object):
                                          overwrite=overwrite)
             reader.read_halocat(self.columns_to_convert)
             if add_local_density:
-                self.add_local_density(reader, snapdir) # TODO how to add radius?
+                self.add_local_density(reader, snapdir)  # TODO how to add radius?
 
-            reader.write_to_disk() #do these after so we have a halo table to work off of
+            reader.write_to_disk()  # do these after so we have a halo table to work off of
             reader.update_cache_log()
 
-
-    def add_local_density(self, reader,snapdir, radius = 5):
+    def add_local_density(self, reader, snapdir, radius=5):
         """
         Calculates the local density around each halo and adds it to the halo table, to be cached.
         :param reader:
@@ -305,8 +309,8 @@ class Cat(object):
             Radius (in Mpc/h) around which to search for particles to estimate locas density. Default is 5 Mpc.
         :return: None
         """
-        #doing imports here since these are both files i've stolen from Yao
-        #Possible this will be slow
+        # doing imports here since these are both files i've stolen from Yao
+        # Possible this will be slow
         from time import time
         t0 = time()
         from .readGadgetSnapshot import readGadgetSnapshot
@@ -318,7 +322,8 @@ class Cat(object):
         for file in glob(path.join(snapdir, 'snapshot*')):
             # TODO should find out which is "fast" axis and use that.
             # Numpy uses fortran ordering.
-            particles = readGadgetSnapshot(file, read_pos=True)[1]  # Think this returns some type of tuple; should check
+            particles = readGadgetSnapshot(file, read_pos=True)[
+                1]  # Think this returns some type of tuple; should check
             particles = particles[np.random.rand(particles.shape[0]) < p]  # downsample
             if particles.shape[0] == 0:
                 continue
@@ -326,24 +331,24 @@ class Cat(object):
             all_particles = np.resize(all_particles, (all_particles.shape[0] + particles.shape[0], 3))
             all_particles[-particles.shape[0]:, :] = particles
 
-        print 'All done', time()-t0, 's'
+        print 'All done', time() - t0, 's'
 
         print all_particles.shape
 
-        #all_pos *= h
-        #TODO not entirely sure if i'm applying little h correctly
-        #densities = np.ones(reader.halo_table['x'].shape)/(4*np.pi/(3*self.h**2)*radius**3)
-        densities = np.ones(reader.halo_table['halo_x'].shape)/(p*4*np.pi/3*radius**3)
+        # all_pos *= h
+        # TODO not entirely sure if i'm applying little h correctly
+        # densities = np.ones(reader.halo_table['x'].shape)/(4*np.pi/(3*self.h**2)*radius**3)
+        densities = np.ones(reader.halo_table['halo_x'].shape) / (p * 4 * np.pi / 3 * radius ** 3)
         with fast3tree(all_particles) as tree:
-            for idx, halo_pos in enumerate(izip(reader.halo_table['halo_x'],reader.halo_table['halo_y'],reader.halo_table['halo_z'])):
-                #print idx, time()-t0, 's'
+            for idx, halo_pos in enumerate(
+                    izip(reader.halo_table['halo_x'], reader.halo_table['halo_y'], reader.halo_table['halo_z'])):
+                # print idx, time()-t0, 's'
                 particle_idxs = tree.query_radius(halo_pos, radius)
-                densities[idx]*=reader.particle_mass*len(particle_idxs)
+                densities[idx] *= reader.particle_mass * len(particle_idxs)
 
         reader.halo_table['halo_local_density'] = densities
         print densities.mean()
         print 'Done'
-
 
     def load(self, scale_factor, HOD='redMagic', tol=0.05):
         '''
@@ -376,8 +381,8 @@ class Cat(object):
             if a is None:
                 raise ValueError('Scale factor %.3f not within given tolerance.' % scale_factor)
         else:
-            a = scale_factor#YOLO
-        z = 1.0/a-1
+            a = scale_factor  # YOLO
+        z = 1.0 / a - 1
 
         self.halocat = CachedHaloCatalog(simname=self.simname, halo_finder=self.halo_finder,
                                          version_name=self.version_name, redshift=z)
@@ -401,12 +406,12 @@ class Cat(object):
             if a is None:
                 raise ValueError('Scale factor %.3f not within given tolerance.' % scale_factor)
         else:
-            a = scale_factor#YOLO
-        z = 1.0/a-1
+            a = scale_factor  # YOLO
+        z = 1.0 / a - 1
 
-        assert HOD in {'redMagic','abRedMagic','stepFunc', 'zheng07', 'leauthaud11', 'tinker13', 'hearin15'}
+        assert HOD in {'redMagic', 'abRedMagic', 'stepFunc', 'zheng07', 'leauthaud11', 'tinker13', 'hearin15'}
 
-        #TODO could compactify this a bit, esp if I add anymore custom models.
+        # TODO could compactify this a bit, esp if I add anymore custom models.
         if HOD == 'redMagic':
             cens_occ = RedMagicCens(redshift=z)
             sats_occ = RedMagicSats(redshift=z, cenocc_model=cens_occ)
@@ -449,8 +454,7 @@ class Cat(object):
         :return:
         '''
         assert gal_type in {'centrals', 'satellites'}
-        return self.model.input_model_dictionary['%s_occupation'%gal_type]._get_assembias_param_dict_key(0)
-
+        return self.model.input_model_dictionary['%s_occupation' % gal_type]._get_assembias_param_dict_key(0)
 
     def populate(self, params={}, min_ptcl=200):
         '''
@@ -480,10 +484,10 @@ class Cat(object):
         Return the number density for a populated box.
         :return: Number density of a populated box.
         '''
-        #TODO I think i'm missing little h's here
+        # TODO I think i'm missing little h's here
         return len(self.model.mock.galaxy_table['x']) / (self.Lbox ** 3)
 
-    #TODO do_jackknife to cov?
+    # TODO do_jackknife to cov?
     @observable
     def calc_xi(self, rbins, n_cores='all', do_jackknife=True, use_corrfunc=False, jk_args={}):
         '''
@@ -501,7 +505,7 @@ class Cat(object):
                 xi_cov (if do_jacknife and ! use_corrfunc):
                 (len(rbins), len(rbins)) covariance matrix for xi.
         '''
-        assert not (do_jackknife and use_corrfunc) # can't both be true. 
+        assert not (do_jackknife and use_corrfunc)  # can't both be true.
 
         n_cores = self._check_cores(n_cores)
 
@@ -524,17 +528,17 @@ class Cat(object):
                                    z.astype('float32') * self.h)
             xi_all = np.array(xi_all, dtype='float64')[:, 3]
             '''
-            out = xi(self.model.mock.Lbox * self.h, n_cores,rbins,
-                                   x.astype('float32') * self.h, y.astype('float32') * self.h,
-                                   z.astype('float32') * self.h)
+            out = xi(self.model.mock.Lbox * self.h, n_cores, rbins,
+                     x.astype('float32') * self.h, y.astype('float32') * self.h,
+                     z.astype('float32') * self.h)
 
-            xi_all = out[4] #returns a lot of irrelevant info
+            xi_all = out[4]  # returns a lot of irrelevant info
             # TODO jackknife with corrfunc?
 
         else:
             if do_jackknife:
                 np.random.seed(int(time()))
-                if not jk_args: 
+                if not jk_args:
                     # TODO customize these?
                     n_rands = 5
                     n_sub = 5
@@ -547,7 +551,8 @@ class Cat(object):
                 xi_all, xi_cov = tpcf_jackknife(pos * self.h, randoms, rbins, period=self.Lbox * self.h,
                                                 num_threads=n_cores, Nsub=n_sub, estimator='Landy-Szalay')
             else:
-                xi_all = tpcf(pos * self.h, rbins, period=self.Lbox * self.h, num_threads=n_cores, estimator='Landy-Szalay')
+                xi_all = tpcf(pos * self.h, rbins, period=self.Lbox * self.h, num_threads=n_cores,
+                              estimator='Landy-Szalay')
 
         # TODO 1, 2 halo terms?
 
@@ -558,7 +563,7 @@ class Cat(object):
     # TODO use Joe's code. Remember to add sensible asserts when I do.
     # TODO Jackknife? A way to do it without Joe's code?
     @observable
-    def calc_wp(self,rp_bins,pi_max=40,do_jackknife=True, use_corrfunc=False, n_cores='all',RSD=True):
+    def calc_wp(self, rp_bins, pi_max=40, do_jackknife=True, use_corrfunc=False, n_cores='all', RSD=True):
         '''
         Calculate the projected correlation on a populated catalog
         :param rp_bins:
@@ -573,33 +578,33 @@ class Cat(object):
             wp_all, the projection correlation function.
         '''
 
-        #could move these last parts ot the decorator or a helper. Ah well.
+        # could move these last parts ot the decorator or a helper. Ah well.
         n_cores = self._check_cores(n_cores)
 
         x, y, z = [self.model.mock.galaxy_table[c] for c in ['x', 'y', 'z']]
         if RSD:
             # for now, hardcode 'z' as the distortion dimension.
             distortion_dim = 'z'
-            v_distortion_dim = self.model.mock.galaxy_table['v%s'%distortion_dim]
-            #apply redshift space distortions
-            pos = return_xyz_formatted_array(x,y,z,velocity=v_distortion_dim, \
-                                velocity_distortion_dimension=distortion_dim, period = self.Lbox)
+            v_distortion_dim = self.model.mock.galaxy_table['v%s' % distortion_dim]
+            # apply redshift space distortions
+            pos = return_xyz_formatted_array(x, y, z, velocity=v_distortion_dim, \
+                                             velocity_distortion_dimension=distortion_dim, period=self.Lbox)
         else:
             pos = return_xyz_formatted_array(x, y, z, period=self.Lbox)
 
-        #don't forget little h!!
+        # don't forget little h!!
         if use_corrfunc:
-            out = xi(self.model.mock.Lbox * self.h,pi_max*self.h, n_cores, rp_bins,
+            out = xi(self.model.mock.Lbox * self.h, pi_max * self.h, n_cores, rp_bins,
                      x.astype('float32') * self.h, y.astype('float32') * self.h,
                      z.astype('float32') * self.h)
 
             wp_all = out[4]  # returns a lot of irrelevant info
         else:
-            wp_all = wp(pos*self.h, rp_bins, pi_max*self.h, period=self.Lbox*self.h, num_threads=n_cores)
+            wp_all = wp(pos * self.h, rp_bins, pi_max * self.h, period=self.Lbox * self.h, num_threads=n_cores)
         return wp_all
 
     @observable
-    def calc_wt(self,theta_bins,do_jackknife=True, n_cores='all'):
+    def calc_wt(self, theta_bins, do_jackknife=True, n_cores='all'):
         '''
         Calculate the angular correlation function, w(theta), from a populated catalog.
         :param theta_bins:
@@ -616,17 +621,16 @@ class Cat(object):
         vels = np.vstack([self.model.mock.galaxy_table[c] for c in ['vx', 'vy', 'vz']]).T
 
         # TODO is the model cosmo same as the one attached to the cat?
-        ra, dec, z = mock_survey.ra_dec_z(pos*self.h, vels*self.h, cosmo=self.cosmology)
-        ang_pos = np.vstack((np.degrees(ra), np.degrees(dec) )).T
+        ra, dec, z = mock_survey.ra_dec_z(pos * self.h, vels * self.h, cosmo=self.cosmology)
+        ang_pos = np.vstack((np.degrees(ra), np.degrees(dec))).T
 
-        n_rands=5
-        rand_pos = np.random.random((pos.shape[0] * n_rands,3)) * self.Lbox * self.h
-        rand_vels = np.zeros((pos.shape[0]*n_rands, 3))
+        n_rands = 5
+        rand_pos = np.random.random((pos.shape[0] * n_rands, 3)) * self.Lbox * self.h
+        rand_vels = np.zeros((pos.shape[0] * n_rands, 3))
 
-        rand_ra, rand_dec, rand_z = mock_survey.ra_dec_z(rand_pos*self.h, rand_vels*self.h, cosmo=self.cosmology)
+        rand_ra, rand_dec, rand_z = mock_survey.ra_dec_z(rand_pos * self.h, rand_vels * self.h, cosmo=self.cosmology)
         rand_ang_pos = np.vstack((np.degrees(rand_ra), np.degrees(rand_dec))).T
 
-        #NOTE I can transform coordinates and not have to use randoms at all. Consider?
+        # NOTE I can transform coordinates and not have to use randoms at all. Consider?
         wt_all = angular_tpcf(ang_pos, theta_bins, randoms=rand_ang_pos, num_threads=n_cores)
         return wt_all
-
