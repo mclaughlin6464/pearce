@@ -157,27 +157,66 @@ class Cat(object):
         '''If the user passes in a scale factor or filename, we have to do some cropping to ensure they align.
         Used by subclasses during initialization.'''
 
+        sf_idxs = [] #store the indicies, as they have applications elsewhere
+
+        if 'filenames' in user_kwargs and 'scale_factors' in user_kwargs:
+            assert len(user_kwargs['filenames']) == len(user_kwargs['scale_factors'])
+            for kw_fname in user_kwargs['filenames']:
+                # Store indicies. If not in, will throw and error.
+                sf_idxs.append(tmp_fnames.index(kw_fname))
+                # do nothing, we're good.
+        elif 'scale_factors' in user_kwargs:
+            user_kwargs['filenames'] = []
+            for a in user_kwargs['scale_factors']:
+                idx = tmp_scale_factors.index(a) #will raise an error if it's not there
+                sf_idxs.append(idx)
+                user_kwargs['filenames'].append(tmp_fnames[idx])  # get teh matching scale factor
+        elif 'filenames' in user_kwargs:
+            user_kwargs['scale_factors'] = []
+            for kw_fname in user_kwargs['filenames']:
+                idx = tmp_fnames.index(kw_fname)  # will throw an error if not in there.
+                sf_idxs.append(idx)
+                user_kwargs['scale_factors'].append(tmp_scale_factors[idx])  # get teh matching scale factor
+        else:
+            user_kwargs['filenames'] = tmp_fnames
+            user_kwargs['scale_factors'] = tmp_scale_factors
+            sf_idxs = range(len(tmp_scale_factors))
+
+        self.sf_idxs = np.array(sf_idxs)
+
+        '''
+        #I'm sorry the logic is a bit of a mess here...
         if 'filenames' not in user_kwargs:
             user_kwargs['filenames'] = tmp_fnames
         elif 'scale_factors' in user_kwargs:  # don't know why this case would ever be true
             assert len(user_kwargs['filenames']) == len(user_kwargs['scale_factors'])
             for kw_fname in user_kwargs['filenames']:
-                assert kw_fname in tmp_fnames
+                #Store indicies. If not in, will throw and error.
+                sf_idxs.append(tmp_fnames.index(kw_fname))
                 # do nothing, we're good.
+            return
         else:
             user_kwargs['scale_factors'] = []
             for kw_fname in user_kwargs['filenames']:
-                assert kw_fname in tmp_fnames
-                user_kwargs['scale_factors'].append(
-                    tmp_scale_factors[tmp_fnames.index(kw_fname)])  # get teh matching scale factor
+                idx = tmp_fnames.index(kw_fname) #will throw an error if not in there.
+                sf_idxs.append(idx)
+                user_kwargs['scale_factors'].append(tmp_scale_factors[idx])  # get teh matching scale factor
+            return
 
         if 'scale_factors' not in user_kwargs:
             user_kwargs['scale_factors'] = tmp_scale_factors
         else:  # both case covered above.
             user_kwargs['filenames'] = []
             for a in user_kwargs['scale_factors']:
-                assert a in tmp_scale_factors
-                user_kwargs['filenames'].append(tmp_fnames[tmp_scale_factors.index(a)])  # get teh matching scale factor
+                idx = tmp_scale_factors.index(a)
+                sf_idxs.append(idx)
+                user_kwargs['filenames'].append(tmp_fnames[idx])  # get teh matching scale factor
+        if not sf_idxs: #it's empty
+            self.sf_idxs = np.array(range(len(tmp_scale_factors)))
+        else:
+            self.sf_idxs = np.array(self.sf_idxs)
+        return
+        '''
 
     def _return_nearest_sf(self, a, tol=0.05):
         '''
@@ -236,7 +275,7 @@ class Cat(object):
             raise AssertionError('Cannot add local density without gadget location for %s'%self.simname)
 
         if add_local_density:
-            snapdirs = glob(path.join(self.gadget_loc, 'snapdir*'))
+            snapdirs = glob(path.join(self.gadget_loc, 'snapdir*'))[self.sf_idxs]
         else:
             snapdirs = ['' for i in self.scale_factors]
 
