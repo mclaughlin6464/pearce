@@ -279,7 +279,8 @@ class Cat(object):
             raise AssertionError('Cannot add local density without gadget location for %s' % self.simname)
 
         if add_local_density:
-            snapdirs = glob(path.join(self.gadget_loc, 'snapdir*'))[self.sf_idxs]
+            all_snapdirs = glob(path.join(self.gadget_loc, 'snapdir*'))
+            snapdirs = [all_snapdirs[idx] for idx in self.sf_idxs]#only the snapdirs for the scale factors were interested in .
         else:
             snapdirs = ['' for i in self.scale_factors]
 

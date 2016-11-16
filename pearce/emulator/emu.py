@@ -431,7 +431,7 @@ class Emu(object):
             What G.O.F. statistic to calculate. Default is R2. Other options are rmsfd, abs(olute), and rel(ative).
         :return: values, a numpy arrray of the calculated statistics at each of the N training opints.
         """
-        assert statistic in {'r2', 'rms','rmsfd', 'abs', 'rel'}
+        assert statistic in {'r2', 'rms','rmsfd', 'abs', 'log_abs', 'frac', 'log_frac'}
         if N is not None:
             assert N > 0 and int(N) == N
 
@@ -484,11 +484,15 @@ class Emu(object):
             return 1 - SSR / SST
 
         elif statistic == 'abs':
+            return 10**pred_y -10**y
+        elif statistic == 'log_abs':
             return pred_y-y
             #return np.mean((pred_y - y), axis=0)
-        else:  # 'rel'
+        elif statistic == 'log_frac':  # 'rel'
             return (pred_y-y)/y
             #return np.mean((pred_y - y) / y, axis=0)
+        else: #'frac'
+            return (10**pred_y-10**y)/(10**y)
 
     @abstractmethod
     def train_metric(self, **kwargs):
