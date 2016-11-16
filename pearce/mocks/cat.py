@@ -480,27 +480,37 @@ class Cat(object):
             self.populated_once = True
 
     @observable
-    def calc_number_density(self):
+    def calc_number_density(self, halo=False):
         '''
         Return the number density for a populated box.
+        :param: halo
+            Whether to calculate hte number density of halos instead of galaxies. Default is false.
         :return: Number density of a populated box.
         '''
         # TODO I think i'm missing little h's here
+        if halo:
+            return len(self.model.mock.halo_table['halo_x']) / (self.Lbox ** 3)
         return len(self.model.mock.galaxy_table['x']) / (self.Lbox ** 3)
 
     # TODO do_jackknife to cov?
     @observable
-    def calc_xi(self, rbins, n_cores='all', do_jackknife=True, use_corrfunc=False, jk_args={}):
+    def calc_xi(self, rbins, n_cores='all', do_jackknife=True, use_corrfunc=False, jk_args={}, halo=False):
         '''
         Calculate a 3-D correlation function on a populated catalog.
         :param rbins:
             Radial bins for the correlation function.
+        :param n_cores
+            Number of cores to use. default is 'all'
         :param do_jackknife:
             Whether or not to do a jackknife along with the xi calculation. Generally slower. Not supported with
             with corrfunc at present.
         :param use_corrfunc:
             Whether or not to use the halotools function to calculate xi, or Manodeep's corrfunc. Corrfunc is not
             available on all systems and currently jackknife is not supported.
+        :param jk_args
+            Dictionary of arguements for the jackknife call.
+        :param halo
+            Whether to calculate the halo correlation instead of the galaxy correlation. Default is False.
         :return: xi:
                 len(rbins) 3-D correlation function
                 xi_cov (if do_jacknife and ! use_corrfunc):
@@ -509,8 +519,10 @@ class Cat(object):
         assert not (do_jackknife and use_corrfunc)  # can't both be true.
 
         n_cores = self._check_cores(n_cores)
-
-        x, y, z = [self.model.mock.galaxy_table[c] for c in ['x', 'y', 'z']]
+        if halo:
+            x,y,z = [self.model.mock.halo_table[c] for c in ['halo_x', 'halo_y', 'halo_z']]
+        else:
+            x, y, z = [self.model.mock.galaxy_table[c] for c in ['x', 'y', 'z']]
         pos = return_xyz_formatted_array(x, y, z, period=self.Lbox)
 
         if use_corrfunc:
@@ -564,7 +576,7 @@ class Cat(object):
     # TODO use Joe's code. Remember to add sensible asserts when I do.
     # TODO Jackknife? A way to do it without Joe's code?
     @observable
-    def calc_wp(self, rp_bins, pi_max=40, do_jackknife=True, use_corrfunc=False, n_cores='all', RSD=True):
+    def calc_wp(self, rp_bins, pi_max=40, do_jackknife=True, use_corrfunc=False, n_cores='all', RSD=True, halo=False):
         '''
         Calculate the projected correlation on a populated catalog
         :param rp_bins:
@@ -575,6 +587,8 @@ class Cat(object):
             Number of cores to use for calculation. Default is 'all' to use all available.
         :param RSD:
             Boolean whether or not to apply redshift space distortions. Default is True.
+        :param halo:
+            Whether to calculate halo correlation or galaxy correlation. Default is False.
         :return:
             wp_all, the projection correlation function.
         '''
@@ -582,8 +596,13 @@ class Cat(object):
         # could move these last parts ot the decorator or a helper. Ah well.
         n_cores = self._check_cores(n_cores)
 
-        x, y, z = [self.model.mock.galaxy_table[c] for c in ['x', 'y', 'z']]
-        if RSD:
+        if halo:
+            x,y,z = [self.model.mock.halo_table[c] for c in ['halo_x', 'halo_y', 'halo_z']]
+        else:
+            x, y, z = [self.model.mock.galaxy_table[c] for c in ['x', 'y', 'z']]
+
+        #No RSD for halos
+        if RSD and not halo:
             # for now, hardcode 'z' as the distortion dimension.
             distortion_dim = 'z'
             v_distortion_dim = self.model.mock.galaxy_table['v%s' % distortion_dim]
@@ -605,21 +624,27 @@ class Cat(object):
         return wp_all
 
     @observable
-    def calc_wt(self, theta_bins, do_jackknife=True, n_cores='all'):
+    def calc_wt(self, theta_bins, do_jackknife=True, n_cores='all', halo = False):
         '''
         Calculate the angular correlation function, w(theta), from a populated catalog.
         :param theta_bins:
             The bins in theta to use.
         :param n_cores:
             Number of cores to use for calculation. Default is 'all' to use all available.
+        :param halo:
+            Whether or not to calculate clustering or halos or galaxies. Default is False.
         :return:
             wt_all, the angular correlation function.
         '''
 
         n_cores = self._check_cores(n_cores)
 
-        pos = np.vstack([self.model.mock.galaxy_table[c] for c in ['x', 'y', 'z']]).T
-        vels = np.vstack([self.model.mock.galaxy_table[c] for c in ['vx', 'vy', 'vz']]).T
+        if halo:
+            pos = np.vstack( [self.model.mock.halo_table[c] for c in ['halo_x', 'halo_y', 'halo_z']]).T
+            vels = np.vstack([self.model.mock.halo_table[c] for c in ['halo_vx', 'halo_vy', 'halo_vz']]).T
+        else:
+            pos = np.vstack([self.model.mock.galaxy_table[c] for c in ['x', 'y', 'z']]).T
+            vels = np.vstack([self.model.mock.galaxy_table[c] for c in ['vx', 'vy', 'vz']]).T
 
         # TODO is the model cosmo same as the one attached to the cat?
         ra, dec, z = mock_survey.ra_dec_z(pos * self.h, vels * self.h, cosmo=self.cosmology)
