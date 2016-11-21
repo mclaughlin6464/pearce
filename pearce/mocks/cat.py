@@ -231,7 +231,8 @@ class Cat(object):
             Tolerance within which "near" is defined. Default is 0.05
         :return: If a nearest scale factor is found, returns it. Else, returns None.
         '''
-        assert 0 < a < 1  # assert a valid scale factor
+        print a
+        assert 0 < a <= 1  # assert a valid scale factor
         if a in self.scale_factors:  # try for an exact match.
             return a
         idx = np.argmin(np.abs(np.array(self.scale_factors) - a))
@@ -286,6 +287,11 @@ class Cat(object):
 
         for a, z, fname, cache_fnames, snapdir in izip(self.scale_factors, self.redshifts, self.filenames,
                                                        self.cache_filenames, snapdirs):
+            print a
+            print fname
+            print cache_fnames
+            print snapdir
+            print
             # TODO get right reader for each halofinder.
             if scale_factors != 'all' and a not in scale_factors:
                 continue
@@ -316,15 +322,19 @@ class Cat(object):
         t0 = time()
         from .readGadgetSnapshot import readGadgetSnapshot
         from fast3tree import fast3tree
-        p = 1e-2
+        p = 1e0
         all_particles = np.array([], dtype='float32')
+        avg_pos = np.zeros((3,))
+        N_pos = 0
         # TODO should fail gracefully if memory is exceeded or if p is too small.
         t1 = time()
         for file in glob(path.join(snapdir, 'snapshot*')):
             # TODO should find out which is "fast" axis and use that.
             # Numpy uses fortran ordering.
-            particles = readGadgetSnapshot(file, read_pos=True)[
-                1]  # Think this returns some type of tuple; should check
+            particles = readGadgetSnapshot(file, read_pos=True)[1]  # Think this returns some type of tuple; should check
+            avg_pos+=particles.sum(axis=0)
+            N_pos+=particles.shape[0]
+
             particles = particles[np.random.rand(particles.shape[0]) < p]  # downsample
             if particles.shape[0] == 0:
                 continue
@@ -335,16 +345,19 @@ class Cat(object):
         print 'All done', time() - t0, 's'
 
         print all_particles.shape
+        print all_particles.mean(axis=0), all_particles.max(axis=0), all_particles.min(axis=0)
+        print avg_pos/N_pos
 
         # all_pos *= h
         # TODO not entirely sure if i'm applying little h correctly
         # densities = np.ones(reader.halo_table['x'].shape)/(4*np.pi/(3*self.h**2)*radius**3)
-        densities = np.ones(reader.halo_table['halo_x'].shape) / (p * 4 * np.pi / 3 * radius ** 3)
+        #densities = np.ones(reader.halo_table['halo_x'].shape) / (p * 4 * np.pi / 3 * radius ** 3)
+        densities = np.ones(reader.halo_table['halo_x'].shape) / (p * 4 * np.pi / 3 * reader.halo_table['halo_rvir'] ** 3)
         with fast3tree(all_particles) as tree:
             for idx, halo_pos in enumerate(
-                    izip(reader.halo_table['halo_x'], reader.halo_table['halo_y'], reader.halo_table['halo_z'])):
+                    izip(reader.halo_table['halo_x'], reader.halo_table['halo_y'], reader.halo_table['halo_z'], reader.halo_table['halo_rvir'])):
                 # print idx, time()-t0, 's'
-                particle_idxs = tree.query_radius(halo_pos, radius)
+                particle_idxs = tree.query_radius(halo_pos[:-1], radius=halo_pos[-1], periodic=True)
                 densities[idx] *= reader.particle_mass * len(particle_idxs)
 
         reader.halo_table['halo_local_density'] = densities

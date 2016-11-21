@@ -43,7 +43,7 @@ class Aardvark(Cat):
         assert system in locations
         loc = locations[system]
 
-        tmp_fnames = glob(loc+ 'hlist_*.list')  # snag all the hlists
+        tmp_fnames =sorted( glob(loc+ 'hlist_*.list'))  # snag all the hlists
         tmp_fnames = [fname[len(loc):] for fname in tmp_fnames]  # just want the names in the dir
         tmp_scale_factors = [float(fname[6:-5]) for fname in tmp_fnames]  # pull out scale factors
 
@@ -77,6 +77,7 @@ class Chinchilla(Cat):
         #Lbox required, npart should be if Lbox is not 1050!
         simname = 'chinchilla'
         cosmo = cosmology.core.LambdaCDM(H0=100 * 0.7, Om0=0.286, Ode0=0.714)
+        gadget_loc = ''
 
         if Lbox not in {125.0, 250.0, 400.0, 1050.0}:
             raise ValueError("Invalid boxsize %.1f for Chinchilla"%Lbox)
@@ -84,7 +85,7 @@ class Chinchilla(Cat):
 
         #the different box sizes are in differenct locations, among other things.
         if Lbox==1050:
-            locations = {'ki-ls':'/u/ki/swmclau2/des/rockstar_outputs/'}
+            locations = {'ki-ls':'/u/ki/swmclau2/des/chinchilla1050/'}
             assert system in locations #necessary?
             loc = locations[system]
 
@@ -102,7 +103,6 @@ class Chinchilla(Cat):
             assert system in locations
             loc = locations[system]
             columns_to_keep = HLIST_COLS
-            gadget_loc = ''
 
             #may also work for 1050 too.
             pmass = 1.44390e+08*((Lbox / 125.0) ** 3) * ((1024.0/npart)** 3)
@@ -124,7 +124,7 @@ class Chinchilla(Cat):
                 loc += '/rockstar/hlists/'
                 gadget_loc+='/output/'
 
-            tmp_fnames = glob(loc + 'hlist_*.list')  # snag all the hlists
+            tmp_fnames = sorted(glob(loc + 'hlist_*.list'))  # snag all the hlists
             tmp_fnames = [fname[len(loc):] for fname in tmp_fnames]  # just want the names in the dir
             tmp_scale_factors = [float(fname[6:-5]) for fname in tmp_fnames]  # pull out scale factors
 
@@ -175,7 +175,7 @@ class Emu(Cat):
             columns_to_keep = HLIST_COLS
             pmass = 6.3994e8
 
-            tmp_fnames = glob(loc+ 'hlist_*.list')  # snag all the hlists
+            tmp_fnames = sorted(glob(loc+ 'hlist_*.list'))  # snag all the hlists
             tmp_fnames = [fname[len(kwargs['loc']):] for fname in tmp_fnames]  # just want the names in the dir
             tmp_scale_factors = [float(fname[6:-5]) for fname in tmp_fnames]
 
