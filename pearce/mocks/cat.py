@@ -322,7 +322,8 @@ class Cat(object):
         t0 = time()
         from .readGadgetSnapshot import readGadgetSnapshot
         from fast3tree import fast3tree
-        p = 1e0
+        numpy.random.seed(int(t0))
+        p = 1e-2
         all_particles = np.array([], dtype='float32')
         avg_pos = np.zeros((3,))
         N_pos = 0
@@ -334,8 +335,9 @@ class Cat(object):
             particles = readGadgetSnapshot(file, read_pos=True)[1]  # Think this returns some type of tuple; should check
             avg_pos+=particles.sum(axis=0)
             N_pos+=particles.shape[0]
-
-            particles = particles[np.random.rand(particles.shape[0]) < p]  # downsample
+            downsample_idxs = np.random.choice(particles.shape[0], size =int( particles.shape[0]*p))
+            particles = particles[downsample_idxs, :]
+            #particles = particles[np.random.rand(particles.shape[0]) < p]  # downsample
             if particles.shape[0] == 0:
                 continue
 
@@ -352,12 +354,12 @@ class Cat(object):
         # TODO not entirely sure if i'm applying little h correctly
         # densities = np.ones(reader.halo_table['x'].shape)/(4*np.pi/(3*self.h**2)*radius**3)
         #densities = np.ones(reader.halo_table['halo_x'].shape) / (p * 4 * np.pi / 3 * radius ** 3)
-        densities = np.ones(reader.halo_table['halo_x'].shape) / (p * 4 * np.pi / 3 * reader.halo_table['halo_rvir'] ** 3)
+        densities = np.ones(reader.halo_table['halo_x'].shape) / (p * 4 * np.pi / 3 * radius ** 3)
         with fast3tree(all_particles) as tree:
             for idx, halo_pos in enumerate(
-                    izip(reader.halo_table['halo_x'], reader.halo_table['halo_y'], reader.halo_table['halo_z'], reader.halo_table['halo_rvir'])):
+                    izip(reader.halo_table['halo_x'], reader.halo_table['halo_y'], reader.halo_table['halo_z'])):
                 # print idx, time()-t0, 's'
-                particle_idxs = tree.query_radius(halo_pos[:-1], radius=halo_pos[-1], periodic=True)
+                particle_idxs = tree.query_radius(halo_pos, radius, periodic=True)
                 densities[idx] *= reader.particle_mass * len(particle_idxs)
 
         reader.halo_table['halo_local_density'] = densities
