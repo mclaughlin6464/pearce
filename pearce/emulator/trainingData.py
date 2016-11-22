@@ -84,7 +84,7 @@ def makeFHC(ordered_params, N=4):
     return points[idxs, :]
     # return points
 
-def make_kils_command(jobname, max_time, outputdir, queue='bulletmpi'):
+def make_kils_command(jobname, max_time, outputdir, queue='kipac-ibq'):#'bulletmpi'):
     '''
     Return a list of strings that comprise a bash command to call trainingHelper.py on the cluster.
     Designed to work on ki-ls's batch system
@@ -197,7 +197,7 @@ def training_config_reader(filename):
         #TODO change to scale factors?
         if '[' in cosmo_params['scale_factor']: # user passed in a list
             sf_str = cosmo_params['scale_factor']
-            cosmo_params['scale_facor'] = [float(a.strip()) for a in sf_str.strip('[ ]').split(',')]
+            cosmo_params['scale_factor'] = [float(a.strip()) for a in sf_str.strip('[ ]').split(',')]
         elif cosmo_params['scale_factor'] == 'all':
             cosmo_params['scale_factor'] = [cosmo_params['scale_factor'].strip()]
         else: #float
@@ -229,13 +229,18 @@ def make_training_data(config_filename, ordered_params=None):
 
     scale_factors = cosmo_params['scale_factor']
 
-    cat = cat_dict[cosmo_params['simname']]#(**cosmo_params)
+    #load one up to test that these scale factors maek sense.
+    cat = cat_dict[cosmo_params['simname']](**cosmo_params)
 
-    if scale_factors == 'all':
+    if scale_factors[0] == 'all':
         #have to load up a cat to get them
         scale_factors = cat.scale_factors
     else: #a list
-        assert all(min(a-scale_factors) < 0.05 for a in scale_factors)
+        assert all(min(a-cat.scale_factors) < 0.05 for a in scale_factors)
+
+    if ordered_params is None:
+        #raise warning?
+        from .ioHelpers import DEFAULT_PARAMS as ordered_params
 
     # determine the specific functions needed for this setup
     # same points for each redshift
@@ -253,14 +258,14 @@ def make_training_data(config_filename, ordered_params=None):
     else:
         raise ValueError('Invalid system for making training data: %s' % system)
 
-    n_jobs_per_a = np.ceil(float(n_jobs)/len(scale_factors))
+    n_jobs_per_a = int(np.ceil(float(n_jobs)/len(scale_factors)))
 
     for a in scale_factors:
 
         cosmo_params['scale_factor'] = a #store to pass in
         outputdir = path.join(base_outputdir, 'a_%.5f'%a)
         if not path.exists(outputdir):
-            mkdir(path)
+            mkdir(outputdir)
 
         if ordered_params is None:
             from .ioHelpers import DEFAULT_PARAMS as ordered_params
@@ -273,7 +278,8 @@ def make_training_data(config_filename, ordered_params=None):
         header = '\n'.join(header_start)
         np.savetxt(path.join(outputdir, GLOBAL_FILENAME), bins, header=header)
         #Writing ordering to file.
-        pickle.dump(ordered_params, path.join(outputdir, PARAMS_FILENAME))
+        with open(path.join(outputdir, PARAMS_FILENAME), 'w') as f:
+            pickle.dump(ordered_params,f )
 
         # call each job individually
         points_per_job = int(points.shape[0] / n_jobs_per_a)
@@ -283,7 +289,7 @@ def make_training_data(config_filename, ordered_params=None):
                 job_points = points[job*points_per_job:, :]
             else:
                 job_points = points[job * points_per_job:(job+1) * points_per_job, :]
-            jobname = 'training_data%03d' % job
+            jobname = 'training_data_a%.3f_%03d' %(a,job)
             param_filename = path.join(outputdir, jobname + '.npy')
             np.savetxt(param_filename, job_points)
 

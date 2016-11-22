@@ -79,7 +79,7 @@ class Emu(object):
         assert len(input_params) - len(self.ordered_params) <= 1  # can exclude r
         # HERE can we exclude z too, somehow?
         sub_dirs = glob(path.join(data_dir, 'a_*'))
-        sub_dirs_as = np.array(float(fname[-5:]) for fname in sub_dirs)
+        sub_dirs_as = np.array([float(fname[-7:]) for fname in sub_dirs])
 
         if 'z' in fixed_params:  # don't have to look in dirs that aren't fixed.
             zs = fixed_params['z']
@@ -92,11 +92,12 @@ class Emu(object):
                 idx = np.argmin(np.abs(sub_dirs_as - input_a))
                 a = sub_dirs_as[idx]
                 if np.abs(a - input_a) > 0.05:  # tolerance
-                    raise IOError('No subfolder within tolerance of %.3f' % z)
-                sub_dirs.append(path.join(data_dir, 'a_%.3f' % a))
+                    raise IOError('No subfolder within tolerance of z=%.3f' % z)
+                sub_dirs.append(path.join(data_dir, 'a_%.5f' % a))
                 _sub_dirs_as.append(a)
-            sub_dirs_as = _sub_dirs_as
-            self.z_bin_centers = 1 / sub_dirs_as - 1
+            sub_dirs_as = np.array(_sub_dirs_as)
+        self.z_bin_centers = 1 / sub_dirs_as - 1
+
 
         all_x, all_y, all_yerr = [], [], []
 
@@ -108,10 +109,8 @@ class Emu(object):
             # Could add an assert that a = cosmo_params['scale_factor']
             # Not sure if I need a flag here for plot_data; I thnk it's always used with a fixed_params so should be fine.
             if fixed_params and sampling_method == 'LHC':
-                if fixed_params.keys() == ['z']:  # allowed:
-                    pass
-
-                raise ValueError('Fixed parameters is not empty, but the data in data_dir is form a Latin Hypercube. \
+                if fixed_params.keys() != ['z']:  # allowed:
+                    raise ValueError('Fixed parameters is not empty, but the data in data_dir is form a Latin Hypercube. \
                                     Cannot performs slices on a LHC.')
 
             self.obs = obs
@@ -149,6 +148,8 @@ class Emu(object):
                 # TODO check if a fixed_param is not one of the options i.e. typo
                 to_continue = True
                 for key, val in input_params.iteritems():
+                    if key in {'z', 'r'}:
+                        continue #these won't be in params, or have been already screened.
                     if type(val) is type(y):
                         if np.all(np.abs(params[key] - val) > 1e-3):
                             break
@@ -197,15 +198,15 @@ class Emu(object):
                 # remove rows that were skipped due to the fixed thing
                 # NOTE: HACK
                 # a reshape may be faster.
-                zeros_slice = np.all(x != 0.0, axis=1)
+            zeros_slice = np.all(x != 0.0, axis=1)
                 # set the results of these calculations.
 
                 # return x[zeros_slice], y[zeros_slice], yerr[zeros_slice]
-                all_x.append(x[zeros_slice])
-                all_y.append(y[zeros_slice])
-                all_yerr.append(yerr[zeros_slice])
-        # TODO sort?
+            all_x.append(x[zeros_slice])
+            all_y.append(y[zeros_slice])
+            all_yerr.append(yerr[zeros_slice])
 
+        # TODO sort?
         return np.vstack(all_x), np.hstack(all_y), np.hstack(all_yerr)
 
     def get_plot_data(self, em_params, training_dir, independent_variable=None, fixed_params={}):
@@ -224,6 +225,7 @@ class Emu(object):
         """
 
         x, y, yerr = self.get_data(training_dir, em_params, fixed_params, independent_variable)
+
 
         sort_idxs = self._sort_params(x, argsort=True)
 
@@ -354,20 +356,23 @@ class Emu(object):
             if independent_variable is None:
                 ig = {'amp': 0.481, 'logMmin': 0.1349, 'sigma_logM': 0.089,
                       'logM0': 2.0, 'logM1': 0.204, 'alpha': 0.039,
-                      'f_c': 0.041, 'r': 0.040}
+                      'f_c': 0.041, 'r': 0.040, 'z':1.0}
             else:
                 pass
         elif self.obs == 'wp':
             if independent_variable is None:
                 ig = {'logMmin': 1.7348042925, 'f_c': 0.327508062386, 'logM0': 15.8416094906,
                       'sigma_logM': 5.36288382789, 'alpha': 3.63498762588, 'r': 0.306139450843,
-                      'logM1': 1.66509412286, 'amp': 1.18212664544}
+                      'logM1': 1.66509412286, 'amp': 1.18212664544, 'z':1.0}
         else:
             pass  # no other guesses saved yet.
 
         # remove entries for variables that are being held fixed.
         for key in self.fixed_params.iterkeys():
-            del ig[key]
+            try:
+                del ig[key]
+            except KeyError:
+                pass #can happen for redshift and others. 
 
         return ig
 
@@ -419,7 +424,9 @@ class Emu(object):
         input_params = {}
         input_params.update(self.fixed_params)
         input_params.update(em_params)
-        assert len(input_params) == self.emulator_ndim + self.fixed_ndim  # check dimenstionality
+        print input_params
+        print self.emulator_ndim, self.fixed_ndim
+        assert len(input_params) - self.emulator_ndim + self.fixed_ndim <=2  # check dimenstionality
         for i in input_params:  # check that the names in input params are all defined in the ordering.
             assert any(i == p.name for p in self.ordered_params)
 
@@ -428,6 +435,7 @@ class Emu(object):
         t_grid = np.meshgrid(*t_list)
         t = np.stack(t_grid).T
         # TODO george can sort?
+        print self.emulator_ndim
         t = t.reshape((-1, self.emulator_ndim))
 
         t = self._sort_params(t)
@@ -857,10 +865,10 @@ class OriginalRecipe(Emu):
         :return:
         """
         vep = dict(em_params)
-        rpc = np.log10(r_bin_centers) if r_bin_centers else []  # make sure not to throw an error
+        rpc = np.log10(r_bin_centers) if np.any(r_bin_centers)else []  # make sure not to throw an error
         # TODO change 'r' to something more general
         for key, val in zip(['r', 'z'], (rpc, z_bin_centers)):
-            if key not in vep and val:  # key must not already exist and must be nonzero:
+            if key not in vep and np.any(val):  # key must not already exist and must be nonzero:
                 vep[key] = val
         # vep.update({'r': np.log10(r_bin_centers), 'z': z_bin_centers})
         return self.emulate(vep, gp_errs)
@@ -1124,6 +1132,8 @@ class ExtraCrispy(Emu):
         xs, ys = [], []
         for td in training_dir:
             x, y, _ = self.get_data(td, {}, self.fixed_params, self.independent_variable)
+
+            print x.shape
             xs.append(x)
             ys.append(y)
 

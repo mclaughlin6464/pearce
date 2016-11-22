@@ -104,7 +104,7 @@ class Cat(object):
         self.Lbox = Lbox
         self.pmass = pmass
 
-        self.scale_factors = sorted(scale_factors)
+        self.scale_factors = np.array(sorted(scale_factors))
         self.redshifts = [1.0 / a - 1 for a in
                           self.scale_factors]  # TODO let user pass in redshift and get a scale factor
 
@@ -188,7 +188,7 @@ class Cat(object):
             Tolerance within which "near" is defined. Default is 0.05
         :return: If a nearest scale factor is found, returns it. Else, returns None.
         '''
-        assert 0 < a < 1  # assert a valid scale factor
+        assert 0 < a <= 1  # assert a valid scale factor
         if a in self.scale_factors:  # try for an exact match.
             return a
         idx = np.argmin(np.abs(np.array(self.scale_factors) - a))
