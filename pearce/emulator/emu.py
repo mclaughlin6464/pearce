@@ -198,7 +198,7 @@ class Emu(object):
                 # remove rows that were skipped due to the fixed thing
                 # NOTE: HACK
                 # a reshape may be faster.
-            zeros_slice = np.all(x != 0.0, axis=1)
+            zeros_slice = np.any(x != 0.0, axis=1)
                 # set the results of these calculations.
 
                 # return x[zeros_slice], y[zeros_slice], yerr[zeros_slice]
@@ -436,7 +436,9 @@ class Emu(object):
         t = np.stack(t_grid).T
         # TODO george can sort?
         print self.emulator_ndim
+        print t.shape
         t = t.reshape((-1, self.emulator_ndim))
+        print t.shape
 
         t = self._sort_params(t)
 
@@ -780,6 +782,7 @@ class OriginalRecipe(Emu):
         xs, ys, yerrs = [], [], []
         for td in training_dir:
             x, y, yerr = self.get_data(td, {}, self.fixed_params, self.independent_variable)
+            print x.shape
             xs.append(x)
             ys.append(y)
             yerrs.append(yerr)
@@ -1144,7 +1147,9 @@ class ExtraCrispy(Emu):
 
         scale_nbins = len(self.scale_bin_centers)
         redshift_nbins = len(self.z_bin_centers)
+        print scale_nbins, redshift_nbins
         self.x = np.vstack(xs)[0:-1:scale_nbins + redshift_nbins, :]
+        print self.x.shape
         self.y = np.hstack(ys).reshape((-1, scale_nbins, redshift_nbins))
         self.yerr = np.zeros_like(self.y)
         self.y_hat = np.zeros(self.y.shape[1:]) if len(self.y.shape) > 1 else 0  # self.y.mean(axis = 0)
@@ -1170,8 +1175,8 @@ class ExtraCrispy(Emu):
         emulator = george.GP(kernel)
         # gp = george.GP(kernel, solver=george.HODLRSolver, nleaf=x.shape[0]+1,tol=1e-18)
 
-        emulator.compute(self.x, np.zeros((self.x.shape[0],)),
-                         sort=False)  # NOTE I'm using a modified version of george!
+        #TODO iterate over yerrs here. 
+        emulator.compute(self.x,sort=False)  # NOTE I'm using a modified version of george!
 
         # For EC, i'm storing an emulator per bin.
         # I'll have to thikn about how to differ the hyperparams.
