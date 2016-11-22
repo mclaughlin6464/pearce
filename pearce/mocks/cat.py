@@ -322,7 +322,7 @@ class Cat(object):
         t0 = time()
         from .readGadgetSnapshot import readGadgetSnapshot
         from fast3tree import fast3tree
-        numpy.random.seed(int(t0))
+        np.random.seed(int(t0))
         p = 1e-2
         all_particles = np.array([], dtype='float32')
         avg_pos = np.zeros((3,))
