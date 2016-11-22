@@ -461,7 +461,15 @@ class Emu(object):
         :return:
             mu, and if gp_err, a cov. matrix
         """
-        return self.emulate_wrt_r_z(em_params, r_bin_centers, [], gp_err)
+        ep = em_params
+        z_bin_centers = []
+        try:
+            z_bin_centers = ep['z']
+            del ep['z']
+        except KeyError:
+            pass
+
+        return self.emulate_wrt_r_z(ep, r_bin_centers, z_bin_centers, gp_err)
 
     def emulate_wrt_z(self, em_params, z_bin_centers, gp_err=False):
         """
@@ -476,7 +484,16 @@ class Emu(object):
         :return:
             mu, and if gp_err, a cov. matrix
         """
-        return self.emulate_wrt_r_z(em_params, [], z_bin_centers, gp_err)
+        ep = em_params
+        r_bin_centers = []
+        try:
+            r_bin_centers = ep['r']
+            del ep['r']
+        except KeyError:
+            pass
+
+
+        return self.emulate_wrt_r_z(ep, r_bin_centers, z_bin_centers, gp_err)
 
     @abstractmethod
     def emulate_wrt_r_z(self, em_params, r_bin_centers, z_bin_centers, gp_err=False):
@@ -1132,13 +1149,16 @@ class ExtraCrispy(Emu):
         if type(training_dir) is not list:
             training_dir = [training_dir]
 
-        xs, ys = [], []
+        xs, ys, yerrs = [], [], []
         for td in training_dir:
-            x, y, _ = self.get_data(td, {}, self.fixed_params, self.independent_variable)
-
+            x, y, yerr = self.get_data(td, {}, self.fixed_params, self.independent_variable)
             print x.shape
+            print y.shape
+            print yerr.shape
+
             xs.append(x)
             ys.append(y)
+            yerrs.append(yerr)
 
         # now, need to do some shuffling to get these right.
         # NOTE this involves creating a large array and slicing it down, essentially. Not the most efficient.
@@ -1147,11 +1167,11 @@ class ExtraCrispy(Emu):
 
         scale_nbins = len(self.scale_bin_centers)
         redshift_nbins = len(self.z_bin_centers)
-        print scale_nbins, redshift_nbins
-        self.x = np.vstack(xs)[0:-1:scale_nbins + redshift_nbins, :]
+        self.x = np.vstack(xs)[0:-1:scale_nbins*redshift_nbins, :]
         print self.x.shape
         self.y = np.hstack(ys).reshape((-1, scale_nbins, redshift_nbins))
-        self.yerr = np.zeros_like(self.y)
+        #self.yerr = np.zeros_like(self.y)
+        self.yerr = np.hstack(yerrs).reshape((-1, scale_nbins, redshift_nbins))
         self.y_hat = np.zeros(self.y.shape[1:]) if len(self.y.shape) > 1 else 0  # self.y.mean(axis = 0)
         self.y -= self.y_hat
 
@@ -1172,18 +1192,22 @@ class ExtraCrispy(Emu):
         kernel = self._make_kernel(metric)
         # TODO is it confusing for this to have the same name as the sklearn object with a different API?
         # maybe it should be a property? or private?
-        emulator = george.GP(kernel)
-        # gp = george.GP(kernel, solver=george.HODLRSolver, nleaf=x.shape[0]+1,tol=1e-18)
+        self.emulators = [[None for i in xrange(self.yerr.shape[1])] for j in xrange(self.yerr.shape[2])]
 
-        #TODO iterate over yerrs here. 
-        emulator.compute(self.x,sort=False)  # NOTE I'm using a modified version of george!
+        for i in xrange(self.yerr.shape[1]):
+            for j in xrange(self.yerr.shape[2]):
+                emulator = george.GP(kernel)
 
-        # For EC, i'm storing an emulator per bin.
-        # I'll have to thikn about how to differ the hyperparams.
-        # For now, it'll replicate the same behavior as before.
-        # TODO not happy, in general, EC has "emulators" not "emulator" like the others.
-        # Arguement would be this should be all abstracted out from the user.
-        self.emulators = [[emulator for i in xrange(self.yerr.shape[1])] for j in xrange(self.yerr.shape[2])]
+                print self.x.shape
+                print self.yerr.shape
+
+                emulator.compute(self.x, self.yerr[:, i,j],sort=False)  # NOTE I'm using a modified version of george!
+                self.emulators[j][i] = emulator
+                # For EC, i'm storing an emulator per bin.
+                # I'll have to thikn about how to differ the hyperparams.
+                # For now, it'll replicate the same behavior as before.
+                # TODO not happy, in general, EC has "emulators" not "emulator" like the others.
+                # Arguement would be this should be all abstracted out from the user.
 
     def _build_skl(self, hyperparams):
         """
@@ -1279,6 +1303,8 @@ class ExtraCrispy(Emu):
             Off diagonal elements are set to 0.
         """
         # turns out this how it already works!
+        assert 'r' not in em_params
+        assert 'z' not in em_params
         out = self.emulate(em_params, gp_errs)
         # don't need to interpolate!
         for input_bin, owned_bin in zip([r_bin_centers, z_bin_centers], [self.scale_bin_centers, self.z_bin_centers]):
