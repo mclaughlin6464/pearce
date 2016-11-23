@@ -424,8 +424,6 @@ class Emu(object):
         input_params = {}
         input_params.update(self.fixed_params)
         input_params.update(em_params)
-        print input_params
-        print self.emulator_ndim, self.fixed_ndim
         assert len(input_params) - self.emulator_ndim + self.fixed_ndim <=2  # check dimenstionality
         for i in input_params:  # check that the names in input params are all defined in the ordering.
             assert any(i == p.name for p in self.ordered_params)
@@ -435,10 +433,7 @@ class Emu(object):
         t_grid = np.meshgrid(*t_list)
         t = np.stack(t_grid).T
         # TODO george can sort?
-        print self.emulator_ndim
-        print t.shape
         t = t.reshape((-1, self.emulator_ndim))
-        print t.shape
 
         t = self._sort_params(t)
 
@@ -461,7 +456,8 @@ class Emu(object):
         :return:
             mu, and if gp_err, a cov. matrix
         """
-        ep = em_params
+        ep = {}
+        ep.update(em_params)
         z_bin_centers = []
         try:
             z_bin_centers = ep['z']
@@ -484,7 +480,8 @@ class Emu(object):
         :return:
             mu, and if gp_err, a cov. matrix
         """
-        ep = em_params
+        ep = {}
+        ep.update(em_params)
         r_bin_centers = []
         try:
             r_bin_centers = ep['r']
@@ -799,7 +796,6 @@ class OriginalRecipe(Emu):
         xs, ys, yerrs = [], [], []
         for td in training_dir:
             x, y, yerr = self.get_data(td, {}, self.fixed_params, self.independent_variable)
-            print x.shape
             xs.append(x)
             ys.append(y)
             yerrs.append(yerr)
@@ -1152,9 +1148,6 @@ class ExtraCrispy(Emu):
         xs, ys, yerrs = [], [], []
         for td in training_dir:
             x, y, yerr = self.get_data(td, {}, self.fixed_params, self.independent_variable)
-            print x.shape
-            print y.shape
-            print yerr.shape
 
             xs.append(x)
             ys.append(y)
@@ -1168,7 +1161,6 @@ class ExtraCrispy(Emu):
         scale_nbins = len(self.scale_bin_centers)
         redshift_nbins = len(self.z_bin_centers)
         self.x = np.vstack(xs)[0:-1:scale_nbins*redshift_nbins, :]
-        print self.x.shape
         self.y = np.hstack(ys).reshape((-1, scale_nbins, redshift_nbins))
         #self.yerr = np.zeros_like(self.y)
         self.yerr = np.hstack(yerrs).reshape((-1, scale_nbins, redshift_nbins))
@@ -1197,9 +1189,6 @@ class ExtraCrispy(Emu):
         for i in xrange(self.yerr.shape[1]):
             for j in xrange(self.yerr.shape[2]):
                 emulator = george.GP(kernel)
-
-                print self.x.shape
-                print self.yerr.shape
 
                 emulator.compute(self.x, self.yerr[:, i,j],sort=False)  # NOTE I'm using a modified version of george!
                 self.emulators[j][i] = emulator
@@ -1247,27 +1236,29 @@ class ExtraCrispy(Emu):
         :return:
             mu, cov (if gp_errs True). Predicted value for dependetn variable t.
         """
-        all_mu = np.zeros((t.shape[0], self.y.shape[1], self.yshape[2]))  # t down scale_nbins across
+        all_mu = np.zeros((t.shape[0], self.y.shape[1], self.y.shape[2]))  # t down scale_nbins across
+        print all_mu.shape
         # all_err = np.zeros((t.shape[0], self.y.shape[1]))
         all_cov = []  # np.zeros((t.shape[0], t.shape[0], self.y.shape[1]))
-
-        for z_idx, (scale_ys, scale_yhats, scale_emulators) in enumerate(izip(self.y.T, self.y_hat, self.emulators)):
-            for scale_idx, (y, y_hat, emulator) in enumerate(izip(scale_ys, scale_yhats, scale_emulators)):
-                if self.method == 'gp':
-                    out = emulator.predict(y, t, mean_only=not gp_errs)
+        #TODO pythonic iteration. Not happening right now.
+        for scale_idx in xrange(self.y.shape[1]):
+            for z_idx in xrange(self.y.shape[2]):
+                if self.method=='gp':
+                    out = self.emulators[z_idx][scale_idx].predict(self.y[:, scale_idx, z_idx], t, mean_only = not gp_errs)
                     if gp_errs:
                         mu, cov = out
                         all_cov.append(cov)
                     else:
                         mu = out
                 else:
-                    mu = emulator.predict(t)
+                    mu = self.emulators[z_idx][scale_idx].predict(t)
                 # mu and cov come out as (1,) arrays.
-                all_mu[:, scale_idx, z_idx] = mu + y_hat
+                all_mu[:, scale_idx, z_idx] = mu + self.y_hat[scale_idx, z_idx]
                 # all_err[:, idx] = np.sqrt(np.diag(cov))
                 # all_cov[:, :, idx] = cov
 
         # Reshape to be consistent with my otehr implementation
+        #TODO don't reshape!  
         mu = all_mu.reshape((-1,))
         if not gp_errs:
             return mu
@@ -1284,7 +1275,7 @@ class ExtraCrispy(Emu):
                         cov[j * scale_nbins + i * redshift_nbins + n, j * scale_nbins + n] = val
         return mu, cov
 
-    def emulate_wrt_r_z(self, em_params, r_bin_centers, z_bin_centers, gp_errs=False, kind='slinear'):
+    def emulate_wrt_r_z(self, em_params, r_bin_centers, z_bin_centers, gp_errs=False, kind='linear'):
         """
         Conveniance function. Add's 'r' and 'z' to the emulation automatically, as this is the
         most common use case.
@@ -1308,10 +1299,11 @@ class ExtraCrispy(Emu):
         out = self.emulate(em_params, gp_errs)
         # don't need to interpolate!
         for input_bin, owned_bin in zip([r_bin_centers, z_bin_centers], [self.scale_bin_centers, self.z_bin_centers]):
-            if input_bin and input_bin != owned_bin:
+            if np.any(input_bin) and np.any(input_bin != owned_bin):
                 break
         else:
             # if any that exist are not equal to the owned ones, keep going. Else, return.
+            print 'hi'
             return out
 
         if gp_errs:
@@ -1329,25 +1321,34 @@ class ExtraCrispy(Emu):
         all_err = all_err.reshape((-1, len(self.scale_bin_centers), len(self.z_bin_centers)))
 
         if len(all_mu.shape) == 1:  # just one calculation
-            xi_interpolator = interp2d(self.scale_bin_centers, self.z_bin_centers, all_mu, kind=kind)
-            new_mu = xi_interpolator(r_bin_centers, z_bin_centers)
+            xi_interpolator = interp2d(self.z_bin_centers, self.scale_bin_centers, all_mu, kind=kind)
+            new_mu = xi_interpolator(z_bin_centers, r_bin_centers)
             if not gp_errs:
-                return new_mu
-            err_interp = interp2d(self.scale_bin_centers, self.z_bin_centers, all_err, kind=kind)
-            new_err = err_interp(r_bin_centers, z_bin_centers)
-            return new_mu, new_err
+                return new_mu.T
+            err_interp = interp2d(self.z_bin_centers, self.scale_bin_centers, all_err, kind=kind)
+            new_err = err_interp(z_bin_centers, r_bin_centers)
+            return new_mu.T, new_err.T
 
         # TODO ... is this rightt? Was that all I had to do?
         new_mu, new_err = [], []
         for mean, err in izip(all_mu, all_err):
-            xi_interpolator = interp2d(self.scale_bin_centers, self.z_bin_centers, mean, kind=kind)
-            interp_mean = xi_interpolator(r_bin_centers, z_bin_centers)
-            new_mu.append(interp_mean)
-            err_interp = interp2d(self.scale_bin_centers, self.z_bin_centers, err, kind=kind)
-            interp_err = err_interp(r_bin_centers, z_bin_centers)
-            new_err.append(interp_err)
-        mu = np.array(new_mu).reshape((-1,))
-        cov = np.diag(np.array(new_err).reshape((-1,)))
+            print self.scale_bin_centers
+            print self.z_bin_centers
+            print self.scale_bin_centers.shape, self.z_bin_centers
+            print mean.shape
+            xi_interpolator = interp2d(self.z_bin_centers, self.scale_bin_centers, mean, kind=kind)
+            print r_bin_centers
+            print z_bin_centers
+            interp_mean = xi_interpolator(z_bin_centers, r_bin_centers)
+            new_mu.append(interp_mean.T)
+            err_interp = interp2d(self.z_bin_centers, self.scale_bin_centers, err, kind=kind)
+            interp_err = err_interp(z_bin_centers, r_bin_centers)
+            new_err.append(interp_err.T)
+
+        print np.vstack(new_mu).shape
+        mu = np.vstack(new_mu).reshape((-1,))
+        print mu.shape
+        cov = np.diag(np.vstack(new_err).reshape((-1,)))
 
         if gp_errs:
             return mu, cov
