@@ -1316,7 +1316,7 @@ class ExtraCrispy(Emu):
         # TODO check bin_centers in bounds!
         # TODO is there any reasonable way to interpolate the covariance?
         all_err = np.sqrt(np.diag(cov))
-
+        #TODO these reshapes should depend on what the user called!
         all_mu = mu.reshape((-1, len(self.scale_bin_centers), len(self.z_bin_centers)))
         all_err = all_err.reshape((-1, len(self.scale_bin_centers), len(self.z_bin_centers)))
 
@@ -1332,13 +1332,10 @@ class ExtraCrispy(Emu):
         # TODO ... is this rightt? Was that all I had to do?
         new_mu, new_err = [], []
         for mean, err in izip(all_mu, all_err):
-            print self.scale_bin_centers
-            print self.z_bin_centers
-            print self.scale_bin_centers.shape, self.z_bin_centers
+            print self.scale_bin_centers.shape, self.z_bin_centers.shape
             print mean.shape
             xi_interpolator = interp2d(self.z_bin_centers, self.scale_bin_centers, mean, kind=kind)
-            print r_bin_centers
-            print z_bin_centers
+            print r_bin_centers.shape, z_bin_centers.shape
             interp_mean = xi_interpolator(z_bin_centers, r_bin_centers)
             new_mu.append(interp_mean.T)
             err_interp = interp2d(self.z_bin_centers, self.scale_bin_centers, err, kind=kind)
