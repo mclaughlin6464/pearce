@@ -96,7 +96,7 @@ class Emu(object):
                 sub_dirs.append(path.join(data_dir, 'a_%.5f' % a))
                 _sub_dirs_as.append(a)
             sub_dirs_as = np.array(_sub_dirs_as)
-        self.z_bin_centers = 1 / sub_dirs_as - 1
+        self.redshift_bin_centers = 1 / sub_dirs_as - 1
 
 
         all_x, all_y, all_yerr = [], [], []
@@ -1159,7 +1159,7 @@ class ExtraCrispy(Emu):
         # However, the one in the superclass is the "standard" approach.
 
         scale_nbins = len(self.scale_bin_centers)
-        redshift_nbins = len(self.z_bin_centers)
+        redshift_nbins = len(self.redshift_bin_centers)
         self.x = np.vstack(xs)[0:-1:scale_nbins*redshift_nbins, :]
         self.y = np.hstack(ys).reshape((-1, scale_nbins, redshift_nbins))
         #self.yerr = np.zeros_like(self.y)
@@ -1298,12 +1298,11 @@ class ExtraCrispy(Emu):
         assert 'z' not in em_params
         out = self.emulate(em_params, gp_errs)
         # don't need to interpolate!
-        for input_bin, owned_bin in zip([r_bin_centers, z_bin_centers], [self.scale_bin_centers, self.z_bin_centers]):
+        for input_bin, owned_bin in zip([r_bin_centers, z_bin_centers], [self.scale_bin_centers, self.redshift_bin_centers]):
             if np.any(input_bin) and np.any(input_bin != owned_bin):
                 break
         else:
             # if any that exist are not equal to the owned ones, keep going. Else, return.
-            print 'hi'
             return out
 
         if gp_errs:
@@ -1316,35 +1315,33 @@ class ExtraCrispy(Emu):
         # TODO check bin_centers in bounds!
         # TODO is there any reasonable way to interpolate the covariance?
         all_err = np.sqrt(np.diag(cov))
-        #TODO these reshapes should depend on what the user called!
-        all_mu = mu.reshape((-1, len(self.scale_bin_centers), len(self.z_bin_centers)))
-        all_err = all_err.reshape((-1, len(self.scale_bin_centers), len(self.z_bin_centers)))
+        print mu.shape
+        all_mu = mu.reshape((-1, len(self.scale_bin_centers), len(self.redshift_bin_centers)))
+        all_err = all_err.reshape((-1, len(self.scale_bin_centers), len(self.redshift_bin_centers)))
 
-        if len(all_mu.shape) == 1:  # just one calculation
-            xi_interpolator = interp2d(self.z_bin_centers, self.scale_bin_centers, all_mu, kind=kind)
-            new_mu = xi_interpolator(z_bin_centers, r_bin_centers)
+        if all_mu.shape[0] == 1 or len(all_mu.shape)==1:  # just one calculation
+            xi_interpolator = interp2d(self.scale_bin_centers, self.redshift_bin_centers, all_mu, kind=kind)
+            new_mu = xi_interpolator(r_bin_centers, z_bin_centers)
             if not gp_errs:
-                return new_mu.T
-            err_interp = interp2d(self.z_bin_centers, self.scale_bin_centers, all_err, kind=kind)
-            new_err = err_interp(z_bin_centers, r_bin_centers)
-            return new_mu.T, new_err.T
+                return new_mu
+
+            err_interp = interp2d(self.scale_bin_centers, self.redshift_bin_centers, all_err, kind=kind)
+            new_err = err_interp(r_bin_centers, z_bin_centers)
+            return new_mu, np.diag(new_err)
 
         # TODO ... is this rightt? Was that all I had to do?
         new_mu, new_err = [], []
         for mean, err in izip(all_mu, all_err):
-            print self.scale_bin_centers.shape, self.z_bin_centers.shape
-            print mean.shape
-            xi_interpolator = interp2d(self.z_bin_centers, self.scale_bin_centers, mean, kind=kind)
-            print r_bin_centers.shape, z_bin_centers.shape
-            interp_mean = xi_interpolator(z_bin_centers, r_bin_centers)
-            new_mu.append(interp_mean.T)
-            err_interp = interp2d(self.z_bin_centers, self.scale_bin_centers, err, kind=kind)
-            interp_err = err_interp(z_bin_centers, r_bin_centers)
-            new_err.append(interp_err.T)
 
-        print np.vstack(new_mu).shape
-        mu = np.vstack(new_mu).reshape((-1,))
-        print mu.shape
+            xi_interpolator = interp2d(self.scale_bin_centers, self.redshift_bin_centers, mean, kind=kind)
+            interp_mean = xi_interpolator(r_bin_centers, z_bin_centers)
+            new_mu.append(interp_mean)
+            err_interp = interp2d(self.scale_bin_centers, self.redshift_bin_centers, err, kind=kind)
+            interp_err = err_interp(r_bin_centers, z_bin_centers)
+            new_err.append(interp_err)
+
+        #TODO no clue if this makes sense; may need a resisze
+        mu = np.vstack(new_mu)
         cov = np.diag(np.vstack(new_err).reshape((-1,)))
 
         if gp_errs:
