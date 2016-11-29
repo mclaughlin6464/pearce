@@ -305,7 +305,7 @@ class Cat(object):
             reader.write_to_disk()  # do these after so we have a halo table to work off of
             reader.update_cache_log()
 
-    def add_local_density(self, reader, snapdir, radius=5):
+    def add_local_density(self, reader, snapdir, radius=10):
         """
         Calculates the local density around each halo and adds it to the halo table, to be cached.
         :param reader:
@@ -349,7 +349,7 @@ class Cat(object):
         print all_particles.shape
         print all_particles.mean(axis=0), all_particles.max(axis=0), all_particles.min(axis=0)
         print avg_pos/N_pos
-        np.savetxt('/u/ki/swmclau2/des/all_particles.npy', all_particles)
+        #np.savetxt('/u/ki/swmclau2/des/all_particles.npy', all_particles)
 
         # all_pos *= h
         # TODO not entirely sure if i'm applying little h correctly
