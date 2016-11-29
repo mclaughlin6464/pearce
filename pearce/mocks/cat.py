@@ -349,6 +349,7 @@ class Cat(object):
         print all_particles.shape
         print all_particles.mean(axis=0), all_particles.max(axis=0), all_particles.min(axis=0)
         print avg_pos/N_pos
+        np.savetxt('/u/ki/swmclau2/des/all_particles.npy', all_particles)
 
         # all_pos *= h
         # TODO not entirely sure if i'm applying little h correctly
