@@ -346,12 +346,6 @@ class Cat(object):
 
         print 'All done', time() - t0, 's'
 
-        print all_particles.shape
-        print all_particles.mean(axis=0), all_particles.max(axis=0), all_particles.min(axis=0)
-        print avg_pos/N_pos
-        print all_particles.mean(axis=0, dtype=np.float64)
-        print all_particles.sum(axis=0)/all_particles.shape[0]
-        print (all_particles/all_particles.shape[0]).sum(axis=0)
         #np.savetxt('/u/ki/swmclau2/des/all_particles.npy', all_particles)
 
         # all_pos *= h
