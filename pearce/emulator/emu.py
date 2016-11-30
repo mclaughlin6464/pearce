@@ -1015,9 +1015,10 @@ class SpicyBuffalo(Emu):
             nbins = len(self.scale_bin_centers)
             self.x = np.vstack(xs)[0:-1:nbins, :]
             self.y = np.hstack(ys).reshape((-1, nbins))
-
-            self.em_bin_centers =
+            #TODO I think this name is confusing
+            self.em_bin_centers = self.scale_bin_centers
         else:
+            #since z is the second from the end, not so easy as to just skip over them.
             nbins = len(self.scale_bin_centers)
             _xs = []
             for x in xs:
@@ -1026,6 +1027,8 @@ class SpicyBuffalo(Emu):
             self.x = np.vstack(_xs)
             y = np.hstack(ys)
             self.y = np.hstack([y[i * nbins:(i + 1) * nbins] for i in xrange(y.shape[0] / nbins)])
+
+            self.em_bin_centers = self.redshift_bin_centers
 
         self.yerr = np.zeros_like(self.y)
         self.y_hat = np.zeros(self.y.shape[1:]) if len(self.y.shape) > 1 else 0  # self.y.mean(axis = 0)
@@ -1153,13 +1156,19 @@ class SpicyBuffalo(Emu):
             is not equal to the bin_centers in the training data, the mean is interpolated as is the variance.
             Off diagonal elements are set to 0.
         """
-        # turns out this how it already works!
-        assert 'r' not in em_params
+
+        vep = dict(em_params)
+        rpc = np.log10(r_bin_centers) if np.any(r_bin_centers)else []  # make sure not to throw an error
+        # TODO change 'r' to something more general
+        for key, val in zip(['r', 'z'], (rpc, z_bin_centers)):
+            if key == self.em_param and key not in vep and np.any(val):  # key must not already exist and must be nonzero:
+                vep[key] = val
+
         out = self.emulate(em_params, gp_errs)
         # don't need to interpolate!
-        for input_bin, owned_bin in zip([r_bin_centers, z_bin_centers],
+        for key, input_bin, owned_bin in zip(['r', 'z'], [r_bin_centers, z_bin_centers],
                                         [self.scale_bin_centers, self.redshift_bin_centers]):
-            if np.any(input_bin) and np.any(input_bin != owned_bin):
+            if key!=self.em_param and np.any(input_bin) and np.any(input_bin != owned_bin):
                 break
         else:
             # if any that exist are not equal to the owned ones, keep going. Else, return.
@@ -1172,31 +1181,37 @@ class SpicyBuffalo(Emu):
             # I'm a bad, lazy man
             err = np.zeros_like(mu)
 
+        # Remember, these are for the parameter we're NOT emulating
+        if self.em_param == 'r':
+            em_bin_centers = z_bin_centers
+        else:
+            em_bin_centers = r_bin_centers
+
         # TODO check bin_centers in bounds!
         # TODO is there any reasonable way to interpolate the covariance?
         print mu.shape
-        all_mu = mu.reshape((-1, len(self.scale_bin_centers), len(self.redshift_bin_centers)))
-        all_err = err.reshape((-1, len(self.scale_bin_centers), len(self.redshift_bin_centers)))
+        all_mu = mu.reshape((-1, len(self.em_bin_centers)))
+        all_err = err.reshape(all_mu.shape)
 
         # TODO can I combine these two?
         if all_mu.shape[0] == 1 or len(all_mu.shape) == 1:  # just one calculation
-            xi_interpolator = interp2d(self.scale_bin_centers, self.redshift_bin_centers, all_mu, kind=kind)
-            new_mu = xi_interpolator(r_bin_centers, z_bin_centers)
+            xi_interpolator = interp1d(self.em_bin_centers, all_mu, kind=kind)
+            new_mu = xi_interpolator(em_bin_centers)
             if not gp_errs:
                 return new_mu
 
-            err_interp = interp2d(self.scale_bin_centers, self.redshift_bin_centers, all_err, kind=kind)
-            new_err = err_interp(r_bin_centers, z_bin_centers)
+            err_interp = interp1d(self.em_bin_centerss, all_err, kind=kind)
+            new_err = err_interp(em_bin_centers)
             return new_mu, new_err
 
         # TODO ... is this rightt? Was that all I had to do?
         new_mu, new_err = [], []
         for mean, err in izip(all_mu, all_err):
-            xi_interpolator = interp2d(self.scale_bin_centers, self.redshift_bin_centers, mean, kind=kind)
-            interp_mean = xi_interpolator(r_bin_centers, z_bin_centers)
+            xi_interpolator = interp1d(self.em_bin_centers, mean, kind=kind)
+            interp_mean = xi_interpolator(em_bin_centers)
             new_mu.append(interp_mean)
-            err_interp = interp2d(self.scale_bin_centers, self.redshift_bin_centers, err, kind=kind)
-            interp_err = err_interp(r_bin_centers, z_bin_centers)
+            err_interp = interp1d(self.em_bin_centers, err, kind=kind)
+            interp_err = err_interp(em_bin_centers)
             new_err.append(interp_err)
 
         # TODO no clue if this makes sense; may need a resisze
@@ -1225,7 +1240,7 @@ class SpicyBuffalo(Emu):
             # params are log(a) and log(m)
             emulator.kernel[:] = p
             # check this has the right direction
-            ll = np.sum(emulator.lnlikelihood(y, quiet=True) for y in self.y.flatten())
+            ll = np.mean(emulator.lnlikelihood(y, quiet=True) for y in self.y.flatten())
 
             # The scipy optimizer doesn't play well with infinities.
             return -ll if np.isfinite(ll) else 1e25
