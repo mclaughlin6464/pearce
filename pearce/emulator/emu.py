@@ -477,8 +477,12 @@ class Emu(object):
             mu, errs  = out
         else:
             mu = out
+        print 'wrt_r'
+        print mu.shape
         #the swapaxes ensures this works correctly
-        mu = mu.swapaxes(1,2).reshape((-1, r_bin_centers.shape[0]))
+        #mu = mu.swapaxes(1,2).reshape((-1, r_bin_centers.shape[0]))
+        mu = mu.reshape((-1, r_bin_centers.shape[0]))
+        print mu.shape
         if not gp_errs:
             return mu
         errs = errs.swapaxes(1,2).reshape(mu.shape)
@@ -924,8 +928,10 @@ class OriginalRecipe(Emu):
             mu, errs  = out
         else:
             mu = out
+        print mu.shape
         #TODO not sure this reshape does what I want.
         mu = mu.reshape((-1,r_bin_centers.shape[0], z_bin_centers.shape[0]))
+        print mu.shape
         if not gp_errs:
             return mu
         errs = errs.reshape(mu.shape)
@@ -1370,6 +1376,7 @@ class ExtraCrispy(Emu):
             mu, cov (if gp_errs True). Predicted value for dependetn variable t.
         """
         all_mu = np.zeros((t.shape[0], self.y.shape[1], self.y.shape[2]))  # t down scale_nbins across
+        print 'emulate_helper'
         print all_mu.shape
         all_err = np.zeros_like(all_mu)
         #all_cov = []  # np.zeros((t.shape[0], t.shape[0], self.y.shape[1]))
@@ -1391,7 +1398,7 @@ class ExtraCrispy(Emu):
                 # all_cov[:, :, idx] = cov
 
         # Reshape to be consistent with my otehr implementation
-        #TODO don't reshape!  
+        print 1, all_mu.shape
         mu = all_mu.reshape((-1,))
         if not gp_errs:
             return mu
@@ -1430,7 +1437,9 @@ class ExtraCrispy(Emu):
             Off diagonal elements are set to 0.
         """
         # turns out this how it already works!
-        assert self.em_param not in em_params
+        #assert self.em_param not in em_params
+        assert 'r' not in em_params
+        assert 'z' not in em_params
         out = self.emulate(em_params, gp_errs)
         # don't need to interpolate!
         for input_bin, owned_bin in zip([r_bin_centers, z_bin_centers], [self.scale_bin_centers, self.redshift_bin_centers]):
@@ -1449,18 +1458,24 @@ class ExtraCrispy(Emu):
 
         # TODO check bin_centers in bounds!
         # TODO is there any reasonable way to interpolate the covariance?
+        print 'wrt_r_z'
         print mu.shape
         all_mu = mu.reshape((-1, len(self.scale_bin_centers), len(self.redshift_bin_centers)))
         all_err = err.reshape((-1, len(self.scale_bin_centers), len(self.redshift_bin_centers)))
 
         # TODO can I combine these two?
-        if all_mu.shape[0] == 1 or len(all_mu.shape)==1:  # just one calculation
-            xi_interpolator = interp2d(self.scale_bin_centers, self.redshift_bin_centers, all_mu, kind=kind)
-            new_mu = xi_interpolator(r_bin_centers, z_bin_centers)
+        if all_mu.shape[0] == 1:  # just one calculation
+            print self.scale_bin_centers.shape, self.redshift_bin_centers.shape
+            print all_mu[0].shape
+            #xi_interpolator = interp2d(self.scale_bin_centers, self.redshift_bin_centers, all_mu[0], kind=kind)
+            xi_interpolator = interp2d(self.redshift_bin_centers, self.scale_bin_centers, all_mu[0], kind=kind)
+            new_mu = xi_interpolator(z_bin_centers, r_bin_centers)
+            print new_mu.shape
+            print new_mu.swapaxes(0,1).shape
             if not gp_errs:
-                return new_mu
+                return new_mu.swapaxes(0,1)
 
-            err_interp = interp2d(self.scale_bin_centers, self.redshift_bin_centers, all_err, kind=kind)
+            err_interp = interp2d(self.scale_bin_centers, self.redshift_bin_centers, all_err[0], kind=kind)
             new_err = err_interp(r_bin_centers, z_bin_centers)
             return new_mu, new_err
 
