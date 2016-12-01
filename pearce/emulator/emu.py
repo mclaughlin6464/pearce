@@ -1006,11 +1006,12 @@ class SpicyBuffalo(Emu):
         if type(training_dir) is not list:
             training_dir = [training_dir]
 
-        xs, ys = [], []
+        xs, ys,yerrs = [], [], []
         for td in training_dir:
-            x, y, _ = self.get_data(td, {}, self.fixed_params, self.independent_variable)
+            x, y, yerr = self.get_data(td, {}, self.fixed_params, self.independent_variable)
             xs.append(x)
             ys.append(y)
+            yerrs.append(yerr)
 
         # this is a bit of a mess. apologies.
 
@@ -1018,6 +1019,7 @@ class SpicyBuffalo(Emu):
             nbins = len(self.scale_bin_centers)
             self.x = np.vstack(xs)[0:-1:nbins, :]
             self.y = np.hstack(ys).reshape((-1, nbins))
+            self.yerr = np.hstack(yerrs).reshape(self.y.shape)
             #TODO I think this name is confusing
             self.em_bin_centers = self.scale_bin_centers
         else:
@@ -1026,14 +1028,17 @@ class SpicyBuffalo(Emu):
             _xs = []
             for x in xs:
                 n_per_bin = x.shape[0] / nbins
-                _xs.append(x[:n_per_bin + 1])
+                _xs.append(x[:n_per_bin, :])
+
             self.x = np.vstack(_xs)
             y = np.hstack(ys)
-            self.y = np.hstack([y[i * nbins:(i + 1) * nbins] for i in xrange(y.shape[0] / nbins)])
+            yerr = np.hstack(yerrs)
+            self.y = np.vstack([y[i * nbins:(i + 1) * nbins] for i in xrange(y.shape[0]/nbins)])
+            
+            self.yerr = np.vstack([yerr[i * nbins:(i+1) * nbins] for i in xrange(y.shape[0]/nbins)])
 
             self.em_bin_centers = self.redshift_bin_centers
 
-        self.yerr = np.zeros_like(self.y)
         self.y_hat = np.zeros(self.y.shape[1:]) if len(self.y.shape) > 1 else 0  # self.y.mean(axis = 0)
         self.y -= self.y_hat
 
@@ -1056,16 +1061,13 @@ class SpicyBuffalo(Emu):
         # maybe it should be a property? or private?
         emulator = george.GP(kernel)
         # gp = george.GP(kernel, solver=george.HODLRSolver, nleaf=x.shape[0]+1,tol=1e-18)
+        self.emulators = [None for i in xrange(self.yerr.shape[1])]
 
-        emulator.compute(self.x, np.zeros((self.x.shape[0],)),
-                         sort=False)  # NOTE I'm using a modified version of george!
+        for i in xrange(self.yerr.shape[1]):
+                emulator = george.GP(kernel)
 
-        # For EC, i'm storing an emulator per bin.
-        # I'll have to thikn about how to differ the hyperparams.
-        # For now, it'll replicate the same behavior as before.
-        # TODO not happy, in general, EC has "emulators" not "emulator" like the others.
-        # Arguement would be this should be all abstracted out from the user.
-        self.emulators = [emulator for i in xrange(self.yerr.shape[1])]
+                emulator.compute(self.x, self.yerr[:, i],sort=False)  # NOTE I'm using a modified version of george!
+                self.emulators[i] = emulator
 
     def _build_skl(self, hyperparams):
         """
@@ -1192,7 +1194,6 @@ class SpicyBuffalo(Emu):
 
         # TODO check bin_centers in bounds!
         # TODO is there any reasonable way to interpolate the covariance?
-        print mu.shape
         all_mu = mu.reshape((-1, len(self.em_bin_centers)))
         all_err = err.reshape(all_mu.shape)
 
@@ -1373,8 +1374,6 @@ class ExtraCrispy(Emu):
             mu, cov (if gp_errs True). Predicted value for dependetn variable t.
         """
         all_mu = np.zeros((t.shape[0], self.y.shape[1], self.y.shape[2]))  # t down scale_nbins across
-        print 'emulate_helper'
-        print all_mu.shape
         all_err = np.zeros_like(all_mu)
         #all_cov = []  # np.zeros((t.shape[0], t.shape[0], self.y.shape[1]))
         #TODO pythonic iteration. Not happening right now.
@@ -1395,7 +1394,6 @@ class ExtraCrispy(Emu):
                 # all_cov[:, :, idx] = cov
 
         # Reshape to be consistent with my otehr implementation
-        print 1, all_mu.shape
         mu = all_mu.reshape((-1,))
         if not gp_errs:
             return mu
@@ -1415,7 +1413,7 @@ class ExtraCrispy(Emu):
         return mu, cov
         '''
 
-    def emulate_wrt_r_z(self, em_params, r_bin_centers, z_bin_centers, gp_errs=False, kind='linear'):
+    def emulate_wrt_r_z(self, em_params, r_bin_centers, z_bin_centers, gp_errs=False, kind='cubic'):
         """
         Conveniance function. Add's 'r' and 'z' to the emulation automatically, as this is the
         most common use case.
@@ -1452,6 +1450,10 @@ class ExtraCrispy(Emu):
             mu = out
             # I'm a bad, lazy man
             err = np.zeros_like(mu)
+
+        if kind == 'cubic' and any(len(bc) < 3 for bc in (self.scale_bin_centers, self.redshift_bin_centers)):
+            kind = 'linear' #can only do cubic if there's 3 points
+
 
         # TODO check bin_centers in bounds!
         # TODO is there any reasonable way to interpolate the covariance?
