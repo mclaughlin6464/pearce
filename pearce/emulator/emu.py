@@ -479,6 +479,7 @@ class Emu(object):
             mu = out
         #the swapaxes ensures this works correctly
         #mu = mu.swapaxes(1,2).reshape((-1, r_bin_centers.shape[0]))
+        print 'Mu r', mu.shape
         mu = mu.reshape((-1, r_bin_centers.shape[0]))
         if not gp_errs:
             return mu
@@ -507,14 +508,13 @@ class Emu(object):
             del ep['r']
         except KeyError:
             pass
-
-
         out =  self.emulate_wrt_r_z(ep, r_bin_centers, z_bin_centers, gp_errs)
         if gp_errs:
             mu, errs  = out
         else:
             mu = out
         #TODO not sure this reshape does what I want.
+        print 'Mu 3',mu.shape
         mu = mu.swapaxes(1,2).reshape((-1, z_bin_centers.shape[0]))
         if not gp_errs:
             return mu
@@ -920,6 +920,7 @@ class OriginalRecipe(Emu):
             if key not in vep and np.any(val):  # key must not already exist and must be nonzero:
                 vep[key] = val
         # vep.update({'r': np.log10(r_bin_centers), 'z': z_bin_centers})
+
         out = self.emulate(vep, gp_errs)
         if gp_errs:
             mu, errs  = out
@@ -1463,6 +1464,8 @@ class ExtraCrispy(Emu):
             # I'm a bad, lazy man
             err = np.zeros_like(mu)
 
+        print 'mu', mu.shape
+
         if kind == 'cubic' and any(len(bc) < 3 for bc in (self.scale_bin_centers, self.redshift_bin_centers)):
             kind = 'linear' #can only do cubic if there's 3 points
 
@@ -1470,6 +1473,7 @@ class ExtraCrispy(Emu):
         # TODO check bin_centers in bounds!
         # TODO is there any reasonable way to interpolate the covariance?
         all_mu = mu.reshape((-1, len(self.redshift_bin_centers), len(self.scale_bin_centers)))
+        print 'All Mu', all_mu.shape
         all_err = err.reshape(all_mu.shape)
 
         # TODO can I combine these two?
@@ -1496,6 +1500,7 @@ class ExtraCrispy(Emu):
 
         #TODO no clue if this makes sense; may need a resisze
         mu = np.vstack(new_mu)
+        print 'mu 3', mu.shape
         err = np.vstack(new_err)
         if gp_errs:
             return mu, err
