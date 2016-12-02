@@ -925,10 +925,8 @@ class OriginalRecipe(Emu):
             mu, errs  = out
         else:
             mu = out
-        print mu.shape
         #TODO not sure this reshape does what I want.
         mu = mu.reshape((-1,z_bin_centers.shape[0], r_bin_centers.shape[0]))
-        print mu.shape
         if not gp_errs:
             return mu
         errs = errs.reshape(mu.shape)
@@ -1018,26 +1016,32 @@ class SpicyBuffalo(Emu):
         if self.em_param == 'z':
             nbins = len(self.scale_bin_centers)
             self.x = np.vstack(xs)[0:-1:nbins, :]
+            #TODO I checked the 'r' case but not this one
             self.y = np.hstack(ys).reshape((-1, nbins))
             self.yerr = np.hstack(yerrs).reshape(self.y.shape)
             #TODO I think this name is confusing
             self.em_bin_centers = self.scale_bin_centers
         else:
             #since z is the second from the end, not so easy as to just skip over them.
-            nbins = len(self.scale_bin_centers)
+            #TODO I feel like this has to be easier than this.
+            nbins = len(self.redshift_bin_centers)
             _xs = []
-            for x in xs:
+            for x,y,yerr in zip(xs,ys, yerrs):
                 n_per_bin = x.shape[0] / nbins
                 _xs.append(x[:n_per_bin, :])
-
+            
             self.x = np.vstack(_xs)
-            y = np.hstack(ys)
+            self.y = np.vstack(yy.reshape((-1,nbins), order = 'F') for yy in ys)
+            self.yerr = np.vstack(ye.reshape((-1,nbins), order = 'F') for ye in yerrs) 
+            '''
             yerr = np.hstack(yerrs)
             self.y = np.vstack([y[i * nbins:(i + 1) * nbins] for i in xrange(y.shape[0]/nbins)])
             
             self.yerr = np.vstack([yerr[i * nbins:(i+1) * nbins] for i in xrange(y.shape[0]/nbins)])
+            '''
 
             self.em_bin_centers = self.redshift_bin_centers
+
 
         self.y_hat = np.zeros(self.y.shape[1:]) if len(self.y.shape) > 1 else 0  # self.y.mean(axis = 0)
         self.y -= self.y_hat
@@ -1120,6 +1124,7 @@ class SpicyBuffalo(Emu):
                     mu = out
             else:
                 mu = emulator.predict(t)
+        
             # mu and cov come out as (1,) arrays.
             all_mu[:, idx] = mu + y_hat
             # all_err[:, idx] = np.sqrt(np.diag(cov))
@@ -1169,7 +1174,7 @@ class SpicyBuffalo(Emu):
             if key == self.em_param and key not in vep and np.any(val):  # key must not already exist and must be nonzero:
                 vep[key] = val
 
-        out = self.emulate(em_params, gp_errs)
+        out = self.emulate(vep, gp_errs)
         # don't need to interpolate!
         for key, input_bin, owned_bin in zip(['r', 'z'], [r_bin_centers, z_bin_centers],
                                         [self.scale_bin_centers, self.redshift_bin_centers]):
@@ -1186,12 +1191,14 @@ class SpicyBuffalo(Emu):
             # I'm a bad, lazy man
             err = np.zeros_like(mu)
 
-        # Remember, these are for the parameter we're NOT emulating
-        if self.em_param == 'r':
-            em_bin_centers = z_bin_centers
-        else:
+        #remmeber, these are the bins of what were not emulating! 
+        if self.em_param == 'z':
             em_bin_centers = r_bin_centers
+        else:
+            em_bin_centers = z_bin_centers
 
+
+        # Remember, these are for the parameter we're NOT emulating
         # TODO check bin_centers in bounds!
         # TODO is there any reasonable way to interpolate the covariance?
         all_mu = mu.reshape((-1, len(self.em_bin_centers)))
@@ -1221,6 +1228,11 @@ class SpicyBuffalo(Emu):
         # TODO no clue if this makes sense; may need a resisze
         mu = np.vstack(new_mu)
         err = np.vstack(new_err)
+        if self.em_param == 'r':
+            #unfortunate reshape constraint.
+            #stops us from rewriting superclasses though!
+            mu = mu.T
+            err = err.T 
         if gp_errs:
             return mu, err
         return mu
