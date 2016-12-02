@@ -430,6 +430,7 @@ class Emu(object):
         input_params = {}
         input_params.update(self.fixed_params)
         input_params.update(em_params)
+        #TODO this check is insufficient
         assert len(input_params) - self.emulator_ndim + self.fixed_ndim <=2  # check dimenstionality
         for i in input_params:  # check that the names in input params are all defined in the ordering.
             assert any(i == p.name for p in self.ordered_params)
@@ -467,6 +468,8 @@ class Emu(object):
         z_bin_centers = []
         try:
             z_bin_centers = ep['z']
+            if type(z_bin_centers) is float:
+                z_bin_centers = np.array([z_bin_centers])
             del ep['z']
         except KeyError:
             pass
@@ -505,6 +508,8 @@ class Emu(object):
         r_bin_centers = []
         try:
             r_bin_centers = ep['r']
+            if type(r_bin_centers) is float:
+                r_bin_centers = np.array([r_bin_centers])
             del ep['r']
         except KeyError:
             pass
@@ -514,7 +519,7 @@ class Emu(object):
         else:
             mu = out
         #TODO not sure this reshape does what I want.
-        print 'Mu 3',mu.shape
+        print 'Mu z',mu.shape
         mu = mu.swapaxes(1,2).reshape((-1, z_bin_centers.shape[0]))
         if not gp_errs:
             return mu
@@ -524,8 +529,6 @@ class Emu(object):
     @abstractmethod
     def emulate_wrt_r_z(self, em_params, r_bin_centers, z_bin_centers, gp_errs=False):
         pass
-
-    # TODO Emulate wrt z
 
     def estimate_uncertainty(self, truth_dir, N=None):
         """
@@ -917,10 +920,9 @@ class OriginalRecipe(Emu):
         rpc = np.log10(r_bin_centers) if np.any(r_bin_centers)else []  # make sure not to throw an error
         # TODO change 'r' to something more general
         for key, val in zip(['r', 'z'], (rpc, z_bin_centers)):
-            if key not in vep and np.any(val):  # key must not already exist and must be nonzero:
+            if key not in vep and val.size :  # key must not already exist and must be nonzero:
                 vep[key] = val
         # vep.update({'r': np.log10(r_bin_centers), 'z': z_bin_centers})
-
         out = self.emulate(vep, gp_errs)
         if gp_errs:
             mu, errs  = out
@@ -1179,10 +1181,14 @@ class SpicyBuffalo(Emu):
         # don't need to interpolate!
         for key, input_bin, owned_bin in zip(['r', 'z'], [r_bin_centers, z_bin_centers],
                                         [self.scale_bin_centers, self.redshift_bin_centers]):
-            if key!=self.em_param and np.any(input_bin) and np.any(input_bin != owned_bin):
+            #If the interpolated parameter has values that are not equal to those we've already emulated. 
+            #TODO check if t he fix i did here should be in EC too
+            if key!=self.em_param and input_bin.size and not np.all([np.any(input_val == owned_bin) for input_val in input_bin]):
                 break
         else:
             # if any that exist are not equal to the owned ones, keep going. Else, return.
+            # TODO needs reshaping here too!
+            print 'Returning out'
             return out
 
         if gp_errs:
@@ -1202,8 +1208,14 @@ class SpicyBuffalo(Emu):
         # Remember, these are for the parameter we're NOT emulating
         # TODO check bin_centers in bounds!
         # TODO is there any reasonable way to interpolate the covariance?
-        all_mu = mu.reshape((-1, len(self.em_bin_centers)))
+        #all_mu = mu.reshape((-1, len(self.em_bin_centers)))
+        #all_err = err.reshape(all_mu.shape)
+
+        all_mu = mu.reshape((-1, len(self.redshift_bin_centers), len(self.scale_bin_centers)))
+        print 'All mu', all_mu.shape
         all_err = err.reshape(all_mu.shape)
+
+        if self.em_param
 
         # TODO can I combine these two?
         if all_mu.shape[0] == 1 or len(all_mu.shape) == 1:  # just one calculation
@@ -1218,16 +1230,20 @@ class SpicyBuffalo(Emu):
 
         # TODO ... is this rightt? Was that all I had to do?
         new_mu, new_err = [], []
-        for mean, err in izip(all_mu, all_err):
-            xi_interpolator = interp1d(self.em_bin_centers, mean, kind=kind)
-            interp_mean = xi_interpolator(em_bin_centers)
-            new_mu.append(interp_mean)
-            err_interp = interp1d(self.em_bin_centers, err, kind=kind)
-            interp_err = err_interp(em_bin_centers)
-            new_err.append(interp_err)
+        for mean_slice, err_slice in izip(all_mu, all_err):
+            for mean, err in izip(mean_slice, err_slice):
+                xi_interpolator = interp1d(self.em_bin_centers, mean, kind=kind)
+                interp_mean = xi_interpolator(em_bin_centers)
+                print 'im', interp_mean.shape
+                new_mu.append(interp_mean)
+
+                err_interp = interp1d(self.em_bin_centers, err, kind=kind)
+                interp_err = err_interp(em_bin_centers)
+                new_err.append(interp_err)
 
         # TODO no clue if this makes sense; may need a resisze
         mu = np.vstack(new_mu)
+        print mu.shape
         err = np.vstack(new_err)
         if self.em_param == 'r':
             #unfortunate reshape constraint.
@@ -1445,7 +1461,6 @@ class ExtraCrispy(Emu):
             Off diagonal elements are set to 0.
         """
         # turns out this how it already works!
-        #assert self.em_param not in em_params
         assert 'r' not in em_params
         assert 'z' not in em_params
         out = self.emulate(em_params, gp_errs)
@@ -1455,6 +1470,7 @@ class ExtraCrispy(Emu):
                 break
         else:
             # if any that exist are not equal to the owned ones, keep going. Else, return.
+            # TODO still need to reshape even if i'm not interpolating gahhh
             return out
 
         if gp_errs:
@@ -1464,8 +1480,6 @@ class ExtraCrispy(Emu):
             # I'm a bad, lazy man
             err = np.zeros_like(mu)
 
-        print 'mu', mu.shape
-
         if kind == 'cubic' and any(len(bc) < 3 for bc in (self.scale_bin_centers, self.redshift_bin_centers)):
             kind = 'linear' #can only do cubic if there's 3 points
 
@@ -1473,7 +1487,6 @@ class ExtraCrispy(Emu):
         # TODO check bin_centers in bounds!
         # TODO is there any reasonable way to interpolate the covariance?
         all_mu = mu.reshape((-1, len(self.redshift_bin_centers), len(self.scale_bin_centers)))
-        print 'All Mu', all_mu.shape
         all_err = err.reshape(all_mu.shape)
 
         # TODO can I combine these two?
@@ -1493,15 +1506,28 @@ class ExtraCrispy(Emu):
 
             xi_interpolator = interp2d(self.scale_bin_centers, self.redshift_bin_centers, mean, kind=kind)
             interp_mean = xi_interpolator(r_bin_centers, z_bin_centers)
+            #TODO swap axes depends on which bin is length 1
+            if interp_mean.ndim == 1:
+                interp_mean = np.array([interp_mean]) #make 2-D array
+
+            print 'im', interp_mean.shape
             new_mu.append(interp_mean)
             err_interp = interp2d(self.scale_bin_centers, self.redshift_bin_centers, err, kind=kind)
             interp_err = err_interp(r_bin_centers, z_bin_centers)
             new_err.append(interp_err)
 
+        if new_mu[0].ndim == 1: #need to do some array voodoo
+            for idx, nm, ne in enumerate(zip(new_mu, new_err)):
+                new_mu[idx] = np.array([nm])
+                new_err[idx] = np.array([ne])
+
+                if len(r_bin_centers) == 1: #have to swap axes in this case
+                    new_mu[idx] = new_mu[idx].swapaxes(0,1)
+                    new_err[idx] = new_err[idx].swapaxes(0,1)
+
         #TODO no clue if this makes sense; may need a resisze
-        mu = np.vstack(new_mu)
-        print 'mu 3', mu.shape
-        err = np.vstack(new_err)
+        mu = np.stack(new_mu)
+        err = np.stack(new_err)
         if gp_errs:
             return mu, err
         return mu
