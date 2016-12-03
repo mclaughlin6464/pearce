@@ -441,8 +441,6 @@ class Emu(object):
         t_grid = np.meshgrid(*t_list)
         t = np.stack(t_grid).T
         # TODO george can sort?
-        print t.shape
-        print 'z' in input_params
         t = t.reshape((-1, self.emulator_ndim))
 
         t = self._sort_params(t)
@@ -1177,7 +1175,7 @@ class SpicyBuffalo(Emu):
         rpc = np.log10(r_bin_centers) if np.any(r_bin_centers)else []  # make sure not to throw an error
         # TODO change 'r' to something more general
         for key, val in zip(['r', 'z'], (rpc, z_bin_centers)):
-            if key == self.em_param and key not in vep and np.any(val):  # key must not already exist and must be nonzero:
+            if key == self.em_param and key not in vep and val.size:  # key must not already exist and must be nonzero:
                 vep[key] = val
 
         out = self.emulate(vep, gp_errs)
@@ -1498,6 +1496,7 @@ class ExtraCrispy(Emu):
         all_err = err.reshape(all_mu.shape)
 
         # TODO can I combine these two?
+        '''
         if all_mu.shape[0] == 1:  # just one calculation
             xi_interpolator = interp2d(self.scale_bin_centers, self.redshift_bin_centers, all_mu[0], kind=kind)
             new_mu = xi_interpolator(r_bin_centers, z_bin_centers)
@@ -1507,6 +1506,7 @@ class ExtraCrispy(Emu):
             err_interp = interp2d(self.scale_bin_centers, self.redshift_bin_centers, all_err[0], kind=kind)
             new_err = err_interp(r_bin_centers, z_bin_centers)
             return new_mu, new_err
+        '''
 
         # TODO ... is this rightt? Was that all I had to do?
         new_mu, new_err = [], []
@@ -1535,6 +1535,7 @@ class ExtraCrispy(Emu):
 
         #TODO no clue if this makes sense; may need a resisze
         mu = np.stack(new_mu)
+        print mu.shape
         err = np.stack(new_err)
         if gp_errs:
             return mu, err
