@@ -441,6 +441,8 @@ class Emu(object):
         t_grid = np.meshgrid(*t_list)
         t = np.stack(t_grid).T
         # TODO george can sort?
+        print t.shape
+        print 'z' in input_params
         t = t.reshape((-1, self.emulator_ndim))
 
         t = self._sort_params(t)
