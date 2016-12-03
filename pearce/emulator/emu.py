@@ -213,6 +213,7 @@ class Emu(object):
             all_yerr.append(yerr[zeros_slice])
 
         # TODO sort?
+
         return np.vstack(all_x), np.hstack(all_y), np.hstack(all_yerr)
 
     def get_plot_data(self, em_params, training_dir, independent_variable=None, fixed_params={}):
@@ -1211,11 +1212,16 @@ class SpicyBuffalo(Emu):
         #all_mu = mu.reshape((-1, len(self.em_bin_centers)))
         #all_err = err.reshape(all_mu.shape)
 
-        all_mu = mu.reshape((-1, len(self.redshift_bin_centers), len(self.scale_bin_centers)))
+        if self.em_param == 'r':
+            all_mu = mu.reshape((-1, len(r_bin_centers),len(self.redshift_bin_centers)))
+        else:
+            all_mu = mu.reshape((-1, len(z_bin_centers), len(self.scale_bin_centers)))
+
+
+        #all_mu = mu.reshape((-1, len(self.redshift_bin_centers), len(self.scale_bin_centers)))
         print 'All mu', all_mu.shape
         all_err = err.reshape(all_mu.shape)
-
-        if self.em_param
+        print all_mu[0]
 
         # TODO can I combine these two?
         if all_mu.shape[0] == 1 or len(all_mu.shape) == 1:  # just one calculation
@@ -1231,25 +1237,25 @@ class SpicyBuffalo(Emu):
         # TODO ... is this rightt? Was that all I had to do?
         new_mu, new_err = [], []
         for mean_slice, err_slice in izip(all_mu, all_err):
+            new_mu.append([])
+            new_err.append([])
             for mean, err in izip(mean_slice, err_slice):
                 xi_interpolator = interp1d(self.em_bin_centers, mean, kind=kind)
                 interp_mean = xi_interpolator(em_bin_centers)
-                print 'im', interp_mean.shape
-                new_mu.append(interp_mean)
+                new_mu[-1].append(interp_mean)
 
                 err_interp = interp1d(self.em_bin_centers, err, kind=kind)
                 interp_err = err_interp(em_bin_centers)
-                new_err.append(interp_err)
+                new_err[-1].append(interp_err)
 
         # TODO no clue if this makes sense; may need a resisze
-        mu = np.vstack(new_mu)
-        print mu.shape
-        err = np.vstack(new_err)
+        mu = np.stack(new_mu)
+        err = np.stack(new_err)
         if self.em_param == 'r':
             #unfortunate reshape constraint.
             #stops us from rewriting superclasses though!
-            mu = mu.T
-            err = err.T 
+            mu = mu.swapaxes(1,2)
+            err = err.swapaxes(1,2) 
         if gp_errs:
             return mu, err
         return mu
