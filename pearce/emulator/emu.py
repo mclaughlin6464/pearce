@@ -110,6 +110,7 @@ class Emu(object):
         for sub_dir, a in zip(sub_dirs, sub_dirs_as):
 
             z = 1.0 / a - 1.0
+            print z
 
             bins, cosmo_params, obs, sampling_method = global_file_reader(path.join(sub_dir, GLOBAL_FILENAME))
             # Could add an assert that a = cosmo_params['scale_factor']
@@ -1338,9 +1339,9 @@ class ExtraCrispy(Emu):
         scale_nbins = len(self.scale_bin_centers)
         redshift_nbins = len(self.redshift_bin_centers)
         self.x = np.vstack(xs)[0:-1:scale_nbins*redshift_nbins, :]
-        self.y = np.hstack(ys).reshape((-1, scale_nbins, redshift_nbins))
-        #self.yerr = np.zeros_like(self.y)
-        self.yerr = np.hstack(yerrs).reshape((-1, scale_nbins, redshift_nbins))
+        self.y = np.hstack(ys).reshape((-1, redshift_nbins, scale_nbins))
+        self.y = self.y.view()[:, range(self.y.shape[-2]-1, -1, -1), :]
+        self.yerr = np.hstack(yerrs).reshape(self.y.shape)
         self.y_hat = np.zeros(self.y.shape[1:]) if len(self.y.shape) > 1 else 0  # self.y.mean(axis = 0)
         self.y -= self.y_hat
 
@@ -1417,10 +1418,10 @@ class ExtraCrispy(Emu):
         all_err = np.zeros_like(all_mu)
         #all_cov = []  # np.zeros((t.shape[0], t.shape[0], self.y.shape[1]))
         #TODO pythonic iteration. Not happening right now.
-        for scale_idx in xrange(self.y.shape[1]):
-            for z_idx in xrange(self.y.shape[2]):
+        for z_idx in xrange(self.y.shape[1]):
+            for scale_idx in xrange(self.y.shape[2]):
                 if self.method=='gp':
-                    out = self.emulators[z_idx][scale_idx].predict(self.y[:, scale_idx, z_idx], t, mean_only = not gp_errs)
+                    out = self.emulators[scale_idx][z_idx].predict(self.y[:, z_idx, scale_idx], t, mean_only = not gp_errs)
                     if gp_errs:
                         mu, cov = out
                         all_err[:, scale_idx, z_idx] = np.diag(cov)
@@ -1429,9 +1430,17 @@ class ExtraCrispy(Emu):
                 else:
                     mu = self.emulators[z_idx][scale_idx].predict(t)
                 # mu and cov come out as (1,) arrays.
-                all_mu[:, scale_idx, z_idx] = mu + self.y_hat[scale_idx, z_idx]
+                all_mu[:, z_idx, scale_idx] = mu + self.y_hat[z_idx, scale_idx]
                 # all_err[:, idx] = np.sqrt(np.diag(cov))
                 # all_cov[:, :, idx] = cov
+        print 'y',self.y.shape
+        #print self.y[0, 0, :]
+        print self.y[0, :, 0]
+        print self.y[10, :, 0]
+
+        print 'AM', all_mu.shape
+        #print all_mu[0, 0, :]
+        print all_mu[0, :, 0]
 
         # Reshape to be consistent with my otehr implementation
         mu = all_mu.reshape((-1,))
@@ -1500,6 +1509,8 @@ class ExtraCrispy(Emu):
         print 'Mu', mu.shape
         all_mu = mu.reshape((-1, len(self.redshift_bin_centers), len(self.scale_bin_centers)))
         print 'All mu', all_mu.shape
+        print all_mu[0, :, 0]
+        print all_mu[0, 0, :]
         all_err = err.reshape(all_mu.shape)
 
         # TODO can I combine these two?
@@ -1519,6 +1530,8 @@ class ExtraCrispy(Emu):
         new_mu, new_err = [], []
         for mean, err in izip(all_mu, all_err):
 
+            print 'z',self.redshift_bin_centers
+            print 'r',self.scale_bin_centers
             xi_interpolator = interp2d(self.scale_bin_centers, self.redshift_bin_centers, mean, kind=kind)
             interp_mean = xi_interpolator(r_bin_centers, z_bin_centers)
             #TODO swap axes depends on which bin is length 1
@@ -1542,7 +1555,11 @@ class ExtraCrispy(Emu):
 
         #TODO no clue if this makes sense; may need a resisze
         mu = np.stack(new_mu)
-        print mu.shape
+        print 'z', z_bin_centers
+        print 'r', r_bin_centers
+        print 'mu', mu.shape
+        print mu[0, :, 0]
+        print mu[0, 0, :]
         err = np.stack(new_err)
         if gp_errs:
             return mu, err
