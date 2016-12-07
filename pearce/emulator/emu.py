@@ -521,7 +521,9 @@ class Emu(object):
             mu = out
         #TODO not sure this reshape does what I want.
         print 'Mu z',mu.shape
+        print 'zbc', z_bin_centers
         mu = mu.swapaxes(1,2).reshape((-1, z_bin_centers.shape[0]))
+        print 'Mu z 2',mu.shape
         if not gp_errs:
             return mu
         errs = errs.swapaxes(1,2).reshape(mu.shape)
@@ -1198,6 +1200,7 @@ class SpicyBuffalo(Emu):
             mu = out
             # I'm a bad, lazy man
             err = np.zeros_like(mu)
+        print 'mu', mu.shape
 
         #remmeber, these are the bins of what were not emulating! 
         if self.em_param == 'z':
@@ -1224,6 +1227,7 @@ class SpicyBuffalo(Emu):
         print all_mu[0]
 
         # TODO can I combine these two?
+        '''
         if all_mu.shape[0] == 1 or len(all_mu.shape) == 1:  # just one calculation
             xi_interpolator = interp1d(self.em_bin_centers, all_mu, kind=kind)
             new_mu = xi_interpolator(em_bin_centers)
@@ -1233,7 +1237,7 @@ class SpicyBuffalo(Emu):
             err_interp = interp1d(self.em_bin_centerss, all_err, kind=kind)
             new_err = err_interp(em_bin_centers)
             return new_mu, new_err
-
+        '''
         # TODO ... is this rightt? Was that all I had to do?
         new_mu, new_err = [], []
         for mean_slice, err_slice in izip(all_mu, all_err):
@@ -1256,6 +1260,7 @@ class SpicyBuffalo(Emu):
             #stops us from rewriting superclasses though!
             mu = mu.swapaxes(1,2)
             err = err.swapaxes(1,2) 
+        print 'mu', mu.shape
         if gp_errs:
             return mu, err
         return mu
@@ -1492,7 +1497,9 @@ class ExtraCrispy(Emu):
 
         # TODO check bin_centers in bounds!
         # TODO is there any reasonable way to interpolate the covariance?
+        print 'Mu', mu.shape
         all_mu = mu.reshape((-1, len(self.redshift_bin_centers), len(self.scale_bin_centers)))
+        print 'All mu', all_mu.shape
         all_err = err.reshape(all_mu.shape)
 
         # TODO can I combine these two?
