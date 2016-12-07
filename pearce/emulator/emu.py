@@ -921,7 +921,7 @@ class OriginalRecipe(Emu):
         :return:
         """
         vep = dict(em_params)
-        rpc = np.log10(r_bin_centers) if np.any(r_bin_centers)else []  # make sure not to throw an error
+        rpc = np.log10(r_bin_centers) if np.any(r_bin_centers) else np.array([]) # make sure not to throw an error
         # TODO change 'r' to something more general
         for key, val in zip(['r', 'z'], (rpc, z_bin_centers)):
             if key not in vep and val.size :  # key must not already exist and must be nonzero:
@@ -1175,7 +1175,7 @@ class SpicyBuffalo(Emu):
         """
 
         vep = dict(em_params)
-        rpc = np.log10(r_bin_centers) if np.any(r_bin_centers)else []  # make sure not to throw an error
+        rpc = np.log10(r_bin_centers) if np.any(r_bin_centers)else np.array([])  # make sure not to throw an error
         # TODO change 'r' to something more general
         for key, val in zip(['r', 'z'], (rpc, z_bin_centers)):
             if key == self.em_param and key not in vep and val.size:  # key must not already exist and must be nonzero:
