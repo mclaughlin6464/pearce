@@ -938,7 +938,8 @@ class OriginalRecipe(Emu):
         :param gp_errs:
             Whether or not to return errors in the gp case
         :return:
-            mu, cov (if gp_errs True). Predicted value for dependetn variable t.
+            mu, err (if gp_errs True). Predicted value for dependetn variable t.
+            mu and err both have shape (t.shape[0])
         """
         if self.method == 'gp':
             if gp_errs:
@@ -959,7 +960,8 @@ class OriginalRecipe(Emu):
             or float.
         :param bin_centers:
             Centers of bins to predict at, for each point in HOD-space.
-        :return:
+        :return: mu, errs (if gp_errs == True)
+                both have been reshaped to have shape (-1, len(z_bin_centers), len(r_bin_centers))
         """
         vep = dict(em_params)
         # take the log of r_bin_centers
@@ -974,7 +976,6 @@ class OriginalRecipe(Emu):
             mu, errs  = out
         else:
             mu = out
-        #TODO not sure this reshape does what I want.
         mu = mu.reshape((-1,z_bin_centers.shape[0], r_bin_centers.shape[0]))
         if not gp_errs:
             return mu
@@ -1046,8 +1047,6 @@ class SpicyBuffalo(Emu):
         Read the training data for the emulator and attach it to the object.
         :param training_dir:
             Directory where training data from trainginData is stored.
-        :param fixed_params:
-            Parameters to hold fixed. Only available if data in training_dir is a full hypercube, not a latin hypercube.
         :return: None
         """
         if type(training_dir) is not list:
