@@ -1064,32 +1064,24 @@ class SpicyBuffalo(Emu):
         if self.em_param == 'z':
             nbins = len(self.scale_bin_centers)
             self.x = np.vstack(xs)[0:-1:nbins, :]
-            #TODO I checked the 'r' case but not this one
             self.y = np.hstack(ys).reshape((-1, nbins))
             self.yerr = np.hstack(yerrs).reshape(self.y.shape)
-            #TODO I think this name is confusing
+            #slightly confusing name.
+            #this is the bins for the parameter we're not emulating; this is what we need
             self.em_bin_centers = self.scale_bin_centers
         else:
             #since z is the second from the end, not so easy as to just skip over them.
-            #TODO I feel like this has to be easier than this.
             nbins = len(self.redshift_bin_centers)
             _xs = []
-            for x,y,yerr in zip(xs,ys, yerrs):
+            for x in xs:
                 n_per_bin = x.shape[0] / nbins
                 _xs.append(x[:n_per_bin, :])
             
             self.x = np.vstack(_xs)
             self.y = np.vstack(yy.reshape((-1,nbins), order = 'F') for yy in ys)
             self.yerr = np.vstack(ye.reshape((-1,nbins), order = 'F') for ye in yerrs) 
-            '''
-            yerr = np.hstack(yerrs)
-            self.y = np.vstack([y[i * nbins:(i + 1) * nbins] for i in xrange(y.shape[0]/nbins)])
-            
-            self.yerr = np.vstack([yerr[i * nbins:(i+1) * nbins] for i in xrange(y.shape[0]/nbins)])
-            '''
 
             self.em_bin_centers = self.redshift_bin_centers
-
 
         self.y_hat = np.zeros(self.y.shape[1:]) if len(self.y.shape) > 1 else 0  # self.y.mean(axis = 0)
         self.y -= self.y_hat
@@ -1106,19 +1098,21 @@ class SpicyBuffalo(Emu):
             Key word parameters for the emulator
         :return: None
         """
-        # TODO could use more of the hyperparams...
-        metric = hyperparams['metric'] if 'metric' in hyperparams else {}
+        if 'metric' in hyperparams:
+            metric = hyperparams['metric']
+            del hyperparams['metric']
+        else:
+            metric = {}
+
         kernel = self._make_kernel(metric)
         # TODO is it confusing for this to have the same name as the sklearn object with a different API?
         # maybe it should be a property? or private?
-        emulator = george.GP(kernel)
-        # gp = george.GP(kernel, solver=george.HODLRSolver, nleaf=x.shape[0]+1,tol=1e-18)
         self.emulators = [None for i in xrange(self.yerr.shape[1])]
 
         for i in xrange(self.yerr.shape[1]):
                 emulator = george.GP(kernel)
 
-                emulator.compute(self.x, self.yerr[:, i],sort=False)  # NOTE I'm using a modified version of george!
+                emulator.compute(self.x, self.yerr[:, i],sort=False, **hyperparams)
                 self.emulators[i] = emulator
 
     def _build_skl(self, hyperparams):
@@ -1133,10 +1127,12 @@ class SpicyBuffalo(Emu):
 
         # Same kernel concerns as above.
         if self.method in {'svr', 'krr'}:  # kernel based method
-            metric = hyperparams['metric'] if 'metric' in hyperparams else {}
-            kernel = self._make_kernel(metric)
             if 'metric' in hyperparams:
+                metric = hyperparams['metric']
                 del hyperparams['metric']
+            else:
+                metric = {}
+            kernel = self._make_kernel(metric)
             if self.method == 'svr':  # slight difference in these, sadly
                 hyperparams['kernel'] = kernel.value
             else:  # krr
@@ -1144,7 +1140,7 @@ class SpicyBuffalo(Emu):
 
         self.emulators = [[skl_methods[self.method](**hyperparams) for i in xrange(self.yerr.shape[1])] \
                           for j in xrange(self.yerr.shape[2])]
-        # TODO make sure this works?
+
         for y, emulator in izip(self.y.T, self.emulators):
             emulator.fit(self.x, y)
 
@@ -1152,15 +1148,17 @@ class SpicyBuffalo(Emu):
         """
         Helper function that takes a dependent variable matrix and makes a prediction.
         :param t:
-            Dependent variable matrix. Assumed to be in the order defined by ordered_params
+            Dependent variable matrix. Assumed to be in the order defined by ordered_params.
+            Includes information for HOD parameters and em_param. The other dependent param
+            of 'z' and 'r' is taken care of with the multiple emulators
         :param gp_errs:
             Whether or not to return errors in the gp case
         :return:
-            mu, cov (if gp_errs True). Predicted value for dependetn variable t.
+            mu, err (if gp_errs True). Predicted value for dependent variable t.
+            Both have shape (t.shape[0]*len(self.em_bin_centers), )
         """
-        all_mu = np.zeros((t.shape[0], self.y.shape[1]))  # t down scale_nbins across
-        all_err = np.zeros((t.shape[0], self.y.shape[1]))
-        #all_cov = []  # np.zeros((t.shape[0], t.shape[0], self.y.shape[1]))
+        all_mu = np.zeros((t.shape[0], self.y.shape[1]))  # t down em_nbins across
+        all_err = np.zeros(all_mu.shape)
 
         for idx, (y, y_hat, emulator) in enumerate(izip(self.y.T, self.y_hat, self.emulators)):
             if self.method == 'gp':
@@ -1173,28 +1171,14 @@ class SpicyBuffalo(Emu):
             else:
                 mu = emulator.predict(t)
         
-            # mu and cov come out as (1,) arrays.
             all_mu[:, idx] = mu + y_hat
-            # all_err[:, idx] = np.sqrt(np.diag(cov))
-            # all_cov[:, :, idx] = cov
 
         # Reshape to be consistent with my otehr implementation
         mu = all_mu.reshape((-1,))
-        err = all_err.reshape(mu.shape)
         if not gp_errs:
             return mu
+        err = all_err.reshape(mu.shape)
         return mu, err
-        '''
-        cov = np.zeros((mu.shape[0], mu.shape[0]))
-        scale_nbins = self.y.shape[1]
-        redshift_nbins = self.y.shape[2]
-        # This seems pretty inefficient; i'd like a more elegant way to do this.
-        for n, c in enumerate(all_cov):
-            for i, row in enumerate(c):
-                for j, val in enumerate(row):
-                    cov[i * scale_nbins + n, j * scale_nbins + n] = val
-        return mu, cov
-        '''
 
     def emulate_wrt_r_z(self, em_params, r_bin_centers, z_bin_centers, gp_errs=False, kind='linear'):
         """
