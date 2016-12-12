@@ -1191,34 +1191,24 @@ class SpicyBuffalo(Emu):
             Centers of scale bins to predict at, for each point in HOD-space.
         :param z_bin_centers:
             Centers of redshift bins to predict at, for each point in HOD-space.
+        :param gp_errs:
+            Boolean. Whether or not to return the uncertainties calculated by the Gaussian process.
+            Default is False.
         :param kind:
-            Kind of interpolation to do, is necessary. Default is slinear.
+            Kind of interpolation to do, is necessary. Default is linear.
         :return:
-            Mu and Cov, the predicted mu and covariance at em_params and bin_centers. If bin_centers
+            Mu and err (if gp_errs), the predicted mu and covariance at em_params and bin_centers. If bin_centers
             is not equal to the bin_centers in the training data, the mean is interpolated as is the variance.
-            Off diagonal elements are set to 0.
+            Mu and err are reshaped to (npoints, z_bin_centers, r_bin_centers)
         """
 
         vep = dict(em_params)
-        rpc = np.log10(r_bin_centers) if np.any(r_bin_centers)else np.array([])  # make sure not to throw an error
-        # TODO change 'r' to something more general
+        rpc = np.log10(r_bin_centers) if r_bin_centers.size else np.array([])  # make sure not to throw an error
         for key, val in zip(['r', 'z'], (rpc, z_bin_centers)):
-            if key == self.em_param and key not in vep and val.size:  # key must not already exist and must be nonzero:
+            if key == self.em_param and key not in vep and val.size:  # key must not already exist and must be nonzero in value:
                 vep[key] = val
 
         out = self.emulate(vep, gp_errs)
-        # don't need to interpolate!
-        for key, input_bin, owned_bin in zip(['r', 'z'], [r_bin_centers, z_bin_centers],
-                                        [self.scale_bin_centers, self.redshift_bin_centers]):
-            #If the interpolated parameter has values that are not equal to those we've already emulated. 
-            #TODO check if t he fix i did here should be in EC too
-            if key!=self.em_param and input_bin.size and not np.all([np.any(input_val == owned_bin) for input_val in input_bin]):
-                break
-        else:
-            # if any that exist are not equal to the owned ones, keep going. Else, return.
-            # TODO needs reshaping here too!
-            print 'Returning out'
-            return out
 
         if gp_errs:
             mu, err = out
@@ -1227,56 +1217,45 @@ class SpicyBuffalo(Emu):
             # I'm a bad, lazy man
             err = np.zeros_like(mu)
 
-        #remmeber, these are the bins of what were not emulating! 
+        if self.em_param == 'r':
+            mu = mu.reshape((-1, len(r_bin_centers),len(self.redshift_bin_centers)))
+        else:
+            mu = mu.reshape((-1, len(z_bin_centers), len(self.scale_bin_centers)))
+
+        err = err.reshape(mu.shape)
+
+        # Check for the case where we  don't need to interpolate.
+        for key, input_bin, owned_bin in zip(['r', 'z'], [r_bin_centers, z_bin_centers],
+                                        [self.scale_bin_centers, self.redshift_bin_centers]):
+            #If the interpolated parameter has values that are not equal to those we've already emulated. 
+            if key!=self.em_param and input_bin.size and not np.all([np.any(input_val == owned_bin) for input_val in input_bin]):
+                break
+        else:
+            if gp_errs:
+                return mu, err
+            return mu, err
+
+        #remember, these are the bins of what were not emulating!
         if self.em_param == 'z':
             em_bin_centers = r_bin_centers
         else:
             em_bin_centers = z_bin_centers
 
-
-        # Remember, these are for the parameter we're NOT emulating
-        # TODO check bin_centers in bounds!
-        # TODO is there any reasonable way to interpolate the covariance?
-        #all_mu = mu.reshape((-1, len(self.em_bin_centers)))
-        #all_err = err.reshape(all_mu.shape)
-
-        if self.em_param == 'r':
-            all_mu = mu.reshape((-1, len(r_bin_centers),len(self.redshift_bin_centers)))
-        else:
-            all_mu = mu.reshape((-1, len(z_bin_centers), len(self.scale_bin_centers)))
-
-
-        #all_mu = mu.reshape((-1, len(self.redshift_bin_centers), len(self.scale_bin_centers)))
-        print 'All mu', all_mu.shape
-        all_err = err.reshape(all_mu.shape)
-
-        # TODO can I combine these two?
-        '''
-        if all_mu.shape[0] == 1 or len(all_mu.shape) == 1:  # just one calculation
-            xi_interpolator = interp1d(self.em_bin_centers, all_mu, kind=kind)
-            new_mu = xi_interpolator(em_bin_centers)
-            if not gp_errs:
-                return new_mu
-
-            err_interp = interp1d(self.em_bin_centerss, all_err, kind=kind)
-            new_err = err_interp(em_bin_centers)
-            return new_mu, new_err
-        '''
-        # TODO ... is this rightt? Was that all I had to do?
         new_mu, new_err = [], []
-        for mean_slice, err_slice in izip(all_mu, all_err):
+        for mean_slice, err_slice in izip(mu, err):
             new_mu.append([])
             new_err.append([])
             for mean, err in izip(mean_slice, err_slice):
                 xi_interpolator = interp1d(self.em_bin_centers, mean, kind=kind)
                 interp_mean = xi_interpolator(em_bin_centers)
                 new_mu[-1].append(interp_mean)
+                if gp_errs:
+                    err_interp = interp1d(self.em_bin_centers, err, kind=kind)
+                    interp_err = err_interp(em_bin_centers)
+                    new_err[-1].append(interp_err)
+                else:
+                    new_err[-1].append(np.zeros_like(interp_mean))
 
-                err_interp = interp1d(self.em_bin_centers, err, kind=kind)
-                interp_err = err_interp(em_bin_centers)
-                new_err[-1].append(interp_err)
-
-        # TODO no clue if this makes sense; may need a resisze
         mu = np.stack(new_mu)
         err = np.stack(new_err)
         if self.em_param == 'r':
@@ -1284,7 +1263,7 @@ class SpicyBuffalo(Emu):
             #stops us from rewriting superclasses though!
             mu = mu.swapaxes(1,2)
             err = err.swapaxes(1,2)
-        print 'mu', mu.shape
+
         if gp_errs:
             return mu, err
         return mu
@@ -1299,16 +1278,16 @@ class SpicyBuffalo(Emu):
 
         assert self.method == 'gp'
 
-        # emulators is a list containing refernces to the same object. this should still work!
-        emulator = self.emulators[0]
-
         # move these outside? hm.
         def nll(p):
             # Update the kernel parameters and compute the likelihood.
             # params are log(a) and log(m)
-            emulator.kernel[:] = p
-            # check this has the right direction
-            ll = np.mean(emulator.lnlikelihood(y, quiet=True) for y in self.y.flatten())
+            ll = 0
+            #TODO make sure that y and the emulators are paired up right
+            for emulator, y in izip(self.emulators, self.y.T):
+                emulator.kernel[:] = p
+                # check this has the right direction
+                ll +=  emulator.lnlikelihood(y, quiet=True)
 
             # The scipy optimizer doesn't play well with infinities.
             return -ll if np.isfinite(ll) else 1e25
@@ -1316,17 +1295,20 @@ class SpicyBuffalo(Emu):
         # And the gradient of the objective function.
         def grad_nll(p):
             # Update the kernel parameters and compute the likelihood.
-            emulator.kernel[:] = p
-            # mean or sum?
-            return -np.mean(emulator.grad_lnlikelihood(y, quiet=True) for y in self.y.flatten())
+            nll = 0
+            for emulator, y in izip(self.emulators, self.y.T):
 
-        p0 = emulator.kernel.vector
+                emulator.kernel[:] = p
+                # mean or sum?
+                nll += emulator.grad_lnlikelihood(y, quiet=True)
+            return -nll
+
+        p0 = self.emulators[0].kernel.vector
         results = op.minimize(nll, p0, jac=grad_nll, **kwargs)
-        # results = op.minimize(nll, p0, jac=grad_nll, method='TNC', bounds =\
-        #   [(np.log(0.01), np.log(10)) for i in xrange(ndim+1)],options={'maxiter':50})
 
-        emulator.kernel[:] = results.x
-        emulator.recompute()
+        for emulator in self.emulators:
+            emulator.kernel[:] = results.x
+            emulator.recompute()
 
         return results.success
 
@@ -1501,7 +1483,7 @@ class ExtraCrispy(Emu):
         out = self.emulate(em_params, gp_errs)
         # don't need to interpolate!
         for input_bin, owned_bin in zip([r_bin_centers, z_bin_centers], [self.scale_bin_centers, self.redshift_bin_centers]):
-            if np.any(input_bin) and np.any(input_bin != owned_bin):
+            if input_bin.size and not np.all([np.any(input_val == owned_bin) for input_val in input_bin]):
                 break
         else:
             # if any that exist are not equal to the owned ones, keep going. Else, return.
