@@ -24,7 +24,6 @@ from .ioHelpers import global_file_reader, obs_file_reader
 from .trainingData import GLOBAL_FILENAME
 
 
-
 class Emu(object):
     '''Main Emulator base class. Cannot itself be instatiated; can only be accessed via subclasses.
        controls all loading, manipulation, and emulation of data.'''
@@ -57,7 +56,7 @@ class Emu(object):
             directly. Presently the only acceptable option is 'r2', which emulates r^2 times the
             parameter in the training data.
         '''
-        #TODO don't need the user to pass in params. It can be generated from the traning data with an ordered_dict.
+        # TODO don't need the user to pass in params. It can be generated from the traning data with an ordered_dict.
         # It should be somewhat hidden from the user.
 
         assert method in self.valid_methods
@@ -78,7 +77,7 @@ class Emu(object):
         # not necessary since it will be delted in a near future version.
         # or, be less lazy with those. (sure).
         self.ordered_params = params
-        if any(p.name == 'z' for p in self.ordered_params) and any(p.name =='r' for p in self.ordered_params):
+        if any(p.name == 'z' for p in self.ordered_params) and any(p.name == 'r' for p in self.ordered_params):
             if self.ordered_params[-1].name != 'r' or self.ordered_params[-2].name != 'z':
                 warnings.warn('Your ordered params order is possibly problematic! ')
 
@@ -109,13 +108,13 @@ class Emu(object):
         input_params = {}
         input_params.update(em_params)
         input_params.update(fixed_params)
-        #TODO a more rigorous test would be better
+        # TODO a more rigorous test would be better
         assert len(input_params) - len(self.ordered_params) <= 1  # can exclude r
         # HERE can we exclude z too, somehow?
         sub_dirs = glob(path.join(data_dir, 'a_*'))
         sub_dirs_as = np.array([float(fname[-7:]) for fname in sub_dirs])
 
-        #sort them for consistancy
+        # sort them for consistancy
         sort_idxs = np.argsort(sub_dirs_as)
         sub_dirs, sub_dirs_as = sub_dirs[sort_idxs], sub_dirs_as[sort_idxs]
 
@@ -125,8 +124,8 @@ class Emu(object):
                 zs = [zs]
             sub_dirs = []
             _sub_dirs_as = []
-            #check the fixed z's against the a's we have in training data
-            #only keep dirs that match
+            # check the fixed z's against the a's we have in training data
+            # only keep dirs that match
             for z in zs:
                 input_a = 1 / (1 + z)
                 idx = np.argmin(np.abs(sub_dirs_as - input_a))
@@ -136,7 +135,7 @@ class Emu(object):
                 sub_dirs.append(path.join(data_dir, 'a_%.5f' % a))
                 _sub_dirs_as.append(a)
             sub_dirs_as = np.array(_sub_dirs_as)
-        #we store redshifts, not scale factors
+        # we store redshifts, not scale factors
         self.redshift_bin_centers = 1 / sub_dirs_as - 1
 
         all_x, all_y, all_yerr = [], [], []
@@ -152,20 +151,20 @@ class Emu(object):
 
             self.obs = obs
 
-            #sorted to ensure parameters line up correctly
+            # sorted to ensure parameters line up correctly
             obs_files = sorted(glob(path.join(sub_dir, 'obs*.npy')))
             cov_files = sorted(glob(path.join(sub_dir, 'cov*.npy')))
 
-            #store the binning for the scale_bins
-            #assumes that it's the same for each box, which should be true.
+            # store the binning for the scale_bins
+            # assumes that it's the same for each box, which should be true.
             self.scale_bin_centers = (bins[:-1] + bins[1:]) / 2
             scale_nbins = self.scale_bin_centers.shape[0]
 
-            #TODO it is at this stage we assume r is last in observed params. Make sure this is explicit.
+            # TODO it is at this stage we assume r is last in observed params. Make sure this is explicit.
 
             npoints = len(obs_files) * scale_nbins  # each file contains NBINS points in r, and each file is a 6-d point
 
-            #parameters that are not held fixed
+            # parameters that are not held fixed
             varied_params = set([p.name for p in self.ordered_params]) - set(fixed_params.keys())
 
             ndim = len(varied_params)
@@ -191,16 +190,16 @@ class Emu(object):
                 to_continue = True
                 for key, val in input_params.iteritems():
                     if key in {'z', 'r'}:
-                        continue #these won't be in params, or have been already screened.
-                    if type(val) is type(y): #array
+                        continue  # these won't be in params, or have been already screened.
+                    if type(val) is type(y):  # array
                         if np.all(np.abs(params[key] - val) > 1e-3):
                             break
-                    elif np.abs(params[key] - val) > 1e-3: #float
+                    elif np.abs(params[key] - val) > 1e-3:  # float
                         break
                 else:
                     to_continue = False  # no break. We found a parameter not in our fixed values
 
-                #skip NaNs as well.
+                # skip NaNs as well.
                 if np.any(np.isnan(cov)) or np.any(np.isnan(obs)):
                     if not warned:
                         warnings.warn('WARNING: NaN detected. Skipping point in %s' % cov_file)
@@ -232,8 +231,9 @@ class Emu(object):
                 # Subclass a helper class
                 x[idx * scale_nbins:(idx + 1) * scale_nbins, :] = np.stack(file_params).T
 
-                y[idx * scale_nbins:(idx + 1) * scale_nbins], yerr[idx * scale_nbins:(\
-                    idx + 1) * scale_nbins] = self._iv_transform(independent_variable, obs, cov)
+                y[idx * scale_nbins:(idx + 1) * scale_nbins], yerr[idx * scale_nbins:( \
+                                                                                         idx + 1) * scale_nbins] = self._iv_transform(
+                    independent_variable, obs, cov)
 
             # remove rows that were skipped due to the fixed thing
             # NOTE: HACK
@@ -247,7 +247,8 @@ class Emu(object):
         # TODO sort?
         return np.vstack(all_x), np.hstack(all_y), np.hstack(all_yerr)
 
-    def get_plot_data(self, em_params, training_dir, independent_variable=None, fixed_params={}, dependent_variable = 'r'):
+    def get_plot_data(self, em_params, training_dir, independent_variable=None, fixed_params={},
+                      dependent_variable='r'):
         """
         Similar function to load_training_data. However, returns values for plotting comparisons to the emulator.
         :param em_params:
@@ -391,16 +392,16 @@ class Emu(object):
             if independent_variable is None:
                 ig = {'amp': 0.481, 'logMmin': 0.1349, 'sigma_logM': 0.089,
                       'logM0': 2.0, 'logM1': 0.204, 'alpha': 0.039,
-                      'f_c': 0.041, 'r': 0.040, 'z':1.0}
+                      'f_c': 0.041, 'r': 0.040, 'z': 1.0}
             else:
-                #could have other guesses for this case, but don't have any now
+                # could have other guesses for this case, but don't have any now
                 # leave this structure in case I make more later
                 pass
         elif self.obs == 'wp':
             if independent_variable is None:
                 ig = {'logMmin': 1.7348042925, 'f_c': 0.327508062386, 'logM0': 15.8416094906,
                       'sigma_logM': 5.36288382789, 'alpha': 3.63498762588, 'r': 0.306139450843,
-                      'logM1': 1.66509412286, 'amp': 1.18212664544, 'z':1.0}
+                      'logM1': 1.66509412286, 'amp': 1.18212664544, 'z': 1.0}
         else:
             pass  # no other guesses saved yet.
 
@@ -409,7 +410,7 @@ class Emu(object):
             try:
                 del ig[key]
             except KeyError:
-                pass #can happen for redshift and others. 
+                pass  # can happen for redshift and others.
 
         return ig
 
@@ -463,8 +464,8 @@ class Emu(object):
         input_params = {}
         input_params.update(self.fixed_params)
         input_params.update(em_params)
-        #TODO this check is insufficient
-        assert len(input_params) - self.emulator_ndim + self.fixed_ndim <=2  # check dimenstionality
+        # TODO this check is insufficient
+        assert len(input_params) - self.emulator_ndim + self.fixed_ndim <= 2  # check dimenstionality
         for i in input_params:  # check that the names in input params are all defined in the ordering.
             assert any(i == p.name for p in self.ordered_params)
 
@@ -508,12 +509,12 @@ class Emu(object):
         except KeyError:
             pass
 
-        out= self.emulate_wrt_r_z(ep, r_bin_centers, z_bin_centers, gp_errs)
-        #now, reshape to have shap (-1, len(r_bin_centers))
+        out = self.emulate_wrt_r_z(ep, r_bin_centers, z_bin_centers, gp_errs)
+        # now, reshape to have shap (-1, len(r_bin_centers))
 
-        #Extract depending on if there are errors
+        # Extract depending on if there are errors
         if gp_errs:
-            mu, errs  = out
+            mu, errs = out
         else:
             mu = out
 
@@ -523,7 +524,6 @@ class Emu(object):
 
         errs = errs.reshape(mu.shape)
         return mu, errs
-
 
     def emulate_wrt_z(self, em_params, z_bin_centers, gp_errs=False):
         """
@@ -557,11 +557,11 @@ class Emu(object):
         else:
             mu = out
 
-        #The swapaxes are necessary to make sure the reshape works properly
-        mu = mu.swapaxes(1,2).reshape((-1, z_bin_centers.shape[0]))
+        # The swapaxes are necessary to make sure the reshape works properly
+        mu = mu.swapaxes(1, 2).reshape((-1, z_bin_centers.shape[0]))
         if not gp_errs:
             return mu
-        errs = errs.swapaxes(1,2).reshape(mu.shape)
+        errs = errs.swapaxes(1, 2).reshape(mu.shape)
         return mu, errs
 
     @abstractmethod
@@ -582,7 +582,7 @@ class Emu(object):
 
         return np.diag(rms_err ** 2)
 
-    #only predicts wrt r. don't know if that's an issue.
+    # only predicts wrt r. don't know if that's an issue.
     def goodness_of_fit(self, truth_dir, N=None, statistic='r2'):
         """
         Calculate the goodness of fit of an emulator as compared to some validation data.
@@ -736,7 +736,7 @@ class Emu(object):
         else:
             return cov
 
-    #TODO move this to another module
+    # TODO move this to another module
     def run_mcmc(self, y, cov, bin_centers, nwalkers=1000, nsteps=100, nburn=20, n_cores='all'):
         """
         Run an MCMC sampler, using the emulator. Uses emcee to perform sampling.
@@ -921,7 +921,7 @@ class OriginalRecipe(Emu):
             kernel = self._make_kernel(metric)
             if 'metric' in hyperparams:
                 del hyperparams['metric']
-            #slight difference in use for these saldy
+            # slight difference in use for these saldy
             if self.method == 'svr':
                 hyperparams['kernel'] = kernel.value
             else:  # krr
@@ -946,7 +946,7 @@ class OriginalRecipe(Emu):
                 mu, cov = self.emulator.predict(self.y, t, mean_only=False)
                 return mu, np.diag(cov)
             else:
-                return self.emulator.predict(self.y, t, mean_only = True)
+                return self.emulator.predict(self.y, t, mean_only=True)
         else:
             return self.emulator.predict(t)
 
@@ -965,18 +965,18 @@ class OriginalRecipe(Emu):
         """
         vep = dict(em_params)
         # take the log of r_bin_centers
-        rpc = np.log10(r_bin_centers) if np.any(r_bin_centers) else np.array([]) # make sure not to throw an error
+        rpc = np.log10(r_bin_centers) if np.any(r_bin_centers) else np.array([])  # make sure not to throw an error
         # TODO change 'r' to something more general
         for key, val in zip(['r', 'z'], (rpc, z_bin_centers)):
-            if key not in vep and val.size :  # key must not already exist and must be nonzero:
+            if key not in vep and val.size:  # key must not already exist and must be nonzero:
                 vep[key] = val
         # vep.update({'r': np.log10(r_bin_centers), 'z': z_bin_centers})
         out = self.emulate(vep, gp_errs)
         if gp_errs:
-            mu, errs  = out
+            mu, errs = out
         else:
             mu = out
-        mu = mu.reshape((-1,z_bin_centers.shape[0], r_bin_centers.shape[0]))
+        mu = mu.reshape((-1, z_bin_centers.shape[0], r_bin_centers.shape[0]))
         if not gp_errs:
             return mu
         errs = errs.reshape(mu.shape)
@@ -1052,7 +1052,7 @@ class SpicyBuffalo(Emu):
         if type(training_dir) is not list:
             training_dir = [training_dir]
 
-        xs, ys,yerrs = [], [], []
+        xs, ys, yerrs = [], [], []
         for td in training_dir:
             x, y, yerr = self.get_data(td, {}, self.fixed_params, self.independent_variable)
             xs.append(x)
@@ -1066,20 +1066,20 @@ class SpicyBuffalo(Emu):
             self.x = np.vstack(xs)[0:-1:nbins, :]
             self.y = np.hstack(ys).reshape((-1, nbins))
             self.yerr = np.hstack(yerrs).reshape(self.y.shape)
-            #slightly confusing name.
-            #this is the bins for the parameter we're not emulating; this is what we need
+            # slightly confusing name.
+            # this is the bins for the parameter we're not emulating; this is what we need
             self.em_bin_centers = self.scale_bin_centers
         else:
-            #since z is the second from the end, not so easy as to just skip over them.
+            # since z is the second from the end, not so easy as to just skip over them.
             nbins = len(self.redshift_bin_centers)
             _xs = []
             for x in xs:
                 n_per_bin = x.shape[0] / nbins
                 _xs.append(x[:n_per_bin, :])
-            
+
             self.x = np.vstack(_xs)
-            self.y = np.vstack(yy.reshape((-1,nbins), order = 'F') for yy in ys)
-            self.yerr = np.vstack(ye.reshape((-1,nbins), order = 'F') for ye in yerrs) 
+            self.y = np.vstack(yy.reshape((-1, nbins), order='F') for yy in ys)
+            self.yerr = np.vstack(ye.reshape((-1, nbins), order='F') for ye in yerrs)
 
             self.em_bin_centers = self.redshift_bin_centers
 
@@ -1110,10 +1110,10 @@ class SpicyBuffalo(Emu):
         self.emulators = [None for i in xrange(self.yerr.shape[1])]
 
         for i in xrange(self.yerr.shape[1]):
-                emulator = george.GP(kernel)
+            emulator = george.GP(kernel)
 
-                emulator.compute(self.x, self.yerr[:, i],sort=False, **hyperparams)
-                self.emulators[i] = emulator
+            emulator.compute(self.x, self.yerr[:, i], sort=False, **hyperparams)
+            self.emulators[i] = emulator
 
     def _build_skl(self, hyperparams):
         """
@@ -1157,30 +1157,30 @@ class SpicyBuffalo(Emu):
             mu, err (if gp_errs True). Predicted value for dependent variable t.
             Both have shape (t.shape[0]*len(self.em_bin_centers), )
         """
-        all_mu = np.zeros((t.shape[0], self.y.shape[1]))  # t down em_nbins across
-        all_err = np.zeros(all_mu.shape)
+        mu = np.zeros((t.shape[0], self.y.shape[1]))  # t down em_nbins across
+        err = np.zeros(mu.shape)
 
         for idx, (y, y_hat, emulator) in enumerate(izip(self.y.T, self.y_hat, self.emulators)):
             if self.method == 'gp':
                 out = emulator.predict(y, t, mean_only=not gp_errs)
                 if gp_errs:
                     mu, cov = out
-                    all_err[:,idx] = np.diag(cov)
+                    err[:, idx] = np.diag(cov)
                 else:
                     mu = out
             else:
                 mu = emulator.predict(t)
-        
-            all_mu[:, idx] = mu + y_hat
+
+            mu[:, idx] = mu + y_hat
 
         # Reshape to be consistent with my otehr implementation
-        mu = all_mu.reshape((-1,))
+        mu = mu.reshape((-1,))
         if not gp_errs:
             return mu
-        err = all_err.reshape(mu.shape)
+        err = err.reshape(mu.shape)
         return mu, err
 
-    def emulate_wrt_r_z(self, em_params, r_bin_centers, z_bin_centers, gp_errs=False, kind='linear'):
+    def emulate_wrt_r_z(self, em_params, r_bin_centers, z_bin_centers, gp_errs=False, kind='cubic'):
         """
         Conveniance function. Add's 'r' and 'z' to the emulation automatically, as this is the
         most common use case.
@@ -1195,7 +1195,7 @@ class SpicyBuffalo(Emu):
             Boolean. Whether or not to return the uncertainties calculated by the Gaussian process.
             Default is False.
         :param kind:
-            Kind of interpolation to do, is necessary. Default is linear.
+            Kind of interpolation to do, is necessary. Default is 'cubic'.
         :return:
             Mu and err (if gp_errs), the predicted mu and covariance at em_params and bin_centers. If bin_centers
             is not equal to the bin_centers in the training data, the mean is interpolated as is the variance.
@@ -1218,7 +1218,7 @@ class SpicyBuffalo(Emu):
             err = np.zeros_like(mu)
 
         if self.em_param == 'r':
-            mu = mu.reshape((-1, len(r_bin_centers),len(self.redshift_bin_centers)))
+            mu = mu.reshape((-1, len(r_bin_centers), len(self.redshift_bin_centers)))
         else:
             mu = mu.reshape((-1, len(z_bin_centers), len(self.scale_bin_centers)))
 
@@ -1226,16 +1226,17 @@ class SpicyBuffalo(Emu):
 
         # Check for the case where we  don't need to interpolate.
         for key, input_bin, owned_bin in zip(['r', 'z'], [r_bin_centers, z_bin_centers],
-                                        [self.scale_bin_centers, self.redshift_bin_centers]):
-            #If the interpolated parameter has values that are not equal to those we've already emulated. 
-            if key!=self.em_param and input_bin.size and not np.all([np.any(input_val == owned_bin) for input_val in input_bin]):
+                                             [self.scale_bin_centers, self.redshift_bin_centers]):
+            # If the interpolated parameter has values that are not equal to those we've already emulated.
+            if key != self.em_param and input_bin.size and not np.all(
+                    [np.any(input_val == owned_bin) for input_val in input_bin]):
                 break
         else:
             if gp_errs:
                 return mu, err
             return mu, err
 
-        #remember, these are the bins of what were not emulating!
+        # remember, these are the bins of what were not emulating!
         if self.em_param == 'z':
             em_bin_centers = r_bin_centers
         else:
@@ -1259,10 +1260,10 @@ class SpicyBuffalo(Emu):
         mu = np.stack(new_mu)
         err = np.stack(new_err)
         if self.em_param == 'r':
-            #unfortunate reshape constraint.
-            #stops us from rewriting superclasses though!
-            mu = mu.swapaxes(1,2)
-            err = err.swapaxes(1,2)
+            # unfortunate reshape constraint.
+            # stops us from rewriting superclasses though!
+            mu = mu.swapaxes(1, 2)
+            err = err.swapaxes(1, 2)
 
         if gp_errs:
             return mu, err
@@ -1283,11 +1284,11 @@ class SpicyBuffalo(Emu):
             # Update the kernel parameters and compute the likelihood.
             # params are log(a) and log(m)
             ll = 0
-            #TODO make sure that y and the emulators are paired up right
+            # TODO make sure that y and the emulators are paired up right
             for emulator, y in izip(self.emulators, self.y.T):
                 emulator.kernel[:] = p
                 # check this has the right direction
-                ll +=  emulator.lnlikelihood(y, quiet=True)
+                ll += emulator.lnlikelihood(y, quiet=True)
 
             # The scipy optimizer doesn't play well with infinities.
             return -ll if np.isfinite(ll) else 1e25
@@ -1297,7 +1298,6 @@ class SpicyBuffalo(Emu):
             # Update the kernel parameters and compute the likelihood.
             nll = 0
             for emulator, y in izip(self.emulators, self.y.T):
-
                 emulator.kernel[:] = p
                 # mean or sum?
                 nll += emulator.grad_lnlikelihood(y, quiet=True)
@@ -1343,10 +1343,13 @@ class ExtraCrispy(Emu):
 
         scale_nbins = len(self.scale_bin_centers)
         redshift_nbins = len(self.redshift_bin_centers)
-        self.x = np.vstack(xs)[0:-1:scale_nbins*redshift_nbins, :]
-        self.y = np.hstack(ys).reshape((-1, redshift_nbins, scale_nbins))
-        self.y = self.y.view()[:, range(self.y.shape[-2]-1, -1, -1), :]
-        self.yerr = np.hstack(yerrs).reshape(self.y.shape)
+        self.x = np.vstack(xs)[0:-1:scale_nbins * redshift_nbins, :]
+        y = np.hstack(ys).reshape((-1, redshift_nbins, scale_nbins))
+        # flip last axis, unfortunately something we have to do
+        # not sure why, if i'm honest
+        self.y = y.view()[:, range(y.shape[-2] - 1, -1, -1), :]
+        yerr = np.hstack(yerrs).reshape(self.y.shape)
+        self.yerr = yerr.view()[:, range(yerr.shape[-2] - 1, -1, -1), :]
         self.y_hat = np.zeros(self.y.shape[1:]) if len(self.y.shape) > 1 else 0  # self.y.mean(axis = 0)
         self.y -= self.y_hat
 
@@ -1362,8 +1365,11 @@ class ExtraCrispy(Emu):
             Key word parameters for the emulator
         :return: None
         """
-        # TODO could use more of the hyperparams...
-        metric = hyperparams['metric'] if 'metric' in hyperparams else {}
+        if 'metric' in hyperparams:
+            metric = hyperparams['metric']
+            del hyperparams['metric']
+        else:
+            metric = {}
         kernel = self._make_kernel(metric)
         # TODO is it confusing for this to have the same name as the sklearn object with a different API?
         # maybe it should be a property? or private?
@@ -1373,13 +1379,9 @@ class ExtraCrispy(Emu):
             for j in xrange(self.yerr.shape[2]):
                 emulator = george.GP(kernel)
 
-                emulator.compute(self.x, self.yerr[:, i,j],sort=False)  # NOTE I'm using a modified version of george!
+                emulator.compute(self.x, self.yerr[:, i, j], sort=False,
+                                 **hyperparams)  # NOTE I'm using a modified version of george!
                 self.emulators[j][i] = emulator
-                # For EC, i'm storing an emulator per bin.
-                # I'll have to thikn about how to differ the hyperparams.
-                # For now, it'll replicate the same behavior as before.
-                # TODO not happy, in general, EC has "emulators" not "emulator" like the others.
-                # Arguement would be this should be all abstracted out from the user.
 
     def _build_skl(self, hyperparams):
         """
@@ -1404,7 +1406,7 @@ class ExtraCrispy(Emu):
 
         self.emulators = [[skl_methods[self.method](**hyperparams) for i in xrange(self.yerr.shape[1])] \
                           for j in xrange(self.yerr.shape[2])]
-        # TODO make sure this works?
+
         for scale_ys, scale_emulators in izip(self.y.T, self.emulators):
             for y, emulator in izip(scale_ys, scale_emulators):
                 emulator.fit(self.x, y)
@@ -1417,47 +1419,35 @@ class ExtraCrispy(Emu):
         :param gp_errs:
             Whether or not to return errors in the gp case
         :return:
-            mu, cov (if gp_errs True). Predicted value for dependetn variable t.
+            mu, err (if gp_errs True). Predicted value for dependetn variable t.
+            mu and err both have shape (npoints*self.redshift_bin_centers*self.scale_bin_centers)
         """
-        all_mu = np.zeros((t.shape[0], self.y.shape[1], self.y.shape[2]))  # t down scale_nbins across
-        all_err = np.zeros_like(all_mu)
-        #all_cov = []  # np.zeros((t.shape[0], t.shape[0], self.y.shape[1]))
-        #TODO pythonic iteration. Not happening right now.
+        mu = np.zeros((t.shape[0], self.y.shape[1], self.y.shape[2]))  # t down scale_nbins across
+        err = np.zeros_like(mu)
+
+        # TODO pythonic iteration. Not happening right now.
         for z_idx in xrange(self.y.shape[1]):
             for scale_idx in xrange(self.y.shape[2]):
-                if self.method=='gp':
-                    out = self.emulators[scale_idx][z_idx].predict(self.y[:, z_idx, scale_idx], t, mean_only = not gp_errs)
+                if self.method == 'gp':
+                    out = self.emulators[scale_idx][z_idx].predict(self.y[:, z_idx, scale_idx], t,
+                                                                   mean_only=not gp_errs)
                     if gp_errs:
                         mu, cov = out
-                        all_err[:, scale_idx, z_idx] = np.diag(cov)
+                        err[:, scale_idx, z_idx] = np.diag(cov)
                     else:
                         mu = out
                 else:
                     mu = self.emulators[z_idx][scale_idx].predict(t)
                 # mu and cov come out as (1,) arrays.
-                all_mu[:, z_idx, scale_idx] = mu + self.y_hat[z_idx, scale_idx]
-                # all_err[:, idx] = np.sqrt(np.diag(cov))
+                mu[:, z_idx, scale_idx] = mu + self.y_hat[z_idx, scale_idx]
+                # err[:, idx] = np.sqrt(np.diag(cov))
                 # all_cov[:, :, idx] = cov
 
         # Reshape to be consistent with my otehr implementation
-        mu = all_mu.reshape((-1,))
+        mu = mu.reshape((-1,))
         if not gp_errs:
             return mu
-        return mu, all_err.rehsape((-1,))
-
-        '''
-        cov = np.zeros((mu.shape[0], mu.shape[0]))
-        scale_nbins = self.y.shape[1]
-        redshift_nbins = self.y.shape[2]
-        # This seems pretty inefficient; i'd like a more elegant way to do this.
-        for n, c in enumerate(all_cov):
-            for i, row in enumerate(c):
-                for j, rrow in enumerate(row):
-                    for k, val in enumerate(rrow):
-                        # TODO i am broken pls fix me i don't understand indicies
-                        cov[j * scale_nbins + i * redshift_nbins + n, j * scale_nbins + n] = val
-        return mu, cov
-        '''
+        return mu, err.rehsape((-1,))
 
     def emulate_wrt_r_z(self, em_params, r_bin_centers, z_bin_centers, gp_errs=False, kind='cubic'):
         """
@@ -1471,25 +1461,16 @@ class ExtraCrispy(Emu):
         :param z_bin_centers:
             Centers of redshift bins to predict at, for each point in HOD-space.
         :param kind:
-            Kind of interpolation to do, is necessary. Default is slinear.
+            Kind of interpolation to do, is necessary. Default is cubic.
         :return:
-            Mu and Cov, the predicted mu and covariance at em_params and bin_centers. If bin_centers
+            Mu and err (gp_errs is True), the predicted mu and err at em_params and bin_centers. If bin_centers
             is not equal to the bin_centers in the training data, the mean is interpolated as is the variance.
-            Off diagonal elements are set to 0.
+            Both have shape (-1, reshift_bin_centers, scale_bin_centers)
         """
         # turns out this how it already works!
         assert 'r' not in em_params
         assert 'z' not in em_params
         out = self.emulate(em_params, gp_errs)
-        # don't need to interpolate!
-        for input_bin, owned_bin in zip([r_bin_centers, z_bin_centers], [self.scale_bin_centers, self.redshift_bin_centers]):
-            if input_bin.size and not np.all([np.any(input_val == owned_bin) for input_val in input_bin]):
-                break
-        else:
-            # if any that exist are not equal to the owned ones, keep going. Else, return.
-            # TODO still need to reshape even if i'm not interpolating gahhh
-            return out
-
         if gp_errs:
             mu, err = out
         else:
@@ -1497,61 +1478,56 @@ class ExtraCrispy(Emu):
             # I'm a bad, lazy man
             err = np.zeros_like(mu)
 
-        if kind == 'cubic' and any(len(bc) < 3 for bc in (self.scale_bin_centers, self.redshift_bin_centers)):
-            kind = 'linear' #can only do cubic if there's 3 points
+        mu = mu.reshape((-1, len(self.redshift_bin_centers), len(self.scale_bin_centers)))
+        err = err.reshape(mu.shape)
 
+        # Check for the case where we don't need to interpolate
+        for input_bin, owned_bin in zip([r_bin_centers, z_bin_centers],
+                                        [self.scale_bin_centers, self.redshift_bin_centers]):
+            # If all input values have exact matches with binnings we use
+            if input_bin.size and not np.all([np.any(input_val == owned_bin) for input_val in input_bin]):
+                break
+        else:
+            # if any that exist are not equal to the owned ones, keep going. Else, return.
+            if gp_errs:
+                return mu, err
+            return mu
+
+        if kind == 'cubic' and any(len(bc) < 3 for bc in (self.scale_bin_centers, self.redshift_bin_centers)):
+            kind = 'linear'  # can only do cubic if there's 3 points
 
         # TODO check bin_centers in bounds!
-        # TODO is there any reasonable way to interpolate the covariance?
-        all_mu = mu.reshape((-1, len(self.redshift_bin_centers), len(self.scale_bin_centers)))
-        all_err = err.reshape(all_mu.shape)
-
-        # TODO can I combine these two?
-        '''
-        if all_mu.shape[0] == 1:  # just one calculation
-            xi_interpolator = interp2d(self.scale_bin_centers, self.redshift_bin_centers, all_mu[0], kind=kind)
-            new_mu = xi_interpolator(r_bin_centers, z_bin_centers)
-            if not gp_errs:
-                return new_mu
-
-            err_interp = interp2d(self.scale_bin_centers, self.redshift_bin_centers, all_err[0], kind=kind)
-            new_err = err_interp(r_bin_centers, z_bin_centers)
-            return new_mu, new_err
-        '''
-
-        # TODO ... is this rightt? Was that all I had to do?
         new_mu, new_err = [], []
-        for mean, err in izip(all_mu, all_err):
+        for mean, err in izip(mu, err):
 
             xi_interpolator = interp2d(self.scale_bin_centers, self.redshift_bin_centers, mean, kind=kind)
             interp_mean = xi_interpolator(r_bin_centers, z_bin_centers)
-            #TODO swap axes depends on which bin is length 1
+            # TODO swap axes depends on which bin is length 1
             if interp_mean.ndim == 1:
-                interp_mean = np.array([interp_mean]) #make 2-D array
-
-            print 'im', interp_mean.shape
+                interp_mean = np.array([interp_mean])  # make 2-D array
             new_mu.append(interp_mean)
+
             err_interp = interp2d(self.scale_bin_centers, self.redshift_bin_centers, err, kind=kind)
             interp_err = err_interp(r_bin_centers, z_bin_centers)
+            if interp_err.ndim == 1:
+                interp_err = np.array([interp_err])
             new_err.append(interp_err)
 
-        if new_mu[0].ndim == 1: #need to do some array voodoo
+        if new_mu[0].ndim == 1:  # need to do some array voodoo
             for idx, nm, ne in enumerate(zip(new_mu, new_err)):
                 new_mu[idx] = np.array([nm])
                 new_err[idx] = np.array([ne])
 
-                if len(r_bin_centers) == 1: #have to swap axes in this case
-                    new_mu[idx] = new_mu[idx].swapaxes(0,1)
-                    new_err[idx] = new_err[idx].swapaxes(0,1)
+                if len(r_bin_centers) == 1:  # have to swap axes in this case
+                    new_mu[idx] = new_mu[idx].swapaxes(0, 1)
+                    new_err[idx] = new_err[idx].swapaxes(0, 1)
 
-        #TODO no clue if this makes sense; may need a resisze
         mu = np.stack(new_mu)
         err = np.stack(new_err)
         if gp_errs:
             return mu, err
         return mu
 
-    # TODO I could probably make this learn the metric for each individual emulator
     # TODO could make this learn the metric for other kernel based emulators...
     def train_metric(self, **kwargs):
         """
@@ -1564,15 +1540,17 @@ class ExtraCrispy(Emu):
         assert self.method == 'gp'
 
         # emulators is a list containing refernces to the same object. this should still work!
-        emulator = self.emulators[0]
 
         # move these outside? hm.
         def nll(p):
             # Update the kernel parameters and compute the likelihood.
             # params are log(a) and log(m)
-            emulator.kernel[:] = p
-            # check this has the right direction
-            ll = np.sum(emulator.lnlikelihood(y, quiet=True) for y in self.y.flatten())
+            ll = 0
+            for emulator_row, y_row in izip(self.emulators, self.y.T):
+                for emulator, y in izip(emulator_row, y_row):
+                    emulator.kernel[:] = p
+                    # check this has the right direction
+                    ll += emulator.lnlikelihood(y, quiet=True)
 
             # The scipy optimizer doesn't play well with infinities.
             return -ll if np.isfinite(ll) else 1e25
@@ -1580,16 +1558,21 @@ class ExtraCrispy(Emu):
         # And the gradient of the objective function.
         def grad_nll(p):
             # Update the kernel parameters and compute the likelihood.
-            emulator.kernel[:] = p
-            # mean or sum?
-            return -np.mean(emulator.grad_lnlikelihood(y, quiet=True) for y in self.y.flatten())
+            ll = 0
+            for emulator_row, y_row in izip(self.emulators, self.y.T):
+                for emulator, y in izip(emulator_row, y_row):
+                    emulator.kernel[:] = p
+                    ll += emulator.grad_lnlikelihood(y, quiet=True)
+            return -ll
 
-        p0 = emulator.kernel.vector
+        p0 = self.emulators[0].kernel.vector
         results = op.minimize(nll, p0, jac=grad_nll, **kwargs)
         # results = op.minimize(nll, p0, jac=grad_nll, method='TNC', bounds =\
         #   [(np.log(0.01), np.log(10)) for i in xrange(ndim+1)],options={'maxiter':50})
 
-        emulator.kernel[:] = results.x
-        emulator.recompute()
+        for emulator_row in self.emulators:
+            for emulator in emulator_row:
+                emulator.kernel[:] = results.x
+                emulator.recompute()
 
         return results.success
