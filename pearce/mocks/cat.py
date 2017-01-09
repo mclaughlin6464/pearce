@@ -305,7 +305,7 @@ class Cat(object):
             reader.write_to_disk()  # do these after so we have a halo table to work off of
             reader.update_cache_log()
 
-    def add_local_density(self, reader, snapdir, radius=10):
+    def add_local_density(self, reader, snapdir, radius=[1, 5]):#[1,5,10]
         """
         Calculates the local density around each halo and adds it to the halo table, to be cached.
         :param reader:
@@ -352,16 +352,24 @@ class Cat(object):
         # TODO not entirely sure if i'm applying little h correctly
         # densities = np.ones(reader.halo_table['x'].shape)/(4*np.pi/(3*self.h**2)*radius**3)
         #densities = np.ones(reader.halo_table['halo_x'].shape) / (p * 4 * np.pi / 3 * radius ** 3)
-        densities = np.ones(reader.halo_table['halo_x'].shape) / (p * 4 * np.pi / 3 * radius ** 3)
-        with fast3tree(all_particles) as tree:
-            for idx, halo_pos in enumerate(
-                    izip(reader.halo_table['halo_x'], reader.halo_table['halo_y'], reader.halo_table['halo_z'])):
-                # print idx, time()-t0, 's'
-                particle_idxs = tree.query_radius(halo_pos, radius, periodic=True)
-                densities[idx] *= reader.particle_mass * len(particle_idxs)
+        if type(radius) == float:
+            radius = np.array([radius])
+        elif type(radius) == list:
+            radius = np.array(radius)
+        densities = np.ones((reader.halo_table['halo_x'].shape[0], radius.shape[0])) 
 
-        reader.halo_table['halo_local_density'] = densities
-        print densities.mean()
+        with fast3tree(all_particles) as tree:
+            for r_idx, r in enumerate(radius):
+                densities[:, r_idx] = densities[:, r_idx]/ (p * 4 * np.pi / 3 * r ** 3)
+                for idx, halo_pos in enumerate(
+                        izip(reader.halo_table['halo_x'], reader.halo_table['halo_y'], reader.halo_table['halo_z'])):
+                    # print idx, time()-t0, 's'
+                    particle_idxs = tree.query_radius(halo_pos, r, periodic=True)
+                    densities[idx,r_idx] *= reader.particle_mass * len(particle_idxs)
+
+            reader.halo_table['halo_local_density_%d'%(int(r))] = densities[:, r_idx]
+            print r
+            print densities[:, r_idx].mean()
         print 'Done'
 
     def load(self, scale_factor, HOD='redMagic', tol=0.05):
