@@ -116,7 +116,8 @@ class Emu(object):
 
         # sort them for consistancy
         sort_idxs = np.argsort(sub_dirs_as)
-        sub_dirs, sub_dirs_as = sub_dirs[sort_idxs], sub_dirs_as[sort_idxs]
+        sub_dirs_as = sub_dirs_as[sort_idxs]
+        sub_dirs = [sub_dirs[i] for i in sort_idxs]
 
         if 'z' in fixed_params:  # don't have to look in dirs that aren't fixed.
             zs = fixed_params['z']
@@ -140,7 +141,7 @@ class Emu(object):
 
         all_x, all_y, all_yerr = [], [], []
 
-        for sub_dir, a in zip(sub_dirs, self.redshift_bin_centers):
+        for sub_dir, z in zip(sub_dirs, self.redshift_bin_centers):
 
             bins, cosmo_params, obs, sampling_method = global_file_reader(path.join(sub_dir, GLOBAL_FILENAME))
             # Could add an assert that a = cosmo_params['scale_factor']
