@@ -3,7 +3,7 @@
 points in parameter space. '''
 
 from time import time
-from os import path
+from os import path, mkdir
 from subprocess import call
 from itertools import izip
 import warnings
@@ -12,6 +12,7 @@ import cPickle as pickle
 import numpy as np
 
 from .ioHelpers import config_reader
+from ..mocks import cat_dict
 
 # I initially had the global_filename be variable. Howerver, I couldn't find a reason one would change it!
 GLOBAL_FILENAME = 'global_file.npy'
@@ -83,7 +84,7 @@ def makeFHC(ordered_params, N=4):
     return points[idxs, :]
     # return points
 
-def make_kils_command(jobname, max_time, outputdir, queue='bulletmpi'):
+def make_kils_command(jobname, max_time, outputdir, queue='kipac-ibq'):#'bulletmpi'):
     '''
     Return a list of strings that comprise a bash command to call trainingHelper.py on the cluster.
     Designed to work on ki-ls's batch system
@@ -193,14 +194,20 @@ def training_config_reader(filename):
         # check simname and scale_factor (the 100% required ones) are in there!
         # if fails, will throw a KeyError
         cosmo_params['simname']
-        cosmo_params['scale_factor'] = float(cosmo_params['scale_factor'].strip())
+        #TODO change to scale factors?
+        if '[' in cosmo_params['scale_factor']: # user passed in a list
+            sf_str = cosmo_params['scale_factor']
+            cosmo_params['scale_factor'] = [float(a.strip()) for a in sf_str.strip('[ ]').split(',')]
+        elif cosmo_params['scale_factor'] == 'all':
+            cosmo_params['scale_factor'] = [cosmo_params['scale_factor'].strip()]
+        else: #float
+            cosmo_params['scale_factor'] = float(cosmo_params['scale_factor'].strip())
 
         for cp, t in zip(['Lbox', 'npart','n_repops'], [float, int,int]):
             try:
                 cosmo_params[cp] = t(cosmo_params[cp])
             except KeyError:
                 continue
-
 
     except KeyError:
         raise KeyError("The config file %s is missing a parameter." % filename)
@@ -217,14 +224,26 @@ def make_training_data(config_filename, ordered_params=None):
         None.
     '''
 
-    method,obs, n_points, system, n_jobs, max_time, outputdir, bins, cosmo_params = \
+    method,obs, n_points, system, n_jobs, max_time, base_outputdir, bins, cosmo_params = \
         training_config_reader(config_filename)
 
+    scale_factors = cosmo_params['scale_factor']
+
+    #load one up to test that these scale factors maek sense.
+    cat = cat_dict[cosmo_params['simname']](**cosmo_params)
+
+    if scale_factors[0] == 'all':
+        #have to load up a cat to get them
+        scale_factors = cat.scale_factors
+    else: #a list
+        assert all(min(a-cat.scale_factors) < 0.05 for a in scale_factors)
+
     if ordered_params is None:
+        #raise warning?
         from .ioHelpers import DEFAULT_PARAMS as ordered_params
-        warnings.warn("Using default ordered parameters.")
 
     # determine the specific functions needed for this setup
+    # same points for each redshift
     if method == 'LHC':
         points = makeLHC(ordered_params, n_points)
     elif method == 'FHC':
@@ -239,28 +258,42 @@ def make_training_data(config_filename, ordered_params=None):
     else:
         raise ValueError('Invalid system for making training data: %s' % system)
 
-    # write the global file used by all params
-    # TODO Write system (maybe) and method (definetly) to file!
-    header_start = ['Sampling Method: %s'%method,'Observable: %s'%obs, 'Cosmology Params:']
-    header_start.extend('%s:%s' % (key, str(val)) for key, val in cosmo_params.iteritems())
-    header = '\n'.join(header_start)
-    np.savetxt(path.join(outputdir, GLOBAL_FILENAME), bins, header=header)
-    #Writing ordering to file.
-    pickle.dump(ordered_params, path.join(outputdir, PARAMS_FILENAME))
+    n_jobs_per_a = int(np.ceil(float(n_jobs)/len(scale_factors)))
 
-    # call each job individually
-    points_per_job = int(points.shape[0] / n_jobs)
-    for job in xrange(n_jobs):
-        # slice out a portion of the poitns
-        if job == n_jobs-1: #last one, make sure we get the remainder
-            job_points = points[job*points_per_job:, :]
-        else:
-            job_points = points[job * points_per_job:(job+1) * points_per_job, :]
-        jobname = 'training_data%03d' % job
-        param_filename = path.join(outputdir, jobname + '.npy')
-        np.savetxt(param_filename, job_points)
+    for a in scale_factors:
 
-        # TODO allow queue changing
-        command = make_command(jobname, max_time, outputdir)
-        # the odd shell call is to deal with minute differences in the systems.
-        call(command, shell=system == 'sherlock')
+        cosmo_params['scale_factor'] = a #store to pass in
+        outputdir = path.join(base_outputdir, 'a_%.5f'%a)
+        if not path.exists(outputdir):
+            mkdir(outputdir)
+
+        if ordered_params is None:
+            from .ioHelpers import DEFAULT_PARAMS as ordered_params
+            warnings.warn("Using default ordered parameters.")
+
+        # write the global file used by all params
+        # TODO Write system (maybe) and method (definetly) to file!
+        header_start = ['Sampling Method: %s'%method,'Observable: %s'%obs, 'Cosmology Params:']
+        header_start.extend('%s:%s' % (key, str(val)) for key, val in cosmo_params.iteritems())
+        header = '\n'.join(header_start)
+        np.savetxt(path.join(outputdir, GLOBAL_FILENAME), bins, header=header)
+        #Writing ordering to file.
+        with open(path.join(outputdir, PARAMS_FILENAME), 'w') as f:
+            pickle.dump(ordered_params,f )
+
+        # call each job individually
+        points_per_job = int(points.shape[0] / n_jobs_per_a)
+        for job in xrange(n_jobs_per_a):
+            # slice out a portion of the poitns
+            if job == n_jobs_per_a-1: #last one, make sure we get the remainder
+                job_points = points[job*points_per_job:, :]
+            else:
+                job_points = points[job * points_per_job:(job+1) * points_per_job, :]
+            jobname = 'training_data_a%.3f_%03d' %(a,job)
+            param_filename = path.join(outputdir, jobname + '.npy')
+            np.savetxt(param_filename, job_points)
+
+            # TODO allow queue changing
+            command = make_command(jobname, max_time, outputdir)
+            # the odd shell call is to deal with minute differences in the systems.
+            call(command, shell=system == 'sherlock')

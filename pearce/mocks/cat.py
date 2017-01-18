@@ -47,8 +47,7 @@ def observable(func):
             assert self.model is not None
             assert self.populated_once
         except AssertionError:
-            raise AssertionError(
-                "The cat must have a loaded model and catalog and be populated before calculating an observable.")
+            raise AssertionError("The cat must have a loaded model and catalog and be populated before calculating an observable.")
         return func(self, *args, **kwargs)
 
     # store the arguments, as the decorator destroys the spec
@@ -108,7 +107,7 @@ class Cat(object):
         self.Lbox = Lbox
         self.pmass = pmass
 
-        self.scale_factors = sorted(scale_factors)
+        self.scale_factors = np.array(sorted(scale_factors))
         self.redshifts = [1.0 / a - 1 for a in
                           self.scale_factors]  # TODO let user pass in redshift and get a scale factor
 
@@ -188,39 +187,7 @@ class Cat(object):
 
         self.sf_idxs = np.array(sf_idxs)
 
-        '''
-        #I'm sorry the logic is a bit of a mess here...
-        if 'filenames' not in user_kwargs:
-            user_kwargs['filenames'] = tmp_fnames
-        elif 'scale_factors' in user_kwargs:  # don't know why this case would ever be true
-            assert len(user_kwargs['filenames']) == len(user_kwargs['scale_factors'])
-            for kw_fname in user_kwargs['filenames']:
-                #Store indicies. If not in, will throw and error.
-                sf_idxs.append(tmp_fnames.index(kw_fname))
-                # do nothing, we're good.
-            return
-        else:
-            user_kwargs['scale_factors'] = []
-            for kw_fname in user_kwargs['filenames']:
-                idx = tmp_fnames.index(kw_fname) #will throw an error if not in there.
-                sf_idxs.append(idx)
-                user_kwargs['scale_factors'].append(tmp_scale_factors[idx])  # get teh matching scale factor
-            return
 
-        if 'scale_factors' not in user_kwargs:
-            user_kwargs['scale_factors'] = tmp_scale_factors
-        else:  # both case covered above.
-            user_kwargs['filenames'] = []
-            for a in user_kwargs['scale_factors']:
-                idx = tmp_scale_factors.index(a)
-                sf_idxs.append(idx)
-                user_kwargs['filenames'].append(tmp_fnames[idx])  # get teh matching scale factor
-        if not sf_idxs: #it's empty
-            self.sf_idxs = np.array(range(len(tmp_scale_factors)))
-        else:
-            self.sf_idxs = np.array(self.sf_idxs)
-        return
-        '''
 
     def _return_nearest_sf(self, a, tol=0.05):
         '''
@@ -231,7 +198,6 @@ class Cat(object):
             Tolerance within which "near" is defined. Default is 0.05
         :return: If a nearest scale factor is found, returns it. Else, returns None.
         '''
-        print a
         assert 0 < a <= 1  # assert a valid scale factor
         if a in self.scale_factors:  # try for an exact match.
             return a
@@ -285,13 +251,7 @@ class Cat(object):
         else:
             snapdirs = ['' for i in self.scale_factors]
 
-        for a, z, fname, cache_fnames, snapdir in izip(self.scale_factors, self.redshifts, self.filenames,
-                                                       self.cache_filenames, snapdirs):
-            print a
-            print fname
-            print cache_fnames
-            print snapdir
-            print
+        for a, z, fname, cache_fnames, snapdir in izip(self.scale_factors, self.redshifts, self.filenames, self.cache_filenames, snapdirs):
             # TODO get right reader for each halofinder.
             if scale_factors != 'all' and a not in scale_factors:
                 continue
@@ -316,25 +276,18 @@ class Cat(object):
             Radius (in Mpc/h) around which to search for particles to estimate locas density. Default is 5 Mpc.
         :return: None
         """
-        # doing imports here since these are both files i've stolen from Yao
-        # Possible this will be slow
-        from time import time
-        t0 = time()
+        #doing imports here since these are both files i've stolen from Yao
+        #Possible this will be slow
         from .readGadgetSnapshot import readGadgetSnapshot
         from fast3tree import fast3tree
         np.random.seed(int(t0))
         p = 1e-2
         all_particles = np.array([], dtype='float32')
-        avg_pos = np.zeros((3,))
-        N_pos = 0
         # TODO should fail gracefully if memory is exceeded or if p is too small.
-        t1 = time()
         for file in glob(path.join(snapdir, 'snapshot*')):
             # TODO should find out which is "fast" axis and use that.
             # Numpy uses fortran ordering.
             particles = readGadgetSnapshot(file, read_pos=True)[1]  # Think this returns some type of tuple; should check
-            avg_pos+=particles.sum(axis=0)
-            N_pos+=particles.shape[0]
             downsample_idxs = np.random.choice(particles.shape[0], size =int( particles.shape[0]*p))
             particles = particles[downsample_idxs, :]
             #particles = particles[np.random.rand(particles.shape[0]) < p]  # downsample
@@ -344,19 +297,11 @@ class Cat(object):
             all_particles = np.resize(all_particles, (all_particles.shape[0] + particles.shape[0], 3))
             all_particles[-particles.shape[0]:, :] = particles
 
-        print 'All done', time() - t0, 's'
-
-        #np.savetxt('/u/ki/swmclau2/des/all_particles.npy', all_particles)
-
-        # all_pos *= h
-        # TODO not entirely sure if i'm applying little h correctly
-        # densities = np.ones(reader.halo_table['x'].shape)/(4*np.pi/(3*self.h**2)*radius**3)
-        #densities = np.ones(reader.halo_table['halo_x'].shape) / (p * 4 * np.pi / 3 * radius ** 3)
         if type(radius) == float:
             radius = np.array([radius])
         elif type(radius) == list:
             radius = np.array(radius)
-        densities = np.ones((reader.halo_table['halo_x'].shape[0], radius.shape[0])) 
+        densities = np.ones((reader.halo_table['halo_x'].shape[0], radius.shape[0]))
 
         with fast3tree(all_particles) as tree:
             for r_idx, r in enumerate(radius):
@@ -368,9 +313,6 @@ class Cat(object):
                     densities[idx,r_idx] *= reader.particle_mass * len(particle_idxs)
 
             reader.halo_table['halo_local_density_%d'%(int(r))] = densities[:, r_idx]
-            print r
-            print densities[:, r_idx].mean()
-        print 'Done'
 
     def load(self, scale_factor, HOD='redMagic', tol=0.05):
         '''

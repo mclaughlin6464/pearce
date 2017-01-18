@@ -27,9 +27,10 @@ def load_training_params(param_file):
     hod_params = np.loadtxt(param_file)
     dirname = path.dirname(param_file)
     bins, cosmo_params, obs, _ = global_file_reader(path.join(dirname, GLOBAL_FILENAME))
-    ordered_params = pickle.load(path.join(dirname, PARAMS_FILENAME))
-
-    job_id = int(param_file.split('.')[0][-3:]) #last 3 digits of paramfile is a unique id.
+    with open(path.join(dirname, PARAMS_FILENAME)) as f:
+        ordered_params = pickle.load(f)
+    print param_file
+    job_id = int(param_file.split('.')[-2][-3:]) #last 3 digits of paramfile is a unique id.
 
     return hod_params, bins,obs, cosmo_params,ordered_params, dirname, job_id
 
