@@ -170,6 +170,8 @@ class Cat(object):
                 # do nothing, we're good.
         elif 'scale_factors' in user_kwargs:
             user_kwargs['filenames'] = []
+            print user_kwargs['scale_factors']
+            print tmp_scale_factors
             for a in user_kwargs['scale_factors']:
                 idx = tmp_scale_factors.index(a)  # will raise an error if it's not there
                 sf_idxs.append(idx)

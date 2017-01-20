@@ -515,15 +515,15 @@ class Emu(object):
 
         # Extract depending on if there are errors
         if gp_errs:
-            mu, errs = out
+            _mu, _errs = out
         else:
-            mu = out
+            _mu = out
 
-        mu = mu.reshape((-1, r_bin_centers.shape[0]))
+        mu = _mu.reshape((-1, r_bin_centers.shape[0]))
         if not gp_errs:
             return mu
 
-        errs = errs.reshape(mu.shape)
+        errs = _errs.reshape(mu.shape)
         return mu, errs
 
     def emulate_wrt_z(self, em_params, z_bin_centers, gp_errs=False):
@@ -557,9 +557,11 @@ class Emu(object):
             mu, errs = out
         else:
             mu = out
-
+        print 6, mu.shape
         # The swapaxes are necessary to make sure the reshape works properly
         mu = mu.swapaxes(1, 2).reshape((-1, z_bin_centers.shape[0]))
+        print 7, mu.shape
+        print mu
         if not gp_errs:
             return mu
         errs = errs.swapaxes(1, 2).reshape(mu.shape)
@@ -1169,14 +1171,14 @@ class SpicyBuffalo(Emu):
             if self.method == 'gp':
                 out = emulator.predict(y, t, mean_only=not gp_errs)
                 if gp_errs:
-                    mu, cov = out
+                    _mu, cov = out
                     err[:, idx] = np.diag(cov)
                 else:
-                    mu = out
+                    _mu = out
             else:
-                mu = emulator.predict(t)
+                _mu = emulator.predict(t)
 
-            mu[:, idx] = mu + y_hat
+            mu[:, idx] = _mu + y_hat
 
         # Reshape to be consistent with my otehr implementation
         mu = mu.reshape((-1,))
@@ -1216,18 +1218,18 @@ class SpicyBuffalo(Emu):
         out = self.emulate(vep, gp_errs)
 
         if gp_errs:
-            mu, err = out
+            _mu, _err = out
         else:
-            mu = out
+            _mu = out
             # I'm a bad, lazy man
-            err = np.zeros_like(mu)
+            _err = np.zeros_like(_mu)
 
         if self.em_param == 'r':
-            mu = mu.reshape((-1, len(r_bin_centers), len(self.redshift_bin_centers)))
+            mu = _mu.reshape((-1, len(r_bin_centers), len(self.redshift_bin_centers)))
         else:
-            mu = mu.reshape((-1, len(z_bin_centers), len(self.scale_bin_centers)))
+            mu = _mu.reshape((-1, len(z_bin_centers), len(self.scale_bin_centers)))
 
-        err = err.reshape(mu.shape)
+        err = _err.reshape(mu.shape)
 
         # Check for the case where we  don't need to interpolate.
         for key, input_bin, owned_bin in zip(['r', 'z'], [r_bin_centers, z_bin_centers],
@@ -1239,13 +1241,18 @@ class SpicyBuffalo(Emu):
         else:
             if gp_errs:
                 return mu, err
-            return mu, err
+            return mu
 
         # remember, these are the bins of what were not emulating!
         if self.em_param == 'z':
             em_bin_centers = r_bin_centers
         else:
             em_bin_centers = z_bin_centers
+
+        if kind == 'cubic' and len(self.em_bin_centers) < 3 :
+            kind = 'linear'  # can only do cubic if there's 3 points
+
+
 
         new_mu, new_err = [], []
         for mean_slice, err_slice in izip(mu, err):
@@ -1348,13 +1355,13 @@ class ExtraCrispy(Emu):
 
         scale_nbins = len(self.scale_bin_centers)
         redshift_nbins = len(self.redshift_bin_centers)
-        self.x = np.vstack(xs)[0:-1:scale_nbins * redshift_nbins, :]
-        y = np.hstack(ys).reshape((-1, redshift_nbins, scale_nbins))
-        # flip last axis, unfortunately something we have to do
-        # not sure why, if i'm honest
-        self.y = y.view()[:, range(y.shape[-2] - 1, -1, -1), :]
-        yerr = np.hstack(yerrs).reshape(self.y.shape)
-        self.yerr = yerr.view()[:, range(yerr.shape[-2] - 1, -1, -1), :]
+        x = np.vstack(xs)
+        self.x = x[0:x.shape[0]/redshift_nbins:scale_nbins, :]
+        y = np.hstack(ys).reshape((-1, scale_nbins))
+        #I believe, finally, this reshape scheme works
+        self.y = y.reshape((-1, redshift_nbins, scale_nbins), order = 'F')
+        yerr = np.hstack(yerrs).reshape((-1, scale_nbins))
+        self.yerr = yerr.reshape(-1, redshift_nbins, scale_nbins)
         self.y_hat = np.zeros(self.y.shape[1:]) if len(self.y.shape) > 1 else 0  # self.y.mean(axis = 0)
         self.y -= self.y_hat
 
@@ -1409,12 +1416,12 @@ class ExtraCrispy(Emu):
             else:  # krr
                 hyperparams['kernel'] = lambda x1, x2: kernel.value(np.array([x1]), np.array([x2]))
 
-        self.emulators = [[skl_methods[self.method](**hyperparams) for i in xrange(self.yerr.shape[1])] \
-                          for j in xrange(self.yerr.shape[2])]
+        self.emulators = [[skl_methods[self.method](**hyperparams) for j in xrange(self.yerr.shape[2])] \
+                          for i in xrange(self.yerr.shape[1])]
 
-        for scale_ys, scale_emulators in izip(self.y.T, self.emulators):
-            for y, emulator in izip(scale_ys, scale_emulators):
-                emulator.fit(self.x, y)
+        for i, scale_emulators in enumerate(self.emulators):
+            for j, emulator in enumerate(scale_emulators):
+                emulator.fit(self.x, self.y[:, i,j])
 
     def _emulate_helper(self, t, gp_errs=False):
         """
@@ -1428,6 +1435,10 @@ class ExtraCrispy(Emu):
             mu and err both have shape (npoints*self.redshift_bin_centers*self.scale_bin_centers)
         """
         mu = np.zeros((t.shape[0], self.y.shape[1], self.y.shape[2]))  # t down scale_nbins across
+        print 1, mu.shape
+        print 't'
+        print t
+        print 
         err = np.zeros_like(mu)
 
         # TODO pythonic iteration. Not happening right now.
@@ -1437,19 +1448,21 @@ class ExtraCrispy(Emu):
                     out = self.emulators[scale_idx][z_idx].predict(self.y[:, z_idx, scale_idx], t,
                                                                    mean_only=not gp_errs)
                     if gp_errs:
-                        mu, cov = out
+                        _mu, cov = out
                         err[:, scale_idx, z_idx] = np.diag(cov)
                     else:
-                        mu = out
+                        _mu = out
                 else:
-                    mu = self.emulators[z_idx][scale_idx].predict(t)
+                    _mu = self.emulators[z_idx][scale_idx].predict(t)
                 # mu and cov come out as (1,) arrays.
-                mu[:, z_idx, scale_idx] = mu + self.y_hat[z_idx, scale_idx]
+                mu[:, z_idx, scale_idx] = _mu + self.y_hat[z_idx, scale_idx]
                 # err[:, idx] = np.sqrt(np.diag(cov))
                 # all_cov[:, :, idx] = cov
 
         # Reshape to be consistent with my otehr implementation
+        print mu
         mu = mu.reshape((-1,))
+        print 2, mu.shape
         if not gp_errs:
             return mu
         return mu, err.rehsape((-1,))
@@ -1484,6 +1497,8 @@ class ExtraCrispy(Emu):
             err = np.zeros_like(mu)
 
         mu = mu.reshape((-1, len(self.redshift_bin_centers), len(self.scale_bin_centers)))
+        print 3, mu.shape
+        print mu
         err = err.reshape(mu.shape)
 
         # Check for the case where we don't need to interpolate
@@ -1494,8 +1509,14 @@ class ExtraCrispy(Emu):
                 break
         else:
             # if any that exist are not equal to the owned ones, keep going. Else, return.
+            #only take the passed in vals
+            scale_idxs = np.array([sbc in r_bin_centers for sbc in self.scale_bin_centers])
+            redshift_idxs = np.array([rbc in z_bin_centers for rbc in self.redshift_bin_centers])
+            mu = mu[:, redshift_idxs, scale_idxs] 
+            err = err[:, redshift_idxs, scale_idxs]
             if gp_errs:
                 return mu, err
+            print 4, mu.shape
             return mu
 
         if kind == 'cubic' and any(len(bc) < 3 for bc in (self.scale_bin_centers, self.redshift_bin_centers)):
@@ -1505,12 +1526,17 @@ class ExtraCrispy(Emu):
         new_mu, new_err = [], []
         for mean, err in izip(mu, err):
 
+            print mean
+            print self.scale_bin_centers, self.redshift_bin_centers
+
             xi_interpolator = interp2d(self.scale_bin_centers, self.redshift_bin_centers, mean, kind=kind)
             interp_mean = xi_interpolator(r_bin_centers, z_bin_centers)
             # TODO swap axes depends on which bin is length 1
             if interp_mean.ndim == 1:
                 interp_mean = np.array([interp_mean])  # make 2-D array
             new_mu.append(interp_mean)
+            print interp_mean
+            print r_bin_centers, z_bin_centers
 
             err_interp = interp2d(self.scale_bin_centers, self.redshift_bin_centers, err, kind=kind)
             interp_err = err_interp(r_bin_centers, z_bin_centers)
@@ -1529,6 +1555,7 @@ class ExtraCrispy(Emu):
 
         mu = np.stack(new_mu)
         err = np.stack(new_err)
+        print 5, mu.shape
         if gp_errs:
             return mu, err
         return mu
