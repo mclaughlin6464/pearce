@@ -30,7 +30,7 @@ class AssembiasRedMagicCens(RedMagicCens, ContinuousAssembias):
             lower_assembias_bound=self._lower_occupation_bound,
             upper_assembias_bound=self._upper_occupation_bound,
             method_name_to_decorate='mean_occupation', 
-            sec_haloprop_key = 'halo_local_density', #TODO I'm hardcoding this in. Need error handling and also an option to change!  
+            sec_haloprop_key = 'halo_local_density_5', #TODO I'm hardcoding this in. Need error handling and also an option to change!  
             **kwargs)
 
 class RedMagicSats(Zheng07Sats):
@@ -62,7 +62,7 @@ class AssembiasRedMagicSats(RedMagicSats, ContinuousAssembias):
             lower_assembias_bound=self._lower_occupation_bound,
             upper_assembias_bound=self._upper_occupation_bound,
             method_name_to_decorate='mean_occupation',  
-            sec_haloprop_key = 'halo_local_density', #TODO I'm hardcoding this in. Need error handling and also an option to change!  
+            sec_haloprop_key = 'halo_local_density_5', #TODO I'm hardcoding this in. Need error handling and also an option to change!  
             **kwargs)
 
 
