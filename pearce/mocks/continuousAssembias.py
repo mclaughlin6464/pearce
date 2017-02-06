@@ -314,7 +314,6 @@ class ContinuousAssembias(HeavisideAssembias):
             self.param_dict[self._get_assembias_param_dict_key(ipar)] = val
 
     #TODO testme
-    #TODO this isn't done because I don't do the median subtraction.
     def _galprop_perturbation(self, **kwargs):
         """
         Method determines hwo much to boost the baseline function
