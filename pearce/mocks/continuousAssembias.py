@@ -8,6 +8,7 @@ from warnings import warn
 import numpy as np
 from halotools.empirical_models import HeavisideAssembias
 from halotools.custom_exceptions import HalotoolsError
+from halotools.utils.table_utils import compute_conditional_percentiles
 
 def sigmoid(sec_haloprop, slope=1):
     return np.reciprocal(1+np.exp(-slope*sec_haloprop))
@@ -366,3 +367,96 @@ class ContinuousAssembias(HeavisideAssembias):
     def assembias_decorator(self, func):
         #keep everything the smae but get rid of the perturbation flip cuz it's not necessary.
         #also the mask is not necessary
+
+
+        """ Primary behavior of the `HeavisideAssembias` class.
+        This method is used to introduce a boost/decrement of the baseline
+        function in a manner that preserves the all-halo result.
+        Any function with a semi-bounded range can be decorated with
+        `assembias_decorator`. The baseline behavior can be anything
+        whatsoever, such as mean star formation rate or
+        mean halo occupation, provided it has a semi-bounded range.
+        Parameters
+        -----------
+        func : function object
+            Baseline function whose behavior is being decorated with assembly bias.
+        Returns
+        -------
+        wrapper : function object
+            Decorated function that includes assembly bias effects.
+        """
+        lower_bound_key = 'lower_bound_' + self._method_name_to_decorate + '_' + self.gal_type
+        baseline_lower_bound = getattr(self, lower_bound_key)
+        upper_bound_key = 'upper_bound_' + self._method_name_to_decorate + '_' + self.gal_type
+        baseline_upper_bound = getattr(self, upper_bound_key)
+
+        def wrapper(*args, **kwargs):
+
+            #################################################################################
+            # Retrieve the arrays storing prim_haloprop and sec_haloprop
+            # The control flow below is what permits accepting an input
+            # table or a directly inputting prim_haloprop and sec_haloprop arrays
+            _HAS_table = False
+            if 'table' in kwargs:
+                try:
+                    table = kwargs['table']
+                    prim_haloprop = table[self.prim_haloprop_key]
+                    sec_haloprop = table[self.sec_haloprop_key]
+                    _HAS_table = True
+                except KeyError:
+                    msg = ("When passing an input ``table`` to the "
+                           " ``assembias_decorator`` method,\n"
+                           "the input table must have a column with name ``%s``"
+                           "and a column with name ``%s``.\n")
+                    raise HalotoolsError(msg % (self.prim_haloprop_key), self.sec_haloprop_key)
+            else:
+                try:
+                    prim_haloprop = np.atleast_1d(kwargs['prim_haloprop'])
+                except KeyError:
+                    msg = ("\nIf not passing an input ``table`` to the "
+                           "``assembias_decorator`` method,\n"
+                           "you must pass ``prim_haloprop`` argument.\n")
+                    raise HalotoolsError(msg)
+                try:
+                    sec_haloprop = np.atleast_1d(kwargs['sec_haloprop'])
+                except KeyError:
+                    if 'sec_haloprop_percentile' not in kwargs:
+                        msg = ("\nIf not passing an input ``table`` to the "
+                               "``assembias_decorator`` method,\n"
+                               "you must pass either a ``sec_haloprop`` or "
+                               "``sec_haloprop_percentile`` argument.\n")
+                        raise HalotoolsError(msg)
+
+            #################################################################################
+
+            # Compute the fraction of type-2 halos as a function of the input prim_haloprop
+            split = self.percentile_splitting_function(prim_haloprop)
+
+            # Compute the baseline, undecorated result
+            result = func(*args, **kwargs)
+
+            # We will only decorate values that are not edge cases,
+            # so first compute the mask for non-edge cases
+            no_edge_mask = (
+                (split > 0) & (split < 1) &
+                (result > baseline_lower_bound) & (result < baseline_upper_bound)
+            )
+            # Now create convenient references to the non-edge-case sub-arrays
+            no_edge_result = result[no_edge_mask]
+            no_edge_split = split[no_edge_mask]
+
+            #NOTE I've removed the type 1 mask as it is not necessary
+            # this has all been rolled into the galprop_perturbation function
+
+            perturbation = self._galprop_perturbation(
+                prim_haloprop=prim_haloprop[no_edge_mask],
+                sec_haloprop=sec_haloprop[no_edge_mask],
+                baseline_result=no_edge_result,
+                splitting_result=no_edge_split)
+
+            no_edge_result += perturbation
+            result[no_edge_mask] = no_edge_result
+
+            return result
+
+        return wrapper
