@@ -4,6 +4,7 @@
 from itertools import izip
 import inspect
 from warnings import warn
+from math import ceil
 
 import numpy as np
 from halotools.empirical_models import HeavisideAssembias
@@ -67,7 +68,7 @@ def compute_prim_haloprop_bins(dlog10_prim_haloprop=0.05, **kwargs):
 
     return output
 
-def compute_conditional_averages(disp_func = lambda x: x, **kwargs):
+def compute_conditional_averages(disp_func = lambda x: x,disp_func_kwargs={}, **kwargs):
     """
     In bins of the ``prim_haloprop``, compute the average value of disp_func given
     the input ``table`` based on the value of ``sec_haloprop``.
@@ -77,6 +78,8 @@ def compute_conditional_averages(disp_func = lambda x: x, **kwargs):
         A kwarg that is the function to calculate the conditional average of.
         Default is 'lambda x: x' which will compute the average value of sec_haloprop
         in bins of prim_haloprop
+    disp_func_kwargs: dictionary, optional
+        kwargs for the disp_func. Default is an empty dictionary
     table : astropy table, optional
         a keyword argument that stores halo catalog being used to make mock galaxy population
         If a `table` is passed, the `prim_haloprop_key` and `sec_haloprop_key` keys
@@ -158,7 +161,7 @@ def compute_conditional_averages(disp_func = lambda x: x, **kwargs):
         indices_of_prim_haloprop_bin = np.where(prim_haloprop_bins == ibin)[0]
 
         # place the percentiles into the catalog
-        output[indices_of_prim_haloprop_bin] = np.mean(disp_func(sec_haloprop[indices_of_prim_haloprop_bin]))
+        output[indices_of_prim_haloprop_bin] = np.mean(disp_func(sec_haloprop[indices_of_prim_haloprop_bin], **disp_func_kwargs))
 
     #TODO i'm not sure if this should have dimensions of prim_haloprop or the binning...
     return output
@@ -211,7 +214,7 @@ def compute_conditional_percentile(p = 0.5, **kwargs):
     """
 
     try:
-        assert np.all(0 < p < 1)
+        assert np.all(0 < p) and np.all(1 > p)
     except AssertionError:
         raise HalotoolsError("p must be a floating number between 0 and 1. ")
 
@@ -289,9 +292,10 @@ class ContinuousAssembias(HeavisideAssembias):
         :param kwargs:
             All other arguements. For details, see the declaration of HeavisideAssembias in Halotools.
         '''
-        super(ContinuousAssembias, self).__init__(**kwargs)
-
         self.disp_func = disp_func
+        super(ContinuousAssembias, self).__init__(**kwargs)
+        print self.prim_haloprop_key
+        print self.sec_haloprop_key
 
     def _initialize_assembias_param_dict(self, assembias_strength=0.5, **kwargs):
         '''
@@ -310,8 +314,13 @@ class ContinuousAssembias(HeavisideAssembias):
         #get the function specification from the displacement function
         argspec = inspect.getargspec(self.disp_func)
         #add any additional parameters to the parameter dict
-        for ipar, val in izip(argspec.args[1:], argspec.defaults):
-            self.param_dict[self._get_assembias_param_dict_key(ipar)] = val
+        for par_name, val in izip(argspec.args[1:], argspec.defaults):
+            self.param_dict[self._get_disp_func_param_dict_key(par_name)] = val
+
+    def _get_disp_func_param_dict_key(self, par_name):
+        '''
+        '''
+        return 'disp_func_'+str(par_name)
 
     #TODO testme
     def _galprop_perturbation(self, **kwargs):
@@ -350,16 +359,28 @@ class ContinuousAssembias(HeavisideAssembias):
         #evaluate my continuous modification
         strength = self.assembias_strength(prim_haloprop)
 
+        #get the kwargs for disp_func from the param dict
+        disp_func_kwargs = {}
+        for key, val in self.param_dict.iteritems():
+            if key[:10] == 'disp_func_':
+                disp_func_kwargs[key[10:]] = val
+
         #subtract the central value to make sure the right value is in the center of the function
         central_val =  compute_conditional_percentile(splitting_result, prim_haloprop = prim_haloprop, sec_haloprop=sec_haloprop)
         #the average displacement acts as a normalization we need.
-        disp_average = compute_conditional_averages(self.disp_func, prim_haloprop=prim_haloprop, sec_haloprop=sec_haloprop-central_val)
+        disp_average = compute_conditional_averages(self.disp_func, disp_func_kwargs, prim_haloprop=prim_haloprop, sec_haloprop=sec_haloprop-central_val)
 
         bound1 = baseline_result/disp_average
         bound2 = (baseline_upper_bound - baseline_result)/(baseline_upper_bound-disp_average)
+        #stop NaN broadcasting
+        bound1[np.isnan(bound1)] = np.inf
+        bound2[np.isnan(bound2)] = np.inf
+
         bound = np.minimum(bound1, bound2)
 
-        result = strength*bound(self.disp_func(sec_haloprop-central_val)- disp_average)
+        result = strength*bound*(self.disp_func(sec_haloprop-central_val, **disp_func_kwargs)- disp_average)
+        #print 'Perturbations'
+        #print result.mean(),result.std(), result.max(), result.min()
 
         return result
 
@@ -454,7 +475,11 @@ class ContinuousAssembias(HeavisideAssembias):
                 splitting_result=no_edge_split)
 
             no_edge_result += perturbation
+            #print result.mean(), result.std(), result.max(), result.min()
             result[no_edge_mask] = no_edge_result
+
+            #print 'End Wrapper'
+            #print result.mean(), result.std(), result.max(), result.min()
 
             return result
 

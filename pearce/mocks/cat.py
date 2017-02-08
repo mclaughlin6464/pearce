@@ -375,7 +375,7 @@ class Cat(object):
             a = scale_factor  # YOLO
         z = 1.0 / a - 1
 
-        assert HOD in {'redMagic', 'abRedMagic', 'stepFunc', 'zheng07', 'leauthaud11', 'tinker13', 'hearin15'}
+        assert HOD in {'redMagic', 'hsabRedMagic','abRedMagic', 'stepFunc', 'zheng07', 'leauthaud11', 'tinker13', 'hearin15'}
 
         # TODO could compactify this a bit, esp if I add anymore custom models.
         if HOD == 'redMagic':
@@ -398,6 +398,18 @@ class Cat(object):
                 centrals_profile=TrivialPhaseSpace(redshift=z),
                 satellites_occupation=sats_occ,
                 satellites_profile=NFWPhaseSpace(redshift=z))
+
+        elif HOD == 'hsabRedMagic':
+
+            cens_occ = HSAssembiasRedMagicCens(redshift=z)
+            sats_occ = HSAssembiasRedMagicSats(redshift=z, cenocc_model=cens_occ)
+
+            self.model = HodModelFactory(
+                centrals_occupation=cens_occ,
+                centrals_profile=TrivialPhaseSpace(redshift=z),
+                satellites_occupation=sats_occ,
+                satellites_profile=NFWPhaseSpace(redshift=z))
+
 
         elif HOD == 'stepFunc':
             cens_occ = StepFuncCens(redshift=z)

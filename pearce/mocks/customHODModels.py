@@ -22,16 +22,39 @@ class RedMagicCens(Zheng07Cens):
         return self.param_dict['f_c'] * super(RedMagicCens, self).mean_occupation(**kwargs)
 
 class AssembiasRedMagicCens(RedMagicCens, ContinuousAssembias):
-    '''RedMagic Cens with Assembly bias'''
+    '''RedMagic Cens with Continuous Assembly bias'''
     def __init__(self, **kwargs):
         '''See halotools docs for more info. '''
         super(AssembiasRedMagicCens, self).__init__(**kwargs)
+
+        sec_haloprop_key = 'halo_nfw_conc'
+        if 'sec_haloprop_key' in kwargs:
+            sec_haloprop_key = kwargs['sec_haloprop_key']
+
+        ContinuousAssembias.__init__(self,
+            lower_assembias_bound=self._lower_occupation_bound,
+            upper_assembias_bound=self._upper_occupation_bound,
+            method_name_to_decorate='mean_occupation', 
+            sec_haloprop_key = sec_haloprop_key, #TODO I'm hardcoding this in. Need error handling and also an option to change!  
+            **kwargs)
+
+class HSAssembiasRedMagicCens(RedMagicCens, HeavisideAssembias):
+    '''RedMagic Cens with Heaviside Assembly bias'''
+    def __init__(self, **kwargs):
+        '''See halotools docs for more info. '''
+        super(HSAssembiasRedMagicCens, self).__init__(**kwargs)
+
+        sec_haloprop_key = 'halo_nfw_conc'
+        if 'sec_haloprop_key' in kwargs:
+            sec_haloprop_key = kwargs['sec_haloprop_key']
+
         HeavisideAssembias.__init__(self,
             lower_assembias_bound=self._lower_occupation_bound,
             upper_assembias_bound=self._upper_occupation_bound,
             method_name_to_decorate='mean_occupation', 
-            sec_haloprop_key = 'halo_local_density_5', #TODO I'm hardcoding this in. Need error handling and also an option to change!  
+            sec_haloprop_key = sec_haloprop_key, #TODO I'm hardcoding this in. Need error handling and also an option to change!  
             **kwargs)
+
 
 class RedMagicSats(Zheng07Sats):
     '''Tweak of Zheng model to add a new parameter, f_c, denoting a modified central fraction.'''
@@ -58,12 +81,33 @@ class AssembiasRedMagicSats(RedMagicSats, ContinuousAssembias):
     def __init__(self, **kwargs):
         '''See halotools docs for more info. '''
         super(AssembiasRedMagicSats, self).__init__(**kwargs)
+        sec_haloprop_key = 'halo_nfw_conc'
+        if 'sec_haloprop_key' in kwargs:
+            sec_haloprop_key = kwargs['sec_haloprop_key']
+
+        ContinuousAssembias.__init__(self,
+            lower_assembias_bound=self._lower_occupation_bound,
+            upper_assembias_bound=self._upper_occupation_bound,
+            method_name_to_decorate='mean_occupation',  
+            sec_haloprop_key = sec_haloprop_key, #TODO I'm hardcoding this in. Need error handling and also an option to change!  
+            **kwargs)
+
+class HSAssembiasRedMagicSats(RedMagicSats, HeavisideAssembias):
+    '''RedMagic Cens with Assembly bias'''
+    def __init__(self, **kwargs):
+        '''See halotools docs for more info. '''
+        super(HSAssembiasRedMagicSats, self).__init__(**kwargs)
+        sec_haloprop_key = 'halo_nfw_conc'
+        if 'sec_haloprop_key' in kwargs:
+            sec_haloprop_key = kwargs['sec_haloprop_key']
+
         HeavisideAssembias.__init__(self,
             lower_assembias_bound=self._lower_occupation_bound,
             upper_assembias_bound=self._upper_occupation_bound,
             method_name_to_decorate='mean_occupation',  
-            sec_haloprop_key = 'halo_local_density_5', #TODO I'm hardcoding this in. Need error handling and also an option to change!  
+            sec_haloprop_key = sec_haloprop_key, #TODO I'm hardcoding this in. Need error handling and also an option to change!  
             **kwargs)
+
 
 
 class StepFuncCens(Zheng07Cens):
