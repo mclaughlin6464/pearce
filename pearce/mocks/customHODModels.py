@@ -78,9 +78,9 @@ class RedMagicSats(Zheng07Sats):
 
 class AssembiasRedMagicSats(RedMagicSats, ContinuousAssembias):
     '''RedMagic Cens with Assembly bias'''
-    def __init__(self, **kwargs):
+    def __init__(self, cenocc_model,**kwargs):
         '''See halotools docs for more info. '''
-        super(AssembiasRedMagicSats, self).__init__(**kwargs)
+        super(AssembiasRedMagicSats, self).__init__(cenocc_model, **kwargs)
         sec_haloprop_key = 'halo_nfw_conc'
         if 'sec_haloprop_key' in kwargs:
             sec_haloprop_key = kwargs['sec_haloprop_key']
@@ -94,9 +94,9 @@ class AssembiasRedMagicSats(RedMagicSats, ContinuousAssembias):
 
 class HSAssembiasRedMagicSats(RedMagicSats, HeavisideAssembias):
     '''RedMagic Cens with Assembly bias'''
-    def __init__(self, **kwargs):
+    def __init__(self, cenocc_model, **kwargs):
         '''See halotools docs for more info. '''
-        super(HSAssembiasRedMagicSats, self).__init__(**kwargs)
+        super(HSAssembiasRedMagicSats, self).__init__(cenocc_model, **kwargs)
         sec_haloprop_key = 'halo_nfw_conc'
         if 'sec_haloprop_key' in kwargs:
             sec_haloprop_key = kwargs['sec_haloprop_key']

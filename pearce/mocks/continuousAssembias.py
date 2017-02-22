@@ -1,6 +1,7 @@
 #!/bin/bash
 # This module contains my modification of Hearin's decorated HOD, that is a continuous extension of the idea.
 
+from time import time
 from itertools import izip
 import inspect
 from warnings import warn
@@ -294,8 +295,6 @@ class ContinuousAssembias(HeavisideAssembias):
         '''
         self.disp_func = disp_func
         super(ContinuousAssembias, self).__init__(**kwargs)
-        print self.prim_haloprop_key
-        print self.sec_haloprop_key
 
     def _initialize_assembias_param_dict(self, assembias_strength=0.5, **kwargs):
         '''
@@ -366,9 +365,14 @@ class ContinuousAssembias(HeavisideAssembias):
                 disp_func_kwargs[key[10:]] = val
 
         #subtract the central value to make sure the right value is in the center of the function
+        t0 = time()
         central_val =  compute_conditional_percentile(splitting_result, prim_haloprop = prim_haloprop, sec_haloprop=sec_haloprop)
         #the average displacement acts as a normalization we need.
+        t1 = time()
         disp_average = compute_conditional_averages(self.disp_func, disp_func_kwargs, prim_haloprop=prim_haloprop, sec_haloprop=sec_haloprop-central_val)
+        t2 = time()
+
+        print t1-t0, t2-t1
 
         bound1 = baseline_result/disp_average
         bound2 = (baseline_upper_bound - baseline_result)/(baseline_upper_bound-disp_average)
@@ -467,7 +471,7 @@ class ContinuousAssembias(HeavisideAssembias):
 
             #NOTE I've removed the type 1 mask as it is not necessary
             # this has all been rolled into the galprop_perturbation function
-
+            
             perturbation = self._galprop_perturbation(
                 prim_haloprop=prim_haloprop[no_edge_mask],
                 sec_haloprop=sec_haloprop[no_edge_mask],
