@@ -141,6 +141,7 @@ def compute_conditional_averages(disp_func = lambda x: x,disp_func_kwargs={}, **
                 "you must pass a ``prim_haloprop`` and ``sec_haloprop`` arguments\n")
             raise HalotoolsError(msg)
 
+
     compute_prim_haloprop_bins_dict = {}
     compute_prim_haloprop_bins_dict['prim_haloprop'] = prim_haloprop
     try:
@@ -163,7 +164,6 @@ def compute_conditional_averages(disp_func = lambda x: x,disp_func_kwargs={}, **
 
         # place the percentiles into the catalog
         output[indices_of_prim_haloprop_bin] = np.mean(disp_func(sec_haloprop[indices_of_prim_haloprop_bin], **disp_func_kwargs))
-
     #TODO i'm not sure if this should have dimensions of prim_haloprop or the binning...
     return output
 
@@ -365,14 +365,17 @@ class ContinuousAssembias(HeavisideAssembias):
                 disp_func_kwargs[key[10:]] = val
 
         #subtract the central value to make sure the right value is in the center of the function
-        t0 = time()
+        #t0 = time()
         central_val =  compute_conditional_percentile(splitting_result, prim_haloprop = prim_haloprop, sec_haloprop=sec_haloprop)
         #the average displacement acts as a normalization we need.
-        t1 = time()
+        #t1 = time()
         disp_average = compute_conditional_averages(self.disp_func, disp_func_kwargs, prim_haloprop=prim_haloprop, sec_haloprop=sec_haloprop-central_val)
-        t2 = time()
+        #t2 = time()
+        x = compute_conditional_percentiles(prim_haloprop=prim_haloprop, sec_haloprop=sec_haloprop-central_val)
+        #t3 = time() 
 
-        print t1-t0, t2-t1
+        #print type(self)
+        #print t1-t0, t2-t1, t3-t2
 
         bound1 = baseline_result/disp_average
         bound2 = (baseline_upper_bound - baseline_result)/(baseline_upper_bound-disp_average)
@@ -457,7 +460,10 @@ class ContinuousAssembias(HeavisideAssembias):
             split = self.percentile_splitting_function(prim_haloprop)
 
             # Compute the baseline, undecorated result
+            #t0 = time()
             result = func(*args, **kwargs)
+            #t1 = time()
+            #print 'Baseline time:',t1 - t0
 
             # We will only decorate values that are not edge cases,
             # so first compute the mask for non-edge cases

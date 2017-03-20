@@ -246,6 +246,9 @@ class Emu(object):
             all_yerr.append(yerr[zeros_slice])
 
         # TODO sort?
+        print len(all_x)
+        print len(all_y)
+        print len(all_yerr)
         return np.vstack(all_x), np.hstack(all_y), np.hstack(all_yerr)
 
     def get_plot_data(self, em_params, training_dir, independent_variable=None, fixed_params={},
