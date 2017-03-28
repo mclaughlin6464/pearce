@@ -112,12 +112,14 @@ class Emu(object):
         assert len(input_params) - len(self.ordered_params) <= 1  # can exclude r
         # HERE can we exclude z too, somehow?
         sub_dirs = glob(path.join(data_dir, 'a_*'))
+        print sub_dirs
         sub_dirs_as = np.array([float(fname[-7:]) for fname in sub_dirs])
 
         # sort them for consistancy
         sort_idxs = np.argsort(sub_dirs_as)
         sub_dirs_as = sub_dirs_as[sort_idxs]
         sub_dirs = [sub_dirs[i] for i in sort_idxs]
+        print sub_dirs
 
         if 'z' in fixed_params:  # don't have to look in dirs that aren't fixed.
             zs = fixed_params['z']
