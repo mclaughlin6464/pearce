@@ -282,7 +282,6 @@ class Cat(object):
         #Possible this will be slow
         from .readGadgetSnapshot import readGadgetSnapshot
         from fast3tree import fast3tree
-        np.random.seed(int(t0))
         p = 1e-2
         all_particles = np.array([], dtype='float32')
         # TODO should fail gracefully if memory is exceeded or if p is too small.

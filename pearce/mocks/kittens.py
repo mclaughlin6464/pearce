@@ -17,7 +17,7 @@ HLIST_COLS = {'halo_id': (1, 'i8'), 'halo_upid': (6, 'i8'),
               'halo_x': (17, 'f4'), 'halo_y': (18, 'f4'), 'halo_z': (19, 'f4'),
               'halo_vx': (20, 'f4'), 'halo_vy': (21, 'f4'), 'halo_vz': (22, 'f4'),
               'halo_mvir': (10, 'f4'), 'halo_rvir': (11, 'f4'), 'halo_rs':(12, 'f4'),
-              'halo_snapnum': (31, 'i8'),'halo_halfmass_scale': (58, 'f4')}
+              'halo_snapnum': (31, 'i8'),'halo_vpeak':(57,'f4'), 'halo_halfmass_scale': (58, 'f4')}
 
 OUTLIST_COLS = {'halo_id': (0, 'i8'), 'halo_upid': (36, 'i8'),
                 'halo_x': (8, 'f4'), 'halo_y': (9, 'f4'), 'halo_z': (10, 'f4'),

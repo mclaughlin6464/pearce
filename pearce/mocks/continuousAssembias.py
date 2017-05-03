@@ -3,6 +3,7 @@
 
 from time import time
 from itertools import izip
+from functools import wraps
 import inspect
 from warnings import warn
 from math import ceil
@@ -319,9 +320,26 @@ class ContinuousAssembias(HeavisideAssembias):
     def _get_disp_func_param_dict_key(self, par_name):
         '''
         '''
-        return 'disp_func_'+str(par_name)
+        return 'disp_func_'+str(par_name)+'_'+self.gal_type
 
-    #TODO testme
+    def assembias_percentile_calculator(self, table):
+        return compute_conditional_percentiles(table=table,
+                                            prim_haloprop_key=self.prim_haloprop_key,
+                                            sec_haloprop_key=self.sec_haloprop_key)
+
+    def _bind_new_haloprop_func_dict(self):
+        """
+        """
+        key = self.sec_haloprop_key + '_percentile'
+        try:
+            self.new_haloprop_func_dict[key] = self.assembias_percentile_calculator
+        except AttributeError:
+            self.new_haloprop_func_dict = {}
+            self.new_haloprop_func_dict[key] = self.assembias_percentile_calculator
+        
+        self._methods_to_inherit.extend(['assembias_strength'])
+
+#TODO testme
     def _galprop_perturbation(self, **kwargs):
         """
         Method determines hwo much to boost the baseline function
@@ -362,7 +380,8 @@ class ContinuousAssembias(HeavisideAssembias):
         disp_func_kwargs = {}
         for key, val in self.param_dict.iteritems():
             if key[:10] == 'disp_func_':
-                disp_func_kwargs[key[10:]] = val
+                split_key = key.split('_')
+                disp_func_kwargs[split_key[-2]] = val
 
         #subtract the central value to make sure the right value is in the center of the function
         #t0 = time()
@@ -417,6 +436,7 @@ class ContinuousAssembias(HeavisideAssembias):
         upper_bound_key = 'upper_bound_' + self._method_name_to_decorate + '_' + self.gal_type
         baseline_upper_bound = getattr(self, upper_bound_key)
 
+        @wraps(func)
         def wrapper(*args, **kwargs):
 
             #################################################################################
@@ -477,12 +497,15 @@ class ContinuousAssembias(HeavisideAssembias):
 
             #NOTE I've removed the type 1 mask as it is not necessary
             # this has all been rolled into the galprop_perturbation function
-            
-            perturbation = self._galprop_perturbation(
-                prim_haloprop=prim_haloprop[no_edge_mask],
-                sec_haloprop=sec_haloprop[no_edge_mask],
-                baseline_result=no_edge_result,
-                splitting_result=no_edge_split)
+
+            if prim_haloprop[no_edge_mask].shape[0] == 0:
+                perturbation = np.zeros_like(no_edge_result)
+            else:
+                perturbation = self._galprop_perturbation(
+                    prim_haloprop=prim_haloprop[no_edge_mask],
+                    sec_haloprop=sec_haloprop[no_edge_mask],
+                    baseline_result=no_edge_result,
+                    splitting_result=no_edge_split)
 
             no_edge_result += perturbation
             #print result.mean(), result.std(), result.max(), result.min()
