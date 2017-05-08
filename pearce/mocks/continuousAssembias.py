@@ -13,8 +13,8 @@ from halotools.empirical_models import HeavisideAssembias
 from halotools.custom_exceptions import HalotoolsError
 from halotools.utils.table_utils import compute_conditional_percentiles
 
-def sigmoid(sec_haloprop, slope=1):
-    return np.reciprocal(1+np.exp(-slope*sec_haloprop))
+def sigmoid(sec_haloprop, slope=0.0):
+    return np.reciprocal(1+np.exp(-(10**slope)*sec_haloprop))
 
 
 def compute_prim_haloprop_bins(dlog10_prim_haloprop=0.05, **kwargs):
@@ -390,7 +390,7 @@ class ContinuousAssembias(HeavisideAssembias):
         #t1 = time()
         disp_average = compute_conditional_averages(self.disp_func, disp_func_kwargs, prim_haloprop=prim_haloprop, sec_haloprop=sec_haloprop-central_val)
         #t2 = time()
-        x = compute_conditional_percentiles(prim_haloprop=prim_haloprop, sec_haloprop=sec_haloprop-central_val)
+        #x = compute_conditional_percentiles(prim_haloprop=prim_haloprop, sec_haloprop=sec_haloprop-central_val)
         #t3 = time() 
 
         #print type(self)
