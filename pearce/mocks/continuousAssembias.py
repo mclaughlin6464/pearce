@@ -55,6 +55,7 @@ def compute_prim_haloprop_bins(dlog10_prim_haloprop=0.05, **kwargs):
             num=ceil(num_prim_haloprop_bins))
 
     # digitize the masses so that we can access them bin-wise
+    print "PHP",np.max(prim_haloprop), prim_haloprop_bin_boundaries[-1]
     output = np.digitize(prim_haloprop, prim_haloprop_bin_boundaries)
 
     # Use the largest bin for any points larger than the largest bin boundary,

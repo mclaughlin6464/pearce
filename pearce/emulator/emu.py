@@ -83,9 +83,12 @@ class Emu(object):
 
         self.fixed_params = fixed_params
         self.independent_variable = independent_variable
-
+        
+        print 'Loading training data...'
         self.load_training_data(training_dir)
+        print 'Done.\nBuilding emulator...'
         self.build_emulator(hyperparams)
+        print 'Done.'
 
     ###Data Loading and Manipulation####################################################################################
 
@@ -109,6 +112,8 @@ class Emu(object):
         input_params.update(em_params)
         input_params.update(fixed_params)
         # TODO a more rigorous test would be better
+        # TODO it is! If user doesn't define z at all, still works treating all the same.
+        # TODO I tried to make this general but I should just wrap in subclasses and call super
         assert len(input_params) - len(self.ordered_params) <= 1  # can exclude r
         # HERE can we exclude z too, somehow?
         sub_dirs = glob(path.join(data_dir, 'a_*'))
@@ -246,9 +251,6 @@ class Emu(object):
             all_yerr.append(yerr[zeros_slice])
 
         # TODO sort?
-        print len(all_x)
-        print len(all_y)
-        print len(all_yerr)
         return np.vstack(all_x), np.hstack(all_y), np.hstack(all_yerr)
 
     def get_plot_data(self, em_params, training_dir, independent_variable=None, fixed_params={},
@@ -405,7 +407,8 @@ class Emu(object):
             if independent_variable is None:
                 ig = {'logMmin': 1.7348042925, 'f_c': 0.327508062386, 'logM0': 15.8416094906,
                       'sigma_logM': 5.36288382789, 'alpha': 3.63498762588, 'r': 0.306139450843,
-                      'logM1': 1.66509412286, 'amp': 1.18212664544, 'z': 1.0}
+                      'logM1': 1.66509412286, 'amp': 1.18212664544, 'z': 1.0, 
+                      'disp_func_slope_centrals': 10.0,'disp_func_slope_satellites': 10.0}
         else:
             pass  # no other guesses saved yet.
 
@@ -439,7 +442,9 @@ class Emu(object):
             try:
                 metric.append(ig[p.name])
             except KeyError:
-                raise KeyError('Key %s was not in the metric.' % p.name)
+                metric.append(1e0)
+                warnings.warn('Key %s was not in the metric.' % p.name)
+                #raise KeyError('Key %s was not in the metric.' % p.name)
 
         metric = np.array(metric)
 
@@ -468,7 +473,7 @@ class Emu(object):
         input_params = {}
         input_params.update(self.fixed_params)
         input_params.update(em_params)
-        # TODO this check is insufficient
+        # TODO this check is wrong. It allowed me to run without 'z' in params & emulator without crashing. I don't know how! 
         assert len(input_params) - self.emulator_ndim + self.fixed_ndim <= 2  # check dimenstionality
         for i in input_params:  # check that the names in input params are all defined in the ordering.
             assert any(i == p.name for p in self.ordered_params)
@@ -481,6 +486,9 @@ class Emu(object):
 
         # TODO george can sort?
         t = self._sort_params(t)
+
+        print 't',t.shape
+        print t[0,:]
 
         return self._emulate_helper(t, gp_errs)
 
@@ -560,11 +568,8 @@ class Emu(object):
             mu, errs = out
         else:
             mu = out
-        print 6, mu.shape
         # The swapaxes are necessary to make sure the reshape works properly
         mu = mu.swapaxes(1, 2).reshape((-1, z_bin_centers.shape[0]))
-        print 7, mu.shape
-        print mu
         if not gp_errs:
             return mu
         errs = errs.swapaxes(1, 2).reshape(mu.shape)
@@ -981,12 +986,24 @@ class OriginalRecipe(Emu):
             if key not in vep and val.size:  # key must not already exist and must be nonzero:
                 vep[key] = val
         # vep.update({'r': np.log10(r_bin_centers), 'z': z_bin_centers})
+        print vep
         out = self.emulate(vep, gp_errs)
         if gp_errs:
             mu, errs = out
         else:
             mu = out
-        mu = mu.reshape((-1, z_bin_centers.shape[0], r_bin_centers.shape[0]))
+
+        print mu.shape
+        print z_bin_centers.shape
+        print r_bin_centers.shape
+        if z_bin_centers.shape[0] == 0:
+            #TODO not sure if this should have the extra axis or not
+            mu = mu.reshape((-1, 1, r_bin_centers.shape[0]))
+        elif r_bin_centers.shape[0] == 0:
+            mu = mu.reshape((-1, z_bin_centers.shape[0], 1))
+        else:
+            mu = mu.reshape((-1, z_bin_centers.shape[0], r_bin_centers.shape[0]))
+
         if not gp_errs:
             return mu
         errs = errs.reshape(mu.shape)
@@ -1025,7 +1042,6 @@ class OriginalRecipe(Emu):
         results = op.minimize(nll, p0, jac=grad_nll, **kwargs)
         # results = op.minimize(nll, p0, jac=grad_nll, method='TNC', bounds =\
         #   [(np.log(0.01), np.log(10)) for i in xrange(ndim+1)],options={'maxiter':50})
-        print results
 
         self.emulator.kernel[:] = results.x
         self.emulator.recompute()
@@ -1438,10 +1454,6 @@ class ExtraCrispy(Emu):
             mu and err both have shape (npoints*self.redshift_bin_centers*self.scale_bin_centers)
         """
         mu = np.zeros((t.shape[0], self.y.shape[1], self.y.shape[2]))  # t down scale_nbins across
-        print 1, mu.shape
-        print 't'
-        print t
-        print 
         err = np.zeros_like(mu)
 
         # TODO pythonic iteration. Not happening right now.
@@ -1463,9 +1475,7 @@ class ExtraCrispy(Emu):
                 # all_cov[:, :, idx] = cov
 
         # Reshape to be consistent with my otehr implementation
-        print mu
         mu = mu.reshape((-1,))
-        print 2, mu.shape
         if not gp_errs:
             return mu
         return mu, err.rehsape((-1,))
@@ -1500,8 +1510,6 @@ class ExtraCrispy(Emu):
             err = np.zeros_like(mu)
 
         mu = mu.reshape((-1, len(self.redshift_bin_centers), len(self.scale_bin_centers)))
-        print 3, mu.shape
-        print mu
         err = err.reshape(mu.shape)
 
         # Check for the case where we don't need to interpolate
@@ -1519,27 +1527,26 @@ class ExtraCrispy(Emu):
             err = err[:, redshift_idxs, scale_idxs]
             if gp_errs:
                 return mu, err
-            print 4, mu.shape
             return mu
 
-        if kind == 'cubic' and any(len(bc) < 3 for bc in (self.scale_bin_centers, self.redshift_bin_centers)):
+        if kind == 'cubic' and any(len(bc) < 4 for bc in (self.scale_bin_centers, self.redshift_bin_centers)):
             kind = 'linear'  # can only do cubic if there's 3 points
 
         # TODO check bin_centers in bounds!
         new_mu, new_err = [], []
         for mean, err in izip(mu, err):
 
-            print mean
-            print self.scale_bin_centers, self.redshift_bin_centers
-
+            print kind, self.scale_bin_centers.shape, self.redshift_bin_centers.shape
+            print mean.shape
             xi_interpolator = interp2d(self.scale_bin_centers, self.redshift_bin_centers, mean, kind=kind)
+            print r_bin_centers.shape, z_bin_centers.shape
+            print r_bin_centers
+            print z_bin_centers
             interp_mean = xi_interpolator(r_bin_centers, z_bin_centers)
             # TODO swap axes depends on which bin is length 1
             if interp_mean.ndim == 1:
                 interp_mean = np.array([interp_mean])  # make 2-D array
             new_mu.append(interp_mean)
-            print interp_mean
-            print r_bin_centers, z_bin_centers
 
             err_interp = interp2d(self.scale_bin_centers, self.redshift_bin_centers, err, kind=kind)
             interp_err = err_interp(r_bin_centers, z_bin_centers)
@@ -1558,7 +1565,6 @@ class ExtraCrispy(Emu):
 
         mu = np.stack(new_mu)
         err = np.stack(new_err)
-        print 5, mu.shape
         if gp_errs:
             return mu, err
         return mu
