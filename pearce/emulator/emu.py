@@ -16,6 +16,7 @@ import george
 from george.kernels import *
 from scipy.interpolate import interp1d, interp2d
 from scipy.linalg import inv
+from scipy.spatial import KDTree
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 from sklearn.kernel_ridge import KernelRidge
 from sklearn.svm import SVR
@@ -76,6 +77,7 @@ class Emu(object):
         # TODO ordered_params needs some checks, cuz i've hardcoded some index stuff in the new version
         # not necessary since it will be delted in a near future version.
         # or, be less lazy with those. (sure).
+        # I'll probably just remove it in an update soon.
         self.ordered_params = params
         if any(p.name == 'z' for p in self.ordered_params) and any(p.name == 'r' for p in self.ordered_params):
             if self.ordered_params[-1].name != 'r' or self.ordered_params[-2].name != 'z':
@@ -112,14 +114,12 @@ class Emu(object):
         assert len(input_params) - len(self.ordered_params) <= 1  # can exclude r
         # HERE can we exclude z too, somehow?
         sub_dirs = glob(path.join(data_dir, 'a_*'))
-        print sub_dirs
         sub_dirs_as = np.array([float(fname[-7:]) for fname in sub_dirs])
 
         # sort them for consistancy
         sort_idxs = np.argsort(sub_dirs_as)
         sub_dirs_as = sub_dirs_as[sort_idxs]
         sub_dirs = [sub_dirs[i] for i in sort_idxs]
-        print sub_dirs
 
         if 'z' in fixed_params:  # don't have to look in dirs that aren't fixed.
             zs = fixed_params['z']
@@ -143,6 +143,7 @@ class Emu(object):
 
         all_x, all_y, all_yerr = [], [], []
 
+        #TODO need a dictionary of files to refer to 
         for sub_dir, z in zip(sub_dirs, self.redshift_bin_centers):
 
             bins, cosmo_params, obs, sampling_method = global_file_reader(path.join(sub_dir, GLOBAL_FILENAME))
@@ -221,6 +222,7 @@ class Emu(object):
                 for p in self.ordered_params:
                     if p.name in fixed_params:  # may need to be input_params
                         continue
+                    # TODO if I have my own defined order internally I can do this at the end outside the loop
                     # TODO change 'r' to something else.
                     if p.name == 'r':
                         file_params.append(np.log10(self.scale_bin_centers))
@@ -229,9 +231,6 @@ class Emu(object):
                     else:
                         file_params.append(np.ones((scale_nbins,)) * params[p.name])
 
-                # TODO if I really wanted to I could subclass this and change the behavior for EC.
-                # Woiuld save reshaping later and decrease the max size.
-                # Subclass a helper class
                 x[idx * scale_nbins:(idx + 1) * scale_nbins, :] = np.stack(file_params).T
 
                 y[idx * scale_nbins:(idx + 1) * scale_nbins], yerr[idx * scale_nbins:( \
@@ -241,6 +240,7 @@ class Emu(object):
             # remove rows that were skipped due to the fixed thing
             # NOTE: HACK
             # a reshape may be faster.
+            # TODO could I use Nonzero, or, better, keep track of the index I need?? 
             zeros_slice = np.any(x != 0.0, axis=1)
 
             all_x.append(x[zeros_slice])
@@ -276,6 +276,7 @@ class Emu(object):
         # repeat for each row of y
         log_bin_centers = np.tile(log_bin_centers, sort_idxs.shape[0] / len(log_bin_centers))
 
+        # TODO do I want to reshape to y.shape((-1, log_bin_centers.shape(1)) ?
         return log_bin_centers, y[sort_idxs], yerr[sort_idxs]
 
     @abstractmethod
@@ -299,7 +300,7 @@ class Emu(object):
             # Approximately true, may need to revisit
             # yerr[idx * NBINS:(idx + 1) * NBINS] = np.sqrt(np.diag(cov)) / (xi * np.log(10))
             y_err = np.sqrt(np.diag(cov)) / (obs * np.log(10))
-        elif independent_variable == 'r2':  # r2
+        elif independent_variable == 'r2':  # r2xi
             y = obs * self.scale_bin_centers * self.scale_bin_centers
             y_err = np.sqrt(np.diag(cov)) * self.scale_bin_centers
         else:
@@ -356,12 +357,8 @@ class Emu(object):
     def build_emulator(self, hyperparams):
         """
         Initialization of the emulator from recovered training data. Calls submethods depending on "method"
-        :param method:
-            The machine learning method to use.
-.       :param hyperparams
+        :param hyperparams
             A dictionary of hyperparameter kwargs for the emulator
-        :param fixed_params:
-            Parameterst to hold fixed in teh training data
         :return: None
         """
 
@@ -468,9 +465,13 @@ class Emu(object):
         input_params.update(self.fixed_params)
         input_params.update(em_params)
         # TODO this check is insufficient
+        # TODO make a helper function to include these sanity checks! 
         assert len(input_params) - self.emulator_ndim + self.fixed_ndim <= 2  # check dimenstionality
         for i in input_params:  # check that the names in input params are all defined in the ordering.
             assert any(i == p.name for p in self.ordered_params)
+        # check that all params are defiend! 
+        for p in self.ordered_params:
+            assert p.name in input_params
 
         # i'd like to remove 'r'. possibly requiring a passed in param?
         t_list = [input_params[p.name] for p in self.ordered_params if p.name in em_params]
@@ -513,7 +514,7 @@ class Emu(object):
             pass
 
         out = self.emulate_wrt_r_z(ep, r_bin_centers, z_bin_centers, gp_errs)
-        # now, reshape to have shap (-1, len(r_bin_centers))
+        # now, reshape to have shape (-1, len(r_bin_centers))
 
         # Extract depending on if there are errors
         if gp_errs:
@@ -559,11 +560,9 @@ class Emu(object):
             mu, errs = out
         else:
             mu = out
-        print 6, mu.shape
         # The swapaxes are necessary to make sure the reshape works properly
         mu = mu.swapaxes(1, 2).reshape((-1, z_bin_centers.shape[0]))
-        print 7, mu.shape
-        print mu
+
         if not gp_errs:
             return mu
         errs = errs.swapaxes(1, 2).reshape(mu.shape)
@@ -573,6 +572,7 @@ class Emu(object):
     def emulate_wrt_r_z(self, em_params, r_bin_centers, z_bin_centers, gp_errs=False):
         pass
 
+    # TODO Jeremey keeps konwn uncertainties, I should do the same here, or near to here. 
     def estimate_uncertainty(self, truth_dir, N=None):
         """
         Estimate the uncertainty of the emulator by comparing to a "test" box of true values.
@@ -801,7 +801,7 @@ class Emu(object):
 
 
 # These functions cannot be instance methods
-# Emcee throws a few when trying to compile the liklihood functions that are attached
+# Emcee throws a fit when trying to compile the liklihood functions that are attached
 # to the object calling it
 def lnprob(theta, *args):
     """
@@ -895,7 +895,6 @@ class OriginalRecipe(Emu):
         ndim = self.x.shape[1]
         self.fixed_ndim = len(self.fixed_params)
         self.emulator_ndim = ndim  # The number of params for the emulator is different than those in sampling.
-        self.sampling_ndim = ndim - 1
 
     def _build_gp(self, hyperparams):
         """
@@ -1098,7 +1097,6 @@ class SpicyBuffalo(Emu):
         ndim = self.x.shape[1]
         self.fixed_ndim = len(self.fixed_params)
         self.emulator_ndim = ndim  # The number of params for the emulator is different than those in sampling.
-        self.sampling_ndim = ndim - 1
 
     def _build_gp(self, hyperparams):
         """
@@ -1326,9 +1324,61 @@ class SpicyBuffalo(Emu):
 
         return results.success
 
+def get_leaves(kdtree):
+    """
+    Helper function for recursively retriving the leaves of a KDTree
+    :param: kdtree
+        instance of KDTree to recover leaves of.
+    :return: leaves, a 2d numpy array of shape (experts, points_per_expert), of leaves. 
+    """
+    experts = kdtree.leafsize
+    points_per_expert = kdtree.n/experts
+    leaves = np.zeros(experts, points_per_expert)
+    leaves_list = []
+    get_leaves_helper(kdtree.tree,leaves_list)
+
+    for i, l in enumerate(leaves_list):
+        leaves[i,:] = np.array(l)
+
+    return leaves
+
+def get_leaves_helper(node, leaves):
+    """
+    Meta helper function. Recursively 
+    """
+    if isinstance(node, KDTree.leafnode):
+        leaves.append(node.idxs)
+    else:
+        get_leaves_helper(node.less, leaves)
+        get_leaves_helper(node.greater, leaves)
 
 class ExtraCrispy(Emu):
-    """Emulator that emulates with bins as an implicit parameter. """
+    """Emulator that emulates with a mixture of expert learners rather than a single one."""
+
+    def __init__(self, training_dir, experts, overlap=1, partition_scheme='kdtree', **kwargs):
+        """
+        Similar initialization as the superclass with one additional parameter: Em_param
+        :param training_dir:
+            See above in EMu
+        :param experts:
+            number of experts to use in the mixture. Must be an integer greater than 1.
+        :param overlap:
+            overlap in training points between experts. For example, if overlap=2, each datapoint will be in 
+            2 experts. Default is 1, no overlap. 
+        :param kwargs:
+            As in Emu
+        """
+
+        assert experts > 1  and int(experts) == experts#no point in having less than this
+        # TODO max value?
+        assert overlap > 0 and int(overlap) == overlap
+        assert partition_scheme in {'kdree', 'random'}
+
+        self.experts = int(experts)
+        self.overlap = int(overlap)
+        self.partition_scheme = partition_scheme
+
+        super(ExtraCrispy, self).__init__(training_dir, **kwargs)
 
     def load_training_data(self, training_dir):
         """
@@ -1350,27 +1400,51 @@ class ExtraCrispy(Emu):
             ys.append(y)
             yerrs.append(yerr)
 
-        # now, need to do some shuffling to get these right.
-        # NOTE this involves creating a large array and slicing it down, essentially. Not the most efficient.
-        # Possibly more efficient would be to load in the format we do here, and then do the transform on that.
-        # However, the one in the superclass is the "standard" approach.
-
-        scale_nbins = len(self.scale_bin_centers)
-        redshift_nbins = len(self.redshift_bin_centers)
         x = np.vstack(xs)
-        self.x = x[0:x.shape[0]/redshift_nbins:scale_nbins, :]
-        y = np.hstack(ys).reshape((-1, scale_nbins))
-        #I believe, finally, this reshape scheme works
-        self.y = y.reshape((-1, redshift_nbins, scale_nbins), order = 'F')
-        yerr = np.hstack(yerrs).reshape((-1, scale_nbins))
-        self.yerr = yerr.reshape(-1, redshift_nbins, scale_nbins)
-        self.y_hat = np.zeros(self.y.shape[1:]) if len(self.y.shape) > 1 else 0  # self.y.mean(axis = 0)
-        self.y -= self.y_hat
+        # hstack for 1-D
+        y = np.hstack(ys)
+        yerr = np.hstack(yerrs)
+        y_hat = np.zeros(y.shape[1]) if len(y.shape) > 1 else 0  # self.y.mean(axis = 0)
+        y -= y_hat
 
-        ndim = self.x.shape[1]
+        #now, parition the data as specified by the user
+        #note that ppe does not include overlap
+        points_per_expert = int(x.shape[0]*1.0/experts)
+
+        self.x = np.zeros((experts,points_per_expert*overlap , x.shape[1]))
+        self.y = np.zeros((experts, points_per_expert*overlap))
+        self.yerr  = np.zeros_like(self.y)
+
+        if self.partition_scheme == 'random':
+            shuffled_idxs = np.random.shuffle(xrange(y.shape[0]))
+            
+            #select potentially overlapping subets of the data for each expert
+            for i in xrange(experts):
+                self.x[i,:,:] = np.roll(x[shuffled_idxs, :], i*points_per_expert, 0)[:points_per_expert*overlap, :]
+                self.y[i,:] = np.roll(y[shuffled_idxs], i*points_per_expert, 0)[:points_per_expert*overlap]
+                self.yerr[i,:] = np.roll(yerr[shuffled_idxs], i*points_per_expert, 0)[:points_per_expert*overlap]
+
+        else: #KDTree
+            kdtree = KDTree(x, leafsize = points_per_expert) 
+            leaves = get_leaves(kdtree)
+
+            for i, leaf in enumerate(leaves):
+                shuffled_idxs = np.random.shuffle(xrange(leaf.shape[0]))
+
+                leaf_ppe = leaf.shape[0]/experts
+                
+                #select potentially overlapping subets of the data for each expert
+                for j in xrange(experts):
+                    self.x[j,i*leaf_ppe:(i+1)*leaf_ppe,:] =\
+                            np.roll(x[leaf[shuffled_idxs]], :], j*leaf_ppe, 0)[:leaf_ppe*overlap, :]
+                    self.y[j,i*leaf_ppe:(i+1)*leaf_ppe] = \
+                            np.roll(y[leaf[shuffled_idxs]], j*leaf_ppe, 0)[:leaf_ppe*overlap]
+                    self.yerr[j,i*leaf_ppe:(i+1)*leaf_ppe]\
+                            = np.roll(yerr[leaf[shuffled_idxs]], j*leaf_ppe, 0)[:leaf_ppe*overlap]
+
+        ndim = x.shape[1]
         self.fixed_ndim = len(self.fixed_params)
         self.emulator_ndim = ndim  # The number of params for the emulator is different than those in sampling.
-        self.sampling_ndim = ndim - 1
 
     def _build_gp(self, hyperparams):
         """
