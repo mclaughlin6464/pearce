@@ -568,9 +568,37 @@ class Emu(object):
         errs = errs.swapaxes(1, 2).reshape(mu.shape)
         return mu, errs
 
-    @abstractmethod
     def emulate_wrt_r_z(self, em_params, r_bin_centers, z_bin_centers, gp_errs=False):
-        pass
+        """
+        Conveniance function. Add's 'r' to the emulation automatically, as this is the
+        most common use case.
+        :param em_params:
+            Dictionary of what values to predict at for each param. Values can be array
+            or float.
+        :param bin_centers:
+            Centers of bins to predict at, for each point in HOD-space.
+        :return: mu, errs (if gp_errs == True)
+                both have been reshaped to have shape (-1, len(z_bin_centers), len(r_bin_centers))
+        """
+        vep = dict(em_params)
+        # take the log of r_bin_centers
+        rpc = np.log10(r_bin_centers) if np.any(r_bin_centers) else np.array([])  # make sure not to throw an error
+        # TODO change 'r' to something more general
+        for key, val in zip(['r', 'z'], (rpc, z_bin_centers)):
+            if key not in vep and val.size:  # key must not already exist and must be nonzero:
+                vep[key] = val
+        # vep.update({'r': np.log10(r_bin_centers), 'z': z_bin_centers})
+        out = self.emulate(vep, gp_errs)
+        if gp_errs:
+            mu, errs = out
+        else:
+            mu = out
+        mu = mu.reshape((-1, z_bin_centers.shape[0], r_bin_centers.shape[0]))
+        if not gp_errs:
+            return mu
+        errs = errs.reshape(mu.shape)
+        return mu, errs
+
 
     # TODO Jeremey keeps konwn uncertainties, I should do the same here, or near to here. 
     def estimate_uncertainty(self, truth_dir, N=None):
@@ -673,6 +701,7 @@ class Emu(object):
 
     # TODO this feature is not super useful anymore, and also is poorly defined w.r.t non gp methods.
     # did a lot of work on it tho, maybe i'll leave it around...?
+    # TODO this feature is no longer correct with EC
     def _loo_errors(self, y, t):
         """
         Calculate the LOO Jackknife error matrix. This is implemented using the analytic LOO procedure,
@@ -727,9 +756,6 @@ class Emu(object):
             # Store the estimate for this LOO GP
             mus[idx, :] = np.dot(Kxxs_t, alpha_m_idx) + emulator.mean(t)
 
-            # print mus[idx]
-            # print
-
             # restore the original values for the next loop
             x[[N - 1, idx]] = x[[idx, N - 1]]
             y[[N - 1, idx]] = y[[idx, N - 1]]
@@ -737,7 +763,6 @@ class Emu(object):
             K_inv_full[[idx, N - 1], :] = K_inv_full[[N - 1, idx], :]
             K_inv_full[:, [idx, N - 1]] = K_inv_full[:, [N - 1, idx]]
 
-        # print time() - t0, 's Total'
         # return the jackknife cov matrix.
         cov = (N - 1.0) / N * np.cov(mus, rowvar=False)
         if mus.shape[1] == 1:
@@ -957,39 +982,7 @@ class OriginalRecipe(Emu):
                 return self.emulator.predict(self.y, t, mean_only=True)
         else:
             return self.emulator.predict(t)
-
-    # TODO It's not clear to the user if bin_centers should be log or not!
-    def emulate_wrt_r_z(self, em_params, r_bin_centers, z_bin_centers, gp_errs=False):
-        """
-        Conveniance function. Add's 'r' to the emulation automatically, as this is the
-        most common use case.
-        :param em_params:
-            Dictionary of what values to predict at for each param. Values can be array
-            or float.
-        :param bin_centers:
-            Centers of bins to predict at, for each point in HOD-space.
-        :return: mu, errs (if gp_errs == True)
-                both have been reshaped to have shape (-1, len(z_bin_centers), len(r_bin_centers))
-        """
-        vep = dict(em_params)
-        # take the log of r_bin_centers
-        rpc = np.log10(r_bin_centers) if np.any(r_bin_centers) else np.array([])  # make sure not to throw an error
-        # TODO change 'r' to something more general
-        for key, val in zip(['r', 'z'], (rpc, z_bin_centers)):
-            if key not in vep and val.size:  # key must not already exist and must be nonzero:
-                vep[key] = val
-        # vep.update({'r': np.log10(r_bin_centers), 'z': z_bin_centers})
-        out = self.emulate(vep, gp_errs)
-        if gp_errs:
-            mu, errs = out
-        else:
-            mu = out
-        mu = mu.reshape((-1, z_bin_centers.shape[0], r_bin_centers.shape[0]))
-        if not gp_errs:
-            return mu
-        errs = errs.reshape(mu.shape)
-        return mu, errs
-
+    
     def train_metric(self, **kwargs):
         """
         Train the metric parameters of the GP. Has a spotty record of working.
@@ -1036,25 +1029,21 @@ def get_leaves(kdtree):
     Helper function for recursively retriving the leaves of a KDTree
     :param: kdtree
         instance of KDTree to recover leaves of.
-    :return: leaves, a 2d numpy array of shape (experts, points_per_expert), of leaves. 
+    :return: leaves, a list of  numpy arrays of shape (experts, points_per_expert), of leaves. 
     """
-    experts = kdtree.leafsize
-    points_per_expert = kdtree.n/experts
-    leaves = np.zeros(experts, points_per_expert)
+    points_per_expert= kdtree.leafsize
+    experts = kdtree.n/points_per_expert
     leaves_list = []
     get_leaves_helper(kdtree.tree,leaves_list)
 
-    for i, l in enumerate(leaves_list):
-        leaves[i,:] = np.array(l)
-
-    return leaves
+    return [np.array(l) for l in leaves_list] 
 
 def get_leaves_helper(node, leaves):
     """
     Meta helper function. Recursively 
     """
     if isinstance(node, KDTree.leafnode):
-        leaves.append(node.idxs)
+        leaves.append(node.idx)
     else:
         get_leaves_helper(node.less, leaves)
         get_leaves_helper(node.greater, leaves)
@@ -1077,9 +1066,10 @@ class ExtraCrispy(Emu):
         """
 
         assert experts > 1  and int(experts) == experts#no point in having less than this
-        # TODO max value?
-        assert overlap > 0 and int(overlap) == overlap
-        assert partition_scheme in {'kdree', 'random'}
+        # TODO experts max value?
+        #no point in having overlap the same as experts. You just have experts-many identical gps!  
+        assert experts > overlap > 0 and int(overlap) == overlap
+        assert partition_scheme in {'kdtree', 'random'}
 
         self.experts = int(experts)
         self.overlap = int(overlap)
@@ -1123,7 +1113,8 @@ class ExtraCrispy(Emu):
         self.yerr  = np.zeros_like(self.y)
 
         if self.partition_scheme == 'random':
-            shuffled_idxs = np.random.shuffle(xrange(y.shape[0]))
+            shuffled_idxs = range(y.shape[0])
+            np.random.shuffle(shuffled_idxs)
             
             #select potentially self.overlapping subets of the data for each expert
             for i in xrange(self.experts):
@@ -1132,21 +1123,31 @@ class ExtraCrispy(Emu):
                 self.yerr[i,:] = np.roll(yerr[shuffled_idxs], i*points_per_expert, 0)[:points_per_expert*self.overlap]
 
         else: #KDTree
+            #TODO leaves won't all have the same size, must fix.
             kdtree = KDTree(x, leafsize = points_per_expert) 
             leaves = get_leaves(kdtree)
 
             for i, leaf in enumerate(leaves):
-                shuffled_idxs = np.random.shuffle(xrange(leaf.shape[0]))
+                shuffled_idxs = range(leaf.shape[0])
+                np.random.shuffle(shuffled_idxs)
 
                 leaf_ppe = leaf.shape[0]/self.experts
                 
                 #select potentially overlapping subets of the data for each expert
                 for j in xrange(self.experts):
-                    self.x[j,i*leaf_ppe:(i+1)*leaf_ppe,:] =\
+                    print i,j
+                    print leaf_ppe*self.overlap
+                    print leaf_ppe*self.overlap - leaf_ppe
+                    print self.x[j].shape[0]-i*leaf_ppe*self.overlap
+                    print i*leaf_ppe*self.overlap-(i+1)*leaf_ppe*self.overlap
+                    print self.x[j,i*leaf_ppe*self.overlap:(i+1)*leaf_ppe*self.overlap,:].shape
+                    print np.roll(x[leaf[shuffled_idxs], :], j*leaf_ppe, 0)[:leaf_ppe*self.overlap, :].shape
+
+                    self.x[j,i*leaf_ppe*self.overlap:(i+1)*leaf_ppe*self.overlap,:] =\
                             np.roll(x[leaf[shuffled_idxs], :], j*leaf_ppe, 0)[:leaf_ppe*self.overlap, :]
-                    self.y[j,i*leaf_ppe:(i+1)*leaf_ppe] = \
+                    self.y[j,i*leaf_ppe*self.overlap:(i+1)*leaf_ppe*self.overlap] = \
                             np.roll(y[leaf[shuffled_idxs]], j*leaf_ppe, 0)[:leaf_ppe*self.overlap]
-                    self.yerr[j,i*leaf_ppe:(i+1)*leaf_ppe]\
+                    self.yerr[j,i*leaf_ppe*self.overlap:(i+1)*leaf_ppe*self.overlap]\
                             = np.roll(yerr[leaf[shuffled_idxs]], j*leaf_ppe, 0)[:leaf_ppe*self.overlap]
 
         ndim = x.shape[1]
@@ -1216,7 +1217,7 @@ class ExtraCrispy(Emu):
         mu = np.zeros((self.experts, t.shape[0]))  # experts down, t deep
         err = np.zeros_like(mu)
 
-        for i, (emulator, _y) in enumerate(self.emulators, self.y):
+        for i, (emulator, _y) in enumerate(izip(self.emulators, self.y)):
             if self.method == 'gp':
                 local_mu, local_cov = emulator.predict(_y, t, mean_only= False)
                 local_err = np.sqrt(np.diag(local_cov))
@@ -1227,108 +1228,17 @@ class ExtraCrispy(Emu):
             mu[i,:] = local_mu
             err[i,:] = local_err
 
-        #now, combine with weighted average
+        print mu.mean(axis = 0)
+        print mu.std(axis = 0)
 
-        combined_var = np.reciprocal(np.sum(np.reciprocal(err**2), axis = 1))
-        combined_mu = combined_var*np.sum(np.reciprocal(err**2)*mu, axis = 1)
+        #now, combine with weighted average
+        combined_var = np.reciprocal(np.sum(np.reciprocal(err**2), axis = 0))
+        combined_mu = combined_var*np.sum(np.reciprocal(err**2)*mu, axis = 0)
 
         # Reshape to be consistent with my otehr implementation
         if not gp_errs:
             return combined_mu
         return combined_mu, np.sqrt(combined_var)
-
-    def emulate_wrt_r_z(self, em_params, r_bin_centers, z_bin_centers, gp_errs=False, kind='cubic'):
-        """
-        Conveniance function. Add's 'r' and 'z' to the emulation automatically, as this is the
-        most common use case.
-        :param em_params:
-            Dictionary of what values to predict at for each param. Values can be array
-            or float.
-        :param r_bin_centers:
-            Centers of scale bins to predict at, for each point in HOD-space.
-        :param z_bin_centers:
-            Centers of redshift bins to predict at, for each point in HOD-space.
-        :param kind:
-            Kind of interpolation to do, is necessary. Default is cubic.
-        :return:
-            Mu and err (gp_errs is True), the predicted mu and err at em_params and bin_centers. If bin_centers
-            is not equal to the bin_centers in the training data, the mean is interpolated as is the variance.
-            Both have shape (-1, reshift_bin_centers, scale_bin_centers)
-        """
-        # turns out this how it already works!
-        assert 'r' not in em_params
-        assert 'z' not in em_params
-        out = self.emulate(em_params, gp_errs)
-        if gp_errs:
-            mu, err = out
-        else:
-            mu = out
-            # I'm a bad, lazy man
-            err = np.zeros_like(mu)
-
-        mu = mu.reshape((-1, len(self.redshift_bin_centers), len(self.scale_bin_centers)))
-        print 3, mu.shape
-        print mu
-        err = err.reshape(mu.shape)
-
-        # Check for the case where we don't need to interpolate
-        for input_bin, owned_bin in zip([r_bin_centers, z_bin_centers],
-                                        [self.scale_bin_centers, self.redshift_bin_centers]):
-            # If all input values have exact matches with binnings we use
-            if input_bin.size and not np.all([np.any(input_val == owned_bin) for input_val in input_bin]):
-                break
-        else:
-            # if any that exist are not equal to the owned ones, keep going. Else, return.
-            #only take the passed in vals
-            scale_idxs = np.array([sbc in r_bin_centers for sbc in self.scale_bin_centers])
-            redshift_idxs = np.array([rbc in z_bin_centers for rbc in self.redshift_bin_centers])
-            mu = mu[:, redshift_idxs, scale_idxs] 
-            err = err[:, redshift_idxs, scale_idxs]
-            if gp_errs:
-                return mu, err
-            print 4, mu.shape
-            return mu
-
-        if kind == 'cubic' and any(len(bc) < 3 for bc in (self.scale_bin_centers, self.redshift_bin_centers)):
-            kind = 'linear'  # can only do cubic if there's 3 points
-
-        # TODO check bin_centers in bounds!
-        new_mu, new_err = [], []
-        for mean, err in izip(mu, err):
-
-            print mean
-            print self.scale_bin_centers, self.redshift_bin_centers
-
-            xi_interpolator = interp2d(self.scale_bin_centers, self.redshift_bin_centers, mean, kind=kind)
-            interp_mean = xi_interpolator(r_bin_centers, z_bin_centers)
-            # TODO swap axes depends on which bin is length 1
-            if interp_mean.ndim == 1:
-                interp_mean = np.array([interp_mean])  # make 2-D array
-            new_mu.append(interp_mean)
-            print interp_mean
-            print r_bin_centers, z_bin_centers
-
-            err_interp = interp2d(self.scale_bin_centers, self.redshift_bin_centers, err, kind=kind)
-            interp_err = err_interp(r_bin_centers, z_bin_centers)
-            if interp_err.ndim == 1:
-                interp_err = np.array([interp_err])
-            new_err.append(interp_err)
-
-        if new_mu[0].ndim == 1:  # need to do some array voodoo
-            for idx, nm, ne in enumerate(zip(new_mu, new_err)):
-                new_mu[idx] = np.array([nm])
-                new_err[idx] = np.array([ne])
-
-                if len(r_bin_centers) == 1:  # have to swap axes in this case
-                    new_mu[idx] = new_mu[idx].swapaxes(0, 1)
-                    new_err[idx] = new_err[idx].swapaxes(0, 1)
-
-        mu = np.stack(new_mu)
-        err = np.stack(new_err)
-        print 5, mu.shape
-        if gp_errs:
-            return mu, err
-        return mu
 
     # TODO could make this learn the metric for other kernel based emulators...
     def train_metric(self, **kwargs):
@@ -1348,11 +1258,9 @@ class ExtraCrispy(Emu):
             # Update the kernel parameters and compute the likelihood.
             # params are log(a) and log(m)
             ll = 0
-            for emulator_row, y_row in izip(self.emulators, self.y.T):
-                for emulator, y in izip(emulator_row, y_row):
-                    emulator.kernel[:] = p
-                    # check this has the right direction
-                    ll += emulator.lnlikelihood(y, quiet=True)
+            for emulator,_y in izip(self.emulators, self.y):
+                emulator.kernel[:] = p
+                ll += emulator.lnlikelihood(_y, quiet=True)
 
             # The scipy optimizer doesn't play well with infinities.
             return -ll if np.isfinite(ll) else 1e25
@@ -1360,21 +1268,19 @@ class ExtraCrispy(Emu):
         # And the gradient of the objective function.
         def grad_nll(p):
             # Update the kernel parameters and compute the likelihood.
-            ll = 0
-            for emulator_row, y_row in izip(self.emulators, self.y.T):
-                for emulator, y in izip(emulator_row, y_row):
-                    emulator.kernel[:] = p
-                    ll += emulator.grad_lnlikelihood(y, quiet=True)
-            return -ll
+            gll = 0
+            for emulator, _y in izip(self.emulators, self.y):
+                emulator.kernel[:] = p
+                gll += emulator.grad_lnlikelihood(_y, quiet=True)
+            return -gll
 
         p0 = self.emulators[0].kernel.vector
         results = op.minimize(nll, p0, jac=grad_nll, **kwargs)
         # results = op.minimize(nll, p0, jac=grad_nll, method='TNC', bounds =\
         #   [(np.log(0.01), np.log(10)) for i in xrange(ndim+1)],options={'maxiter':50})
 
-        for emulator_row in self.emulators:
-            for emulator in emulator_row:
-                emulator.kernel[:] = results.x
-                emulator.recompute()
+        for emulator in self.emulators:
+            emulator.kernel[:] = results.x
+            emulator.recompute()
 
         return results.success
