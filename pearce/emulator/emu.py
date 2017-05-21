@@ -1179,6 +1179,18 @@ class ExtraCrispy(Emu):
                     self.yerr[j, prev_idx:curr_idx] \
                         = np.roll(yerr[missed_points], i * missed_ppe / self.overlap, 0)[:missed_ppe]
 
+                #now, to cover the meta-missed ones, just fill in points until they're full
+                while curr_idx != self.x.shape[1]:
+                    prev_idx = curr_idx
+                    curr_idx+=1
+                    i+=1
+                    self.x[i, prev_idx:curr_idx, :] = \
+                        np.roll(x[missed_points, :], i * missed_ppe / self.overlap, 0)[:1, :]
+                    self.y[j, prev_idx:curr_idx] = \
+                        np.roll(y[missed_points], i * missed_ppe / self.overlap, 0)[:1]
+                    self.yerr[j, prev_idx:curr_idx] \
+                        = np.roll(yerr[missed_points], i * missed_ppe / self.overlap, 0)[:1]
+
         ndim = x.shape[1]
         self.fixed_ndim = len(self.fixed_params)
         self.emulator_ndim = ndim  # The number of params for the emulator is different than those in sampling.
