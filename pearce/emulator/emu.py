@@ -1106,13 +1106,11 @@ class ExtraCrispy(Emu):
 
         #now, parition the data as specified by the user
         #note that ppe does not include overlap
-        points_per_expert = int(x.shape[0]*1.0/self.experts)
+        points_per_expert = int(1.0*x.shape[0]*self.overlap/self.experts)
 
-        self.x = np.zeros((self.experts,points_per_expert*self.overlap , x.shape[1]))
-        self.y = np.zeros((self.experts, points_per_expert*self.overlap))
+        self.x = np.zeros((self.experts,points_per_expert , x.shape[1]))
+        self.y = np.zeros((self.experts, points_per_expert))
         self.yerr  = np.zeros_like(self.y)
-
-        s = 0
 
         if self.partition_scheme == 'random':
             shuffled_idxs = range(y.shape[0])
@@ -1120,40 +1118,53 @@ class ExtraCrispy(Emu):
             
             #select potentially self.overlapping subets of the data for each expert
             for i in xrange(self.experts):
-                self.x[i,:,:] = np.roll(x[shuffled_idxs, :], i*points_per_expert, 0)[:points_per_expert*self.overlap, :]
-                self.y[i,:] = np.roll(y[shuffled_idxs], i*points_per_expert, 0)[:points_per_expert*self.overlap]
-                self.yerr[i,:] = np.roll(yerr[shuffled_idxs], i*points_per_expert, 0)[:points_per_expert*self.overlap]
+                self.x[i,:,:] = np.roll(x[shuffled_idxs, :], i*points_per_expert/self.overlap, 0)[:points_per_expert, :]
+                self.y[i,:] = np.roll(y[shuffled_idxs], i*points_per_expert/self.overlap, 0)[:points_per_expert]
+                self.yerr[i,:] = np.roll(yerr[shuffled_idxs], i*points_per_expert/self.overlap, 0)[:points_per_expert]
 
         else: #KDTree
             #TODO leaves won't all have the same size, must fix.
-            kdtree = KDTree(x, leafsize = points_per_expert) 
+            kdtree = KDTree(x, leafsize = points_per_expert/self.overlap)
             leaves = get_leaves(kdtree)
 
             prev_idx, curr_idx = 0,0
+            # If points cannot be evenly divided, there'll be some skipped ones.
+            # We'll add them in at the end.
+            n_missed = np.sum([len(leaf)%self.experts for leaf in leaves])
+            missed_points = np.zeros(n_missed)
+            missed_idx = 0
+
             for i, leaf in enumerate(leaves):
                 shuffled_idxs = range(leaf.shape[0])
                 np.random.shuffle(shuffled_idxs)
 
-                leaf_ppe = leaf.shape[0]/self.experts
-                curr_idx = prev_idx+leaf_ppe*self.overlap
-
-                print leaf.shape[0], leaf_ppe
-
-                s+=leaf.shape[0]%self.experts
+                leaf_ppe = int(1.0*self.overlap*leaf.shape[0]/self.experts)
+                curr_idx = prev_idx+leaf_ppe
 
                 #select potentially overlapping subets of the data for each expert
                 for j in xrange(self.experts):
 
                     self.x[j,prev_idx:curr_idx,:] =\
-                            np.roll(x[leaf[shuffled_idxs], :], j*leaf_ppe, 0)[:leaf_ppe*self.overlap, :]
+                            np.roll(x[leaf[shuffled_idxs], :], j*leaf_ppe/self.overlap, 0)[:leaf_ppe, :]
                     self.y[j,prev_idx:curr_idx] = \
-                            np.roll(y[leaf[shuffled_idxs]], j*leaf_ppe, 0)[:leaf_ppe*self.overlap]
+                            np.roll(y[leaf[shuffled_idxs]], j*leaf_ppe/self.overlap, 0)[:leaf_ppe]
                     self.yerr[j,prev_idx:curr_idx]\
-                            = np.roll(yerr[leaf[shuffled_idxs]], j*leaf_ppe, 0)[:leaf_ppe*self.overlap]
+                            = np.roll(yerr[leaf[shuffled_idxs]], j*leaf_ppe/self.overlap, 0)[:leaf_ppe]
 
                 prev_idx = curr_idx
+                nm = leaf.shape[0] % self.experts
+                missed_points[missed_idx:missed_idx+nm] = leaf[shuffled_idxs][-nm:]
+                missed_idx+=nm
 
-        print curr_idx,s, self.x.shape
+            #now, distribute leftover points over experts
+            missed_ppe = int(1.0*n_missed*self.overlap/self.experts)
+            for i in xrange(self.experts):
+                self.x[i, prev_idx:, :] = \
+                    np.roll(x[missed_points, :], i * missed_ppe / self.overlap, 0)[:missed_ppe, :]
+                self.y[j, prev_idx:] = \
+                    np.roll(y[missed_points], i * missed_ppe / self.overlap, 0)[:missed_ppe]
+                self.yerr[j, prev_idx:] \
+                    = np.roll(yerr[missed_points], i * missed_ppe / self.overlap, 0)[:missed_ppe]
 
         ndim = x.shape[1]
         self.fixed_ndim = len(self.fixed_params)
