@@ -1112,6 +1112,8 @@ class ExtraCrispy(Emu):
         self.y = np.zeros((self.experts, points_per_expert*self.overlap))
         self.yerr  = np.zeros_like(self.y)
 
+        s = 0
+
         if self.partition_scheme == 'random':
             shuffled_idxs = range(y.shape[0])
             np.random.shuffle(shuffled_idxs)
@@ -1135,6 +1137,10 @@ class ExtraCrispy(Emu):
                 leaf_ppe = leaf.shape[0]/self.experts
                 curr_idx = prev_idx+leaf_ppe*self.overlap
 
+                print leaf.shape[0], leaf_ppe
+
+                s+=leaf.shape[0]%self.experts
+
                 #select potentially overlapping subets of the data for each expert
                 for j in xrange(self.experts):
 
@@ -1147,7 +1153,7 @@ class ExtraCrispy(Emu):
 
                 prev_idx = curr_idx
 
-        print curr_idx, self.x.shape
+        print curr_idx,s, self.x.shape
 
         ndim = x.shape[1]
         self.fixed_ndim = len(self.fixed_params)
