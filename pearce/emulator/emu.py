@@ -1133,7 +1133,6 @@ class ExtraCrispy(Emu):
             # If points cannot be evenly divided, there'll be some skipped ones.
             # We'll add them in at the end.
             n_missed = np.sum([(self.overlap*len(leaf)%self.experts)/self.overlap for leaf in leaves])
-            print n_missed, self.x.shape
 
             missed_points = np.zeros(n_missed, dtype=int)
             missed_idx = 0
@@ -1165,11 +1164,8 @@ class ExtraCrispy(Emu):
             if n_missed>0:
                 missed_ppe = int(1.0*n_missed*self.overlap/self.experts)
 
-                print missed_points
-                print missed_points.shape, missed_ppe
 
                 curr_idx = prev_idx +missed_ppe
-                print self.x.shape,curr_idx, prev_idx
 
                 for i in xrange(self.experts):
                     self.x[i, prev_idx:curr_idx, :] = \
@@ -1183,13 +1179,13 @@ class ExtraCrispy(Emu):
                 while curr_idx != self.x.shape[1]:
                     prev_idx = curr_idx
                     curr_idx+=1
-                    i+=1
-                    self.x[i, prev_idx:curr_idx, :] = \
-                        np.roll(x[missed_points, :], i * missed_ppe / self.overlap, 0)[:1, :]
-                    self.y[j, prev_idx:curr_idx] = \
-                        np.roll(y[missed_points], i * missed_ppe / self.overlap, 0)[:1]
-                    self.yerr[j, prev_idx:curr_idx] \
-                        = np.roll(yerr[missed_points], i * missed_ppe / self.overlap, 0)[:1]
+                    for j in xrange(self.experts):
+                        self.x[j, prev_idx:curr_idx, :] = \
+                            np.roll(x[missed_points, :], (j+i)* missed_ppe / self.overlap, 0)[:1, :]
+                        self.y[j, prev_idx:curr_idx] = \
+                            np.roll(y[missed_points],(j+ i)* missed_ppe / self.overlap, 0)[:1]
+                        self.yerr[j, prev_idx:curr_idx] \
+                            = np.roll(yerr[missed_points], (j+i) * missed_ppe / self.overlap, 0)[:1]
 
         ndim = x.shape[1]
         self.fixed_ndim = len(self.fixed_params)
