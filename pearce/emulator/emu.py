@@ -1124,7 +1124,7 @@ class ExtraCrispy(Emu):
 
         else: #KDTree
             #TODO leaves won't all have the same size, must fix.
-            kdtree = KDTree(x, leafsize = points_per_expert/self.overlap)
+            kdtree = KDTree(x,leafsize = 50)# leafsize = points_per_expert/self.overlap)
             leaves = get_leaves(kdtree)
 
             prev_idx, curr_idx = 0,0
