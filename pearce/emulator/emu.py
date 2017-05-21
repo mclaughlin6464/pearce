@@ -1127,6 +1127,9 @@ class ExtraCrispy(Emu):
             kdtree = KDTree(x, leafsize = points_per_expert) 
             leaves = get_leaves(kdtree)
 
+            s=np.sum([len(leaf) for leaf in leaves])
+            print s, s/self.experts, x.shape, self.x.shape
+
             for i, leaf in enumerate(leaves):
                 shuffled_idxs = range(leaf.shape[0])
                 np.random.shuffle(shuffled_idxs)
@@ -1135,13 +1138,6 @@ class ExtraCrispy(Emu):
                 
                 #select potentially overlapping subets of the data for each expert
                 for j in xrange(self.experts):
-                    print i,j
-                    print leaf_ppe*self.overlap
-                    print leaf_ppe*self.overlap - leaf_ppe
-                    print self.x[j].shape[0]-i*leaf_ppe*self.overlap
-                    print i*leaf_ppe*self.overlap-(i+1)*leaf_ppe*self.overlap
-                    print self.x[j,i*leaf_ppe*self.overlap:(i+1)*leaf_ppe*self.overlap,:].shape
-                    print np.roll(x[leaf[shuffled_idxs], :], j*leaf_ppe, 0)[:leaf_ppe*self.overlap, :].shape
 
                     self.x[j,i*leaf_ppe*self.overlap:(i+1)*leaf_ppe*self.overlap,:] =\
                             np.roll(x[leaf[shuffled_idxs], :], j*leaf_ppe, 0)[:leaf_ppe*self.overlap, :]
