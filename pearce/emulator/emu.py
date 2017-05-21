@@ -1132,27 +1132,32 @@ class ExtraCrispy(Emu):
 
             lsum = 0
 
+            prev_idx, curr_idx = 0,0
             for i, leaf in enumerate(leaves):
                 shuffled_idxs = range(leaf.shape[0])
                 np.random.shuffle(shuffled_idxs)
 
                 leaf_ppe = leaf.shape[0]/self.experts
+                curr_idx = prev_idx+leaf_ppe*self.overlap
 
                 lsum+=leaf_ppe*self.overlap
                 print leaf.shape, leaf_ppe, leaf_ppe*self.overlap
                 print lsum, self.x.shape[1]-lsum
                 print i*leaf_ppe*self.overlap, (i+1)*leaf_ppe*self.overlap
+                print prev_idx, curr_idx
                 print '*'*50
-                
+
                 #select potentially overlapping subets of the data for each expert
                 for j in xrange(self.experts):
 
-                    self.x[j,i*leaf_ppe*self.overlap:(i+1)*leaf_ppe*self.overlap,:] =\
+                    self.x[j,prev_idx:curr_idx,:] =\
                             np.roll(x[leaf[shuffled_idxs], :], j*leaf_ppe, 0)[:leaf_ppe*self.overlap, :]
-                    self.y[j,i*leaf_ppe*self.overlap:(i+1)*leaf_ppe*self.overlap] = \
+                    self.y[j,prev_idx:curr_idx] = \
                             np.roll(y[leaf[shuffled_idxs]], j*leaf_ppe, 0)[:leaf_ppe*self.overlap]
-                    self.yerr[j,i*leaf_ppe*self.overlap:(i+1)*leaf_ppe*self.overlap]\
+                    self.yerr[j,prev_idx:curr_idx]\
                             = np.roll(yerr[leaf[shuffled_idxs]], j*leaf_ppe, 0)[:leaf_ppe*self.overlap]
+
+                prev_idx = curr_idx
 
         ndim = x.shape[1]
         self.fixed_ndim = len(self.fixed_params)
