@@ -1152,22 +1152,23 @@ class ExtraCrispy(Emu):
                             = np.roll(yerr[leaf[shuffled_idxs]], j*leaf_ppe/self.overlap, 0)[:leaf_ppe]
 
                 prev_idx = curr_idx
-                nm = leaf.shape[0] % self.experts
+                nm = (self.overlap*leaf.shape[0] % self.experts)/self.overlap
                 if nm != 0:
                     missed_points[missed_idx:missed_idx+nm] = leaf[shuffled_idxs][-nm:]
                     missed_idx+=nm
 
             #now, distribute leftover points over experts
-            missed_ppe = int(1.0*n_missed*self.overlap/self.experts)
-            print n_missed, missed_points
-            print prev_idx, self.x.shape
-            for i in xrange(self.experts):
-                self.x[i, prev_idx:, :] = \
-                    np.roll(x[missed_points, :], i * missed_ppe / self.overlap, 0)[:missed_ppe, :]
-                self.y[j, prev_idx:] = \
-                    np.roll(y[missed_points], i * missed_ppe / self.overlap, 0)[:missed_ppe]
-                self.yerr[j, prev_idx:] \
-                    = np.roll(yerr[missed_points], i * missed_ppe / self.overlap, 0)[:missed_ppe]
+            if n_missed>0:
+                missed_ppe = int(1.0*n_missed*self.overlap/self.experts)
+                print n_missed, missed_points
+                print prev_idx, self.x.shape
+                for i in xrange(self.experts):
+                    self.x[i, prev_idx:, :] = \
+                        np.roll(x[missed_points, :], i * missed_ppe / self.overlap, 0)[:missed_ppe, :]
+                    self.y[j, prev_idx:] = \
+                        np.roll(y[missed_points], i * missed_ppe / self.overlap, 0)[:missed_ppe]
+                    self.yerr[j, prev_idx:] \
+                        = np.roll(yerr[missed_points], i * missed_ppe / self.overlap, 0)[:missed_ppe]
 
         ndim = x.shape[1]
         self.fixed_ndim = len(self.fixed_params)
