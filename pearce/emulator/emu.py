@@ -1068,7 +1068,7 @@ class ExtraCrispy(Emu):
         assert experts > 1  and int(experts) == experts#no point in having less than this
         # TODO experts max value?
         #no point in having overlap the same as experts. You just have experts-many identical gps!  
-        assert experts > overlap > 0 and int(overlap) == overlap
+        assert experts >= overlap > 0 and int(overlap) == overlap
         assert partition_scheme in {'kdtree', 'random'}
 
         self.experts = int(experts)
