@@ -1160,6 +1160,7 @@ class ExtraCrispy(Emu):
             #now, distribute leftover points over experts
             missed_ppe = int(1.0*n_missed*self.overlap/self.experts)
             print n_missed, missed_points
+            print prev_idx, self.x.shape
             for i in xrange(self.experts):
                 self.x[i, prev_idx:, :] = \
                     np.roll(x[missed_points, :], i * missed_ppe / self.overlap, 0)[:missed_ppe, :]
