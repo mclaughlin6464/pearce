@@ -1153,8 +1153,9 @@ class ExtraCrispy(Emu):
 
                 prev_idx = curr_idx
                 nm = leaf.shape[0] % self.experts
-                missed_points[missed_idx:missed_idx+nm] = leaf[shuffled_idxs][-nm:]
-                missed_idx+=nm
+                if nm != 0:
+                    missed_points[missed_idx:missed_idx+nm] = leaf[shuffled_idxs][-nm:]
+                    missed_idx+=nm
 
             #now, distribute leftover points over experts
             missed_ppe = int(1.0*n_missed*self.overlap/self.experts)
