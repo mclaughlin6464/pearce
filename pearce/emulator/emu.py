@@ -1130,7 +1130,7 @@ class ExtraCrispy(Emu):
             prev_idx, curr_idx = 0,0
             # If points cannot be evenly divided, there'll be some skipped ones.
             # We'll add them in at the end.
-            n_missed = np.sum([len(leaf)%self.experts for leaf in leaves])
+            n_missed = np.sum([(self.overlap*len(leaf)%self.experts)/self.overlap for leaf in leaves])
             missed_points = np.zeros(n_missed, dtype=int)
             missed_idx = 0
 
