@@ -1123,8 +1123,10 @@ class ExtraCrispy(Emu):
                 self.yerr[i,:] = np.roll(yerr[shuffled_idxs], i*points_per_expert/self.overlap, 0)[:points_per_expert]
 
         else: #KDTree
-            #TODO leaves won't all have the same size, must fix.
-            kdtree = KDTree(x,leafsize = 50)# leafsize = points_per_expert/self.overlap)
+            #whiten so all distances are the same
+            normed_x = (x - x.min(axis=0)) / x.max(axis=0)
+            normed_x[np.isnan(normed_x)] = 0.0
+            kdtree = KDTree(normed_x,leafsize = 50)# leafsize = points_per_expert/self.overlap)
             leaves = get_leaves(kdtree)
 
             prev_idx, curr_idx = 0,0
