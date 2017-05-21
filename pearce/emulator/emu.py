@@ -1140,7 +1140,7 @@ class ExtraCrispy(Emu):
 
                 lsum+=leaf_ppe*self.overlap
                 print leaf.shape, leaf_ppe, leaf_ppe*self.overlap
-                print lsum, x.shape[1]-lsum
+                print lsum, self.x.shape[1]-lsum
                 print '*'*50
                 
                 #select potentially overlapping subets of the data for each expert
