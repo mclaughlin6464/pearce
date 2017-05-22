@@ -1237,7 +1237,7 @@ class ExtraCrispy(Emu):
 
         self.emulators = [skl_methods[self.method](**hyperparams) for i in xrange(self.experts)]
 
-        for i, emulator, _x, _y in enumerate(izip(self.emulators, self.x, self.y)):
+        for i, (emulator, _x, _y) in enumerate(izip(self.emulators, self.x, self.y)):
             emulator.fit(_x, _y)
 
     def _emulate_helper(self, t, gp_errs=False):
