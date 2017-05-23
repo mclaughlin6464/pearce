@@ -11,7 +11,7 @@ import cPickle as pickle
 
 import numpy as np
 
-from .ioHelpers import config_reader, PARAMS_FILENAME, GLOBAL_FILENAME
+from .ioHelpers import config_reader, PARAMS_FILENAME, GLOBAL_FILENAME, TRAINING_FILE_LOC_FILENAME
 from ..mocks import cat_dict
 
 
@@ -266,6 +266,9 @@ def make_training_data(config_filename, ordered_params=None):
         if not path.exists(outputdir):
             mkdir(outputdir)
 
+        training_file_loc = {}  # dict of tuples that defines where files are located.
+        # This will make it so you don't have to open every file looking for the ones you want in a fixed_param case.
+
         # write the global file used by all params
         # TODO Write system (maybe) and method (definetly) to file!
         header_start = ['Sampling Method: %s'%method,'Observable: %s'%obs, 'Cosmology Params:']
@@ -288,7 +291,16 @@ def make_training_data(config_filename, ordered_params=None):
             param_filename = path.join(outputdir, jobname + '.npy')
             np.savetxt(param_filename, job_points)
 
+            for i, point in enumerate(job_points):
+                #this string should be standardized between this class and training_helper
+                training_file_loc[tuple(point)] = 'job%03d_HOD%03d.npy'%(job, i)
+
             # TODO allow queue changing
             command = make_command(jobname, max_time, outputdir)
             # the odd shell call is to deal with minute differences in the systems.
             call(command, shell=system == 'sherlock')
+
+        #dump the locations
+        with open(path.join(outputdir, TRAINING_FILE_LOC_FILENAME), 'w') as f:
+            pickle.dump(training_file_loc, f)
+

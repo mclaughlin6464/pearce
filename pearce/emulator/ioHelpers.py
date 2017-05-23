@@ -8,6 +8,10 @@ import cPickle as pickle
 import numpy as np
 from collections import namedtuple
 
+__all__ = ['parameter', 'DEFAULT_PARAMS', 'GLOBAL_FILENAME','PARAMS_FILENAME', 'TRAINING_FILE_LOC_FILENAME',
+           'params_file_reader','training_file_loc_reader', 'obs_file_reader','global_file_reader',
+           'config_reader']
+
 parameter = namedtuple('parameter', ['name', 'low', 'high'])
 
 # global object that defines the names and ordering of the parameters, as well as their boundaries.
@@ -23,6 +27,7 @@ DEFAULT_PARAMS = [parameter('logMmin', 11.7, 12.5),
 # I initially had the global_filename be variable. Howerver, I couldn't find a reason one would change it!
 GLOBAL_FILENAME = 'global_file.npy'
 PARAMS_FILENAME = 'params.pkl'
+TRAINING_FILE_LOC_FILENAME = 'training_file_loc.pkl'
 
 def params_file_reader(dirname, fname = PARAMS_FILENAME):
     '''
@@ -39,6 +44,21 @@ def params_file_reader(dirname, fname = PARAMS_FILENAME):
 
     return ordered_params
 
+
+def training_file_loc_reader(dirname, fname=TRAINING_FILE_LOC_FILENAME):
+    '''
+    Load the training location file from a given directory.
+    :param dir:
+            Directory to get the file from.
+    :param fname:
+            Optional. Custom filename. Default is PARAMS_FILENAME
+    :return:
+        ordered_params, a list of parameter tuples.
+    '''
+    with open(path.join(dirname, fname)) as f:
+        training_file_loc = pickle.load(f)
+
+    return training_file_loc
 
 def obs_file_reader(corr_file, cov_file=None):
     '''

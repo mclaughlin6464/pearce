@@ -21,7 +21,7 @@ from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 from sklearn.kernel_ridge import KernelRidge
 from sklearn.svm import SVR
 
-from .ioHelpers import global_file_reader, obs_file_reader, params_file_reader, parameter
+from .ioHelpers import *
 
 class Emu(object):
     '''Main Emulator base class. Cannot itself be instatiated; can only be accessed via subclasses.
@@ -72,7 +72,7 @@ class Emu(object):
         self.build_emulator(hyperparams)
 
     ###Data Loading and Manipulation####################################################################################
-
+    # TODO this function is too long, should break into sub_functions.
     def get_data(self, data_dir, em_params, fixed_params, independent_variable):
         """
         Read data in the format compatible with this object and return it
@@ -126,15 +126,16 @@ class Emu(object):
 
         all_x, all_y, all_yerr = [], [], []
 
-        #TODO need a dictionary of files to refer to
         for sub_dir, z in zip(sub_dirs, self.redshift_bin_centers):
 
             bins, cosmo_params, obs, sampling_method = global_file_reader(sub_dir)
             # Could add an assert that a = cosmo_params['scale_factor']
-            if fixed_params and sampling_method == 'LHC':
-                if fixed_params.keys() != ['z']:  # allowed:
+            if fixed_params  and fixed_params.keys() != ['z']:
+                if sampling_method == 'LHC':  # not allowed
                     raise ValueError('Fixed parameters is not empty, but the data in data_dir is form a Latin Hypercube. \
                                     Cannot performs slices on a LHC.')
+                else: # FHC, load up the training file locations
+                    training_file_loc = training_file_loc_reader(sub_dir)
 
             #get the defined param ordered for the training data, and ensure its ok.
             ordered_params = params_file_reader(sub_dir)
@@ -152,11 +153,11 @@ class Emu(object):
                                        It's possible fixed_params is missing a parameter, or you defined an extra one. \
                                        Additionally, orded_params in %s could be wrong too!"%sub_dir)
 
-            attached_or = getattr(self,"ordered_params", None)
+            attached_or = getattr(self,"_ordered_params", None)
             # attach the oredered params if its new. Otherwise, ensure that the ordering in this dir is the same as what
             # we have already.
             if attached_or is None:
-                self.ordered_params = ordered_params
+                self._ordered_params = ordered_params
             else:
                 try:
                     assert ordered_params == attached_or
@@ -166,21 +167,22 @@ class Emu(object):
 
             self.obs = obs
 
-            # sorted to ensure parameters line up correctly
-            obs_files = sorted(glob(path.join(sub_dir, 'obs*.npy')))
-            cov_files = sorted(glob(path.join(sub_dir, 'cov*.npy')))
+            if 'FHC':
+                obs_files, cov_files = self._get_fixed_files(training_file_loc, input_params, sub_dir)
+            else: #look at all of them.
+                # sorted to ensure parameters line up correctly
+                obs_files = sorted(glob(path.join(sub_dir, 'obs*.npy')))
+                cov_files = sorted(glob(path.join(sub_dir, 'cov*.npy')))
 
             # store the binning for the scale_bins
             # assumes that it's the same for each box, which should be true.
             self.scale_bin_centers = (bins[:-1] + bins[1:]) / 2
             scale_nbins = self.scale_bin_centers.shape[0]
 
-            # TODO it is at this stage we assume r is last in observed params. Make sure this is explicit.
-
             npoints = len(obs_files) * scale_nbins  # each file contains NBINS points in r, and each file is a 6-d point
 
             # parameters that are not held fixed
-            varied_params = set([p.name for p in self.ordered_params]) - set(fixed_params.keys())
+            varied_params = set([p.name for p in self._ordered_params]) - set(fixed_params.keys())
 
             ndim = len(varied_params)
             x = np.zeros((npoints, ndim))
@@ -194,42 +196,19 @@ class Emu(object):
             for idx, (obs_file, cov_file) in enumerate(izip(obs_files, cov_files)):
                 params, obs, cov = obs_file_reader(obs_file, cov_file)
 
-                # skip values that aren't where we've fixed them to be.
-                # It'd be nice to do this before the file I/O. Not possible without putting all info in the filename.
-                # or, a more nuanced file structure
-                # Note is is complex because fixed_params can have floats or arrays of floats.
-
-                # TODO I can fix the above problem with some kind of global file. It'd be easy to do!
-
-                # TODO check if a fixed_param is not one of the options i.e. typo
-                to_continue = True
-                for key, val in input_params.iteritems():
-                    if key in {'z', 'r'}:
-                        continue  # these won't be in params, or have been already screened.
-                    if type(val) is type(y):  # array
-                        if np.all(np.abs(params[key] - val) > 1e-3):
-                            break
-                    elif np.abs(params[key] - val) > 1e-3:  # float
-                        break
-                else:
-                    to_continue = False  # no break. We found a parameter not in our fixed values
-
-                # skip NaNs as well.
+                # skip NaNs
                 if np.any(np.isnan(cov)) or np.any(np.isnan(obs)):
                     if not warned:
                         warnings.warn('WARNING: NaN detected. Skipping point in %s' % cov_file)
                         warned = True
                     num_skipped += 1
-                    to_continue = True
-
-                if to_continue:
                     continue
 
                 num_used += 1
 
                 # doing some shuffling and stacking
                 file_params = []
-                for p in self.ordered_params:
+                for p in self._ordered_params:
                     if p.name in fixed_params:  # may need to be input_params
                         continue
                     else:
@@ -290,6 +269,37 @@ class Emu(object):
     @abstractmethod
     def load_training_data(self, training_dir):
         pass
+
+    def _get_fixed_files(self, training_file_loc, fixed_params, dirname=''):
+        """
+        Return the files that satisfy the constraints in fixed_params.
+        :param training_file_loc:
+            dictionary where the keys are tuples of the parameters of a file, and the value is the corresponding file.
+        :param fixed_params:
+            dictionary of parameters to hold fixed. Only files with these values will be returned.
+        :param dirname
+            optiona. The directory the file is located, so this can return an absolute filename. Default is '', which
+            means thsi will return relative filenames.
+        :return: obs_files, cov_files. Two lists of filenames where the observed data and the covariance are stored.
+        """
+        #store the idxs and values so we can look in the tuples.
+        idx_val = {}
+        for idx, p in self._ordered_params:
+            if p.name in fixed_params and p.name not in {'z', 'r'}:
+                idx_val[idx] = fixed_params[p.name]
+
+        obs_files, cov_files = [], []
+
+        for params, fbase in training_file_loc.iteritems():
+
+            if not all(np.any(params[idx] - val > 1e3) for idx, val in fixed_params):
+                continue
+
+            obs_files.append(path.join(dirname, 'obs_', fbase))
+            cov_files.append(path.join(dirname, 'cov_', fbase))
+
+        return obs_files, cov_files
+
 
     def _iv_transform(self, independent_variable, obs, cov):
         """
@@ -394,7 +404,7 @@ class Emu(object):
 
         # default
         ig = {'amp': 1}
-        ig.update({p.name: 0.1 for p in self.ordered_params})
+        ig.update({p.name: 0.1 for p in self._ordered_params})
 
         if self.obs == 'xi':
             if independent_variable is None:
@@ -437,7 +447,7 @@ class Emu(object):
             ig = metric  # use the user's initial guesses
 
         metric = [ig['amp']]
-        for p in self.ordered_params:
+        for p in self._ordered_params:
             if p.name in self.fixed_params:
                 continue
             try:
@@ -473,7 +483,7 @@ class Emu(object):
         input_params.update(self.fixed_params)
         input_params.update(em_params)
 
-        op_set = set([p.name for p in self.ordered_params])
+        op_set = set([p.name for p in self._ordered_params])
         ip_set = set(input_params.iterkeys())
         try:
             assert len(op_set ^ ip_set) == 0
@@ -481,7 +491,7 @@ class Emu(object):
             raise AssertionError("Parameters passed into emulate did not match the ordering defined in ordered_params.")
 
         # i'd like to remove 'r'. possibly requiring a passed in param?
-        t_list = [input_params[p.name] for p in self.ordered_params if p.name in em_params]
+        t_list = [input_params[p.name] for p in self._ordered_params if p.name in em_params]
         t_grid = np.meshgrid(*t_list)
         t = np.stack(t_grid).T
         t = t.reshape((-1, self.emulator_ndim))
@@ -810,7 +820,7 @@ class Emu(object):
 
         pos0 = np.zeros((nwalkers, self.sampling_ndim))
         # The zip ensures we don't use the params that are only for the emulator
-        for idx, (p, _) in enumerate(izip(self.ordered_params, xrange(self.sampling_ndim))):
+        for idx, (p, _) in enumerate(izip(self._ordered_params, xrange(self.sampling_ndim))):
             # pos0[:, idx] = np.random.uniform(p.low, p.high, size=nwalkers)
             pos0[:, idx] = np.random.normal(loc=(p.high + p.low) / 2, scale=(p.high + p.low) / 10, size=nwalkers)
 
