@@ -18,6 +18,7 @@ from ..mocks import cat_dict
 GLOBAL_FILENAME = 'global_file.npy'
 PARAMS_FILENAME = 'params.pkl'
 
+
 # I think that it's better to have this param global, as it prevents there from being any conflicts.
 def makeLHC(ordered_params, N=500):
     '''Return a vector of points in parameter space that defines a latin hypercube.
@@ -62,7 +63,7 @@ def makeFHC(ordered_params, N=4):
     # TODO check if n_total is 1.
 
     grid_points = np.meshgrid(*[np.linspace(param.low, param.high, n) \
-                               for n, param in izip(N, ordered_params)])
+                                for n, param in izip(N, ordered_params)])
     points = np.stack(grid_points).T
     points = points.reshape((-1, len(ordered_params)))
 
@@ -84,7 +85,8 @@ def makeFHC(ordered_params, N=4):
     return points[idxs, :]
     # return points
 
-def make_kils_command(jobname, max_time, outputdir, queue='kipac-ibq'):#'bulletmpi'):
+
+def make_kils_command(jobname, max_time, outputdir, queue='kipac-ibq'):  # 'bulletmpi'):
     '''
     Return a list of strings that comprise a bash command to call trainingHelper.py on the cluster.
     Designed to work on ki-ls's batch system
@@ -184,8 +186,8 @@ def training_config_reader(filename):
         bins = [float(r.strip()) for r in bins_str.strip('[ ]').split(',')]
 
         # cosmology information assumed to be in the remaining ones!
-        #Delete the ones we've removed.
-        for key in ['method','obs', 'n_points', 'system', 'n_jobs', 'max_time',
+        # Delete the ones we've removed.
+        for key in ['method', 'obs', 'n_points', 'system', 'n_jobs', 'max_time',
                     'outputdir', 'bins']:
             del config[key]
 
@@ -194,16 +196,16 @@ def training_config_reader(filename):
         # check simname and scale_factor (the 100% required ones) are in there!
         # if fails, will throw a KeyError
         cosmo_params['simname']
-        #TODO change to scale factors?
-        if '[' in cosmo_params['scale_factor']: # user passed in a list
+        # TODO change to scale factors?
+        if '[' in cosmo_params['scale_factor']:  # user passed in a list
             sf_str = cosmo_params['scale_factor']
             cosmo_params['scale_factor'] = [float(a.strip()) for a in sf_str.strip('[ ]').split(',')]
         elif cosmo_params['scale_factor'] == 'all':
             cosmo_params['scale_factor'] = [cosmo_params['scale_factor'].strip()]
-        else: #float
+        else:  # float
             cosmo_params['scale_factor'] = float(cosmo_params['scale_factor'].strip())
 
-        for cp, t in zip(['Lbox', 'npart','n_repops'], [float, int,int]):
+        for cp, t in zip(['Lbox', 'npart', 'n_repops'], [float, int, int]):
             try:
                 cosmo_params[cp] = t(cosmo_params[cp])
             except KeyError:
@@ -212,7 +214,8 @@ def training_config_reader(filename):
     except KeyError:
         raise KeyError("The config file %s is missing a parameter." % filename)
 
-    return method,obs, n_points, system, n_jobs, max_time, outputdir, bins, cosmo_params
+    return method, obs, n_points, system, n_jobs, max_time, outputdir, bins, cosmo_params
+
 
 def make_training_data(config_filename, ordered_params=None):
     '''
@@ -224,22 +227,22 @@ def make_training_data(config_filename, ordered_params=None):
         None.
     '''
 
-    method,obs, n_points, system, n_jobs, max_time, base_outputdir, bins, cosmo_params = \
+    method, obs, n_points, system, n_jobs, max_time, base_outputdir, bins, cosmo_params = \
         training_config_reader(config_filename)
 
     scale_factors = cosmo_params['scale_factor']
 
-    #load one up to test that these scale factors maek sense.
+    # load one up to test that these scale factors maek sense.
     cat = cat_dict[cosmo_params['simname']](**cosmo_params)
 
     if scale_factors[0] == 'all':
-        #have to load up a cat to get them
+        # have to load up a cat to get them
         scale_factors = cat.scale_factors
-    else: #a list
-        assert all(min(a-cat.scale_factors) < 0.05 for a in scale_factors)
+    else:  # a list
+        assert all(min(a - cat.scale_factors) < 0.05 for a in scale_factors)
 
     if ordered_params is None:
-        #raise warning?
+        # raise warning?
         from .ioHelpers import DEFAULT_PARAMS as ordered_params
 
     # determine the specific functions needed for this setup
@@ -258,12 +261,12 @@ def make_training_data(config_filename, ordered_params=None):
     else:
         raise ValueError('Invalid system for making training data: %s' % system)
 
-    n_jobs_per_a = int(np.ceil(float(n_jobs)/len(scale_factors)))
+    n_jobs_per_a = int(np.ceil(float(n_jobs) / len(scale_factors)))
 
     for a in scale_factors:
 
-        cosmo_params['scale_factor'] = a #store to pass in
-        outputdir = path.join(base_outputdir, 'a_%.5f'%a)
+        cosmo_params['scale_factor'] = a  # store to pass in
+        outputdir = path.join(base_outputdir, 'a_%.5f' % a)
         if not path.exists(outputdir):
             mkdir(outputdir)
 
@@ -273,23 +276,23 @@ def make_training_data(config_filename, ordered_params=None):
 
         # write the global file used by all params
         # TODO Write system (maybe) and method (definetly) to file!
-        header_start = ['Sampling Method: %s'%method,'Observable: %s'%obs, 'Cosmology Params:']
+        header_start = ['Sampling Method: %s' % method, 'Observable: %s' % obs, 'Cosmology Params:']
         header_start.extend('%s:%s' % (key, str(val)) for key, val in cosmo_params.iteritems())
         header = '\n'.join(header_start)
         np.savetxt(path.join(outputdir, GLOBAL_FILENAME), bins, header=header)
-        #Writing ordering to file.
+        # Writing ordering to file.
         with open(path.join(outputdir, PARAMS_FILENAME), 'w') as f:
-            pickle.dump(ordered_params,f )
+            pickle.dump(ordered_params, f)
 
         # call each job individually
         points_per_job = int(points.shape[0] / n_jobs_per_a)
         for job in xrange(n_jobs_per_a):
             # slice out a portion of the poitns
-            if job == n_jobs_per_a-1: #last one, make sure we get the remainder
-                job_points = points[job*points_per_job:, :]
+            if job == n_jobs_per_a - 1:  # last one, make sure we get the remainder
+                job_points = points[job * points_per_job:, :]
             else:
-                job_points = points[job * points_per_job:(job+1) * points_per_job, :]
-            jobname = 'training_data_a%.3f_%03d' %(a,job)
+                job_points = points[job * points_per_job:(job + 1) * points_per_job, :]
+            jobname = 'training_data_a%.3f_%03d' % (a, job)
             param_filename = path.join(outputdir, jobname + '.npy')
             np.savetxt(param_filename, job_points)
 
