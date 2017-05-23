@@ -4,6 +4,7 @@ and useful in multiple cases. More specific, one-use functions are generally lef
 # TODO FOR GOD SAKES DECIDE ON CAMELCASE V UNDERSCORES YOU MADMAN
 
 from os import path
+import cPickle as pickle
 import numpy as np
 from collections import namedtuple
 
@@ -18,6 +19,26 @@ DEFAULT_PARAMS = [parameter('logMmin', 11.7, 12.5),
           parameter('logM1', 13.1, 14.3),
           parameter('alpha', 0.75, 1.25),
           parameter('f_c', 0.1, 0.5)]
+
+# I initially had the global_filename be variable. Howerver, I couldn't find a reason one would change it!
+GLOBAL_FILENAME = 'global_file.npy'
+PARAMS_FILENAME = 'params.pkl'
+
+def params_file_reader(dirname, fname = PARAMS_FILENAME):
+    '''
+    Load the parameter file from a given directory.
+    :param dir:
+            Directory to get the file from.
+    :param fname:
+            Optional. Custom filename. Default is PARAMS_FILENAME
+    :return:
+        ordered_params, a list of parameter tuples.
+    '''
+    with open(path.join(dirname, fname)) as f:
+        ordered_params = pickle.load(f)
+
+    return ordered_params
+
 
 def obs_file_reader(corr_file, cov_file=None):
     '''
@@ -48,7 +69,7 @@ def obs_file_reader(corr_file, cov_file=None):
     return params, obs
 
 
-def global_file_reader(global_filename):
+def global_file_reader(dirname, fname=GLOBAL_FILENAME):
     '''
     Helper function, useful for reading the information in the global file.
     :param global_filename:
@@ -56,6 +77,7 @@ def global_file_reader(global_filename):
     :return:
         bins, cosmo_params, obs, method
     '''
+    global_filename = path.join(dirname, fname)
     bins = np.loadtxt(global_filename)
     # cosmology parameters are stored in the global header
     cosmo_params = {}

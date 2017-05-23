@@ -11,12 +11,9 @@ import cPickle as pickle
 
 import numpy as np
 
-from .ioHelpers import config_reader
+from .ioHelpers import config_reader, PARAMS_FILENAME, GLOBAL_FILENAME
 from ..mocks import cat_dict
 
-# I initially had the global_filename be variable. Howerver, I couldn't find a reason one would change it!
-GLOBAL_FILENAME = 'global_file.npy'
-PARAMS_FILENAME = 'params.pkl'
 
 # I think that it's better to have this param global, as it prevents there from being any conflicts.
 def makeLHC(ordered_params, N=500):
@@ -220,6 +217,8 @@ def make_training_data(config_filename, ordered_params=None):
     at various points in HOD parameter space.
     :param config_filename:
         Config file.
+    :param ordered_params:
+        A list of 'parameter' named tuples. Contains the name of the parameter and the min and max values it can hold.
     :return:
         None.
     '''
@@ -239,8 +238,8 @@ def make_training_data(config_filename, ordered_params=None):
         assert all(min(a-cat.scale_factors) < 0.05 for a in scale_factors)
 
     if ordered_params is None:
-        #raise warning?
         from .ioHelpers import DEFAULT_PARAMS as ordered_params
+        warnings.warn("No value of 'params' passed into make_training_data. Using default from ioHelpers.")
 
     # determine the specific functions needed for this setup
     # same points for each redshift
@@ -266,10 +265,6 @@ def make_training_data(config_filename, ordered_params=None):
         outputdir = path.join(base_outputdir, 'a_%.5f'%a)
         if not path.exists(outputdir):
             mkdir(outputdir)
-
-        if ordered_params is None:
-            from .ioHelpers import DEFAULT_PARAMS as ordered_params
-            warnings.warn("Using default ordered parameters.")
 
         # write the global file used by all params
         # TODO Write system (maybe) and method (definetly) to file!
