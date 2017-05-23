@@ -11,18 +11,16 @@ from abc import ABCMeta, abstractmethod
 
 import emcee as mc
 import numpy as np
-import scipy.optimize as op
 import george
 from george.kernels import *
+import scipy.optimize as op
 from scipy.interpolate import interp1d, interp2d
 from scipy.linalg import inv
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 from sklearn.kernel_ridge import KernelRidge
 from sklearn.svm import SVR
 
-from .ioHelpers import global_file_reader, obs_file_reader
-from .trainingData import GLOBAL_FILENAME
-
+from .ioHelpers import global_file_reader, obs_file_reader, params_file_reader, parameter
 
 class Emu(object):
     '''Main Emulator base class. Cannot itself be instatiated; can only be accessed via subclasses.
@@ -31,8 +29,7 @@ class Emu(object):
     __metaclass__ = ABCMeta
     valid_methods = {'gp', 'svr', 'gbdt', 'rf', 'krr'}  # could add more, coud even check if they exist in sklearn
 
-    def __init__(self, training_dir, method='gp', hyperparams={}, params=None, fixed_params={},
-                 independent_variable=None):
+    def __init__(self, training_dir, method='gp', hyperparams={}, fixed_params={}, independent_variable=None):
         '''
         Initialize the Emu
         :param training_dir:
@@ -45,9 +42,6 @@ class Emu(object):
             sklearn. A special hyperparam is 'metric', which determines the metric for kernel-based methods.
              See documentation for a full list of hyperparameters.
              Default is {}.
-        :param params:
-            List of parameter namedtuples. Defines the order of the parameters in the data matrix.
-             Default is None, where DEFAULT_PARAMS is loaded from ioHelpers
         :param fixed_params:
             Parameters to hold fixed during training. Key is the name of the param, and value is the fixed value.
              Default is {}.
@@ -68,18 +62,7 @@ class Emu(object):
         # TODO I hate the assembly bias parameter keys. It'd be nice if the use could pass in something
         # else and I make a change
 
-        # use default if needed
-        if params is None:
-            from .ioHelpers import DEFAULT_PARAMS as params
-
         self.method = method
-        # TODO ordered_params needs some checks, cuz i've hardcoded some index stuff in the new version
-        # not necessary since it will be delted in a near future version.
-        # or, be less lazy with those. (sure).
-        self.ordered_params = params
-        if any(p.name == 'z' for p in self.ordered_params) and any(p.name == 'r' for p in self.ordered_params):
-            if self.ordered_params[-1].name != 'r' or self.ordered_params[-2].name != 'z':
-                warnings.warn('Your ordered params order is possibly problematic! ')
 
         self.fixed_params = fixed_params
         self.independent_variable = independent_variable
@@ -96,6 +79,9 @@ class Emu(object):
             Directory where data from trainingData is stored
         :param em_params:
             Parameters held fixed by the emulator. Slightly different than fixed_params, used for plotting.
+            NOTE Sort of different than em_params accepted by the emulator. If comparing emulator predictions to
+            truth on a plot, passing in em_params used for the emulator to this function will return data values
+            at em_params.
         :param fixed_params:
             Parameters to hold fixed. Only available if data in data_dir is a full hypercube, not a latin hypercube
         :param independent_variable:
@@ -109,7 +95,6 @@ class Emu(object):
         input_params.update(em_params)
         input_params.update(fixed_params)
         # TODO a more rigorous test would be better
-        assert len(input_params) - len(self.ordered_params) <= 1  # can exclude r
         # HERE can we exclude z too, somehow?
         sub_dirs = glob(path.join(data_dir, 'a_*'))
         sub_dirs_as = np.array([float(fname[-7:]) for fname in sub_dirs])
@@ -143,12 +128,40 @@ class Emu(object):
 
         for sub_dir, z in zip(sub_dirs, self.redshift_bin_centers):
 
-            bins, cosmo_params, obs, sampling_method = global_file_reader(path.join(sub_dir, GLOBAL_FILENAME))
+            bins, cosmo_params, obs, sampling_method = global_file_reader(sub_dir)
             # Could add an assert that a = cosmo_params['scale_factor']
             if fixed_params and sampling_method == 'LHC':
                 if fixed_params.keys() != ['z']:  # allowed:
                     raise ValueError('Fixed parameters is not empty, but the data in data_dir is form a Latin Hypercube. \
                                     Cannot performs slices on a LHC.')
+
+            #get the defined param ordered for the training data, and ensure its ok.
+            ordered_params = params_file_reader(sub_dir)
+            # this will not contain 'z' or 'r'. Add them to the end.
+            # note that the bounds of these parameters are not used.
+            ordered_params.extend([parameter('z', 0, 1), parameter('r', 0, 1)])
+
+            try:
+                #make sure they contain the exact same keys.
+                op_set = set([p.name for p in ordered_params])
+                ip_set = set(input_params.iterkeys())
+                assert len(op_set ^ ip_set) == 0
+            except AssertionError:
+                raise AssertionError("The input_params passed into get_data did not match ordered_params. \
+                                       It's possible fixed_params is missing a parameter, or you defined an extra one. \
+                                       Additionally, orded_params in %s could be wrong too!"%sub_dir)
+
+            attached_or = getattr(self,"ordered_params", None)
+            # attach the oredered params if its new. Otherwise, ensure that the ordering in this dir is the same as what
+            # we have already.
+            if attached_or is None:
+                self.ordered_params = ordered_params
+            else:
+                try:
+                    assert ordered_params == attached_or
+                except AssertionError:
+                    raise AssertionError("ordered_params in %s did not match the value attached to this object."%sub_dir)
+
 
             self.obs = obs
 
@@ -215,25 +228,20 @@ class Emu(object):
 
                 # doing some shuffling and stacking
                 file_params = []
-                # NOTE could do a param ordering here
                 for p in self.ordered_params:
                     if p.name in fixed_params:  # may need to be input_params
                         continue
-                    # TODO change 'r' to something else.
-                    if p.name == 'r':
-                        file_params.append(np.log10(self.scale_bin_centers))
-                    elif p.name == 'z':
-                        file_params.append(np.ones((scale_nbins,)) * z)
                     else:
                         file_params.append(np.ones((scale_nbins,)) * params[p.name])
 
-                # TODO if I really wanted to I could subclass this and change the behavior for EC.
-                # Woiuld save reshaping later and decrease the max size.
-                # Subclass a helper class
+                #r and z will always be at the end.
+                file_params.append(np.ones((scale_nbins,)) * z)
+                file_params.append(np.log10(self.scale_bin_centers))
+
                 x[idx * scale_nbins:(idx + 1) * scale_nbins, :] = np.stack(file_params).T
 
                 y[idx * scale_nbins:(idx + 1) * scale_nbins], yerr[idx * scale_nbins:( \
-                                                                                         idx + 1) * scale_nbins] = self._iv_transform(
+                                     idx + 1) * scale_nbins] = self._iv_transform(
                     independent_variable, obs, cov)
 
             # remove rows that were skipped due to the fixed thing
@@ -465,10 +473,13 @@ class Emu(object):
         input_params = {}
         input_params.update(self.fixed_params)
         input_params.update(em_params)
-        # TODO this check is insufficient
-        assert len(input_params) - self.emulator_ndim + self.fixed_ndim <= 2  # check dimenstionality
-        for i in input_params:  # check that the names in input params are all defined in the ordering.
-            assert any(i == p.name for p in self.ordered_params)
+
+        op_set = set([p.name for p in self.ordered_params])
+        ip_set = set(input_params.iterkeys())
+        try:
+            assert len(op_set ^ ip_set) == 0
+        except AssertionError:
+            raise AssertionError("Parameters passed into emulate did not match the ordering defined in ordered_params.")
 
         # i'd like to remove 'r'. possibly requiring a passed in param?
         t_list = [input_params[p.name] for p in self.ordered_params if p.name in em_params]
@@ -604,15 +615,9 @@ class Emu(object):
 
         x, y, _ = self.get_data(truth_dir, {}, self.fixed_params, self.independent_variable)
 
-        bins, _, _, _ = global_file_reader(path.join(truth_dir, GLOBAL_FILENAME))
+        bins, _, _, _ = global_file_reader(truth_dir)
         bin_centers = (bins[1:] + bins[:-1]) / 2
         scale_nbins = len(bin_centers)
-
-        # this hack is not a future proof test!
-        # TODO this whole method needs adjusting. It doesn't work right for other subclasses.
-        # The fix might be to have a helper method that does the proper reshaping done while loading data.
-        if self.ordered_params[-1].name != 'r':
-            x = x[0:-1:scale_nbins, :]
 
         y = y.reshape((-1, scale_nbins))
 
@@ -626,12 +631,8 @@ class Emu(object):
         pred_y = self._emulate_helper(x, False)
         pred_y = pred_y.reshape((-1, scale_nbins))
 
-        # have to inerpolate...
-        # TODO also have to fix when ordered is changed.
-        # This is a question of waht subclass we're using in a sense.
-        # this part could maybe just be wrapped into the above as a helper move.
-        # I'd have to standarize the shaping and stuff...
-        if self.ordered_params[-1].name != 'r' and not np.all(bin_centers == self.scale_bin_centers):
+        # TODO untested
+        if np.any(bin_centers != self.scale_bin_centers):
             bin_centers = bin_centers[self.scale_bin_centers[0] <= bin_centers <= self.scale_bin_centers[-1]]
             new_mu = []
             for mean in pred_y:
