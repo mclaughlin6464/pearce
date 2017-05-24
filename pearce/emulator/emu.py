@@ -105,7 +105,11 @@ class Emu(object):
 
             bins, cosmo_params, obs, sampling_method = global_file_reader(sub_dir)
             self.obs = obs
-            self._get_ordered_params(sub_dir, input_params)
+            #will attach the ordered_params from sub_dir
+            self._get_ordered_params(sub_dir, fixed_params)
+
+            for key in em_params: #assert defined params are in ordered
+                assert any([p.name == key for p in self._ordered_params])
 
             # Could add an assert that a = cosmo_params['scale_factor']
             if fixed_params  and fixed_params.keys() != ['z']:
@@ -114,9 +118,7 @@ class Emu(object):
                                     Cannot performs slices on a LHC.')
                 else: # FHC, load up the training file locations
                     training_file_loc = training_file_loc_reader(sub_dir)
-
-            if sampling_method == 'FHC':
-                obs_files, cov_files = self._get_fixed_files(training_file_loc, input_params, sub_dir)
+                    obs_files, cov_files = self._get_fixed_files(training_file_loc, input_params, sub_dir)
             else: #look at all of them.
                 # sorted to ensure parameters line up correctly
                 obs_files = sorted(glob(path.join(sub_dir, 'obs*.npy')))
@@ -155,13 +157,15 @@ class Emu(object):
 
                 # doing some shuffling and stacking
                 file_params = []
-                for p in self._ordered_params:
+                for p in self._ordered_params[:-2]:
                     if p.name not in fixed_params:  # may need to be input_params
                         file_params.append(np.ones((scale_nbins,)) * params[p.name])
 
                 #r and z will always be at the end.
-                file_params.append(np.ones((scale_nbins,)) * z)
-                file_params.append(np.log10(self.scale_bin_centers))
+                if 'z' not in fixed_params:
+                    file_params.append(np.ones((scale_nbins,)) * z)
+                if 'r' not in fixed_params:
+                    file_params.append(np.log10(self.scale_bin_centers))
 
                 x[idx * scale_nbins:(idx + 1) * scale_nbins, :] = np.stack(file_params).T
 
@@ -215,12 +219,15 @@ class Emu(object):
     def load_training_data(self, training_dir):
         pass
 
-    def _get_ordered_params(self, dirname, input_params):
+    def _get_ordered_params(self, dirname, fixed_params):
         """
-        Load the ordered params from directory 'dirname.' Check that there are no violations and, if it is not
-        currently attached to the object, attach it.
+        Load the ordered params from directory 'dirname.' Remove params that
+        are held fixed by the emulatorCheck that there are no violations and, 
+        if it is not currently attached to the object, attach it.
         :param dirname:
             name of the directory to load ordered_params from
+        :param fixed_params:
+            Iterator of fixed parameters. Will be removed from ordered params
         :return: None
         """
         # get the defined param ordered for the training data, and ensure its ok.
@@ -228,6 +235,15 @@ class Emu(object):
         # this will not contain 'z' or 'r'. Add them to the end.
         # note that the bounds of these parameters are not used.
         ordered_params.extend([parameter('z', 0, 1), parameter('r', 0, 1)])
+
+        #Remove fixed parameters
+        idxs_to_pop = []
+        for i,p in enumerate(ordered_params):
+            if p.name in fixed_params:
+                idxs_to_pop.append(i - len(idxs_to_pop))
+
+        for idx in idxs_to_pop:
+            ordered_params.pop(idx)
 
         attached_or = getattr(self, "_ordered_params", None)
         # attach the oredered params if its new. Otherwise, ensure that the ordering in this dir is the same as what
@@ -240,8 +256,6 @@ class Emu(object):
             except AssertionError:
                 raise AssertionError("ordered_params in %s did not match the value attached to this object." % dirname)
 
-        self._check_params(input_params)
-
     def _check_params(self, params):
         """
         Assert that all keys in params are defined in ordered params, and vice versa. Raises an AssertionError otherwise.
@@ -252,7 +266,7 @@ class Emu(object):
         """
         try:
             # make sure they contain the exact same keys.
-            op_set = set([p.name for p in self.ordered_params])
+            op_set = set([p.name for p in self._ordered_params])
             ip_set = set(params.iterkeys())
             assert len(op_set ^ ip_set) == 0
         except AssertionError:
@@ -326,6 +340,9 @@ class Emu(object):
 
             obs_files.append(path.join(dirname, 'obs_', fbase))
             cov_files.append(path.join(dirname, 'cov_', fbase))
+
+        if len(obs_files) == 0:
+            raise IOError("No files found with the fixed parameters defined!")
 
         return sorted(obs_files), sorted(cov_files)
 
@@ -1295,9 +1312,6 @@ class ExtraCrispy(Emu):
 
             mu[i,:] = local_mu
             err[i,:] = local_err
-
-        print mu.mean(axis = 0)
-        print mu.std(axis = 0)
 
         #now, combine with weighted average
         combined_var = np.reciprocal(np.sum(np.reciprocal(err**2), axis = 0))
