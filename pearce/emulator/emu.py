@@ -72,7 +72,6 @@ class Emu(object):
         self.build_emulator(hyperparams)
 
     ###Data Loading and Manipulation####################################################################################
-    # TODO this function is too long, should break into sub_functions.
     def get_data(self, data_dir, em_params, fixed_params, independent_variable):
         """
         Read data in the format compatible with this object and return it
@@ -129,6 +128,9 @@ class Emu(object):
         for sub_dir, z in zip(sub_dirs, self.redshift_bin_centers):
 
             bins, cosmo_params, obs, sampling_method = global_file_reader(sub_dir)
+            self.obs = obs
+            self._get_ordered_params(sub_dir, input_params)
+
             # Could add an assert that a = cosmo_params['scale_factor']
             if fixed_params  and fixed_params.keys() != ['z']:
                 if sampling_method == 'LHC':  # not allowed
@@ -137,37 +139,7 @@ class Emu(object):
                 else: # FHC, load up the training file locations
                     training_file_loc = training_file_loc_reader(sub_dir)
 
-            #get the defined param ordered for the training data, and ensure its ok.
-            ordered_params = params_file_reader(sub_dir)
-            # this will not contain 'z' or 'r'. Add them to the end.
-            # note that the bounds of these parameters are not used.
-            ordered_params.extend([parameter('z', 0, 1), parameter('r', 0, 1)])
-
-            try:
-                #make sure they contain the exact same keys.
-                op_set = set([p.name for p in ordered_params])
-                ip_set = set(input_params.iterkeys())
-                assert len(op_set ^ ip_set) == 0
-            except AssertionError:
-                raise AssertionError("The input_params passed into get_data did not match ordered_params. \
-                                       It's possible fixed_params is missing a parameter, or you defined an extra one. \
-                                       Additionally, orded_params in %s could be wrong too!"%sub_dir)
-
-            attached_or = getattr(self,"_ordered_params", None)
-            # attach the oredered params if its new. Otherwise, ensure that the ordering in this dir is the same as what
-            # we have already.
-            if attached_or is None:
-                self._ordered_params = ordered_params
-            else:
-                try:
-                    assert ordered_params == attached_or
-                except AssertionError:
-                    raise AssertionError("ordered_params in %s did not match the value attached to this object."%sub_dir)
-
-
-            self.obs = obs
-
-            if 'FHC':
+            if sampling_method == 'FHC':
                 obs_files, cov_files = self._get_fixed_files(training_file_loc, input_params, sub_dir)
             else: #look at all of them.
                 # sorted to ensure parameters line up correctly
@@ -178,7 +150,6 @@ class Emu(object):
             # assumes that it's the same for each box, which should be true.
             self.scale_bin_centers = (bins[:-1] + bins[1:]) / 2
             scale_nbins = self.scale_bin_centers.shape[0]
-
             npoints = len(obs_files) * scale_nbins  # each file contains NBINS points in r, and each file is a 6-d point
 
             # parameters that are not held fixed
@@ -209,9 +180,7 @@ class Emu(object):
                 # doing some shuffling and stacking
                 file_params = []
                 for p in self._ordered_params:
-                    if p.name in fixed_params:  # may need to be input_params
-                        continue
-                    else:
+                    if p.name not in fixed_params:  # may need to be input_params
                         file_params.append(np.ones((scale_nbins,)) * params[p.name])
 
                 #r and z will always be at the end.
@@ -270,6 +239,51 @@ class Emu(object):
     def load_training_data(self, training_dir):
         pass
 
+    def _get_ordered_params(self, dirname, input_params):
+        """
+        Load the ordered params from directory 'dirname.' Check that there are no violations and, if it is not
+        currently attached to the object, attach it.
+        :param dirname:
+            name of the directory to load ordered_params from
+        :return: None
+        """
+        # get the defined param ordered for the training data, and ensure its ok.
+        ordered_params = params_file_reader(dirname)
+        # this will not contain 'z' or 'r'. Add them to the end.
+        # note that the bounds of these parameters are not used.
+        ordered_params.extend([parameter('z', 0, 1), parameter('r', 0, 1)])
+
+        attached_or = getattr(self, "_ordered_params", None)
+        # attach the oredered params if its new. Otherwise, ensure that the ordering in this dir is the same as what
+        # we have already.
+        if attached_or is None:
+            self._ordered_params = ordered_params
+        else:
+            try:
+                assert ordered_params == attached_or
+            except AssertionError:
+                raise AssertionError("ordered_params in %s did not match the value attached to this object." % dirname)
+
+        self._check_params(input_params)
+
+    def _check_params(self, params):
+        """
+        Assert that all keys in params are defined in ordered params, and vice versa. Raises an AssertionError otherwise.
+        :param params:
+            Dictionary of params, where the key is the name and the value is the value it holds. Value can also
+            be a numpy array.
+        :return: None
+        """
+        try:
+            # make sure they contain the exact same keys.
+            op_set = set([p.name for p in self.ordered_params])
+            ip_set = set(params.iterkeys())
+            assert len(op_set ^ ip_set) == 0
+        except AssertionError:
+            raise AssertionError("The input_params passed into get_data did not match ordered_params. \
+                                              It's possible fixed_params is missing a parameter, or you defined an extra one. \
+                                              Additionally, orded_params could be wrong too!")
+
     def _get_fixed_files(self, training_file_loc, fixed_params, dirname=''):
         """
         Return the files that satisfy the constraints in fixed_params.
@@ -298,7 +312,7 @@ class Emu(object):
             obs_files.append(path.join(dirname, 'obs_', fbase))
             cov_files.append(path.join(dirname, 'cov_', fbase))
 
-        return obs_files, cov_files
+        return sorted(obs_files), sorted(cov_files)
 
 
     def _iv_transform(self, independent_variable, obs, cov):
@@ -483,12 +497,7 @@ class Emu(object):
         input_params.update(self.fixed_params)
         input_params.update(em_params)
 
-        op_set = set([p.name for p in self._ordered_params])
-        ip_set = set(input_params.iterkeys())
-        try:
-            assert len(op_set ^ ip_set) == 0
-        except AssertionError:
-            raise AssertionError("Parameters passed into emulate did not match the ordering defined in ordered_params.")
+        self._check_params(input_params)
 
         # i'd like to remove 'r'. possibly requiring a passed in param?
         t_list = [input_params[p.name] for p in self._ordered_params if p.name in em_params]
