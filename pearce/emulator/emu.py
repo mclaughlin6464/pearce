@@ -95,31 +95,7 @@ class Emu(object):
         input_params.update(em_params)
         input_params.update(fixed_params)
 
-        sub_dirs = glob(path.join(data_dir, 'a_*'))
-        sub_dirs_as = np.array([float(fname[-7:]) for fname in sub_dirs])
-
-        # sort them for consistancy
-        sort_idxs = np.argsort(sub_dirs_as)
-        sub_dirs_as = sub_dirs_as[sort_idxs]
-        sub_dirs = [sub_dirs[i] for i in sort_idxs]
-
-        if 'z' in fixed_params:  # don't have to look in dirs that aren't fixed.
-            zs = fixed_params['z']
-            if type(zs) is float:
-                zs = [zs]
-            sub_dirs = []
-            _sub_dirs_as = []
-            # check the fixed z's against the a's we have in training data
-            # only keep dirs that match
-            for z in zs:
-                input_a = 1 / (1 + z)
-                idx = np.argmin(np.abs(sub_dirs_as - input_a))
-                a = sub_dirs_as[idx]
-                if np.abs(a - input_a) > 0.05:  # tolerance
-                    raise IOError('No subfolder within tolerance of z=%.3f' % z)
-                sub_dirs.append(path.join(data_dir, 'a_%.5f' % a))
-                _sub_dirs_as.append(a)
-            sub_dirs_as = np.array(_sub_dirs_as)
+        sub_dirs, sub_dirs_as = self._get_z_subdirs(data_dir, fixed_zs=fixed_params.get('z', None) )
         # we store redshifts, not scale factors
         self.redshift_bin_centers = 1 / sub_dirs_as - 1
 
@@ -283,6 +259,45 @@ class Emu(object):
             raise AssertionError("The input_params passed into get_data did not match ordered_params. \
                                               It's possible fixed_params is missing a parameter, or you defined an extra one. \
                                               Additionally, orded_params could be wrong too!")
+
+    def _get_z_subdirs(self, dirname, fixed_zs=None):
+        """
+        Quick helper function. Takes a directory with subdirectories labeled by their scale factors
+         and the redshifts to hold fixed.
+        Finds the corresponding sub_dirs. If it can't find one, raises IOError.
+        :param dirname
+            Name of the directory to find relevant sub directories
+        :param fixed_zs:
+            List or float of redshifts to hold fixed.
+        :return: sub_dirs, sub_dirs_as. The list of subdirectories, and the corresponding scale factors
+        """
+
+        sub_dirs = glob(path.join(dirname, 'a_*'))
+        sub_dirs_as = np.array([float(fname[-7:]) for fname in sub_dirs])
+
+        # sort them for consistancy
+        sort_idxs = np.argsort(sub_dirs_as)
+        sub_dirs_as = sub_dirs_as[sort_idxs]
+        sub_dirs = [sub_dirs[i] for i in sort_idxs]
+
+        if fixed_zs is None:
+            return sub_dirs, sub_dirs_as
+
+        if type(fixed_zs) is float:
+            fixed_zs = [fixed_zs]
+        fixed_sub_dirs = []
+        fixed_sub_dirs_as = []
+        # check the fixed z's against the a's we have in training data
+        # only keep dirs that match
+        for z in fixed_zs:
+            input_a = 1 / (1 + z)
+            idx = np.argmin(np.abs(sub_dirs_as - input_a))
+            a = sub_dirs_as[idx]
+            if np.abs(a - input_a) > 0.05:  # tolerance
+                raise IOError('No subfolder within tolerance of z=%.3f' % z)
+            fixed_sub_dirs.append(sub_dirs[idx])
+            fixed_sub_dirs_as.append(a)
+        return fixed_sub_dirs, np.array(fixed_sub_dirs_as)
 
     def _get_fixed_files(self, training_file_loc, fixed_params, dirname=''):
         """
