@@ -126,7 +126,8 @@ class Emu(object):
 
             # store the binning for the scale_bins
             # assumes that it's the same for each box, which should be true.
-            scale_nbins = self.scale_bin_centers.shape[0]
+            scale_bin_centers = (bins[:-1] + bins[1:]) / 2
+            scale_nbins = scale_bin_centers.shape[0]
             npoints = len(obs_files) * scale_nbins  # each file contains NBINS points in r, and each file is a 6-d point
 
             # parameters that are not held fixed
@@ -164,7 +165,7 @@ class Emu(object):
                 if 'z' not in fixed_params:
                     file_params.append(np.ones((scale_nbins,)) * z)
                 if 'r' not in fixed_params:
-                    file_params.append(np.log10(self.scale_bin_centers))
+                    file_params.append(np.log10(scale_bin_centers))
 
                 x[idx * scale_nbins:(idx + 1) * scale_nbins, :] = np.stack(file_params).T
 
@@ -182,7 +183,7 @@ class Emu(object):
             all_y.append(y[zeros_slice])
             all_yerr.append(yerr[zeros_slice])
 
-        self.scale_bin_centers = (bins[:-1] + bins[1:]) / 2
+        self.scale_bin_centers = scale_bin_centers
 
         #update the bounds in r and z
         for i, p in enumerate(self._ordered_params):
