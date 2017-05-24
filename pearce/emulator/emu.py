@@ -126,7 +126,6 @@ class Emu(object):
 
             # store the binning for the scale_bins
             # assumes that it's the same for each box, which should be true.
-            self.scale_bin_centers = (bins[:-1] + bins[1:]) / 2
             scale_nbins = self.scale_bin_centers.shape[0]
             npoints = len(obs_files) * scale_nbins  # each file contains NBINS points in r, and each file is a 6-d point
 
@@ -183,6 +182,15 @@ class Emu(object):
             all_y.append(y[zeros_slice])
             all_yerr.append(yerr[zeros_slice])
 
+        self.scale_bin_centers = (bins[:-1] + bins[1:]) / 2
+
+        #update the bounds in r and z
+        for i, p in enumerate(self._ordered_params):
+            if p.name == 'r':
+                self._ordered_params[i] = parameter('r', np.min(self.scale_bin_centers), np.max(self.scale_bin_centers))
+            elif p.name == 'z':
+                self._ordered_params[i] = parameter('z', np.min(self.redshift_bin_centers), np.max(self.redshift_bin_centers))
+
         # TODO sort?
         return np.vstack(all_x), np.hstack(all_y), np.hstack(all_yerr)
 
@@ -219,6 +227,28 @@ class Emu(object):
     def load_training_data(self, training_dir):
         pass
 
+    def get_param_names(self):
+        """
+        Helper function that returns the names of the parameters in the emulator.
+        :return: names, a list of parameter names (in order)
+        """
+        return [p.name for p in self._ordered_params]
+
+    def get_param_bounds(self, param):
+        """
+        Return the emulator bounds for parameter param. Raises a ValueError if it can't be found.
+        :param param:
+            String, the name of the parameter to return bounds for.
+        :return: bounds, a 2 element tuple with the lower and higher bounds of point param.
+        """
+        for p in self._ordered_params:
+            if p.name == param:
+                break
+        else:
+            raise ValueError("Parameter %s could not be found."%param)
+
+        return (p.low, p.high)
+
     def _get_ordered_params(self, dirname, fixed_params):
         """
         Load the ordered params from directory 'dirname.' Remove params that
@@ -233,7 +263,7 @@ class Emu(object):
         # get the defined param ordered for the training data, and ensure its ok.
         ordered_params = params_file_reader(dirname)
         # this will not contain 'z' or 'r'. Add them to the end.
-        # note that the bounds of these parameters are not used.
+        # note that the bounds of these parameters will be updated later in get_data.
         ordered_params.extend([parameter('z', 0, 1), parameter('r', 0, 1)])
 
         #Remove fixed parameters
@@ -259,6 +289,7 @@ class Emu(object):
     def _check_params(self, params):
         """
         Assert that all keys in params are defined in ordered params, and vice versa. Raises an AssertionError otherwise.
+        Will also raise a warning if trying to emulate out of bounds.
         :param params:
             Dictionary of params, where the key is the name and the value is the value it holds. Value can also
             be a numpy array.
@@ -273,6 +304,12 @@ class Emu(object):
             raise AssertionError("The input_params passed into get_data did not match ordered_params. \
                                               It's possible fixed_params is missing a parameter, or you defined an extra one. \
                                               Additionally, orded_params could be wrong too!")
+
+        for val, p in izip(params.itervalues(),self._ordered_params ):
+            try:
+                assert p.low <= val <= p.high
+            except AssertionError:
+                warnings.warn("Emulator value %.3f is outside the bounds (%.3f, %.3f) of the emulator."%(val, p.low, p.high))
 
     def _get_z_subdirs(self, dirname, fixed_zs=None):
         """
