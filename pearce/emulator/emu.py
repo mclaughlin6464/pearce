@@ -302,15 +302,29 @@ class Emu(object):
             ip_set = set(params.iterkeys())
             assert len(op_set ^ ip_set) == 0
         except AssertionError:
-            raise AssertionError("The input_params passed into get_data did not match ordered_params. \
+            output = "The input_params passed into get_data did not match ordered_params. \
                                               It's possible fixed_params is missing a parameter, or you defined an extra one. \
-                                              Additionally, orded_params could be wrong too!")
+                                              Additionally, orded_params could be wrong too!\n"
+            ip_not_op = ip_set - op_set
+            op_not_ip = op_set - ip_set
 
-        for val, p in izip(params.itervalues(),self._ordered_params ):
+            if ip_not_op:
+                output+='Param %s was in the input but not the training data.\n'%ip_not_op[0]
+            if op_not_ip:
+                output+='Param %s was in the training data but not the input.\n'%op_not_ip[0]
+
+            raise AssertionError(output)
+
+        for p in self._ordered_params:
             try:
-                assert p.low <= val <= p.high
+                val = params[p.name]
+                assert np.all(p.low <= val) and np.all(val <= p.high)
             except AssertionError:
-                warnings.warn("Emulator value %.3f is outside the bounds (%.3f, %.3f) of the emulator."%(val, p.low, p.high))
+                if type(val) is float:
+                    warnings.warn("Emulator value for %s %.3f is outside the bounds (%.3f, %.3f) of the emulator."%(p.name, val, p.low, p.high))
+                else:
+                    warnings.warn("One value for %s is outside the bounds (%.3f, %.3f) of the emulator."%(p.name, p.low, p.high))
+
 
     def _get_z_subdirs(self, dirname, fixed_zs=None):
         """
@@ -564,7 +578,7 @@ class Emu(object):
         assert not gp_errs or self.method == 'gp'
 
         input_params = {}
-        input_params.update(self.fixed_params)
+        #input_params.update(self.fixed_params)
         input_params.update(em_params)
 
         self._check_params(input_params)
@@ -681,7 +695,7 @@ class Emu(object):
         rpc = np.log10(r_bin_centers) if np.any(r_bin_centers) else np.array([])  # make sure not to throw an error
         # TODO change 'r' to something more general
         for key, val in zip(['r', 'z'], (rpc, z_bin_centers)):
-            if key not in vep and val.size:  # key must not already exist and must be nonzero:
+            if key not in vep and key not in self.fixed_params and val.size:  # key must not already exist and must be nonzero:
                 vep[key] = val
         # vep.update({'r': np.log10(r_bin_centers), 'z': z_bin_centers})
         out = self.emulate(vep, gp_errs)
@@ -689,7 +703,18 @@ class Emu(object):
             mu, errs = out
         else:
             mu = out
-        mu = mu.reshape((-1, z_bin_centers.shape[0], r_bin_centers.shape[0]))
+
+        #account for weird binning isues.
+        if not z_bin_centers.shape[0]:
+            if not r_bin_centers.shape[0]:
+                mu = mu.reshape((-1, 1, 1))
+            else:
+                mu = mu.reshape((-1, 1, r_bin_centers.shape[0]))
+        elif not r_bin_centers.shape[0]:
+            mu = mu.reshape((-1,z_bin_centers.shape[0], 1)) 
+        else:
+            mu = mu.reshape((-1, z_bin_centers.shape[0], r_bin_centers.shape[0]))
+
         if not gp_errs:
             return mu
         errs = errs.reshape(mu.shape)
