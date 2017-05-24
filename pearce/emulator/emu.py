@@ -156,8 +156,8 @@ class Emu(object):
 
                 # doing some shuffling and stacking
                 file_params = []
-                for p in self._ordered_params[:-2]:
-                    if p.name not in fixed_params:  # may need to be input_params
+                for p in self._ordered_params:
+                    if p.name not in fixed_params and p.name not in {'z','r'}: # may need to be input_params
                         file_params.append(np.ones((scale_nbins,)) * params[p.name])
 
                 #r and z will always be at the end.
