@@ -55,7 +55,7 @@ def compute_prim_haloprop_bins(dlog10_prim_haloprop=0.05, **kwargs):
             num=ceil(num_prim_haloprop_bins))
 
     # digitize the masses so that we can access them bin-wise
-    print "PHP",np.max(prim_haloprop), prim_haloprop_bin_boundaries[-1]
+    #print "PHP",np.max(prim_haloprop), prim_haloprop_bin_boundaries[-1]
     output = np.digitize(prim_haloprop, prim_haloprop_bin_boundaries)
 
     # Use the largest bin for any points larger than the largest bin boundary,
@@ -380,7 +380,7 @@ class ContinuousAssembias(HeavisideAssembias):
         #get the kwargs for disp_func from the param dict
         disp_func_kwargs = {}
         for key, val in self.param_dict.iteritems():
-            if key[:10] == 'disp_func_':
+            if key[:10] == 'disp_func_' and self.gal_type in key:
                 split_key = key.split('_')
                 disp_func_kwargs[split_key[-2]] = val
 
