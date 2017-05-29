@@ -130,6 +130,11 @@ class Emu(object):
             scale_nbins = scale_bin_centers.shape[0]
             npoints = len(obs_files) * scale_nbins  # each file contains NBINS points in r, and each file is a 6-d point
 
+            if hasattr(self, "scale_bin_centers"):
+                if scale_bin_centers.shape != self.scale_bin_centers.shape or\
+                        np.any(scale_bin_centers != self.scale_bin_centers):
+                    warnings.warn("The scale bin centers in %s are not the same as the ones alread attached to this object. This may lead to weird behavior!"%sub_dir)
+
             # parameters that are not held fixed
             varied_params = set([p.name for p in self._ordered_params]) - set(fixed_params.keys())
 
@@ -185,11 +190,11 @@ class Emu(object):
 
         self.scale_bin_centers = scale_bin_centers
 
-        #update the bounds in r and z
+        #update the bounds in r and z, if they're the defaults.
         for i, p in enumerate(self._ordered_params):
-            if p.name == 'r':
+            if p.name == 'r' and p.low == 0 and p.high == 1:
                 self._ordered_params[i] = parameter('r', np.min(self.scale_bin_centers), np.max(self.scale_bin_centers))
-            elif p.name == 'z':
+            elif p.name == 'z' and p.low == 0 and p.high == 1:
                 self._ordered_params[i] = parameter('z', np.min(self.redshift_bin_centers), np.max(self.redshift_bin_centers))
 
         # TODO sort?
@@ -265,7 +270,14 @@ class Emu(object):
         ordered_params = params_file_reader(dirname)
         # this will not contain 'z' or 'r'. Add them to the end.
         # note that the bounds of these parameters will be updated later in get_data.
-        ordered_params.extend([parameter('z', 0, 1), parameter('r', 0, 1)])
+
+        if hasattr(self, "redshift_bin_centers") and hasattr(self, "scale_bin_centers"):
+            #if we know the actual bounds, attach them
+            ordered_params.extend([\
+                    parameter('z', np.min(self.redshift_bin_centers), np.max(self.redshift_bin_centers)),\
+                    parameter('r', np.min(self.scale_bin_centers), np.max(self.scale_bin_centers))])
+        else:
+            ordered_params.extend([parameter('z', 0, 1), parameter('r', 0, 1)])
 
         #Remove fixed parameters
         idxs_to_pop = []
@@ -309,9 +321,9 @@ class Emu(object):
             op_not_ip = op_set - ip_set
 
             if ip_not_op:
-                output+='Param %s was in the input but not the training data.\n'%ip_not_op[0]
+                output+='Param %s was in the input but not the training data.\n'%list(ip_not_op)[0]
             if op_not_ip:
-                output+='Param %s was in the training data but not the input.\n'%op_not_ip[0]
+                output+='Param %s was in the training data but not the input.\n'%list(op_not_ip)[0]
 
             raise AssertionError(output)
 
@@ -590,7 +602,9 @@ class Emu(object):
         t = t.reshape((-1, self.emulator_ndim))
 
         # TODO george can sort?
-        t = self._sort_params(t)
+        _t = self._sort_params(t)
+        if _t.shape == t.shape: #protect against weird edge case...
+            t = _t 
 
         return self._emulate_helper(t, gp_errs)
 
