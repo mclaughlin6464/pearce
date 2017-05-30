@@ -105,24 +105,26 @@ class Emu(object):
 
             bins, cosmo_params, obs, sampling_method = global_file_reader(sub_dir)
             self.obs = obs
-            #will attach the ordered_params from sub_dir
-            self._get_ordered_params(sub_dir, fixed_params)
 
-            for key in em_params: #assert defined params are in ordered
-                assert any([p.name == key for p in self._ordered_params])
-
+            # Depending on if this is a full or latin hypercube, and if params are supposed to be fixed, do different
+            # things.
             # Could add an assert that a = cosmo_params['scale_factor']
             if fixed_params  and fixed_params.keys() != ['z']:
                 if sampling_method == 'LHC':  # not allowed
                     raise ValueError('Fixed parameters is not empty, but the data in data_dir is form a Latin Hypercube. \
                                     Cannot performs slices on a LHC.')
                 else: # FHC, load up the training file locations
+                    ordered_params_with_fixed = self._get_ordered_params(sub_dir, fixed_params, with_fixed_params=True)
                     training_file_loc = training_file_loc_reader(sub_dir)
-                    obs_files, cov_files = self._get_fixed_files(training_file_loc, input_params, sub_dir)
+                    obs_files, cov_files = self._get_fixed_files(training_file_loc,ordered_params_with_fixed, input_params, sub_dir)
             else: #look at all of them.
                 # sorted to ensure parameters line up correctly
+                self._get_ordered_params(sub_dir, fixed_params)
                 obs_files = sorted(glob(path.join(sub_dir, 'obs*.npy')))
                 cov_files = sorted(glob(path.join(sub_dir, 'cov*.npy')))
+
+            for key in em_params: #assert defined params are in ordered
+                assert any([p.name == key for p in self._ordered_params])
 
             # store the binning for the scale_bins
             # assumes that it's the same for each box, which should be true.
@@ -255,7 +257,7 @@ class Emu(object):
 
         return (p.low, p.high)
 
-    def _get_ordered_params(self, dirname, fixed_params):
+    def _get_ordered_params(self, dirname, fixed_params, with_fixed_params = False):
         """
         Load the ordered params from directory 'dirname.' Remove params that
         are held fixed by the emulatorCheck that there are no violations and, 
@@ -264,6 +266,10 @@ class Emu(object):
             name of the directory to load ordered_params from
         :param fixed_params:
             Iterator of fixed parameters. Will be removed from ordered params
+        :param with_fixed_params:
+            Boolean. Whether to return the ordered params without the fixed_params removed.
+            This is unfrotunately a little hacky, but it is necessary for the training_file_loc
+            feature.
         :return: None
         """
         # get the defined param ordered for the training data, and ensure its ok.
@@ -285,6 +291,8 @@ class Emu(object):
             if p.name in fixed_params:
                 idxs_to_pop.append(i - len(idxs_to_pop))
 
+        op_with_fixed = ordered_params[:]
+
         for idx in idxs_to_pop:
             ordered_params.pop(idx)
 
@@ -298,6 +306,9 @@ class Emu(object):
                 assert ordered_params == attached_or
             except AssertionError:
                 raise AssertionError("ordered_params in %s did not match the value attached to this object." % dirname)
+
+        if with_fixed_params:
+            return op_with_fixed
 
     def _check_params(self, params):
         """
@@ -377,7 +388,7 @@ class Emu(object):
             fixed_sub_dirs_as.append(a)
         return fixed_sub_dirs, np.array(fixed_sub_dirs_as)
 
-    def _get_fixed_files(self, training_file_loc, fixed_params, dirname=''):
+    def _get_fixed_files(self, training_file_loc,ordered_params, fixed_params, dirname=''):
         """
         Return the files that satisfy the constraints in fixed_params.
         :param training_file_loc:
@@ -392,9 +403,7 @@ class Emu(object):
         # store the idxs and values so we can look in the tuples without searching
         # each time.
         idx_fixed_val = {}
-        print self._ordered_params
-        print fixed_params
-        for idx, p in enumerate(self._ordered_params):
+        for idx, p in enumerate(ordered_params):
             if p.name in fixed_params and p.name not in {'z', 'r'}:
                 idx_fixed_val[idx] = fixed_params[p.name]
 
@@ -608,6 +617,9 @@ class Emu(object):
         _t = self._sort_params(t)
         if _t.shape == t.shape: #protect against weird edge case...
             t = _t 
+
+        if len(t.shape) == 1:
+            t = np.array([t])
 
         return self._emulate_helper(t, gp_errs)
 
