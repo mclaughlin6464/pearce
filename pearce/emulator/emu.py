@@ -389,17 +389,20 @@ class Emu(object):
             means thsi will return relative filenames.
         :return: obs_files, cov_files. Two lists of filenames where the observed data and the covariance are stored.
         """
-        #store the idxs and values so we can look in the tuples.
-        idx_val = {}
-        for idx, p in self._ordered_params:
+        # store the idxs and values so we can look in the tuples without searching
+        # each time.
+        idx_fixed_val = {}
+        print self._ordered_params
+        print fixed_params
+        for idx, p in enumerate(self._ordered_params):
             if p.name in fixed_params and p.name not in {'z', 'r'}:
-                idx_val[idx] = fixed_params[p.name]
+                idx_fixed_val[idx] = fixed_params[p.name]
 
         obs_files, cov_files = [], []
 
         for params, fbase in training_file_loc.iteritems():
 
-            if not all(np.any(params[idx] - val > 1e3) for idx, val in fixed_params):
+            if np.any( np.all(idx_fixed_val[idx] - val > 1e-6) for idx, val in enumerate(params) if idx in idx_fixed_val):
                 continue
 
             obs_files.append(path.join(dirname, 'obs_', fbase))
