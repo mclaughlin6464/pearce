@@ -6,23 +6,23 @@ and useful in multiple cases. More specific, one-use functions are generally lef
 from os import path
 import cPickle as pickle
 import numpy as np
-from collections import namedtuple
+from itertools import izip
+from collections import OrderedDict, namedtuple
+import warnings
 
-__all__ = ['parameter', 'DEFAULT_PARAMS', 'GLOBAL_FILENAME','PARAMS_FILENAME', 'TRAINING_FILE_LOC_FILENAME',
+__all__ = ['parameter','DEFAULT_PARAMS', 'GLOBAL_FILENAME','PARAMS_FILENAME', 'TRAINING_FILE_LOC_FILENAME',
            'params_file_reader','training_file_loc_reader', 'obs_file_reader','global_file_reader',
            'config_reader']
 
-parameter = namedtuple('parameter', ['name', 'low', 'high'])
 
 # global object that defines the names and ordering of the parameters, as well as their boundaries.
 # TODO reading in bounds/params from config
 # TODO add assembias params
-DEFAULT_PARAMS = [parameter('logMmin', 11.7, 12.5),
-          parameter('sigma_logM', 0.2, 0.7),
-          parameter('logM0', 10, 13),
-          parameter('logM1', 13.1, 14.3),
-          parameter('alpha', 0.75, 1.25),
-          parameter('f_c', 0.1, 0.5)]
+DEFAULT_PARAM_NAMES = ['logMmin', 'sigma_logM', 'logM0', 'logM1', 'alpha', 'f_c']
+DEFAULT_PARAM_BOUNDS = [(11.7, 12.5), (0.2, 0.7), (10,13), (13.1, 14.3), (0.75, 1.25), (0.1, 0.5)]
+DEFAULT_PARAMS = OrderedDict( izip(DEFAULT_PARAM_NAMES, DEFAULT_PARAM_BOUNDS))
+
+parameter = namedtuple('parameter', ['name', 'low', 'high'])
 
 # I initially had the global_filename be variable. Howerver, I couldn't find a reason one would change it!
 GLOBAL_FILENAME = 'global_file.npy'
@@ -41,6 +41,17 @@ def params_file_reader(dirname, fname = PARAMS_FILENAME):
     '''
     with open(path.join(dirname, fname)) as f:
         ordered_params = pickle.load(f)
+
+    # TODO I should remove this, bu for now make backwards compatible
+    if not isinstance(ordered_params, OrderedDict):
+        if isinstance(ordered_params, dict):
+            ordered_params = dict(ordered_params.iteritems())
+        elif isinstance(ordered_params, list) and isinstance(list[0] ,parameter):
+            warnings.warn('The new version of ordered_params uses OrderedDicts, not lists. Converting, but this will \
+                           not be supported for long!')
+            ordered_params = OrderedDict([(p.name, (p.low, p.high)) for p in ordered_params])
+        else:
+            raise IOError("Don't recgonize the type of ordered_params in %s"%fname)
 
     return ordered_params
 

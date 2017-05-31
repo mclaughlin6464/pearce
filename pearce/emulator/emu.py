@@ -14,7 +14,7 @@ import numpy as np
 import george
 from george.kernels import *
 import scipy.optimize as op
-from scipy.interpolate import interp1d, interp2d
+from scipy.interpolate import interp1d
 from scipy.linalg import inv
 from scipy.spatial import KDTree
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
@@ -125,7 +125,7 @@ class Emu(object):
                 cov_files = sorted(glob(path.join(sub_dir, 'cov*.npy')))
 
             for key in em_params:  # assert defined params are in ordered
-                assert any([p.name == key for p in self._ordered_params])
+                assert any([pname == key for pname in self._ordered_params])
 
             # store the binning for the scale_bins
             # assumes that it's the same for each box, which should be true.
@@ -139,10 +139,7 @@ class Emu(object):
                     warnings.warn(
                         "The scale bin centers in %s are not the same as the ones alread attached to this object. This may lead to weird behavior!" % sub_dir)
 
-            # parameters that are not held fixed
-            varied_params = set([p.name for p in self._ordered_params]) - set(fixed_params.keys())
-
-            ndim = len(varied_params)
+            ndim = len(self._ordered_params)
             x = np.zeros((npoints, ndim))
             y = np.zeros((npoints,))
             yerr = np.zeros((npoints,))
@@ -167,10 +164,10 @@ class Emu(object):
 
                 # take the params from the file and put them in the right order and right place
                 file_params = []
-                for p in self._ordered_params:
-                    if p.name not in fixed_params and p.name not in {'z', 'r'}:  # may need to be input_params
+                for pname in self._ordered_params:
+                    if pname not in fixed_params and pname not in {'z', 'r'}:  # may need to be input_params
                         # note we have to repeat for each scale bin
-                        file_params.append(np.ones((scale_nbins,)) * params[p.name])
+                        file_params.append(np.ones((scale_nbins,)) * params[pname])
 
                 # r and z will always be at the end.
                 if 'z' not in fixed_params:
@@ -197,13 +194,11 @@ class Emu(object):
 
         self.scale_bin_centers = scale_bin_centers
 
-        # update the bounds in r and z, if they're the defaults.
-        for i, p in enumerate(self._ordered_params):
-            if p.name == 'r' and p.low == 0 and p.high == 1:
-                self._ordered_params[i] = parameter('r', np.min(self.scale_bin_centers), np.max(self.scale_bin_centers))
-            elif p.name == 'z' and p.low == 0 and p.high == 1:
-                self._ordered_params[i] = parameter('z', np.min(self.redshift_bin_centers),
-                                                    np.max(self.redshift_bin_centers))
+        if 'r' in self._ordered_params and self._ordered_params['r'] == (0,1):
+            self._ordered_params['r'] = (np.min(self.scale_bin_centers), np.max(self.scale_bin_centers))
+
+        if 'z' in self._ordered_params and self._ordered_params['z'] == (0,1):
+            self._ordered_params['z'] = (np.min(self.redshift_bin_centers), np.max(self.redshift_bin_centers))
 
         # TODO sort?
         return np.vstack(all_x), np.hstack(all_y), np.hstack(all_yerr)
@@ -274,7 +269,7 @@ class Emu(object):
         Helper function that returns the names of the parameters in the emulator.
         :return: names, a list of parameter names (in order)
         """
-        return [p.name for p in self._ordered_params]
+        return self._ordered_params.keys()
 
     def get_param_bounds(self, param):
         """
@@ -283,13 +278,10 @@ class Emu(object):
             String, the name of the parameter to return bounds for.
         :return: bounds, a 2 element tuple with the lower and higher bounds of point param.
         """
-        for p in self._ordered_params:
-            if p.name == param:
-                break
-        else:
-            raise ValueError("Parameter %s could not be found." % param)
-
-        return (p.low, p.high)
+        try:
+            return self._ordered_params[param]
+        except KeyError:
+            raise KeyError("Parameter %s could not be found." % param)
 
     def _get_ordered_params(self, dirname, fixed_params, with_fixed_params=False):
         """
@@ -315,23 +307,20 @@ class Emu(object):
         # note that the bounds of these parameters will be updated later in get_data, if not here.
         if hasattr(self, "redshift_bin_centers") and hasattr(self, "scale_bin_centers"):
             # if we know the actual bounds, attach them
-            ordered_params.extend([ \
-                parameter('z', np.min(self.redshift_bin_centers), np.max(self.redshift_bin_centers)), \
-                parameter('r', np.min(self.scale_bin_centers), np.max(self.scale_bin_centers))])
+            ordered_params['z'] = (np.min(self.redshift_bin_centers), np.max(self.redshift_bin_centers))
+            ordered_params['r'] = (np.min(self.scale_bin_centers), np.max(self.scale_bin_centers))
         else:
-            ordered_params.extend([parameter('z', 0, 1), parameter('r', 0, 1)])
+            ordered_params['z'] = (0,1)
+            ordered_params['r'] = (0,1)
 
         # store in case we have to return this
-        op_with_fixed = ordered_params[:]
+        op_with_fixed = ordered_params.copy()
 
-        # Remove fixed parameters
-        idxs_to_pop = []
-        for i, p in enumerate(ordered_params):
-            if p.name in fixed_params:
-                idxs_to_pop.append(i - len(idxs_to_pop))
-
-        for idx in idxs_to_pop:
-            ordered_params.pop(idx)
+        for pname in fixed_params:
+            if pname in ordered_params:
+                del ordered_params[pname]
+            else:
+                raise KeyError('Parameter %s is in fixed_params but not in ordered_params!'%pname)
 
         attached_or = getattr(self, "_ordered_params", None)
         # attach the ordered params if its new. Otherwise, ensure that the ordering in this dir is the same as what
@@ -358,11 +347,11 @@ class Emu(object):
         """
         try:
             # make sure they contain the exact same keys.
-            op_set = set([p.name for p in self._ordered_params])
+            op_set = set(self._ordered_params.iterkeys())
             ip_set = set(params.iterkeys())
             assert len(op_set ^ ip_set) == 0
         except AssertionError:
-            output = "The input_params passed into get_data did not match ordered_params. \
+            output = "The input_params passed into get_data did not match those the Emu knows about. \
                                               It's possible fixed_params is missing a parameter, or you defined an extra one. \
                                               Additionally, orded_params could be wrong too!\n"
             ip_not_op = ip_set - op_set
@@ -375,18 +364,18 @@ class Emu(object):
 
             raise AssertionError(output)
 
-        for p in self._ordered_params:
+        for pname, (plow, phigh) in self._ordered_params.itervalues():
             try:
                 # check if they're in bounds, else raise an informative warning
-                val = params[p.name]
-                assert np.all(p.low <= val) and np.all(val <= p.high)
+                val = params[pname]
+                assert np.all(plow <= val) and np.all(val <= phigh)
             except AssertionError:
                 if type(val) is float:
                     warnings.warn("Emulator value for %s %.3f is outside the bounds (%.3f, %.3f) of the emulator." % (
-                    p.name, val, p.low, p.high))
+                    pname, val, plow, phigh))
                 else:
                     warnings.warn("One value for %s is outside the bounds (%.3f, %.3f) of the emulator." % (
-                    p.name, p.low, p.high))
+                    pname, plow, phigh))
 
     def _get_z_subdirs(self, dirname, fixed_zs=None):
         """
@@ -434,6 +423,9 @@ class Emu(object):
         Return the files that satisfy the constraints in fixed_params.
         :param training_file_loc:
             dictionary where the keys are tuples of the parameters of a file, and the value is the corresponding file.
+        :param ordered_params:
+            An ordered dict with keys as the parameter names and values as their bounds.
+            Note must contain fixed parameters too, which are normally removed during initialization.
         :param fixed_params:
             dictionary of parameters to hold fixed. Only files with these values will be returned.
         :param dirname
@@ -443,9 +435,9 @@ class Emu(object):
         """
         # store the idxs and values so we can look in the tuples without searching each time.
         idx_fixed_val = {}
-        for idx, p in enumerate(ordered_params):
-            if p.name in fixed_params and p.name not in {'z', 'r'}:
-                idx_fixed_val[idx] = fixed_params[p.name]
+        for idx, pname in enumerate(ordered_params):
+            if pname in fixed_params and pname not in {'z', 'r'}:
+                idx_fixed_val[idx] = fixed_params[pname]
 
         obs_files, cov_files = [], []
 
@@ -573,7 +565,7 @@ class Emu(object):
 
         # default
         ig = {'amp': 1}
-        ig.update({p.name: 0.1 for p in self._ordered_params})
+        ig.update({pname: 0.1 for pname in self._ordered_params})
 
         if self.obs == 'xi':
             if independent_variable is None:
@@ -615,9 +607,9 @@ class Emu(object):
             ig = metric  # use the user's initial guesses
 
         metric = [ig['amp']]
-        for p in self._ordered_params:
+        for pname in self._ordered_params:
             try:
-                metric.append(ig[p.name])
+                metric.append(ig[pname])
             except KeyError:
                 raise KeyError('Key %s was not in the metric.' % p.name)
 
@@ -652,7 +644,7 @@ class Emu(object):
         self._check_params(input_params)
 
         # create the dependent variable matrix
-        t_list = [input_params[p.name] for p in self._ordered_params if p.name in em_params]
+        t_list = [input_params[pname] for pname in self._ordered_params if pname in em_params]
         t_grid = np.meshgrid(*t_list)
         t = np.stack(t_grid).T
         t = t.reshape((-1, self.emulator_ndim))
@@ -912,9 +904,9 @@ class Emu(object):
         assert self.method == 'gp'
 
         if isinstance(self, ExtraCrispy):
-            emulator = self.emulators[0]  # hack for EC, do somethign smarter later
+            emulator = self._emulators[0]  # hack for EC, do somethign smarter later
         else:
-            emulator = self.emulator
+            emulator = self._emulator
 
         # We need to perform one full inverse to start.
         K_inv_full = emulator.solver.apply_inverse(np.eye(emulator._alpha.size),
@@ -1094,10 +1086,10 @@ class OriginalRecipe(Emu):
         metric = hyperparams['metric'] if 'metric' in hyperparams else {}
         kernel = self._make_kernel(metric)
 
-        self.emulator = george.GP(kernel)
+        self._emulator = george.GP(kernel)
         # gp = george.GP(kernel, solver=george.HODLRSolver, nleaf=x.shape[0]+1,tol=1e-18)
 
-        self.emulator.compute(self.x, self.yerr, sort=False)  # NOTE I'm using a modified version of george!
+        self._emulator.compute(self.x, self.yerr, sort=False)  # NOTE I'm using a modified version of george!
 
     def _build_skl(self, hyperparams):
         """
@@ -1120,8 +1112,8 @@ class OriginalRecipe(Emu):
             else:  # krr
                 hyperparams['kernel'] = lambda x1, x2: kernel.value(np.array([x1]), np.array([x2]))
 
-        self.emulator = skl_methods[self.method](**hyperparams)
-        self.emulator.fit(self.x, self.y)
+        self._emulator = skl_methods[self.method](**hyperparams)
+        self._emulator.fit(self.x, self.y)
 
     def _emulate_helper(self, t, gp_errs):
         """
@@ -1136,12 +1128,12 @@ class OriginalRecipe(Emu):
         """
         if self.method == 'gp':
             if gp_errs:
-                mu, cov = self.emulator.predict(self.y, t, mean_only=False)
+                mu, cov = self._emulator.predict(self.y, t, mean_only=False)
                 return mu, np.diag(cov)
             else:
-                return self.emulator.predict(self.y, t, mean_only=True)
+                return self._emulator.predict(self.y, t, mean_only=True)
         else:
-            return self.emulator.predict(t)
+            return self._emulator.predict(t)
 
     def train_metric(self, **kwargs):
         """
@@ -1160,8 +1152,8 @@ class OriginalRecipe(Emu):
         def nll(p):
             # Update the kernel parameters and compute the likelihood.
             # params are log(a) and log(m)
-            self.emulator.kernel[:] = p
-            ll = self.emulator.lnlikelihood(self.y, quiet=True)
+            self._emulator.kernel[:] = p
+            ll = self._emulator.lnlikelihood(self.y, quiet=True)
 
             # The scipy optimizer doesn't play well with infinities.
             return -ll if np.isfinite(ll) else 1e25
@@ -1169,17 +1161,17 @@ class OriginalRecipe(Emu):
         # And the gradient of the objective function.
         def grad_nll(p):
             # Update the kernel parameters and compute the likelihood.
-            self.emulator.kernel[:] = p
-            return -self.emulator.grad_lnlikelihood(self.y, quiet=True)
+            self._emulator.kernel[:] = p
+            return -self._emulator.grad_lnlikelihood(self.y, quiet=True)
 
-        p0 = self.emulator.kernel.vector
+        p0 = self._emulator.kernel.vector
         results = op.minimize(nll, p0, jac=grad_nll, **kwargs)
         # results = op.minimize(nll, p0, jac=grad_nll, method='TNC', bounds =\
         #   [(np.log(0.01), np.log(10)) for i in xrange(ndim+1)],options={'maxiter':50})
         print results
 
-        self.emulator.kernel[:] = results.x
-        self.emulator.recompute()
+        self._emulator.kernel[:] = results.x
+        self._emulator.recompute()
         # self.metric = np.exp(results.x)
 
         return results.success
@@ -1354,13 +1346,13 @@ class ExtraCrispy(Emu):
         kernel = self._make_kernel(metric)
 
         # now, make a list of emulators
-        self.emulators = []
+        self._emulators = []
 
         for _x, _yerr in izip(self.x, self.yerr):
             emulator = george.GP(kernel)
 
             emulator.compute(_x, _yerr, sort=False, **hyperparams)  # NOTE I'm using a modified version of george!
-            self.emulators.append(emulator)
+            self._emulators.append(emulator)
 
     def _build_skl(self, hyperparams):
         """
@@ -1383,9 +1375,9 @@ class ExtraCrispy(Emu):
             else:  # krr
                 hyperparams['kernel'] = lambda x1, x2: kernel.value(np.array([x1]), np.array([x2]))
 
-        self.emulators = [skl_methods[self.method](**hyperparams) for i in xrange(self.experts)]
+        self._emulators = [skl_methods[self.method](**hyperparams) for i in xrange(self.experts)]
 
-        for i, (emulator, _x, _y) in enumerate(izip(self.emulators, self.x, self.y)):
+        for i, (emulator, _x, _y) in enumerate(izip(self._emulators, self.x, self.y)):
             emulator.fit(_x, _y)
 
     def _emulate_helper(self, t, gp_errs=False):
@@ -1402,7 +1394,7 @@ class ExtraCrispy(Emu):
         mu = np.zeros((self.experts, t.shape[0]))  # experts down, t deep
         err = np.zeros_like(mu)
 
-        for i, (emulator, _y) in enumerate(izip(self.emulators, self.y)):
+        for i, (emulator, _y) in enumerate(izip(self._emulators, self.y)):
             if self.method == 'gp':
                 local_mu, local_cov = emulator.predict(_y, t, mean_only=False)
                 local_err = np.sqrt(np.diag(local_cov))
@@ -1440,7 +1432,7 @@ class ExtraCrispy(Emu):
             # Update the kernel parameters and compute the likelihood.
             # params are log(a) and log(m)
             ll = 0
-            for emulator, _y in izip(self.emulators, self.y):
+            for emulator, _y in izip(self._emulators, self.y):
                 emulator.kernel[:] = p
                 ll += emulator.lnlikelihood(_y, quiet=True)
 
@@ -1451,17 +1443,17 @@ class ExtraCrispy(Emu):
         def grad_nll(p):
             # Update the kernel parameters and compute the likelihood.
             gll = 0
-            for emulator, _y in izip(self.emulators, self.y):
+            for emulator, _y in izip(self._emulators, self.y):
                 emulator.kernel[:] = p
                 gll += emulator.grad_lnlikelihood(_y, quiet=True)
             return -gll
 
-        p0 = self.emulators[0].kernel.vector
+        p0 = self._emulators[0].kernel.vector
         results = op.minimize(nll, p0, jac=grad_nll, **kwargs)
         # results = op.minimize(nll, p0, jac=grad_nll, method='TNC', bounds =\
         #   [(np.log(0.01), np.log(10)) for i in xrange(ndim+1)],options={'maxiter':50})
 
-        for emulator in self.emulators:
+        for emulator in self._emulators:
             emulator.kernel[:] = results.x
             emulator.recompute()
 

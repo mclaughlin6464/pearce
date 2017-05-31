@@ -6,6 +6,7 @@ from time import time
 from os import path, mkdir
 from subprocess import call
 from itertools import izip
+from collections import OrderedDict
 import warnings
 import cPickle as pickle
 
@@ -19,8 +20,8 @@ from ..mocks import cat_dict
 def makeLHC(ordered_params, N=500):
     '''Return a vector of points in parameter space that defines a latin hypercube.
     :param ordered_params:
-        list of "parameter" named tuple objects that define the ordering, name, and ranges of parameters
-        used in the trianing data.
+        OrderedDict that defines the ordering, name, and ranges of parameters
+        used in the trianing data. Keys are the names, value of a tuple of (lower, higher) bounds
     :param N:
         Number of points per dimension in the hypercube. Default is 500.
     :return
@@ -30,8 +31,8 @@ def makeLHC(ordered_params, N=500):
 
     points = []
     # by linspacing each parameter and shuffling, I ensure there is only one point in each row, in each dimension.
-    for p in ordered_params:
-        point = np.linspace(p.low, p.high, num=N)
+    for plow, phigh  in ordered_params.itervalues():
+        point = np.linspace(plow, phigh, num=N)
         np.random.shuffle(point)  # makes the cube random.
         points.append(point)
     return np.stack(points).T
@@ -41,8 +42,8 @@ def makeFHC(ordered_params, N=4):
     '''
     Return a vector of points in parameter space that defines a afull hyper cube.
     :param ordered_params:
-        list of "parameter" named tuple objects that define the ordering, name, and ranges of parameters
-        used in the trianing data.
+        OrderedDict that defines the ordering, name, and ranges of parameters
+        used in the trianing data. Keys are the names and values are tuples of the bounds (lower, higher)
     :param N:
         Number of points per dimension. Can be an integer or list. If it's a number, it will be the same
         across each dimension. If a list, defines points per dimension in the same ordering as ordered_params.
@@ -58,8 +59,8 @@ def makeFHC(ordered_params, N=4):
     n_total = np.prod(N)
     # TODO check if n_total is 1.
 
-    grid_points = np.meshgrid(*[np.linspace(param.low, param.high, n) \
-                               for n, param in izip(N, ordered_params)])
+    grid_points = np.meshgrid(*[np.linspace(plow, phigh, n) \
+                               for n, (plow, phigh) in izip(N, ordered_params.itervalues())])
     points = np.stack(grid_points).T
     points = points.reshape((-1, len(ordered_params)))
 
@@ -218,7 +219,10 @@ def make_training_data(config_filename, ordered_params=None):
     :param config_filename:
         Config file.
     :param ordered_params:
-        A list of 'parameter' named tuples. Contains the name of the parameter and the min and max values it can hold.
+        A dictof parameter names and their bounds.
+        Contains the name of the parameter and the min and max values it can hold.
+        Default is None, in which case DEFAULT_PARAMS in ioHelpers will be used.
+        If not an ordered_dict, the order of the params will be random going forward!
     :return:
         None.
     '''
@@ -240,6 +244,13 @@ def make_training_data(config_filename, ordered_params=None):
     if ordered_params is None:
         from .ioHelpers import DEFAULT_PARAMS as ordered_params
         warnings.warn("No value of 'params' passed into make_training_data. Using default from ioHelpers.")
+    elif not isinstance(ordered_params, OrderedDict):
+        if isinstance(ordered_params, dict): #dictionary, just not an ordered dict
+            # accept the random order
+            ordered_params = OrderedDict(ordered_params.iteritems())
+        else:
+            raise ValueError('ordered_params is not of type dict!')
+
 
     # determine the specific functions needed for this setup
     # same points for each redshift
