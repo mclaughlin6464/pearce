@@ -364,7 +364,7 @@ class Emu(object):
 
             raise AssertionError(output)
 
-        for pname, (plow, phigh) in self._ordered_params.itervalues():
+        for pname, (plow, phigh) in self._ordered_params.iteritems():
             try:
                 # check if they're in bounds, else raise an informative warning
                 val = params[pname]

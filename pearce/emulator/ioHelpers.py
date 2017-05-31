@@ -46,7 +46,7 @@ def params_file_reader(dirname, fname = PARAMS_FILENAME):
     if not isinstance(ordered_params, OrderedDict):
         if isinstance(ordered_params, dict):
             ordered_params = dict(ordered_params.iteritems())
-        elif isinstance(ordered_params, list) and isinstance(list[0] ,parameter):
+        elif isinstance(ordered_params, list) and isinstance(ordered_params[0] ,parameter):
             warnings.warn('The new version of ordered_params uses OrderedDicts, not lists. Converting, but this will \
                            not be supported for long!')
             ordered_params = OrderedDict([(p.name, (p.low, p.high)) for p in ordered_params])
