@@ -12,7 +12,7 @@ import numpy as np
 #Not happy about this, look into a change.
 
 sys.path.append('..')
-from pearce.emulator import GLOBAL_FILENAME, PARAMS_FILENAME, global_file_reader, parameter
+from pearce.emulator import global_file_reader, params_file_reader, parameter
 from pearce.mocks import cat_dict
 
 # TODO to ioHelpers?
@@ -26,9 +26,8 @@ def load_training_params(param_file):
     '''
     hod_params = np.loadtxt(param_file)
     dirname = path.dirname(param_file)
-    bins, cosmo_params, obs, _ = global_file_reader(path.join(dirname, GLOBAL_FILENAME))
-    with open(path.join(dirname, PARAMS_FILENAME)) as f:
-        ordered_params = pickle.load(f)
+    bins, cosmo_params, obs, _ = global_file_reader(dirname)
+    ordered_params = params_file_reader(dirname)
     print param_file
     job_id = int(param_file.split('.')[-2][-3:]) #last 3 digits of paramfile is a unique id.
 
