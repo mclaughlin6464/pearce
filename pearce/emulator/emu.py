@@ -411,14 +411,17 @@ class Emu(object):
 
         for params, fbase in training_file_loc.iteritems():
 
-            if np.any( np.all(idx_fixed_val[idx] - val > 1e-6) for idx, val in enumerate(params) if idx in idx_fixed_val):
+            if np.any([np.all(np.abs(idx_fixed_val[idx] - val) > 1e-6) for idx, val in enumerate(params) if idx in idx_fixed_val]):
                 continue
-
-            obs_files.append(path.join(dirname, 'obs_', fbase))
-            cov_files.append(path.join(dirname, 'cov_', fbase))
+            obs_files.append(path.join(dirname, 'obs_'+ fbase))
+            cov_files.append(path.join(dirname, 'cov_'+ fbase))
 
         if len(obs_files) == 0:
-            raise IOError("No files found with the fixed parameters defined!")
+            possible_vals = set()
+            for params in training_file_loc:
+                possible_vals.add(tuple([params[idx] for idx in idx_fixed_val]))
+
+            raise IOError("No files found with the fixed parameters defined!\nValues available are: "+' '.join([ str(v) for v in possible_vals]))
 
         return sorted(obs_files), sorted(cov_files)
 
