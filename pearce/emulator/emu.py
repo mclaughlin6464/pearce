@@ -23,6 +23,7 @@ from sklearn.svm import SVR
 
 from .ioHelpers import *
 
+
 class Emu(object):
     '''Main Emulator base class. Cannot itself be instatiated; can only be accessed via subclasses.
        controls all loading, manipulation, and emulation of data.'''
@@ -51,8 +52,6 @@ class Emu(object):
             directly. Presently the only acceptable option is 'r2', which emulates r^2 times the
             parameter in the training data.
         '''
-        # TODO don't need the user to pass in params. It can be generated from the traning data with an ordered_dict.
-        # It should be somewhat hidden from the user.
 
         assert method in self.valid_methods
 
@@ -95,13 +94,14 @@ class Emu(object):
         input_params.update(em_params)
         input_params.update(fixed_params)
 
-        sub_dirs, sub_dirs_as = self._get_z_subdirs(data_dir, fixed_zs=fixed_params.get('z', None) )
+        # If redshfit is fixed, we don't need to open the subdirs for other redshifts.
+        sub_dirs, sub_dirs_as = self._get_z_subdirs(data_dir, fixed_zs=fixed_params.get('z', None))
         # we store redshifts, not scale factors
         self.redshift_bin_centers = 1 / sub_dirs_as - 1
 
         all_x, all_y, all_yerr = [], [], []
 
-        for sub_dir, z in zip(sub_dirs, self.redshift_bin_centers):
+        for sub_dir, z in izip(sub_dirs, self.redshift_bin_centers):
 
             bins, cosmo_params, obs, sampling_method = global_file_reader(sub_dir)
             self.obs = obs
@@ -109,21 +109,22 @@ class Emu(object):
             # Depending on if this is a full or latin hypercube, and if params are supposed to be fixed, do different
             # things.
             # Could add an assert that a = cosmo_params['scale_factor']
-            if fixed_params  and fixed_params.keys() != ['z']:
+            if fixed_params and fixed_params.keys() != ['z']:
                 if sampling_method == 'LHC':  # not allowed
                     raise ValueError('Fixed parameters is not empty, but the data in data_dir is form a Latin Hypercube. \
                                     Cannot performs slices on a LHC.')
-                else: # FHC, load up the training file locations
+                else:  # FHC, load up the training file locations
                     ordered_params_with_fixed = self._get_ordered_params(sub_dir, fixed_params, with_fixed_params=True)
                     training_file_loc = training_file_loc_reader(sub_dir)
-                    obs_files, cov_files = self._get_fixed_files(training_file_loc,ordered_params_with_fixed, input_params, sub_dir)
-            else: #look at all of them.
+                    obs_files, cov_files = self._get_fixed_files(training_file_loc, ordered_params_with_fixed,
+                                                                 input_params, sub_dir)
+            else:  # look at all of them.
                 # sorted to ensure parameters line up correctly
                 self._get_ordered_params(sub_dir, fixed_params)
                 obs_files = sorted(glob(path.join(sub_dir, 'obs*.npy')))
                 cov_files = sorted(glob(path.join(sub_dir, 'cov*.npy')))
 
-            for key in em_params: #assert defined params are in ordered
+            for key in em_params:  # assert defined params are in ordered
                 assert any([p.name == key for p in self._ordered_params])
 
             # store the binning for the scale_bins
@@ -133,9 +134,10 @@ class Emu(object):
             npoints = len(obs_files) * scale_nbins  # each file contains NBINS points in r, and each file is a 6-d point
 
             if hasattr(self, "scale_bin_centers"):
-                if scale_bin_centers.shape != self.scale_bin_centers.shape or\
+                if scale_bin_centers.shape != self.scale_bin_centers.shape or \
                         np.any(scale_bin_centers != self.scale_bin_centers):
-                    warnings.warn("The scale bin centers in %s are not the same as the ones alread attached to this object. This may lead to weird behavior!"%sub_dir)
+                    warnings.warn(
+                        "The scale bin centers in %s are not the same as the ones alread attached to this object. This may lead to weird behavior!" % sub_dir)
 
             # parameters that are not held fixed
             varied_params = set([p.name for p in self._ordered_params]) - set(fixed_params.keys())
@@ -154,6 +156,7 @@ class Emu(object):
 
                 # skip NaNs
                 if np.any(np.isnan(cov)) or np.any(np.isnan(obs)):
+                    # only warn once.
                     if not warned:
                         warnings.warn('WARNING: NaN detected. Skipping point in %s' % cov_file)
                         warned = True
@@ -162,13 +165,14 @@ class Emu(object):
 
                 num_used += 1
 
-                # doing some shuffling and stacking
+                # take the params from the file and put them in the right order and right place
                 file_params = []
                 for p in self._ordered_params:
-                    if p.name not in fixed_params and p.name not in {'z','r'}: # may need to be input_params
+                    if p.name not in fixed_params and p.name not in {'z', 'r'}:  # may need to be input_params
+                        # note we have to repeat for each scale bin
                         file_params.append(np.ones((scale_nbins,)) * params[p.name])
 
-                #r and z will always be at the end.
+                # r and z will always be at the end.
                 if 'z' not in fixed_params:
                     file_params.append(np.ones((scale_nbins,)) * z)
                 if 'r' not in fixed_params:
@@ -177,13 +181,14 @@ class Emu(object):
                 x[idx * scale_nbins:(idx + 1) * scale_nbins, :] = np.stack(file_params).T
 
                 y[idx * scale_nbins:(idx + 1) * scale_nbins], yerr[idx * scale_nbins:( \
-                                     idx + 1) * scale_nbins] = self._iv_transform(
+                                                                                         idx + 1) * scale_nbins] = self._iv_transform(
                     independent_variable, obs, cov)
 
             # remove rows that were skipped due to the fixed thing
             # NOTE: HACK
             # a reshape may be faster.
             # TODO could I use Nonzero, or, better, keep track of the index I need??
+            # Yeah isn't this just num_used?
             zeros_slice = np.any(x != 0.0, axis=1)
 
             all_x.append(x[zeros_slice])
@@ -192,12 +197,13 @@ class Emu(object):
 
         self.scale_bin_centers = scale_bin_centers
 
-        #update the bounds in r and z, if they're the defaults.
+        # update the bounds in r and z, if they're the defaults.
         for i, p in enumerate(self._ordered_params):
             if p.name == 'r' and p.low == 0 and p.high == 1:
                 self._ordered_params[i] = parameter('r', np.min(self.scale_bin_centers), np.max(self.scale_bin_centers))
             elif p.name == 'z' and p.low == 0 and p.high == 1:
-                self._ordered_params[i] = parameter('z', np.min(self.redshift_bin_centers), np.max(self.redshift_bin_centers))
+                self._ordered_params[i] = parameter('z', np.min(self.redshift_bin_centers),
+                                                    np.max(self.redshift_bin_centers))
 
         # TODO sort?
         return np.vstack(all_x), np.hstack(all_y), np.hstack(all_yerr)
@@ -231,9 +237,37 @@ class Emu(object):
         # TODO do I want to reshape to y.shape((-1, log_bin_centers.shape(1)) ?
         return log_bin_centers, y[sort_idxs], yerr[sort_idxs]
 
-    @abstractmethod
     def load_training_data(self, training_dir):
-        pass
+        """
+        Read the training data for the emulator and attach it to the object.
+        :param training_dir:
+            Directory where training data from trainginData is stored. May also be a list of several points.
+        :param fixed_params:
+            Parameters to hold fixed. Only available if data in training_dir is a full hypercube, not a latin hypercube.
+        :return: None
+        """
+        if type(training_dir) is not list:
+            training_dir = [training_dir]
+
+        xs, ys, yerrs = [], [], []
+        for td in training_dir:
+            x, y, yerr = self.get_data(td, {}, self.fixed_params, self.independent_variable)
+            xs.append(x)
+            ys.append(y)
+            yerrs.append(yerr)
+
+        self.x = np.vstack(xs)
+        # hstack for 1-D
+        self.y = np.hstack(ys)
+        self.yerr = np.hstack(yerrs)
+
+        # for now, no mean subtraction
+        self.y_hat = np.zeros(self.y.shape[1]) if len(y.shape) > 1 else 0  # self.y.mean(axis = 0)
+        self.y -= self.y_hat
+
+        ndim = self.x.shape[1]
+        self.fixed_ndim = len(self.fixed_params)
+        self.emulator_ndim = ndim  # The number of params for the emulator is different than those in sampling.
 
     def get_param_names(self):
         """
@@ -253,15 +287,16 @@ class Emu(object):
             if p.name == param:
                 break
         else:
-            raise ValueError("Parameter %s could not be found."%param)
+            raise ValueError("Parameter %s could not be found." % param)
 
         return (p.low, p.high)
 
-    def _get_ordered_params(self, dirname, fixed_params, with_fixed_params = False):
+    def _get_ordered_params(self, dirname, fixed_params, with_fixed_params=False):
         """
         Load the ordered params from directory 'dirname.' Remove params that
-        are held fixed by the emulatorCheck that there are no violations and, 
-        if it is not currently attached to the object, attach it.
+        are held fixed by the emulator. Check that there are no violations and,
+        if it is not currently attached to the object, attach it. Optionally return
+        a version that does not have the fixed parameters removed, which is necessary for some functions
         :param dirname:
             name of the directory to load ordered_params from
         :param fixed_params:
@@ -270,34 +305,36 @@ class Emu(object):
             Boolean. Whether to return the ordered params without the fixed_params removed.
             This is unfrotunately a little hacky, but it is necessary for the training_file_loc
             feature.
-        :return: None
+        :return: if with_fixed_params, ordered_params_with_fixed_params, a version of the attached object with the fixed
+        params left in place.
         """
         # get the defined param ordered for the training data, and ensure its ok.
         ordered_params = params_file_reader(dirname)
-        # this will not contain 'z' or 'r'. Add them to the end.
-        # note that the bounds of these parameters will be updated later in get_data.
 
+        # this will not contain 'z' or 'r'. Add them to the end.
+        # note that the bounds of these parameters will be updated later in get_data, if not here.
         if hasattr(self, "redshift_bin_centers") and hasattr(self, "scale_bin_centers"):
-            #if we know the actual bounds, attach them
-            ordered_params.extend([\
-                    parameter('z', np.min(self.redshift_bin_centers), np.max(self.redshift_bin_centers)),\
-                    parameter('r', np.min(self.scale_bin_centers), np.max(self.scale_bin_centers))])
+            # if we know the actual bounds, attach them
+            ordered_params.extend([ \
+                parameter('z', np.min(self.redshift_bin_centers), np.max(self.redshift_bin_centers)), \
+                parameter('r', np.min(self.scale_bin_centers), np.max(self.scale_bin_centers))])
         else:
             ordered_params.extend([parameter('z', 0, 1), parameter('r', 0, 1)])
 
-        #Remove fixed parameters
+        # store in case we have to return this
+        op_with_fixed = ordered_params[:]
+
+        # Remove fixed parameters
         idxs_to_pop = []
-        for i,p in enumerate(ordered_params):
+        for i, p in enumerate(ordered_params):
             if p.name in fixed_params:
                 idxs_to_pop.append(i - len(idxs_to_pop))
-
-        op_with_fixed = ordered_params[:]
 
         for idx in idxs_to_pop:
             ordered_params.pop(idx)
 
         attached_or = getattr(self, "_ordered_params", None)
-        # attach the oredered params if its new. Otherwise, ensure that the ordering in this dir is the same as what
+        # attach the ordered params if its new. Otherwise, ensure that the ordering in this dir is the same as what
         # we have already.
         if attached_or is None:
             self._ordered_params = ordered_params
@@ -332,22 +369,24 @@ class Emu(object):
             op_not_ip = op_set - ip_set
 
             if ip_not_op:
-                output+='Param %s was in the input but not the training data.\n'%list(ip_not_op)[0]
+                output += 'Param %s was in the input but not the training data.\n' % list(ip_not_op)[0]
             if op_not_ip:
-                output+='Param %s was in the training data but not the input.\n'%list(op_not_ip)[0]
+                output += 'Param %s was in the training data but not the input.\n' % list(op_not_ip)[0]
 
             raise AssertionError(output)
 
         for p in self._ordered_params:
             try:
+                # check if they're in bounds, else raise an informative warning
                 val = params[p.name]
                 assert np.all(p.low <= val) and np.all(val <= p.high)
             except AssertionError:
                 if type(val) is float:
-                    warnings.warn("Emulator value for %s %.3f is outside the bounds (%.3f, %.3f) of the emulator."%(p.name, val, p.low, p.high))
+                    warnings.warn("Emulator value for %s %.3f is outside the bounds (%.3f, %.3f) of the emulator." % (
+                    p.name, val, p.low, p.high))
                 else:
-                    warnings.warn("One value for %s is outside the bounds (%.3f, %.3f) of the emulator."%(p.name, p.low, p.high))
-
+                    warnings.warn("One value for %s is outside the bounds (%.3f, %.3f) of the emulator." % (
+                    p.name, p.low, p.high))
 
     def _get_z_subdirs(self, dirname, fixed_zs=None):
         """
@@ -360,6 +399,8 @@ class Emu(object):
             List or float of redshifts to hold fixed.
         :return: sub_dirs, sub_dirs_as. The list of subdirectories, and the corresponding scale factors
         """
+
+        tol = 0.05
 
         sub_dirs = glob(path.join(dirname, 'a_*'))
         sub_dirs_as = np.array([float(fname[-7:]) for fname in sub_dirs])
@@ -382,13 +423,13 @@ class Emu(object):
             input_a = 1 / (1 + z)
             idx = np.argmin(np.abs(sub_dirs_as - input_a))
             a = sub_dirs_as[idx]
-            if np.abs(a - input_a) > 0.05:  # tolerance
-                raise IOError('No subfolder within tolerance of z=%.3f' % z)
+            if np.abs(a - input_a) > tol:  # tolerance
+                raise IOError('No subfolder within %f tolerance of z=%.3f' % (tol, z))
             fixed_sub_dirs.append(sub_dirs[idx])
             fixed_sub_dirs_as.append(a)
         return fixed_sub_dirs, np.array(fixed_sub_dirs_as)
 
-    def _get_fixed_files(self, training_file_loc,ordered_params, fixed_params, dirname=''):
+    def _get_fixed_files(self, training_file_loc, ordered_params, fixed_params, dirname=''):
         """
         Return the files that satisfy the constraints in fixed_params.
         :param training_file_loc:
@@ -396,12 +437,11 @@ class Emu(object):
         :param fixed_params:
             dictionary of parameters to hold fixed. Only files with these values will be returned.
         :param dirname
-            optiona. The directory the file is located, so this can return an absolute filename. Default is '', which
-            means thsi will return relative filenames.
+            optional. The directory the file is located, so this can return an absolute filename. Default is '', which
+            means this will return relative filenames.
         :return: obs_files, cov_files. Two lists of filenames where the observed data and the covariance are stored.
         """
-        # store the idxs and values so we can look in the tuples without searching
-        # each time.
+        # store the idxs and values so we can look in the tuples without searching each time.
         idx_fixed_val = {}
         for idx, p in enumerate(ordered_params):
             if p.name in fixed_params and p.name not in {'z', 'r'}:
@@ -410,27 +450,31 @@ class Emu(object):
         obs_files, cov_files = [], []
 
         for params, fbase in training_file_loc.iteritems():
-
-            if np.any([np.all(np.abs(idx_fixed_val[idx] - val) > 1e-6) for idx, val in enumerate(params) if idx in idx_fixed_val]):
+            # bit of a spaghetti call
+            # If all values are not near the values being held fixed, continue
+            if np.any([np.abs(idx_fixed_val[idx] - val) > 1e-6 for idx, val in enumerate(params) if
+                       idx in idx_fixed_val]):
                 continue
-            obs_files.append(path.join(dirname, 'obs_'+ fbase))
-            cov_files.append(path.join(dirname, 'cov_'+ fbase))
 
+            obs_files.append(path.join(dirname, 'obs_' + fbase))
+            cov_files.append(path.join(dirname, 'cov_' + fbase))
+
+        # if no files satisfy this constraint, raise an error showing what values would work.
         if len(obs_files) == 0:
             possible_vals = set()
             for params in training_file_loc:
                 possible_vals.add(tuple([params[idx] for idx in idx_fixed_val]))
 
-            raise IOError("No files found with the fixed parameters defined!\nValues available are: "+' '.join([ str(v) for v in possible_vals]))
+            raise IOError("No files found with the fixed parameters defined!\nValues available are: " + ' '.join(
+                [str(v) for v in possible_vals]))
 
         return sorted(obs_files), sorted(cov_files)
-
 
     def _iv_transform(self, independent_variable, obs, cov):
         """
         Independent variable tranform. Helper function that consolidates this operation all in one place.
         :param independent_variable:
-            Which iv to transform to. Current optins are None (just take log) and r2.
+            Which iv to transform to. Current options are None (just take log) and r2.
         :param obs:
             Observable to transform (xi, wprp, etc.)
         :param cov:
@@ -449,11 +493,10 @@ class Emu(object):
         else:
             raise ValueError('Invalid independent variable %s' % independent_variable)
 
-        """
-        if independent_variable == 'bias':
-            y[idx * NBINS:(idx + 1) * NBINS] = xi / xi_mm
-            ycovs.append(cov / np.outer(xi_mm, xi_mm))
-        """
+        # if independent_variable == 'bias':
+        #    y[idx * NBINS:(idx + 1) * NBINS] = xi / xi_mm
+        #    ycovs.append(cov / np.outer(xi_mm, xi_mm))
+
 
         return y, y_err
 
@@ -475,6 +518,7 @@ class Emu(object):
                 return np.array([0])
             return t  # a single row array is already sorted!
 
+        # the sorting procedure is black magic. Don't touch unless you're smarter than me.
         if argsort:  # returns indicies that would sort the array
             # weird try structure because this view is very tempermental!
             try:
@@ -499,7 +543,7 @@ class Emu(object):
 
     def build_emulator(self, hyperparams):
         """
-        Initialization of the emulator from recovered training data. Calls submethods depending on "method"
+        Initialization of the emulator from recovered training data. Calls submethods depending on "self.method"
         :param hyperparams
             A dictionary of hyperparameter kwargs for the emulator
         :return: None
@@ -533,9 +577,9 @@ class Emu(object):
 
         if self.obs == 'xi':
             if independent_variable is None:
-                ig = {'amp': 0.481, 'logMmin': 0.1349, 'sigma_logM': 0.089,
-                      'logM0': 2.0, 'logM1': 0.204, 'alpha': 0.039,
-                      'f_c': 0.041, 'r': 0.040, 'z': 1.0}
+                ig.update({'amp': 0.481, 'logMmin': 0.1349, 'sigma_logM': 0.089,
+                           'logM0': 2.0, 'logM1': 0.204, 'alpha': 0.039,
+                           'f_c': 0.041, 'r': 0.040, 'z': 1.0})
             else:
                 # could have other guesses for this case, but don't have any now
                 # leave this structure in case I make more later
@@ -550,18 +594,17 @@ class Emu(object):
 
         # remove entries for variables that are being held fixed.
         for key in self.fixed_params.iterkeys():
-            try:
+            if key in ig:
                 del ig[key]
-            except KeyError:
-                pass  # can happen for redshift and others.
 
         return ig
 
-    def _make_kernel(self, metric):
+    def _make_kernel(self, metric={}):
         """
         Helper method to build a george kernel for GP's and kernel-based regressions.
         :param metric:
-            Hyperparams for kernel determining relative length scales and amplitudes
+            Hyperparams for kernel determining relative length scales and amplitudes. Default is empty dict.
+            In that case, the initial guesses from the object will be used.
         :return:
             A george ExpSquredKernel object with this metric
         """
@@ -573,8 +616,6 @@ class Emu(object):
 
         metric = [ig['amp']]
         for p in self._ordered_params:
-            if p.name in self.fixed_params:
-                continue
             try:
                 metric.append(ig[p.name])
             except KeyError:
@@ -605,12 +646,12 @@ class Emu(object):
         assert not gp_errs or self.method == 'gp'
 
         input_params = {}
-        #input_params.update(self.fixed_params)
+        # input_params.update(self.fixed_params)
         input_params.update(em_params)
 
         self._check_params(input_params)
 
-        # i'd like to remove 'r'. possibly requiring a passed in param?
+        # create the dependent variable matrix
         t_list = [input_params[p.name] for p in self._ordered_params if p.name in em_params]
         t_grid = np.meshgrid(*t_list)
         t = np.stack(t_grid).T
@@ -618,8 +659,8 @@ class Emu(object):
 
         # TODO george can sort?
         _t = self._sort_params(t)
-        if _t.shape == t.shape: #protect against weird edge case...
-            t = _t 
+        if _t.shape == t.shape:  # protect against weird edge case...
+            t = _t
 
         if len(t.shape) == 1:
             t = np.array([t])
@@ -646,17 +687,16 @@ class Emu(object):
         """
         ep = {}
         ep.update(em_params)
+        # extract z from the emulator params, if it's there
+        # we will use this to call emulate_wrt_r_z below
         z_bin_centers = np.array([])
-        try:
+        if 'z' in ep:
             z_bin_centers = ep['z']
             if type(z_bin_centers) is float:
                 z_bin_centers = np.array([z_bin_centers])
             del ep['z']
-        except KeyError:
-            pass
 
         out = self.emulate_wrt_r_z(ep, r_bin_centers, z_bin_centers, gp_errs)
-        # now, reshape to have shape (-1, len(r_bin_centers))
 
         # Extract depending on if there are errors
         if gp_errs:
@@ -664,6 +704,7 @@ class Emu(object):
         else:
             _mu = out
 
+        # now, reshape to have shape (-1, len(r_bin_centers))
         mu = _mu.reshape((-1, r_bin_centers.shape[0]))
         if not gp_errs:
             return mu
@@ -688,70 +729,79 @@ class Emu(object):
         ep = {}
         ep.update(em_params)
         r_bin_centers = np.array([])
-        try:
+        if 'r' in ep:
             r_bin_centers = ep['r']
             if type(r_bin_centers) is float:
                 r_bin_centers = np.array([r_bin_centers])
             del ep['r']
-        except KeyError:
-            pass
 
         out = self.emulate_wrt_r_z(ep, r_bin_centers, z_bin_centers, gp_errs)
-        # now, reshape to have shape (-1, len(z_bin_centers))
+        # extract errors if they're returned
         if gp_errs:
-            mu, errs = out
+            _mu, _errs = out
         else:
-            mu = out
+            _mu = out
+
+        # now, reshape to have shape (-1, len(z_bin_centers))
         # The swapaxes are necessary to make sure the reshape works properly
-        mu = mu.swapaxes(1, 2).reshape((-1, z_bin_centers.shape[0]))
+        mu = _mu.swapaxes(1, 2).reshape((-1, z_bin_centers.shape[0]))
 
         if not gp_errs:
             return mu
-        errs = errs.swapaxes(1, 2).reshape(mu.shape)
+        errs = _errs.swapaxes(1, 2).reshape(mu.shape)
         return mu, errs
 
     def emulate_wrt_r_z(self, em_params, r_bin_centers, z_bin_centers, gp_errs=False):
         """
-        Conveniance function. Add's 'r' to the emulation automatically, as this is the
+        Conveniance function. Add's 'r' and 'z' to the emulation automatically, as this is the
         most common use case.
         :param em_params:
             Dictionary of what values to predict at for each param. Values can be array
             or float.
-        :param bin_centers:
-            Centers of bins to predict at, for each point in HOD-space.
+        :param r_bin_centers:
+            numpy array. Centers of scale bins to predict at, for each point in HOD-space.
+            Note this function takes their real-space values, not log-space.
+        :param z_bin_centers:
+            numpy array. Centers of redshift bins to predict at, for each point in HOD-space
+        :param gp_errs:
+            Wheter to return the errors of the Gaussian process or not.
         :return: mu, errs (if gp_errs == True)
                 both have been reshaped to have shape (-1, len(z_bin_centers), len(r_bin_centers))
         """
         vep = dict(em_params)
         # take the log of r_bin_centers
         rpc = np.log10(r_bin_centers) if np.any(r_bin_centers) else np.array([])  # make sure not to throw an error
-        # TODO change 'r' to something more general
-        for key, val in zip(['r', 'z'], (rpc, z_bin_centers)):
-            if key not in vep and key not in self.fixed_params and val.size:  # key must not already exist and must be nonzero:
-                vep[key] = val
-        # vep.update({'r': np.log10(r_bin_centers), 'z': z_bin_centers})
+
+        # now, put them into the emulation dictionary.
+        for key, val in izip(['r', 'z'], (rpc, z_bin_centers)):
+            if key not in self.fixed_params and val.size:  # not fixed and the array is nonzero
+                if key not in vep:
+                    vep[key] = val
+                else:
+                    raise ValueError("The parameter %s has been specified twice in emulate_wrt_r_z!" % key)
+
+        # now, emulate.
         out = self.emulate(vep, gp_errs)
         if gp_errs:
-            mu, errs = out
+            _mu, _errs = out
         else:
-            mu = out
+            _mu = out
 
-        #account for weird binning isues.
+        # account for weird binning isues.
         if not z_bin_centers.shape[0]:
             if not r_bin_centers.shape[0]:
-                mu = mu.reshape((-1, 1, 1))
+                mu = _mu.reshape((-1, 1, 1))
             else:
-                mu = mu.reshape((-1, 1, r_bin_centers.shape[0]))
+                mu = _mu.reshape((-1, 1, r_bin_centers.shape[0]))
         elif not r_bin_centers.shape[0]:
-            mu = mu.reshape((-1,z_bin_centers.shape[0], 1)) 
+            mu = _mu.reshape((-1, z_bin_centers.shape[0], 1))
         else:
-            mu = mu.reshape((-1, z_bin_centers.shape[0], r_bin_centers.shape[0]))
+            mu = _mu.reshape((-1, z_bin_centers.shape[0], r_bin_centers.shape[0]))
 
         if not gp_errs:
             return mu
-        errs = errs.reshape(mu.shape)
+        errs = _errs.reshape(mu.shape)
         return mu, errs
-
 
     # TODO Jeremey keeps konwn uncertainties, I should do the same here, or near to here.
     def estimate_uncertainty(self, truth_dir, N=None):
@@ -1017,7 +1067,7 @@ def lnlike(theta, emu, y, cov, bin_centers):
     :return:
         The log liklihood of theta given the measurements and the emulator.
     """
-    em_params = {p.name: t for p, t in zip(emu.ordered_params, theta)}
+    em_params = {p.name: t for p, t in izip(emu.ordered_params, theta)}
 
     # using my own notation
     y_bar, G = emu.emulate_wrt_r(em_params, bin_centers)
@@ -1031,38 +1081,7 @@ def lnlike(theta, emu, y, cov, bin_centers):
 
 
 class OriginalRecipe(Emu):
-    """Emulator that emulates with bins as an implicit parameter. """
-
-    def load_training_data(self, training_dir):
-        """
-        Read the training data for the emulator and attach it to the object.
-        :param training_dir:
-            Directory where training data from trainginData is stored. May also be a list of several points.
-        :param fixed_params:
-            Parameters to hold fixed. Only available if data in training_dir is a full hypercube, not a latin hypercube.
-        :return: None
-        """
-        if type(training_dir) is not list:
-            training_dir = [training_dir]
-
-        xs, ys, yerrs = [], [], []
-        for td in training_dir:
-            x, y, yerr = self.get_data(td, {}, self.fixed_params, self.independent_variable)
-            xs.append(x)
-            ys.append(y)
-            yerrs.append(yerr)
-
-        self.x = np.vstack(xs)
-        # hstack for 1-D
-        self.y = np.hstack(ys)
-        self.yerr = np.hstack(yerrs)
-
-        self.y_hat = np.zeros(self.y.shape[1]) if len(y.shape) > 1 else 0  # self.y.mean(axis = 0)
-        self.y -= self.y_hat
-
-        ndim = self.x.shape[1]
-        self.fixed_ndim = len(self.fixed_params)
-        self.emulator_ndim = ndim  # The number of params for the emulator is different than those in sampling.
+    """Emulator that emulates with only one learner that is trained on all training data. The "naive" approach. """
 
     def _build_gp(self, hyperparams):
         """
@@ -1074,9 +1093,7 @@ class OriginalRecipe(Emu):
         # TODO could use more of the hyperparams...
         metric = hyperparams['metric'] if 'metric' in hyperparams else {}
         kernel = self._make_kernel(metric)
-        # TODO is it confusing for this to have the same name as the sklearn object with a different API?
-        # maybe it should be a property? or private?
-        # The user should never access it directly, I think. They shoud only call the emu functions.
+
         self.emulator = george.GP(kernel)
         # gp = george.GP(kernel, solver=george.HODLRSolver, nleaf=x.shape[0]+1,tol=1e-18)
 
@@ -1167,6 +1184,7 @@ class OriginalRecipe(Emu):
 
         return results.success
 
+
 def get_leaves(kdtree):
     """
     Helper function for recursively retriving the leaves of a KDTree
@@ -1174,12 +1192,12 @@ def get_leaves(kdtree):
         instance of KDTree to recover leaves of.
     :return: leaves, a list of  numpy arrays of shape (experts, points_per_expert), of leaves.
     """
-    points_per_expert= kdtree.leafsize
-    experts = kdtree.n/points_per_expert
+    points_per_expert = kdtree.leafsize
     leaves_list = []
-    get_leaves_helper(kdtree.tree,leaves_list)
+    get_leaves_helper(kdtree.tree, leaves_list)
 
     return [np.array(l) for l in leaves_list]
+
 
 def get_leaves_helper(node, leaves):
     """
@@ -1191,10 +1209,11 @@ def get_leaves_helper(node, leaves):
         get_leaves_helper(node.less, leaves)
         get_leaves_helper(node.greater, leaves)
 
+
 class ExtraCrispy(Emu):
     """Emulator that emulates with a mixture of expert learners rather than a single one."""
 
-    def __init__(self, training_dir, experts, overlap=1, partition_scheme='kdtree', **kwargs):
+    def __init__(self, training_dir, experts, overlap=1, partition_scheme='random', **kwargs):
         """
         Similar initialization as the superclass with one additional parameter: Em_param
         :param training_dir:
@@ -1208,10 +1227,10 @@ class ExtraCrispy(Emu):
             As in Emu
         """
 
-        assert experts > 1  and int(experts) == experts#no point in having less than this
+        assert experts > 1 and int(experts) == experts  # no point in having less than this
         # TODO experts max value?
-        #no point in having overlap the same as experts. You just have experts-many identical gps!
-        assert experts >= overlap > 0 and int(overlap) == overlap
+        # no point in having overlap the same as experts. You just have experts-many identical gps!
+        assert experts > overlap > 0 and int(overlap) == overlap
         assert partition_scheme in {'kdtree', 'random'}
 
         self.experts = int(experts)
@@ -1229,110 +1248,96 @@ class ExtraCrispy(Emu):
             Parameters to hold fixed. Only available if data in training_dir is a full hypercube, not a latin hypercube.
         :return: None
         """
-        if type(training_dir) is not list:
-            training_dir = [training_dir]
+        super(ExtraCrispy, self).load_training_data(training_dir)
 
-        xs, ys, yerrs = [], [], []
-        for td in training_dir:
-            x, y, yerr = self.get_data(td, {}, self.fixed_params, self.independent_variable)
+        # now, parition the data as specified by the user
+        # note that ppe does not include overlap
+        points_per_expert = int(1.0 * self.x.shape[0] * self.overlap / self.experts)
 
-            xs.append(x)
-            ys.append(y)
-            yerrs.append(yerr)
-
-        x = np.vstack(xs)
-        # hstack for 1-D
-        y = np.hstack(ys)
-        yerr = np.hstack(yerrs)
-        y_hat = np.zeros(y.shape[1]) if len(y.shape) > 1 else 0  # self.y.mean(axis = 0)
-        y -= y_hat
-
-        #now, parition the data as specified by the user
-        #note that ppe does not include overlap
-        points_per_expert = int(1.0*x.shape[0]*self.overlap/self.experts)
-
-        self.x = np.zeros((self.experts,points_per_expert , x.shape[1]))
-        self.y = np.zeros((self.experts, points_per_expert))
-        self.yerr  = np.zeros_like(self.y)
+        _x = np.zeros((self.experts, points_per_expert, self.x.shape[1]))
+        _y = np.zeros((self.experts, points_per_expert))
+        _yerr = np.zeros_like(_y)
 
         if self.partition_scheme == 'random':
-            shuffled_idxs = range(y.shape[0])
+            shuffled_idxs = range(self.y.shape[0])
             np.random.shuffle(shuffled_idxs)
 
-            #select potentially self.overlapping subets of the data for each expert
+            # select potentially self.overlapping subets of the data for each expert
             for i in xrange(self.experts):
-                self.x[i,:,:] = np.roll(x[shuffled_idxs, :], i*points_per_expert/self.overlap, 0)[:points_per_expert, :]
-                self.y[i,:] = np.roll(y[shuffled_idxs], i*points_per_expert/self.overlap, 0)[:points_per_expert]
-                self.yerr[i,:] = np.roll(yerr[shuffled_idxs], i*points_per_expert/self.overlap, 0)[:points_per_expert]
+                _x[i, :, :] = np.roll(self.x[shuffled_idxs, :], i * points_per_expert / self.overlap, 0)[
+                              :points_per_expert, :]
+                _y[i, :] = np.roll(self.y[shuffled_idxs], i * points_per_expert / self.overlap, 0)[:points_per_expert]
+                _yerr[i, :] = np.roll(self.yerr[shuffled_idxs], i * points_per_expert / self.overlap, 0)[
+                              :points_per_expert]
 
-        else: #KDTree
-            #whiten so all distances are the same
-            normed_x = (x - x.min(axis=0)) / x.max(axis=0)
+        else:  # KDTree
+            # whiten so all distances are the same
+            normed_x = (self.x - self.x.min(axis=0)) / self.x.max(axis=0)
             normed_x[np.isnan(normed_x)] = 0.0
-            kdtree = KDTree(normed_x, leafsize = points_per_expert/self.overlap)
+            kdtree = KDTree(normed_x, leafsize=points_per_expert / self.overlap)
             leaves = get_leaves(kdtree)
 
-            prev_idx, curr_idx = 0,0
+            prev_idx, curr_idx = 0, 0
             # If points cannot be evenly divided, there'll be some skipped ones.
             # We'll add them in at the end.
-            n_missed = np.sum([(self.overlap*len(leaf)%self.experts)/self.overlap for leaf in leaves])
+            n_missed = np.sum([(self.overlap * len(leaf) % self.experts) / self.overlap for leaf in leaves])
 
             missed_points = np.zeros(n_missed, dtype=int)
             missed_idx = 0
 
+            # leaves can have different sizes, so we have to treat each leaf differently
             for i, leaf in enumerate(leaves):
                 shuffled_idxs = range(leaf.shape[0])
                 np.random.shuffle(shuffled_idxs)
 
-                leaf_ppe = int(1.0*self.overlap*leaf.shape[0]/self.experts)
-                curr_idx = prev_idx+leaf_ppe
+                leaf_ppe = int(1.0 * self.overlap * leaf.shape[0] / self.experts)
+                curr_idx = prev_idx + leaf_ppe
 
-                #select potentially overlapping subets of the data for each expert
+                # select potentially overlapping subets of the data for each expert
                 for j in xrange(self.experts):
-
-                    self.x[j,prev_idx:curr_idx,:] =\
-                            np.roll(x[leaf[shuffled_idxs], :], j*leaf_ppe/self.overlap, 0)[:leaf_ppe, :]
-                    self.y[j,prev_idx:curr_idx] = \
-                            np.roll(y[leaf[shuffled_idxs]], j*leaf_ppe/self.overlap, 0)[:leaf_ppe]
-                    self.yerr[j,prev_idx:curr_idx]\
-                            = np.roll(yerr[leaf[shuffled_idxs]], j*leaf_ppe/self.overlap, 0)[:leaf_ppe]
+                    _x[j, prev_idx:curr_idx, :] = \
+                        np.roll(self.x[leaf[shuffled_idxs], :], j * leaf_ppe / self.overlap, 0)[:leaf_ppe, :]
+                    _y[j, prev_idx:curr_idx] = \
+                        np.roll(self.y[leaf[shuffled_idxs]], j * leaf_ppe / self.overlap, 0)[:leaf_ppe]
+                    _yerr[j, prev_idx:curr_idx] \
+                        = np.roll(self.yerr[leaf[shuffled_idxs]], j * leaf_ppe / self.overlap, 0)[:leaf_ppe]
 
                 prev_idx = curr_idx
-                nm = (self.overlap*leaf.shape[0] % self.experts)/self.overlap
+                nm = (self.overlap * leaf.shape[0] % self.experts) / self.overlap
                 if nm != 0:
-                    missed_points[missed_idx:missed_idx+nm] = leaf[shuffled_idxs][-nm:]
-                    missed_idx+=nm
+                    missed_points[missed_idx:missed_idx + nm] = leaf[shuffled_idxs][-nm:]
+                    missed_idx += nm
 
-            #now, distribute leftover points over experts
-            if n_missed>0:
-                missed_ppe = int(1.0*n_missed*self.overlap/self.experts)
+            # now, distribute leftover points over experts
+            if n_missed > 0:
+                missed_ppe = int(1.0 * n_missed * self.overlap / self.experts)
 
-
-                curr_idx = prev_idx +missed_ppe
+                curr_idx = prev_idx + missed_ppe
 
                 for i in xrange(self.experts):
-                    self.x[i, prev_idx:curr_idx, :] = \
-                        np.roll(x[missed_points, :], i * missed_ppe / self.overlap, 0)[:missed_ppe, :]
-                    self.y[j, prev_idx:curr_idx] = \
-                        np.roll(y[missed_points], i * missed_ppe / self.overlap, 0)[:missed_ppe]
-                    self.yerr[j, prev_idx:curr_idx] \
-                        = np.roll(yerr[missed_points], i * missed_ppe / self.overlap, 0)[:missed_ppe]
+                    _x[i, prev_idx:curr_idx, :] = \
+                        np.roll(self.x[missed_points, :], i * missed_ppe / self.overlap, 0)[:missed_ppe, :]
+                    _y[j, prev_idx:curr_idx] = \
+                        np.roll(self.y[missed_points], i * missed_ppe / self.overlap, 0)[:missed_ppe]
+                    _yerr[j, prev_idx:curr_idx] \
+                        = np.roll(self.yerr[missed_points], i * missed_ppe / self.overlap, 0)[:missed_ppe]
 
-                #now, to cover the meta-missed ones, just fill in points until they're full
+                # now, to cover the meta-missed ones, just fill in points until they're full
                 while curr_idx != self.x.shape[1]:
                     prev_idx = curr_idx
-                    curr_idx+=1
+                    curr_idx += 1
                     for j in xrange(self.experts):
-                        self.x[j, prev_idx:curr_idx, :] = \
-                            np.roll(x[missed_points, :], (j+i)* missed_ppe / self.overlap, 0)[:1, :]
-                        self.y[j, prev_idx:curr_idx] = \
-                            np.roll(y[missed_points],(j+ i)* missed_ppe / self.overlap, 0)[:1]
-                        self.yerr[j, prev_idx:curr_idx] \
-                            = np.roll(yerr[missed_points], (j+i) * missed_ppe / self.overlap, 0)[:1]
+                        _x[j, prev_idx:curr_idx, :] = \
+                            np.roll(self.x[missed_points, :], (j + i) * missed_ppe / self.overlap, 0)[:1, :]
+                        _y[j, prev_idx:curr_idx] = \
+                            np.roll(self.y[missed_points], (j + i) * missed_ppe / self.overlap, 0)[:1]
+                        _yerr[j, prev_idx:curr_idx] \
+                            = np.roll(self.yerr[missed_points], (j + i) * missed_ppe / self.overlap, 0)[:1]
 
-        ndim = x.shape[1]
-        self.fixed_ndim = len(self.fixed_params)
-        self.emulator_ndim = ndim  # The number of params for the emulator is different than those in sampling.
+        # now attach these final versions
+        self.x = _x
+        self.y = _y
+        self.yerr = _yerr
 
     def _build_gp(self, hyperparams):
         """
@@ -1347,8 +1352,8 @@ class ExtraCrispy(Emu):
         else:
             metric = {}
         kernel = self._make_kernel(metric)
-        # TODO is it confusing for this to have the same name as the sklearn object with a different API?
-        # maybe it should be a property? or private?
+
+        # now, make a list of emulators
         self.emulators = []
 
         for _x, _yerr in izip(self.x, self.yerr):
@@ -1399,20 +1404,20 @@ class ExtraCrispy(Emu):
 
         for i, (emulator, _y) in enumerate(izip(self.emulators, self.y)):
             if self.method == 'gp':
-                local_mu, local_cov = emulator.predict(_y, t, mean_only= False)
+                local_mu, local_cov = emulator.predict(_y, t, mean_only=False)
                 local_err = np.sqrt(np.diag(local_cov))
             else:
                 local_mu = emulator.predict(t)
-                local_err = 1.0 #weight with this instead of the errors.
+                local_err = 1.0  # weight with this instead of the errors.
 
-            mu[i,:] = local_mu
-            err[i,:] = local_err
+            mu[i, :] = local_mu
+            err[i, :] = local_err
 
-        #now, combine with weighted average
-        combined_var = np.reciprocal(np.sum(np.reciprocal(err**2), axis = 0))
-        combined_mu = combined_var*np.sum(np.reciprocal(err**2)*mu, axis = 0)
+        # now, combine with weighted average
+        combined_var = np.reciprocal(np.sum(np.reciprocal(err ** 2), axis=0))
+        combined_mu = combined_var * np.sum(np.reciprocal(err ** 2) * mu, axis=0)
 
-        # Reshape to be consistent with my otehr implementation
+        # Reshape to be consistent with my other implementation
         if not gp_errs:
             return combined_mu
         return combined_mu, np.sqrt(combined_var)
@@ -1435,7 +1440,7 @@ class ExtraCrispy(Emu):
             # Update the kernel parameters and compute the likelihood.
             # params are log(a) and log(m)
             ll = 0
-            for emulator,_y in izip(self.emulators, self.y):
+            for emulator, _y in izip(self.emulators, self.y):
                 emulator.kernel[:] = p
                 ll += emulator.lnlikelihood(_y, quiet=True)
 
