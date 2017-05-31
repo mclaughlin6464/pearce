@@ -6,25 +6,23 @@ from time import time
 from os import path, mkdir
 from subprocess import call
 from itertools import izip
+from collections import OrderedDict
 import warnings
 import cPickle as pickle
 
 import numpy as np
 
-from .ioHelpers import config_reader
+from .ioHelpers import config_reader, PARAMS_FILENAME, GLOBAL_FILENAME, TRAINING_FILE_LOC_FILENAME
 from ..mocks import cat_dict
 
-# I initially had the global_filename be variable. Howerver, I couldn't find a reason one would change it!
-GLOBAL_FILENAME = 'global_file.npy'
-PARAMS_FILENAME = 'params.pkl'
 
 
 # I think that it's better to have this param global, as it prevents there from being any conflicts.
 def makeLHC(ordered_params, N=500):
     '''Return a vector of points in parameter space that defines a latin hypercube.
     :param ordered_params:
-        list of "parameter" named tuple objects that define the ordering, name, and ranges of parameters
-        used in the trianing data.
+        OrderedDict that defines the ordering, name, and ranges of parameters
+        used in the trianing data. Keys are the names, value of a tuple of (lower, higher) bounds
     :param N:
         Number of points per dimension in the hypercube. Default is 500.
     :return
@@ -34,8 +32,8 @@ def makeLHC(ordered_params, N=500):
 
     points = []
     # by linspacing each parameter and shuffling, I ensure there is only one point in each row, in each dimension.
-    for p in ordered_params:
-        point = np.linspace(p.low, p.high, num=N)
+    for plow, phigh  in ordered_params.itervalues():
+        point = np.linspace(plow, phigh, num=N)
         np.random.shuffle(point)  # makes the cube random.
         points.append(point)
     return np.stack(points).T
@@ -45,8 +43,8 @@ def makeFHC(ordered_params, N=4):
     '''
     Return a vector of points in parameter space that defines a afull hyper cube.
     :param ordered_params:
-        list of "parameter" named tuple objects that define the ordering, name, and ranges of parameters
-        used in the trianing data.
+        OrderedDict that defines the ordering, name, and ranges of parameters
+        used in the trianing data. Keys are the names and values are tuples of the bounds (lower, higher)
     :param N:
         Number of points per dimension. Can be an integer or list. If it's a number, it will be the same
         across each dimension. If a list, defines points per dimension in the same ordering as ordered_params.
@@ -62,8 +60,13 @@ def makeFHC(ordered_params, N=4):
     n_total = np.prod(N)
     # TODO check if n_total is 1.
 
+<<<<<<< HEAD
     grid_points = np.meshgrid(*[np.linspace(param.low, param.high, n) \
                                 for n, param in izip(N, ordered_params)])
+=======
+    grid_points = np.meshgrid(*[np.linspace(plow, phigh, n) \
+                               for n, (plow, phigh) in izip(N, ordered_params.itervalues())])
+>>>>>>> add_training_dict
     points = np.stack(grid_points).T
     points = points.reshape((-1, len(ordered_params)))
 
@@ -223,6 +226,11 @@ def make_training_data(config_filename, ordered_params=None):
     at various points in HOD parameter space.
     :param config_filename:
         Config file.
+    :param ordered_params:
+        A dictof parameter names and their bounds.
+        Contains the name of the parameter and the min and max values it can hold.
+        Default is None, in which case DEFAULT_PARAMS in ioHelpers will be used.
+        If not an ordered_dict, the order of the params will be random going forward!
     :return:
         None.
     '''
@@ -242,8 +250,19 @@ def make_training_data(config_filename, ordered_params=None):
         assert all(min(a - cat.scale_factors) < 0.05 for a in scale_factors)
 
     if ordered_params is None:
+<<<<<<< HEAD
         # raise warning?
+=======
+>>>>>>> add_training_dict
         from .ioHelpers import DEFAULT_PARAMS as ordered_params
+        warnings.warn("No value of 'params' passed into make_training_data. Using default from ioHelpers.")
+    elif not isinstance(ordered_params, OrderedDict):
+        if isinstance(ordered_params, dict): #dictionary, just not an ordered dict
+            # accept the random order
+            ordered_params = OrderedDict(ordered_params.iteritems())
+        else:
+            raise ValueError('ordered_params is not of type dict!')
+
 
     # determine the specific functions needed for this setup
     # same points for each redshift
@@ -270,9 +289,8 @@ def make_training_data(config_filename, ordered_params=None):
         if not path.exists(outputdir):
             mkdir(outputdir)
 
-        if ordered_params is None:
-            from .ioHelpers import DEFAULT_PARAMS as ordered_params
-            warnings.warn("Using default ordered parameters.")
+        training_file_loc = {}  # dict of tuples that defines where files are located.
+        # This will make it so you don't have to open every file looking for the ones you want in a fixed_param case.
 
         # write the global file used by all params
         # TODO Write system (maybe) and method (definetly) to file!
@@ -296,7 +314,16 @@ def make_training_data(config_filename, ordered_params=None):
             param_filename = path.join(outputdir, jobname + '.npy')
             np.savetxt(param_filename, job_points)
 
+            for i, point in enumerate(job_points):
+                #this string should be standardized between this class and training_helper
+                training_file_loc[tuple(point)] = 'job%03d_HOD%03d.npy'%(job, i)
+
             # TODO allow queue changing
             command = make_command(jobname, max_time, outputdir)
             # the odd shell call is to deal with minute differences in the systems.
             call(command, shell=system == 'sherlock')
+
+        #dump the locations
+        with open(path.join(outputdir, TRAINING_FILE_LOC_FILENAME), 'w') as f:
+            pickle.dump(training_file_loc, f)
+
