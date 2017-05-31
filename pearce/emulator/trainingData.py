@@ -6,7 +6,6 @@ from time import time
 from os import path, mkdir
 from subprocess import call
 from itertools import izip
-from collections import OrderedDict
 import warnings
 import cPickle as pickle
 
@@ -14,8 +13,6 @@ import numpy as np
 
 from .ioHelpers import config_reader, PARAMS_FILENAME, GLOBAL_FILENAME, TRAINING_FILE_LOC_FILENAME
 from ..mocks import cat_dict
-
-
 
 # I think that it's better to have this param global, as it prevents there from being any conflicts.
 def makeLHC(ordered_params, N=500):
@@ -60,13 +57,8 @@ def makeFHC(ordered_params, N=4):
     n_total = np.prod(N)
     # TODO check if n_total is 1.
 
-<<<<<<< HEAD
-    grid_points = np.meshgrid(*[np.linspace(param.low, param.high, n) \
-                                for n, param in izip(N, ordered_params)])
-=======
     grid_points = np.meshgrid(*[np.linspace(plow, phigh, n) \
                                for n, (plow, phigh) in izip(N, ordered_params.itervalues())])
->>>>>>> add_training_dict
     points = np.stack(grid_points).T
     points = points.reshape((-1, len(ordered_params)))
 
@@ -250,10 +242,6 @@ def make_training_data(config_filename, ordered_params=None):
         assert all(min(a - cat.scale_factors) < 0.05 for a in scale_factors)
 
     if ordered_params is None:
-<<<<<<< HEAD
-        # raise warning?
-=======
->>>>>>> add_training_dict
         from .ioHelpers import DEFAULT_PARAMS as ordered_params
         warnings.warn("No value of 'params' passed into make_training_data. Using default from ioHelpers.")
     elif not isinstance(ordered_params, OrderedDict):
