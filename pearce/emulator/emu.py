@@ -612,7 +612,7 @@ class Emu(object):
             try:
                 metric.append(ig[pname])
             except KeyError:
-                raise KeyError('Key %s was not in the metric.' % p.name)
+                raise KeyError('Key %s was not in the metric.' % pname)
 
         metric = np.array(metric)
 
@@ -843,7 +843,7 @@ class Emu(object):
 
             x, y = x[idxs], y[idxs]
 
-        pred_y = self._emulate_helper(x, False)
+        pred_y = self._emulate_helper(x)
         pred_y = pred_y.reshape((-1, scale_nbins))
 
         # TODO untested
@@ -871,15 +871,15 @@ class Emu(object):
             return 1 - SSR / SST
 
         elif statistic == 'abs':
-            return 10 ** pred_y - 10 ** y
+            return np.mean(10 ** pred_y - 10 ** y, axis = 0)
         elif statistic == 'log_abs':
-            return pred_y - y
+            return np.mean(pred_y - y, axis = 0)
             # return np.mean((pred_y - y), axis=0)
         elif statistic == 'log_frac':  # 'rel'
-            return (pred_y - y) / y
+            return np.mean( (pred_y - y) / y, axis = 0)
             # return np.mean((pred_y - y) / y, axis=0)
         else:  # 'frac'
-            return (10 ** pred_y - 10 ** y) / (10 ** y)
+            return  np.mean( (10 ** pred_y - 10 ** y) / (10 ** y), axis = 0)
 
     @abstractmethod
     def train_metric(self, **kwargs):
