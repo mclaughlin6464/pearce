@@ -830,6 +830,8 @@ class Emu(object):
 
         x, y, _ = self.get_data(truth_dir, {}, self.fixed_params, self.independent_variable)
 
+
+
         bins, _, _, _ = global_file_reader(truth_dir)
         bin_centers = (bins[1:] + bins[:-1]) / 2
         scale_nbins = len(bin_centers)
