@@ -463,10 +463,10 @@ class Cat(object):
             Whether to calculate hte number density of halos instead of galaxies. Default is false.
         :return: Number density of a populated box.
         '''
-        # TODO I think i'm missing little h's here
         if halo:
             return len(self.model.mock.halo_table['halo_x']) / (self.Lbox ** 3)
-        return len(self.model.mock.galaxy_table['x']) / (self.Lbox ** 3)
+        #return len(self.model.mock.galaxy_table['x']) / (self.Lbox ** 3)
+        return cat.model.mock.number_density
 
     # TODO do_jackknife to cov?
     @observable
