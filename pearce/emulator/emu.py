@@ -263,7 +263,7 @@ class Emu(object):
         avgcov = np.zeros((self.scale_bin_centers.shape[0], self.scale_bin_centers.shape[0]))
         N = fullcov.shape[0]/self.scale_bin_centers.shape[0]
         for i in xrange(N):
-            avgcov+=fullcov[i*self.scale_bin_centers.shape[0]: (i+1)*self.scale_bin_centers.shape[0]]
+            avgcov+=fullcov[i*self.scale_bin_centers.shape[0]: (i+1)*self.scale_bin_centers.shape[0], i*self.scale_bin_centers.shape[0]: (i+1)*self.scale_bin_centers.shape[0] ]
 
         self.ycov = avgcov/N
 
@@ -489,7 +489,7 @@ class Emu(object):
             y = np.log10(obs)
             # Approximately true, may need to revisit
             # yerr[idx * NBINS:(idx + 1) * NBINS] = np.sqrt(np.diag(cov)) / (xi * np.log(10))
-            y_cov = cov/np.outer(obs * np.log(10))
+            y_cov = cov/np.outer(obs * np.log(10), obs*np.log(10))
         elif independent_variable == 'r2':  # r2xi
             y = obs * self.scale_bin_centers * self.scale_bin_centers
             y_cov = cov* np.outer(self.scale_bin_centers, self.scale_bin_centers)
