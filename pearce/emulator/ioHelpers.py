@@ -10,17 +10,16 @@ from itertools import izip
 from collections import OrderedDict, namedtuple
 import warnings
 
-__all__ = ['parameter','DEFAULT_PARAMS', 'GLOBAL_FILENAME','PARAMS_FILENAME', 'TRAINING_FILE_LOC_FILENAME',
-           'params_file_reader','training_file_loc_reader', 'obs_file_reader','global_file_reader',
+__all__ = ['parameter', 'DEFAULT_PARAMS', 'GLOBAL_FILENAME', 'PARAMS_FILENAME', 'TRAINING_FILE_LOC_FILENAME',
+           'params_file_reader', 'training_file_loc_reader', 'obs_file_reader', 'global_file_reader',
            'config_reader']
-
 
 # global object that defines the names and ordering of the parameters, as well as their boundaries.
 # TODO reading in bounds/params from config
 # TODO add assembias params
 DEFAULT_PARAM_NAMES = ['logMmin', 'sigma_logM', 'logM0', 'logM1', 'alpha', 'f_c']
-DEFAULT_PARAM_BOUNDS = [(11.7, 12.5), (0.2, 0.7), (10,13), (13.1, 14.3), (0.75, 1.25), (0.1, 0.5)]
-DEFAULT_PARAMS = OrderedDict( izip(DEFAULT_PARAM_NAMES, DEFAULT_PARAM_BOUNDS))
+DEFAULT_PARAM_BOUNDS = [(11.7, 12.5), (0.2, 0.7), (10, 13), (13.1, 14.3), (0.75, 1.25), (0.1, 0.5)]
+DEFAULT_PARAMS = OrderedDict(izip(DEFAULT_PARAM_NAMES, DEFAULT_PARAM_BOUNDS))
 
 parameter = namedtuple('parameter', ['name', 'low', 'high'])
 
@@ -29,7 +28,8 @@ GLOBAL_FILENAME = 'global_file.npy'
 PARAMS_FILENAME = 'params.pkl'
 TRAINING_FILE_LOC_FILENAME = 'training_file_loc.pkl'
 
-def params_file_reader(dirname, fname = PARAMS_FILENAME):
+
+def params_file_reader(dirname, fname=PARAMS_FILENAME):
     '''
     Load the parameter file from a given directory.
     :param dir:
@@ -46,12 +46,12 @@ def params_file_reader(dirname, fname = PARAMS_FILENAME):
     if not isinstance(ordered_params, OrderedDict):
         if isinstance(ordered_params, dict):
             ordered_params = dict(ordered_params.iteritems())
-        elif isinstance(ordered_params, list) and isinstance(ordered_params[0] ,parameter):
+        elif isinstance(ordered_params, list) and isinstance(ordered_params[0], parameter):
             warnings.warn('The new version of ordered_params uses OrderedDicts, not lists. Converting, but this will \
                            not be supported for long!')
             ordered_params = OrderedDict([(p.name, (p.low, p.high)) for p in ordered_params])
         else:
-            raise IOError("Don't recgonize the type of ordered_params in %s"%fname)
+            raise IOError("Don't recgonize the type of ordered_params in %s" % fname)
 
     return ordered_params
 
@@ -70,6 +70,7 @@ def training_file_loc_reader(dirname, fname=TRAINING_FILE_LOC_FILENAME):
         training_file_loc = pickle.load(f)
 
     return training_file_loc
+
 
 def obs_file_reader(corr_file, cov_file=None):
     '''
@@ -130,7 +131,7 @@ def global_file_reader(dirname, fname=GLOBAL_FILENAME):
             except ValueError:
                 cosmo_params[splitLine[0]] = splitLine[1].strip()
 
-    return bins, cosmo_params,obs, method
+    return bins, cosmo_params, obs, method
 
 
 # Could use ConfigParser maybe

@@ -6,7 +6,6 @@ from time import time
 from os import path, mkdir
 from subprocess import call
 from itertools import izip
-from collections import OrderedDict
 import warnings
 import cPickle as pickle
 
@@ -14,8 +13,6 @@ import numpy as np
 
 from .ioHelpers import config_reader, PARAMS_FILENAME, GLOBAL_FILENAME, TRAINING_FILE_LOC_FILENAME
 from ..mocks import cat_dict
-
-
 
 # I think that it's better to have this param global, as it prevents there from being any conflicts.
 def makeLHC(ordered_params, N=500):

@@ -15,7 +15,7 @@ import george
 from george.kernels import *
 import scipy.optimize as op
 from scipy.interpolate import interp1d
-from scipy.linalg import inv
+from scipy.linalg import inv, block_diag
 from scipy.spatial import KDTree
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 from sklearn.kernel_ridge import KernelRidge
@@ -85,9 +85,9 @@ class Emu(object):
             Parameters to hold fixed. Only available if data in data_dir is a full hypercube, not a latin hypercube
         :param independent_variable:
             Independant variable to emulate. Options are xi, r2xi, and bias (eventually)..
-        :return: x, y, y_err, all numpy arrays.
+        :return: x, y, ycov, all numpy arrays.
                  x is (n_data_points, n_params)
-                 y and y)err are (n_data_points, )
+                 y is (n_data_points, ), and ycov (n_data_points, n_data_points)
         """
 
         input_params = {}
@@ -99,7 +99,7 @@ class Emu(object):
         # we store redshifts, not scale factors
         self.redshift_bin_centers = 1 / sub_dirs_as - 1
 
-        all_x, all_y, all_yerr = [], [], []
+        all_x, all_y, all_ycov = [], [], []
 
         for sub_dir, z in izip(sub_dirs, self.redshift_bin_centers):
 
@@ -142,7 +142,7 @@ class Emu(object):
             ndim = len(self._ordered_params)
             x = np.zeros((npoints, ndim))
             y = np.zeros((npoints,))
-            yerr = np.zeros((npoints,))
+            ycov = np.zeros((npoints, npoints))
 
             warned = False
             num_skipped = 0
@@ -177,20 +177,20 @@ class Emu(object):
 
                 x[idx * scale_nbins:(idx + 1) * scale_nbins, :] = np.stack(file_params).T
 
-                y[idx * scale_nbins:(idx + 1) * scale_nbins], yerr[idx * scale_nbins:( \
-                                                                                         idx + 1) * scale_nbins] = self._iv_transform(
-                    independent_variable, obs, cov)
+                y[idx * scale_nbins:(idx + 1) * scale_nbins], _cov = self._iv_transform(independent_variable, obs, cov)
+
+                ycov[idx * scale_nbins:(idx + 1) * scale_nbins, idx * scale_nbins:(idx + 1) * scale_nbins] = _cov
 
             # remove rows that were skipped due to the fixed thing
             # NOTE: HACK
             # a reshape may be faster.
             # TODO could I use Nonzero, or, better, keep track of the index I need??
             # Yeah isn't this just num_used?
-            zeros_slice = np.any(x != 0.0, axis=1)
+            #zeros_slice = np.any(x != 0.0, axis=1)
 
-            all_x.append(x[zeros_slice])
-            all_y.append(y[zeros_slice])
-            all_yerr.append(yerr[zeros_slice])
+            all_x.append(x[:num_used])
+            all_y.append(y[:num_used])
+            all_ycov.append(ycov[:num_used, :num_used])
 
         self.scale_bin_centers = scale_bin_centers
 
@@ -201,7 +201,7 @@ class Emu(object):
             self._ordered_params['z'] = (np.min(self.redshift_bin_centers), np.max(self.redshift_bin_centers))
 
         # TODO sort?
-        return np.vstack(all_x), np.hstack(all_y), np.hstack(all_yerr)
+        return np.vstack(all_x), np.hstack(all_y), block_diag(*all_ycov)
 
     def get_plot_data(self, em_params, training_dir, independent_variable=None, fixed_params={},
                       dependent_variable='r'):
@@ -221,7 +221,9 @@ class Emu(object):
         :return: log_r (or z), y, yerr for the independent variable at the points specified by fixed nad em params.
         """
 
-        x, y, yerr = self.get_data(training_dir, em_params, fixed_params, independent_variable)
+        x, y, ycov = self.get_data(training_dir, em_params, fixed_params, independent_variable)
+
+        yerr = np.sqrt(np.diag(ycov))
 
         sort_idxs = self._sort_params(x, argsort=True)
 
@@ -244,17 +246,26 @@ class Emu(object):
         if type(training_dir) is not list:
             training_dir = [training_dir]
 
-        xs, ys, yerrs = [], [], []
+        xs, ys, ycovs = [], [], []
         for td in training_dir:
-            x, y, yerr = self.get_data(td, {}, self.fixed_params, self.independent_variable)
+            x, y, ycov = self.get_data(td, {}, self.fixed_params, self.independent_variable)
             xs.append(x)
             ys.append(y)
-            yerrs.append(yerr)
+            ycovs.append(ycov)
 
         self.x = np.vstack(xs)
         # hstack for 1-D
         self.y = np.hstack(ys)
-        self.yerr = np.hstack(yerrs)
+        fullcov = block_diag(*ycovs)
+        self.yerr = np.sqrt(np.diag(fullcov))
+
+        #compute the average covariance matrix
+        avgcov = np.zeros((self.scale_bin_centers.shape[0], self.scale_bin_centers.shape[0]))
+        N = fullcov.shape[0]/self.scale_bin_centers.shape[0]
+        for i in xrange(N):
+            avgcov+=fullcov[i*self.scale_bin_centers.shape[0]: (i+1)*self.scale_bin_centers.shape[0]]
+
+        self.ycov = avgcov/N
 
         # for now, no mean subtraction
         self.y_hat = np.zeros(self.y.shape[1]) if len(y.shape) > 1 else 0  # self.y.mean(axis = 0)
@@ -472,16 +483,16 @@ class Emu(object):
         :param cov:
             Covariance of obs
         :return:
-            y, yerr the transformed iv's for the emulator
+            y, y_cov the transformed iv's for the emulator
         """
         if independent_variable is None:
             y = np.log10(obs)
             # Approximately true, may need to revisit
             # yerr[idx * NBINS:(idx + 1) * NBINS] = np.sqrt(np.diag(cov)) / (xi * np.log(10))
-            y_err = np.sqrt(np.diag(cov)) / (obs * np.log(10))
+            y_cov = cov/np.outer(obs * np.log(10))
         elif independent_variable == 'r2':  # r2xi
             y = obs * self.scale_bin_centers * self.scale_bin_centers
-            y_err = np.sqrt(np.diag(cov)) * self.scale_bin_centers
+            y_cov = cov* np.outer(self.scale_bin_centers, self.scale_bin_centers)
         else:
             raise ValueError('Invalid independent variable %s' % independent_variable)
 
@@ -489,8 +500,7 @@ class Emu(object):
         #    y[idx * NBINS:(idx + 1) * NBINS] = xi / xi_mm
         #    ycovs.append(cov / np.outer(xi_mm, xi_mm))
 
-
-        return y, y_err
+        return y, y_cov
 
     def _sort_params(self, t, argsort=False):
         """
