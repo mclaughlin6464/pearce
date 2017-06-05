@@ -4,6 +4,7 @@
 import warnings
 from glob import glob
 from itertools import izip
+from collections import OrderedDict
 from multiprocessing import cpu_count
 from os import path
 from time import time
@@ -73,7 +74,11 @@ class Emu(object):
     ###Data Loading and Manipulation####################################################################################
     def get_data(self, data_dir, em_params, fixed_params, independent_variable):
         """
-        Read data in the format compatible with this object and return it
+        Read data in the format compatible with this object and return it.
+
+        This is modified from the main branch, designed to load in the data I've been sent by zhongxu. His scheme is
+        more efficient than mine, and includes cosmology, so I may choose to re-design mine to imitate it.
+
         :param data_dir:
             Directory where data from trainingData is stored
         :param em_params:
@@ -92,46 +97,50 @@ class Emu(object):
 
         input_params = {}
         input_params.update(em_params)
+        # NOTE fixed_params will likely not be valid.
         input_params.update(fixed_params)
 
-        # If redshfit is fixed, we don't need to open the subdirs for other redshifts.
-        sub_dirs, sub_dirs_as = self._get_z_subdirs(data_dir, fixed_zs=fixed_params.get('z', None))
-        # we store redshifts, not scale factors
-        self.redshift_bin_centers = 1 / sub_dirs_as - 1
+        # redshift is fixed.
+        self.redshift_bin_centers = np.array([0.0])
+        z = 0.0
 
-        all_x, all_y, all_ycov = [], [], []
+        obs = 'wp'
+        sampling_method = 'LHC'
+        self.obs = obs
 
-        for sub_dir, z in izip(sub_dirs, self.redshift_bin_centers):
+        cosmologies = np.loadtxt(path.join(data_dir, 'cosmology_camb_full.dat'))
+        HODs = np.loadtxt(path.join(data_dir, 'HOD_design_np8_n400.dat'))
 
-            bins, cosmo_params, obs, sampling_method = global_file_reader(sub_dir)
-            self.obs = obs
+        op_names = ['Msat', 'alpha', 'Mcut', 'sigma_logM','vbias_cen','vbias_sats','conc','v_field_amp']
+        op_names.extend(['Omega_m', 'Omega_b', 'sigma_8', 'h', 'n_s', 'N_eff', 'w_de'])
+        min_max_vals = zip(np.r_[HODs.min(axis = 0),cosmologies.min(axis=0)], \
+                           np.r_[HODs.max(axis=0), cosmologies.max(axis=0)])
+        ordered_params = OrderedDict(izip(op_names, min_max_vals))
+        self._ordered_params = ordered_params
 
-            # Depending on if this is a full or latin hypercube, and if params are supposed to be fixed, do different
-            # things.
-            # Could add an assert that a = cosmo_params['scale_factor']
-            if fixed_params and fixed_params.keys() != ['z']:
-                if sampling_method == 'LHC':  # not allowed
-                    raise ValueError('Fixed parameters is not empty, but the data in data_dir is form a Latin Hypercube. \
-                                    Cannot performs slices on a LHC.')
-                else:  # FHC, load up the training file locations
-                    ordered_params_with_fixed = self._get_ordered_params(sub_dir, fixed_params, with_fixed_params=True)
-                    training_file_loc = training_file_loc_reader(sub_dir)
-                    obs_files, cov_files = self._get_fixed_files(training_file_loc, ordered_params_with_fixed,
-                                                                 input_params, sub_dir)
-            else:  # look at all of them.
-                # sorted to ensure parameters line up correctly
-                self._get_ordered_params(sub_dir, fixed_params)
-                obs_files = sorted(glob(path.join(sub_dir, 'obs*.npy')))
-                cov_files = sorted(glob(path.join(sub_dir, 'cov*.npy')))
+        for key in em_params:  # assert defined params are in ordered
+            assert key in  self._ordered_params
 
-            for key in em_params:  # assert defined params are in ordered
-                assert any([pname == key for pname in self._ordered_params])
+        obs_files = glob(path.join(data_dir, 'data', 'wp*.dat'))
 
-            # store the binning for the scale_bins
-            # assumes that it's the same for each box, which should be true.
-            scale_bin_centers = (bins[:-1] + bins[1:]) / 2
-            scale_nbins = scale_bin_centers.shape[0]
-            npoints = len(obs_files) * scale_nbins  # each file contains NBINS points in r, and each file is a 6-d point
+        # store the binning for the scale_bins
+        # assumes that it's the same for each box, which should be true.
+        scale_nbins = 9 #hardcoding
+        npoints = len(obs_files) * scale_nbins  # each file contains NBINS points in r, and each file is a N-d point
+
+        ndim = len(self._ordered_params)
+        x = np.zeros((npoints, ndim))
+        y = np.zeros((npoints,))
+        ycov = np.zeros((npoints, npoints))
+
+        warned = False
+        num_skipped = 0
+        num_used = 0
+
+        for idx, obs_file in enumerate(obs_files):
+            obs_and_rb = obs_file_reader(obs_file, return_params = False)
+            scale_bin_centers = obs_and_rb[:,0]
+            obs = obs_and_rb[:,1]
 
             if hasattr(self, "scale_bin_centers"):
                 if scale_bin_centers.shape != self.scale_bin_centers.shape or \
@@ -139,58 +148,39 @@ class Emu(object):
                     warnings.warn(
                         "The scale bin centers in %s are not the same as the ones alread attached to this object. This may lead to weird behavior!" % sub_dir)
 
-            ndim = len(self._ordered_params)
-            x = np.zeros((npoints, ndim))
-            y = np.zeros((npoints,))
-            ycov = np.zeros((npoints, npoints))
+            # skip NaNs
+            if np.any(np.isnan(obs)):
+                # only warn once.
+                if not warned:
+                    warnings.warn('WARNING: NaN detected. Skipping point in %s' % obs_file)
+                    warned = True
+                num_skipped += 1
+                continue
 
-            warned = False
-            num_skipped = 0
-            num_used = 0
+            num_used += 1
 
-            for idx, (obs_file, cov_file) in enumerate(izip(obs_files, cov_files)):
-                params, obs, cov = obs_file_reader(obs_file, cov_file)
+            split_obs_fname = obs_file.split('_')
+            cosmo = cosmologies[int(split_obs_fname[3]), :]
+            HOD = HODs[int(split_obs_fname[5]), :]
 
-                # skip NaNs
-                if np.any(np.isnan(cov)) or np.any(np.isnan(obs)):
-                    # only warn once.
-                    if not warned:
-                        warnings.warn('WARNING: NaN detected. Skipping point in %s' % cov_file)
-                        warned = True
-                    num_skipped += 1
-                    continue
+            params = np.r_[HOD, cosmo]
 
-                num_used += 1
+            # take the params from the file and put them in the right order and right place
+            file_params = []
+            for i, pname in enumerate(self._ordered_params):
+                if pname not in fixed_params and pname not in {'z', 'r'}:  # may need to be input_params
+                    # note we have to repeat for each scale bin
+                    file_params.append(np.ones((scale_nbins,)) * params[i])
 
-                # take the params from the file and put them in the right order and right place
-                file_params = []
-                for pname in self._ordered_params:
-                    if pname not in fixed_params and pname not in {'z', 'r'}:  # may need to be input_params
-                        # note we have to repeat for each scale bin
-                        file_params.append(np.ones((scale_nbins,)) * params[pname])
+            # r and z will always be at the end.
+            if 'z' not in fixed_params:
+                file_params.append(np.ones((scale_nbins,)) * z)
+            if 'r' not in fixed_params:
+                file_params.append(np.log10(scale_bin_centers))
 
-                # r and z will always be at the end.
-                if 'z' not in fixed_params:
-                    file_params.append(np.ones((scale_nbins,)) * z)
-                if 'r' not in fixed_params:
-                    file_params.append(np.log10(scale_bin_centers))
+            x[idx * scale_nbins:(idx + 1) * scale_nbins, :] = np.stack(file_params).T
 
-                x[idx * scale_nbins:(idx + 1) * scale_nbins, :] = np.stack(file_params).T
-
-                y[idx * scale_nbins:(idx + 1) * scale_nbins], _cov = self._iv_transform(independent_variable, obs, cov)
-
-                ycov[idx * scale_nbins:(idx + 1) * scale_nbins, idx * scale_nbins:(idx + 1) * scale_nbins] = _cov
-
-            # remove rows that were skipped due to the fixed thing
-            # NOTE: HACK
-            # a reshape may be faster.
-            # TODO could I use Nonzero, or, better, keep track of the index I need??
-            # Yeah isn't this just num_used?
-            #zeros_slice = np.any(x != 0.0, axis=1)
-
-            all_x.append(x[:num_used])
-            all_y.append(y[:num_used])
-            all_ycov.append(ycov[:num_used, :num_used])
+            y[idx * scale_nbins:(idx + 1) * scale_nbins] = self._iv_transform(independent_variable, obs)
 
         self.scale_bin_centers = scale_bin_centers
 
@@ -200,8 +190,15 @@ class Emu(object):
         if 'z' in self._ordered_params and self._ordered_params['z'] == (0,1):
             self._ordered_params['z'] = (np.min(self.redshift_bin_centers), np.max(self.redshift_bin_centers))
 
+        # ok, now get the errors in their weird format.
+        e1 = np.loadtxt(path.join(data_dir, 'data', 'Cosmo_err.dat'))
+        e2 = np.loadtxt(path.join(data_dir, 'data', 'Cosmo_pure_err.dat'))
+
+        yerr_1bin = e2 ** 2.0 + (e1 ** 2.0 - e2 ** 2.0) / scale_nbins
+        ycov_1bin = np.diag(yerr_1bin)
+
         # TODO sort?
-        return np.vstack(all_x), np.hstack(all_y), block_diag(*all_ycov)
+        return x[:num_used], y[:num_used], block_diag(*[ycov_1bin for i in xrange(len(obs_files))])
 
     def get_plot_data(self, em_params, training_dir, independent_variable=None, fixed_params={},
                       dependent_variable='r'):
@@ -473,7 +470,7 @@ class Emu(object):
 
         return sorted(obs_files), sorted(cov_files)
 
-    def _iv_transform(self, independent_variable, obs, cov):
+    def _iv_transform(self, independent_variable, obs, cov=None):
         """
         Independent variable tranform. Helper function that consolidates this operation all in one place.
         :param independent_variable:
@@ -481,26 +478,29 @@ class Emu(object):
         :param obs:
             Observable to transform (xi, wprp, etc.)
         :param cov:
-            Covariance of obs
+            Covariance of obs. Optional.
         :return:
-            y, y_cov the transformed iv's for the emulator
+            y, y_cov the transformed iv's for the emulator. If cov is none, only return y.
         """
         if independent_variable is None:
             y = np.log10(obs)
             # Approximately true, may need to revisit
             # yerr[idx * NBINS:(idx + 1) * NBINS] = np.sqrt(np.diag(cov)) / (xi * np.log(10))
-            y_cov = cov/np.outer(obs * np.log(10))
+            if cov is not None:
+                y_cov = cov/np.outer(obs * np.log(10))
         elif independent_variable == 'r2':  # r2xi
             y = obs * self.scale_bin_centers * self.scale_bin_centers
-            y_cov = cov* np.outer(self.scale_bin_centers, self.scale_bin_centers)
+            if cov is not None:
+                y_cov = cov* np.outer(self.scale_bin_centers, self.scale_bin_centers)
         else:
             raise ValueError('Invalid independent variable %s' % independent_variable)
 
         # if independent_variable == 'bias':
         #    y[idx * NBINS:(idx + 1) * NBINS] = xi / xi_mm
         #    ycovs.append(cov / np.outer(xi_mm, xi_mm))
-
-        return y, y_cov
+        if cov is not None:
+            return y, y_cov
+        return y
 
     def _sort_params(self, t, argsort=False):
         """
