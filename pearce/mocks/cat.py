@@ -466,7 +466,7 @@ class Cat(object):
         if halo:
             return len(self.model.mock.halo_table['halo_x']) / (self.Lbox ** 3)
         #return len(self.model.mock.galaxy_table['x']) / (self.Lbox ** 3)
-        return cat.model.mock.number_density
+        return self.model.mock.number_density
 
     # TODO do_jackknife to cov?
     @observable

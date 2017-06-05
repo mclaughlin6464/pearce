@@ -881,15 +881,17 @@ class Emu(object):
             return 1 - SSR / SST
 
         elif statistic == 'abs':
-            return np.mean(10 ** pred_y - 10 ** y, axis = 0)
+            return 10 ** pred_y - 10 ** y
+            #return np.mean(10 ** pred_y - 10 ** y, axis = 0)
         elif statistic == 'log_abs':
-            return np.mean(pred_y - y, axis = 0)
+            return pred_y - y
             # return np.mean((pred_y - y), axis=0)
         elif statistic == 'log_frac':  # 'rel'
-            return np.mean( (pred_y - y) / y, axis = 0)
+            return (pred_y - y) / y
             # return np.mean((pred_y - y) / y, axis=0)
         else:  # 'frac'
-            return  np.mean( (10 ** pred_y - 10 ** y) / (10 ** y), axis = 0)
+            return   (10 ** pred_y - 10 ** y) / (10 ** y)
+            #return  np.mean( (10 ** pred_y - 10 ** y) / (10 ** y), axis = 0)
 
     @abstractmethod
     def train_metric(self, **kwargs):
