@@ -170,9 +170,9 @@ class Emu(object):
 
             #TODO this structure allows you to hold an HOD or cosmology fixed, which I like.
             split_obs_fname = path.basename(obs_file).split('_')
-            if int(split_obs_fname[3]) != 0 :
-                continue
-            #elif int(split_obs_fname[5]) > 20:
+            #if int(split_obs_fname[3]) != 0 :
+            #    continue
+            #if int(split_obs_fname[5]) > 100:
             #    continue
             num_used += 1
             cosmo = cosmologies[int(split_obs_fname[3]), :]
