@@ -131,14 +131,13 @@ class Emu(object):
         ndim = len(self._ordered_params)
         x = np.zeros((npoints, ndim))
         y = np.zeros((npoints,))
-        ycov = np.zeros((npoints, npoints))
 
         warned = False
         num_skipped = 0
         num_used = 0
 
         for idx, obs_file in enumerate(obs_files):
-            obs_and_rb = obs_file_reader(obs_file, return_params = False)
+            obs_and_rb = obs_file_reader(obs_file)
             scale_bin_centers = obs_and_rb[:,0]
             obs = obs_and_rb[:,1]
 
