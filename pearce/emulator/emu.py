@@ -69,7 +69,9 @@ class Emu(object):
         self.independent_variable = independent_variable
 
         self.load_training_data(training_dir)
+        print 'Loading done'
         self.build_emulator(hyperparams)
+        print 'building done'
 
     ###Data Loading and Manipulation####################################################################################
     def get_data(self, data_dir, em_params, fixed_params, independent_variable):
@@ -116,6 +118,16 @@ class Emu(object):
         min_max_vals = zip(np.r_[HODs.min(axis = 0),cosmologies.min(axis=0)], \
                            np.r_[HODs.max(axis=0), cosmologies.max(axis=0)])
         ordered_params = OrderedDict(izip(op_names, min_max_vals))
+
+        for key, val in ordered_params.iteritems():
+            if key[0] == 'M': #masses have to have the log taken
+                ordered_params[key] = (np.log10(val[0]), np.log10(val[1]))
+
+        if 'z' not in self.fixed_params:
+            ordered_params['z'] = (0,1)
+        if 'r' not in self.fixed_params:
+            ordered_params['r'] = (0,1)
+
         self._ordered_params = ordered_params
 
         for key in em_params:  # assert defined params are in ordered
@@ -127,7 +139,6 @@ class Emu(object):
         # assumes that it's the same for each box, which should be true.
         scale_nbins = 9 #hardcoding
         npoints = len(obs_files) * scale_nbins  # each file contains NBINS points in r, and each file is a N-d point
-
         ndim = len(self._ordered_params)
         x = np.zeros((npoints, ndim))
         y = np.zeros((npoints,))
@@ -137,6 +148,7 @@ class Emu(object):
         num_used = 0
 
         for idx, obs_file in enumerate(obs_files):
+            print idx
             obs_and_rb = obs_file_reader(obs_file)
             scale_bin_centers = obs_and_rb[:,0]
             obs = obs_and_rb[:,1]
@@ -159,8 +171,12 @@ class Emu(object):
             num_used += 1
 
             split_obs_fname = obs_file.split('_')
-            cosmo = cosmologies[int(split_obs_fname[3]), :]
-            HOD = HODs[int(split_obs_fname[5]), :]
+            if int(split_obs_fname[4]) != 0:
+                continue
+            elif int(split_obs_fname[6]) > 20:
+                continue
+            cosmo = cosmologies[int(split_obs_fname[4]), :]
+            HOD = HODs[int(split_obs_fname[6]), :]
 
             params = np.r_[HOD, cosmo]
 
@@ -180,7 +196,6 @@ class Emu(object):
             x[idx * scale_nbins:(idx + 1) * scale_nbins, :] = np.stack(file_params).T
 
             y[idx * scale_nbins:(idx + 1) * scale_nbins] = self._iv_transform(independent_variable, obs)
-
         self.scale_bin_centers = scale_bin_centers
 
         if 'r' in self._ordered_params and self._ordered_params['r'] == (0,1):
