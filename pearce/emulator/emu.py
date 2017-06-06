@@ -110,8 +110,9 @@ class Emu(object):
         sampling_method = 'LHC'
         self.obs = obs
 
-        cosmologies = np.loadtxt(path.join(data_dir, 'cosmology_camb_full.dat'))
-        HODs = np.loadtxt(path.join(data_dir, 'HOD_design_np8_n400.dat'))
+        # TODO it'd be nice if these had a standardized name so I don't have to glob them.
+        cosmologies = np.loadtxt(glob(path.join(data_dir, 'cosmology*.dat'))[0])
+        HODs = np.loadtxt(glob(path.join(data_dir, 'HOD*.dat'))[0])
 
         op_names = ['Msat', 'alpha', 'Mcut', 'sigma_logM','vbias_cen','vbias_sats','conc','v_field_amp']
         op_names.extend(['Omega_m', 'Omega_b', 'sigma_8', 'h', 'n_s', 'N_eff', 'w_de'])
