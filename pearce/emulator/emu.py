@@ -71,7 +71,7 @@ class Emu(object):
         self.load_training_data(training_dir)
         print 'Loading done'
         self.build_emulator(hyperparams)
-        print 'building done'
+        print 'Building done'
 
     ###Data Loading and Manipulation####################################################################################
     def get_data(self, data_dir, em_params, fixed_params, independent_variable):
@@ -134,7 +134,7 @@ class Emu(object):
         for key in em_params:  # assert defined params are in ordered
             assert key in  self._ordered_params
 
-        obs_files = glob(path.join(data_dir, 'data', 'wp*.dat'))
+        obs_files = glob(path.join(data_dir, 'wp*.dat'))
 
         # store the binning for the scale_bins
         # assumes that it's the same for each box, which should be true.
@@ -149,16 +149,15 @@ class Emu(object):
         num_used = 0
 
         for idx, obs_file in enumerate(obs_files):
-            print idx
             obs_and_rb = obs_file_reader(obs_file)
             scale_bin_centers = obs_and_rb[:,0]
             obs = obs_and_rb[:,1]
 
             if hasattr(self, "scale_bin_centers"):
                 if scale_bin_centers.shape != self.scale_bin_centers.shape or \
-                        np.any(scale_bin_centers != self.scale_bin_centers):
+                        np.any(np.abs(scale_bin_centers - self.scale_bin_centers) > 0.1):
                     warnings.warn(
-                        "The scale bin centers in %s are not the same as the ones alread attached to this object. This may lead to weird behavior!" % sub_dir)
+                        "The scale bin centers in %s are not the same as the ones alread attached to this object. This may lead to weird behavior!" % data_dir)
 
             # skip NaNs
             if np.any(np.isnan(obs)):
@@ -169,16 +168,15 @@ class Emu(object):
                 num_skipped += 1
                 continue
 
-            num_used += 1
             #TODO this structure allows you to hold an HOD or cosmology fixed, which I like.
-            split_obs_fname = obs_file.split('_')
-            print split_obs_fname[4], split_obs_fname[6]
-            if int(split_obs_fname[4]) > 2 :
+            split_obs_fname = path.basename(obs_file).split('_')
+            if int(split_obs_fname[3]) != 0 :
                 continue
-            elif int(split_obs_fname[6]) > 20:
-                continue
-            cosmo = cosmologies[int(split_obs_fname[4]), :]
-            HOD = HODs[int(split_obs_fname[6]), :]
+            #elif int(split_obs_fname[5]) > 20:
+            #    continue
+            num_used += 1
+            cosmo = cosmologies[int(split_obs_fname[3]), :]
+            HOD = HODs[int(split_obs_fname[5]), :]
 
             params = np.r_[HOD, cosmo]
 
@@ -187,7 +185,10 @@ class Emu(object):
             for i, pname in enumerate(self._ordered_params):
                 if pname not in fixed_params and pname not in {'z', 'r'}:  # may need to be input_params
                     # note we have to repeat for each scale bin
-                    file_params.append(np.ones((scale_nbins,)) * params[i])
+                    if pname[0] == 'M': # take the log
+                        file_params.append(np.ones((scale_nbins,))*np.log10(params[i]))
+                    else:
+                        file_params.append(np.ones((scale_nbins,)) * params[i])
 
             # r and z will always be at the end.
             if 'z' not in fixed_params:
@@ -207,14 +208,21 @@ class Emu(object):
             self._ordered_params['z'] = (np.min(self.redshift_bin_centers), np.max(self.redshift_bin_centers))
 
         # ok, now get the errors in their weird format.
-        e1 = np.loadtxt(path.join(data_dir, 'data', 'Cosmo_err.dat'))
-        e2 = np.loadtxt(path.join(data_dir, 'data', 'Cosmo_pure_err.dat'))
+        # TODO is this how i want to handle f they don't exist?
+        try:
+            e1 = np.loadtxt(path.join(data_dir, 'Cosmo_err.dat'))
+            e2 = np.loadtxt(path.join(data_dir, 'Cosmo_pure_err.dat'))
 
-        yerr_1bin = e2 ** 2.0 + (e1 ** 2.0 - e2 ** 2.0) / scale_nbins
-        ycov_1bin = np.diag(yerr_1bin)
+            yerr_1bin = e2 ** 2.0 + (e1 ** 2.0 - e2 ** 2.0) / scale_nbins
+            ycov_1bin = np.diag(yerr_1bin)
+        except IOError:
+            # a test dir, just create a dummy since it'll be thrown out.
+            ycov_1bin = np.eye(scale_nbins)
 
         # TODO sort?
-        return x[:num_used], y[:num_used], ycov_1bin
+
+        zeros_slice = np.where(np.any(x != 0.0, axis=1))[0]
+        return x[zeros_slice], y[zeros_slice], ycov_1bin
 
     def get_plot_data(self, em_params, training_dir, independent_variable=None, fixed_params={},
                       dependent_variable='r'):
@@ -271,7 +279,7 @@ class Emu(object):
         self.y = np.hstack(ys)
         fullcov = block_diag(*ycovs)
         yerr = np.sqrt(np.diag(fullcov))
-        self.yerr = np.hstack(*[yerr for i in xrange(self.x.shape[0]/fullcov.shape[0])])
+        self.yerr = np.hstack([yerr for i in xrange(self.x.shape[0]/fullcov.shape[0])])
 
         #compute the average covariance matrix
         avgcov = np.zeros((self.scale_bin_centers.shape[0], self.scale_bin_centers.shape[0]))
@@ -638,7 +646,8 @@ class Emu(object):
             try:
                 metric.append(ig[pname])
             except KeyError:
-                raise KeyError('Key %s was not in the metric.' % p.name)
+                #raise KeyError('Key %s was not in the metric.' % pname)
+                metric.append(1.0)
 
         metric = np.array(metric)
 
@@ -856,8 +865,11 @@ class Emu(object):
 
         x, y, _ = self.get_data(truth_dir, {}, self.fixed_params, self.independent_variable)
 
-        bins, _, _, _ = global_file_reader(truth_dir)
-        bin_centers = (bins[1:] + bins[:-1]) / 2
+        #bins, _, _, _ = global_file_reader(truth_dir)
+        #bin_centers = (bins[1:] + bins[:-1]) / 2
+
+        # Assume they're the same, which they should be. Note i could also just take them from the first n rows of x.
+        bin_centers = self.scale_bin_centers
         scale_nbins = len(bin_centers)
 
         y = y.reshape((-1, scale_nbins))
@@ -1272,6 +1284,11 @@ class ExtraCrispy(Emu):
         # now, parition the data as specified by the user
         # note that ppe does not include overlap
         points_per_expert = int(1.0 * self.x.shape[0] * self.overlap / self.experts)
+        
+        try:
+            assert points_per_expert > 0
+        except AssertionError:
+            raise AssertionError("You have too many experts!")
 
         _x = np.zeros((self.experts, points_per_expert, self.x.shape[1]))
         _y = np.zeros((self.experts, points_per_expert))
@@ -1286,6 +1303,7 @@ class ExtraCrispy(Emu):
                 _x[i, :, :] = np.roll(self.x[shuffled_idxs, :], i * points_per_expert / self.overlap, 0)[
                               :points_per_expert, :]
                 _y[i, :] = np.roll(self.y[shuffled_idxs], i * points_per_expert / self.overlap, 0)[:points_per_expert]
+
                 _yerr[i, :] = np.roll(self.yerr[shuffled_idxs], i * points_per_expert / self.overlap, 0)[
                               :points_per_expert]
 
@@ -1377,7 +1395,6 @@ class ExtraCrispy(Emu):
 
         for _x, _yerr in izip(self.x, self.yerr):
             emulator = george.GP(kernel)
-
             emulator.compute(_x, _yerr, sort=False, **hyperparams)  # NOTE I'm using a modified version of george!
             self._emulators.append(emulator)
 
