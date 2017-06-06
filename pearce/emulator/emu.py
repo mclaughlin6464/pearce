@@ -197,7 +197,7 @@ class Emu(object):
         ycov_1bin = np.diag(yerr_1bin)
 
         # TODO sort?
-        return x[:num_used], y[:num_used], block_diag(*[ycov_1bin for i in xrange(len(obs_files))])
+        return x[:num_used], y[:num_used], ycov_1bin
 
     def get_plot_data(self, em_params, training_dir, independent_variable=None, fixed_params={},
                       dependent_variable='r'):
@@ -253,7 +253,8 @@ class Emu(object):
         # hstack for 1-D
         self.y = np.hstack(ys)
         fullcov = block_diag(*ycovs)
-        self.yerr = np.sqrt(np.diag(fullcov))
+        yerr = np.sqrt(np.diag(fullcov))
+        self.yerr = np.hstack(*[yerr for i in xrange(self.x.shape[0]/fullcov.shape[0])])
 
         #compute the average covariance matrix
         avgcov = np.zeros((self.scale_bin_centers.shape[0], self.scale_bin_centers.shape[0]))
