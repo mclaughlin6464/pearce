@@ -186,11 +186,12 @@ class Emu(object):
             # a reshape may be faster.
             # TODO could I use Nonzero, or, better, keep track of the index I need??
             # Yeah isn't this just num_used?
-            #zeros_slice = np.any(x != 0.0, axis=1)
+            # No, cuz there can be gaps. Also it'd be num_used * n_scalebins
+            zeros_slice = np.all(x == 0.0, axis=1)
 
-            all_x.append(x[:num_used])
-            all_y.append(y[:num_used])
-            all_ycov.append(ycov[:num_used, :num_used])
+            all_x.append(x[zeros_slice])
+            all_y.append(y[zeros_slice])
+            all_ycov.append(ycov[zeros_slice, zeros_slice])
 
         self.scale_bin_centers = scale_bin_centers
 
