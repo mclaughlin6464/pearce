@@ -170,9 +170,10 @@ class Emu(object):
                 continue
 
             num_used += 1
-
+            #TODO this structure allows you to hold an HOD or cosmology fixed, which I like.
             split_obs_fname = obs_file.split('_')
-            if int(split_obs_fname[4]) != 0:
+            print split_obs_fname[4], split_obs_fname[6]
+            if int(split_obs_fname[4]) > 2 :
                 continue
             elif int(split_obs_fname[6]) > 20:
                 continue
