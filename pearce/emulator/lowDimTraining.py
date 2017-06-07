@@ -38,18 +38,21 @@ def low_dim_train(training_dir,emu_type = 'OriginalRecipe', emu_kwargs = {}):
     cosmologies = np.loadtxt(glob(path.join(training_dir, 'cosmology*.dat'))[0])
     HODs = np.loadtxt(glob(path.join(training_dir, 'HOD*.dat'))[0])
 
-    op_names = ['Msat', 'alpha', 'Mcut', 'sigma_logM', 'vbias_cen', 'vbias_sats', 'conc', 'v_field_amp']
-    op_names.extend(['Omega_m', 'Omega_b', 'sigma_8', 'h', 'n_s', 'N_eff', 'w_de'])
+    cosmo_params = ['Omega_m', 'Omega_b', 'sigma_8', 'h', 'n_s', 'N_eff', 'w_de']
+    HOD_params = ['Msat', 'alpha', 'Mcut', 'sigma_logM', 'vbias_cen', 'vbias_sats', 'conc', 'v_field_amp']
+
+    op_names = HOD_params[:]
+    op_names.extend(cosmo_params)
     min_max_vals = zip(np.r_[HODs.min(axis=0), cosmologies.min(axis=0)], \
                        np.r_[HODs.max(axis=0), cosmologies.max(axis=0)])
     ordered_params = OrderedDict(izip(op_names, min_max_vals))
+    ordered_params['r'] = (0,1)
 
     hyper_params = {p: [] for p in ordered_params}
     hyper_params['amp'] = [] #special case
     #unique values in the training data
-    unique_values = get_unique_values(training_dir)#{p.name:list(set(emu.x[:, idx])) for idx, p in enumerate(varied_params)}
-    #all unique combinations to train
-    param_combinations = combinations(varied_params, n_params)
+
+    #optimize HOD params by holding cosmo fixed. Then, do the opposite for cosmo and HOD.
 
     emu = None
     n_max = 20#

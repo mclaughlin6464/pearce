@@ -100,7 +100,9 @@ class Emu(object):
         input_params = {}
         input_params.update(em_params)
         # NOTE fixed_params will likely not be valid.
-        input_params.update(fixed_params)
+        # TODO fixed_params will no longer work when all datasets are necessarily LHC.
+        # Changing fixed_params to represent a fixed HOD or cosmology, which is still possible.
+        #input_params.update(fixed_params)
 
         # redshift is fixed.
         self.redshift_bin_centers = np.array([0.0])
@@ -110,14 +112,26 @@ class Emu(object):
         self.obs = obs
 
         # TODO it'd be nice if these had a standardized name so I don't have to glob them.
+        # TODO move this to a get orderd params func for this future versoin
         cosmologies = np.loadtxt(glob(path.join(data_dir, 'cosmology*.dat'))[0])
         HODs = np.loadtxt(glob(path.join(data_dir, 'HOD*.dat'))[0])
 
-        op_names = ['Msat', 'alpha', 'Mcut', 'sigma_logM','vbias_cen','vbias_sats','conc','v_field_amp']
-        op_names.extend(['Omega_m', 'Omega_b', 'sigma_8', 'h', 'n_s', 'N_eff', 'w_de'])
-        min_max_vals = zip(np.r_[HODs.min(axis = 0),cosmologies.min(axis=0)], \
-                           np.r_[HODs.max(axis=0), cosmologies.max(axis=0)])
-        ordered_params = OrderedDict(izip(op_names, min_max_vals))
+        cosmo_names = ['Omega_m', 'Omega_b', 'sigma_8', 'h', 'n_s', 'N_eff', 'w_de']
+        HOD_names = ['Msat', 'alpha', 'Mcut', 'sigma_logM','vbias_cen','vbias_sats','conc','v_field_amp']
+        if 'HOD' in self.fixed_params:
+            if 'cosmo' in self.fixed_params:
+                raise ValueError("Can't fix both HOD and cosmology!")
+            min_max_vals = zip(cosmologies.min(axis=0), cosmologies.max(axis=0))
+            ordered_params = OrderedDict(izip(cosmo_names, min_max_vals) )
+        elif 'cosmo' in self.fixed_params:
+            min_max_vals = zip(HODs.min(axis=0), HODs.max(axis=0))
+            ordered_params = OrderedDict(izip(HOD_names, min_max_vals))
+        else:
+            op_names = HOD_names[:]
+            op_names.extend(cosmo_names)
+            min_max_vals = zip(np.r_[HODs.min(axis = 0),cosmologies.min(axis=0)], \
+                               np.r_[HODs.max(axis=0), cosmologies.max(axis=0)])
+            ordered_params = OrderedDict(izip(op_names, min_max_vals))
 
         for key, val in ordered_params.iteritems():
             if key[0] == 'M': #masses have to have the log taken
@@ -169,20 +183,31 @@ class Emu(object):
 
             #TODO this structure allows you to hold an HOD or cosmology fixed, which I like.
             split_obs_fname = path.basename(obs_file).split('_')
-            #if int(split_obs_fname[3]) != 0 :
-            #    continue
-            #if int(split_obs_fname[5]) > 100:
-            #    continue
-            num_used += 1
-            cosmo = cosmologies[int(split_obs_fname[3]), :]
-            HOD = HODs[int(split_obs_fname[5]), :]
+            cosmo_no, HOD_no = int(split_obs_fname[3]), int(split_obs_fname[5])
 
-            params = np.r_[HOD, cosmo]
+            cosmo = cosmologies[cosmo_no, :]
+            HOD = HODs[HOD_no, :]
+
+            if 'cosmo' in self.fixed_params:
+                if cosmo_no != self.fixed_params['cosmo'] :
+                    continue
+                else:
+                    params =  HOD[:]
+            elif 'HOD' in self.fixed_params:
+                if HOD_no != self.fixed_params['HOD']:
+                    continue
+                else:
+                    params = cosmo[:]
+            else:
+                params = np.r_[HOD, cosmo]
+
+            num_used += 1
 
             # take the params from the file and put them in the right order and right place
             file_params = []
             for i, pname in enumerate(self._ordered_params):
-                if pname not in fixed_params and pname not in {'z', 'r'}:  # may need to be input_params
+                #if pname not in fixed_params and pname not in {'z', 'r'}:  # may need to be input_params
+                if pname not in {'z', 'r'}:
                     # note we have to repeat for each scale bin
                     if pname[0] == 'M': # take the log
                         file_params.append(np.ones((scale_nbins,))*np.log10(params[i]))
