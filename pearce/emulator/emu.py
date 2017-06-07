@@ -107,7 +107,6 @@ class Emu(object):
         z = 0.0
 
         obs = 'wp'
-        sampling_method = 'LHC'
         self.obs = obs
 
         # TODO it'd be nice if these had a standardized name so I don't have to glob them.
@@ -635,7 +634,48 @@ class Emu(object):
         :return:
             A george ExpSquredKernel object with this metric
         """
+        k1_metric = {'Mcut': 12.0649885,
+                     'Msat': 5.2580634000000002,
+                     'N_eff': 11.991300900000001,
+                     'Omega_b': 0.1071382,
+                     'Omega_m': 0.2995488,
+                     'alpha': 9.4893947000000001,
+                     'conc': 10.1501322,
+                     'h': 0.36731730000000001,
+                     'n_s': 0.18105769999999999,
+                     'sigma_8': 1.3474625,
+                     'sigma_logM': 4.3195398000000003,
+                     'v_field_amp': 7.1899616000000002,
+                     'vbias_cen': 6.6789208999999996,
+                     'vbias_sats': 10.5936158,
+                     'w_de': 6.3314954999999999}
 
+        k2_metric = {'Mcut': 4.0608120999999997,
+                     'Msat': 7.0800576,
+                     'N_eff': 1.7844888000000001,
+                     'Omega_b': 2.0703029000000002,
+                     'Omega_m': -12.2493157,
+                     'alpha': 3.0105699000000001,
+                     'conc': 13.8155106,
+                     'h': 2.3649110000000002,
+                     'n_s': 8.4473841000000007,
+                     'sigma_8': 1.1001152999999999,
+                     'sigma_logM': 8.3664898000000001,
+                     'v_field_amp': 10.032857999999999,
+                     'vbias_cen': 5.3009976999999999,
+                     'vbias_sats': 13.8155106,
+                     'w_de': 8.8358878000000001}
+
+        k3_param, k4_param, k5_param = 12.2973444, -10.1088292, -13.8155106
+
+        k1 = ExpSquaredKernel([k1_metric.get(p, 1.0) for p in self._ordered_params], ndim=self.emulator_ndim)
+        k2 = Matern32Kernel([k2_metric.get(p, 1.0) for p in self._ordered_params], ndim=self.emulator_ndim)
+        k3 = ConstantKernel(k3_param, ndim=self.emulator_ndim)
+        k4 = WhiteKernel(k4_param, ndim=self.emulator_ndim)
+        k5 = ConstantKernel(k5_param, ndim=self.emulator_ndim)
+
+        return k1 * k5 + k2 + k3 + k4
+        '''
         if not metric:
             ig = self._get_initial_guess(self.independent_variable)
         else:
@@ -654,6 +694,7 @@ class Emu(object):
         a = metric[0]
         # TODO other kernels?
         return a * ExpSquaredKernel(metric[1:], ndim=self.emulator_ndim)
+        '''
 
     ###Emulation and methods that Utilize it############################################################################
     def emulate(self, em_params, gp_errs=False):

@@ -3,8 +3,8 @@
 hyperparamters from lower dimensions of data.'''
 from os import path
 from glob import glob
-from itertools import combinations, product
-from collections import defaultdict
+from itertools import combinations, product, izip
+from collections import defaultdict, OrderedDict
 
 import numpy as np
 
@@ -12,7 +12,7 @@ from .emu import OriginalRecipe, ExtraCrispy
 from .ioHelpers import obs_file_reader
 
 #TODO does this need to be in a separate file here? Can I attach it to emu?
-def low_dim_train(training_dir, ordered_params, independent_variable, n_params = 3, emu_type = 'OriginalRecipe'):
+def low_dim_train(training_dir,emu_type = 'OriginalRecipe', emu_kwargs = {}):
     '''
     Train the hyperparameters in lower dimensions and average them together.
     :param training_dir:
@@ -28,15 +28,23 @@ def low_dim_train(training_dir, ordered_params, independent_variable, n_params =
     :return:
     '''
 
+    assert emu_type in {'OriginalRecipe', 'ExtraCrispy'}
+    if emu_type == 'ExtraCrispy':
+        if not emu_kwargs: # need to speciy default params
+            emu_kwargs = {'experts':10, 'overlap': 1}
     emu_obj = OriginalRecipe if emu_type == 'OriginalRecipe' else ExtraCrispy
 
-    #TODO change 'r' to something more general
-    if ordered_params[-1].name == 'r':
-        #we don' do combinations in 'r'
-        varied_params = ordered_params[:-1]
-    else:
-        varied_params = ordered_params[:]
-    hyper_params = {p.name: [] for p in ordered_params}
+    # TODO read this from training_dir
+    cosmologies = np.loadtxt(glob(path.join(training_dir, 'cosmology*.dat'))[0])
+    HODs = np.loadtxt(glob(path.join(training_dir, 'HOD*.dat'))[0])
+
+    op_names = ['Msat', 'alpha', 'Mcut', 'sigma_logM', 'vbias_cen', 'vbias_sats', 'conc', 'v_field_amp']
+    op_names.extend(['Omega_m', 'Omega_b', 'sigma_8', 'h', 'n_s', 'N_eff', 'w_de'])
+    min_max_vals = zip(np.r_[HODs.min(axis=0), cosmologies.min(axis=0)], \
+                       np.r_[HODs.max(axis=0), cosmologies.max(axis=0)])
+    ordered_params = OrderedDict(izip(op_names, min_max_vals))
+
+    hyper_params = {p: [] for p in ordered_params}
     hyper_params['amp'] = [] #special case
     #unique values in the training data
     unique_values = get_unique_values(training_dir)#{p.name:list(set(emu.x[:, idx])) for idx, p in enumerate(varied_params)}
