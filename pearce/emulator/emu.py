@@ -238,7 +238,7 @@ class Emu(object):
             e2 = np.loadtxt(path.join(data_dir, 'Cosmo_pure_err.dat'))
 
             yerr_1bin = e2 ** 2.0 + (e1 ** 2.0 - e2 ** 2.0) / scale_nbins
-            ycov_1bin = np.diag(yerr_1bin)
+            ycov_1bin = np.diag(yerr_1bin)/np.outer(np.mean(x.reshape((-1, scale_nbins)), axis = 0) * np.log(10))
         except IOError:
             # a test dir, just create a dummy since it'll be thrown out.
             ycov_1bin = np.eye(scale_nbins)
