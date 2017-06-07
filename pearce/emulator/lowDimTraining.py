@@ -38,22 +38,47 @@ def low_dim_train(training_dir,emu_type = 'OriginalRecipe', emu_kwargs = {}):
     cosmologies = np.loadtxt(glob(path.join(training_dir, 'cosmology*.dat'))[0])
     HODs = np.loadtxt(glob(path.join(training_dir, 'HOD*.dat'))[0])
 
-    op_names = ['Msat', 'alpha', 'Mcut', 'sigma_logM', 'vbias_cen', 'vbias_sats', 'conc', 'v_field_amp']
-    op_names.extend(['Omega_m', 'Omega_b', 'sigma_8', 'h', 'n_s', 'N_eff', 'w_de'])
+    cosmo_params = ['Omega_m', 'Omega_b', 'sigma_8', 'h', 'n_s', 'N_eff', 'w_de']
+    HOD_params = ['Msat', 'alpha', 'Mcut', 'sigma_logM', 'vbias_cen', 'vbias_sats', 'conc', 'v_field_amp']
+
+    op_names = HOD_params[:]
+    op_names.extend(cosmo_params)
     min_max_vals = zip(np.r_[HODs.min(axis=0), cosmologies.min(axis=0)], \
                        np.r_[HODs.max(axis=0), cosmologies.max(axis=0)])
     ordered_params = OrderedDict(izip(op_names, min_max_vals))
+    ordered_params['r'] = (0,1)
 
     hyper_params = {p: [] for p in ordered_params}
     hyper_params['amp'] = [] #special case
     #unique values in the training data
-    unique_values = get_unique_values(training_dir)#{p.name:list(set(emu.x[:, idx])) for idx, p in enumerate(varied_params)}
-    #all unique combinations to train
-    param_combinations = combinations(varied_params, n_params)
 
-    emu = None
-    n_max = 20#
+    #optimize HOD params by holding cosmo fixed. Then, do the opposite for cosmo and HOD.
 
+    for fixed_key,fixed_values, varied_values, varied_params  in izip( ['cosmo', 'HOD'],(cosmologies, HODs), \
+                                                                       (HODs, cosmologies),  (HOD_params, cosmo_params)):
+        for fno in xrange(fixed_values.shape[0]):
+
+            fixed_params = {fixed_key: fno}
+            emu = emu_obj(training_dir, fixed_params = fixed_params, **emu_kwargs)
+            success = emu.train()
+
+        if not success:
+            continue
+
+        for p, m in zip(varied_params, emu.metric[1:]):
+            hyper_params[p.name].append(m)
+        hyper_params['amp'].append(emu.metric[0])
+
+    for key in hyper_params:
+        hyper_params[key] = np.array(hyper_params[key])
+
+    for key, val in hyper_params.iteritems():
+        print key,val.shape,np.median(val), val.mean(), val.std()
+    print
+
+    return {key:val.mean() for key, val in hyper_params.iteritems()}
+
+    '''
     for pc in param_combinations:
         #for each combination, also train for each combination of unique values
         #we're being very thorough
@@ -100,7 +125,7 @@ def low_dim_train(training_dir,emu_type = 'OriginalRecipe', emu_kwargs = {}):
     print
 
     return {key:val.mean() for key, val in hyper_params.iteritems()}
-
+    '''
 def get_unique_values(training_dir):
     '''
     Returns a dictionary of sets containing the unique training values of each
