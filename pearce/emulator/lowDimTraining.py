@@ -58,8 +58,12 @@ def low_dim_train(training_dir,emu_type = 'OriginalRecipe', emu_kwargs = {}):
                                                                        (HODs, cosmologies),  (HOD_params, cosmo_params)):
         for fno in xrange(fixed_values.shape[0]):
 
-            fixed_params = {fixed_key: fno}
-            emu = emu_obj(training_dir, fixed_params = fixed_params, **emu_kwargs)
+            if 'fixed_params' in emu_kwargs:
+                emu_kwargs['fixed_params'].update({fixed_key: fno})
+                emu = emu_obj(training_dir,  **emu_kwargs)
+            else:
+                fixed_params = {fixed_key: fno}
+                emu = emu_obj(training_dir, fixed_params = fixed_params, **emu_kwargs)
             success = emu.train()
 
         if not success:
