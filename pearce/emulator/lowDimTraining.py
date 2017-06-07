@@ -54,9 +54,31 @@ def low_dim_train(training_dir,emu_type = 'OriginalRecipe', emu_kwargs = {}):
 
     #optimize HOD params by holding cosmo fixed. Then, do the opposite for cosmo and HOD.
 
-    emu = None
-    n_max = 20#
+    for fixed_key,fixed_values, varied_values, varied_params  in izip( ['cosmo', 'HOD'],(cosmologies, HODs), \
+                                                                       (HODs, cosmologies),  (HOD_params, cosmo_params)):
+        for fno in xrange(fixed_values.shape[0]):
 
+            fixed_params = {fixed_key: fno}
+            emu = emu_obj(training_dir, fixed_params = fixed_params, **emu_kwargs)
+            success = emu.train()
+
+        if not success:
+            continue
+
+        for p, m in zip(varied_params, emu.metric[1:]):
+            hyper_params[p.name].append(m)
+        hyper_params['amp'].append(emu.metric[0])
+
+    for key in hyper_params:
+        hyper_params[key] = np.array(hyper_params[key])
+
+    for key, val in hyper_params.iteritems():
+        print key,val.shape,np.median(val), val.mean(), val.std()
+    print
+
+    return {key:val.mean() for key, val in hyper_params.iteritems()}
+
+    '''
     for pc in param_combinations:
         #for each combination, also train for each combination of unique values
         #we're being very thorough
@@ -103,7 +125,7 @@ def low_dim_train(training_dir,emu_type = 'OriginalRecipe', emu_kwargs = {}):
     print
 
     return {key:val.mean() for key, val in hyper_params.iteritems()}
-
+    '''
 def get_unique_values(training_dir):
     '''
     Returns a dictionary of sets containing the unique training values of each
