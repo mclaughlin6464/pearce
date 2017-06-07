@@ -634,6 +634,7 @@ class Emu(object):
         :return:
             A george ExpSquredKernel object with this metric
         """
+
         k1_metric = {'Mcut': 12.0649885,
                      'Msat': 5.2580634000000002,
                      'N_eff': 11.991300900000001,
@@ -674,7 +675,7 @@ class Emu(object):
         k4 = WhiteKernel(k4_param, ndim=self.emulator_ndim)
         k5 = ConstantKernel(k5_param, ndim=self.emulator_ndim)
 
-        return k1 * k5 + k2 + k3 + k4
+        return k1# * k5 + k2 + k3 + k4
         '''
         if not metric:
             ig = self._get_initial_guess(self.independent_variable)
@@ -694,7 +695,7 @@ class Emu(object):
         a = metric[0]
         # TODO other kernels?
         return a * ExpSquaredKernel(metric[1:], ndim=self.emulator_ndim)
-        '''
+    '''
 
     ###Emulation and methods that Utilize it############################################################################
     def emulate(self, em_params, gp_errs=False):
