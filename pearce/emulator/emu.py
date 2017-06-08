@@ -912,7 +912,7 @@ class Emu(object):
 
         return np.diag(rms_err ** 2)
 
-    # only predicts wrt r. don't know if that's an issue.
+    # only predicts wrt r. don't know if that's an ihmssue.
     def goodness_of_fit(self, truth_dir, N=None, statistic='r2'):
         """
         Calculate the goodness of fit of an emulator as compared to some validation data.
