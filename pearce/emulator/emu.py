@@ -21,6 +21,7 @@ from scipy.spatial import KDTree
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 from sklearn.kernel_ridge import KernelRidge
 from sklearn.svm import SVR
+from sklearn.linear_model import LinearRegression
 
 from .ioHelpers import *
 
@@ -30,7 +31,7 @@ class Emu(object):
        controls all loading, manipulation, and emulation of data.'''
 
     __metaclass__ = ABCMeta
-    valid_methods = {'gp', 'svr', 'gbdt', 'rf', 'krr'}  # could add more, coud even check if they exist in sklearn
+    valid_methods = {'gp', 'svr', 'gbdt', 'rf', 'krr', 'linear'}  # could add more, coud even check if they exist in sklearn
 
     def __init__(self, training_dir, method='gp', hyperparams={}, fixed_params={}, independent_variable=None):
         '''
@@ -659,6 +660,7 @@ class Emu(object):
         :return:
             A george ExpSquredKernel object with this metric
         """
+        
 
         k1_metric = {'Mcut': 12.0649885,
                      'Msat': 5.2580634000000002,
@@ -675,7 +677,7 @@ class Emu(object):
                      'vbias_cen': 6.6789208999999996,
                      'vbias_sats': 10.5936158,
                      'w_de': 6.3314954999999999}
-
+        '''
         k2_metric = {'Mcut': 4.0608120999999997,
                      'Msat': 7.0800576,
                      'N_eff': 1.7844888000000001,
@@ -700,7 +702,8 @@ class Emu(object):
         k4 = WhiteKernel(k4_param, ndim=self.emulator_ndim)
         k5 = ConstantKernel(k5_param, ndim=self.emulator_ndim)
 
-        return k1# * k5 + k2 + k3 + k4
+        return k2# + k2 #k1 * k5+ k2 + k3 + k4
+
         '''
         if not metric:
             ig = self._get_initial_guess(self.independent_variable)
@@ -709,18 +712,18 @@ class Emu(object):
 
         metric = [ig['amp']]
         for pname in self._ordered_params:
-            try:
-                metric.append(ig[pname])
-            except KeyError:
+            metric.append(k1_metric.get(pname, 1.0))
+            #try:
+            #    metric.append(ig[pname])
+            #except KeyError:
                 #raise KeyError('Key %s was not in the metric.' % pname)
-                metric.append(1.0)
+            #    metric.append(1.0)
 
         metric = np.array(metric)
 
         a = metric[0]
         # TODO other kernels?
         return a * ExpSquaredKernel(metric[1:], ndim=self.emulator_ndim)
-    '''
 
     ###Emulation and methods that Utilize it############################################################################
     def emulate(self, em_params, gp_errs=False):
@@ -1205,7 +1208,7 @@ class OriginalRecipe(Emu):
         :return: None
         """
         skl_methods = {'gbdt': GradientBoostingRegressor, 'rf': RandomForestRegressor, \
-                       'svr': SVR, 'krr': KernelRidge}
+                'svr': SVR, 'krr': KernelRidge, 'linear':LinearRegression}
 
         if self.method in {'svr', 'krr'}:  # kernel based method
             metric = hyperparams['metric'] if 'metric' in hyperparams else {}
@@ -1278,7 +1281,7 @@ class OriginalRecipe(Emu):
 
         self._emulator.kernel[:] = results.x
         self._emulator.recompute()
-        # self.metric = np.exp(results.x)
+        self.metric = np.exp(results.x)
 
         return results.success
 
@@ -1567,5 +1570,7 @@ class ExtraCrispy(Emu):
         for emulator in self._emulators:
             emulator.kernel[:] = results.x
             emulator.recompute()
+
+        self.metric = np.exp(results.x)
 
         return results.success

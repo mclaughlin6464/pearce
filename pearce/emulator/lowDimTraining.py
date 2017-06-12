@@ -15,8 +15,7 @@ from .ioHelpers import obs_file_reader
 def low_dim_train(training_dir,emu_type = 'OriginalRecipe', emu_kwargs = {}):
     '''
     Train the hyperparameters in lower dimensions and average them together.
-    :param training_dir:
-        Directory with the training data, passed into the emu object
+    :param training_dir: Directory with the training data, passed into the emu object
     :param ordered_params:
         Ordered parameter list, passed into the emu object
     :param independent_variable:
@@ -47,40 +46,51 @@ def low_dim_train(training_dir,emu_type = 'OriginalRecipe', emu_kwargs = {}):
                        np.r_[HODs.max(axis=0), cosmologies.max(axis=0)])
     ordered_params = OrderedDict(izip(op_names, min_max_vals))
     ordered_params['r'] = (0,1)
+    HOD_params.append('r')
 
     hyper_params = {p: [] for p in ordered_params}
     hyper_params['amp'] = [] #special case
     #unique values in the training data
 
     #optimize HOD params by holding cosmo fixed. Then, do the opposite for cosmo and HOD.
+    if 'fixed_params' in emu_kwargs:
+        user_fp = emu_kwargs['fixed_params']
+        del emu_kwargs['fixed_params']
+    else:
+        user_fp = {}
+
+    sucesses = 0
 
     for fixed_key,fixed_values, varied_values, varied_params  in izip( ['cosmo', 'HOD'],(cosmologies, HODs), \
                                                                        (HODs, cosmologies),  (HOD_params, cosmo_params)):
         for fno in xrange(fixed_values.shape[0]):
 
+            fixed_params = {fixed_key: fno}
             if 'fixed_params' in emu_kwargs:
-                emu_kwargs['fixed_params'].update({fixed_key: fno})
-                emu = emu_obj(training_dir,  **emu_kwargs)
-            else:
-                fixed_params = {fixed_key: fno}
-                emu = emu_obj(training_dir, fixed_params = fixed_params, **emu_kwargs)
-            success = emu.train()
+                fixed_params.update(user_fp)
 
-        if not success:
-            continue
+            emu = emu_obj(training_dir, fixed_params = fixed_params, **emu_kwargs)
+            success = emu.train_metric()
 
-        for p, m in zip(varied_params, emu.metric[1:]):
-            hyper_params[p.name].append(m)
-        hyper_params['amp'].append(emu.metric[0])
+            if not success:
+                print 'Failed'
+                continue
+            sucesses+=1
+
+            for p, m in zip(varied_params, emu.metric[1:]):
+                hyper_params[p].append(m)
+            hyper_params['amp'].append(emu.metric[0])
 
     for key in hyper_params:
         hyper_params[key] = np.array(hyper_params[key])
 
+    print 'Sucesses: %d'%sucesses
     for key, val in hyper_params.iteritems():
         print key,val.shape,np.median(val), val.mean(), val.std()
     print
 
-    return {key:val.mean() for key, val in hyper_params.iteritems()}
+    #return {key:val.mean() for key, val in hyper_params.iteritems()}
+    return hyper_params
 
     '''
     for pc in param_combinations:
