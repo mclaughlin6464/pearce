@@ -85,9 +85,10 @@ class Emu(object):
             Parameters to hold fixed. Only available if data in data_dir is a full hypercube, not a latin hypercube
         :param independent_variable:
             Independant variable to emulate. Options are xi, r2xi, and bias (eventually)..
-        :return: x, y, ycov, all numpy arrays.
+        :return: x, y, yerr, ycov, all numpy arrays.
                  x is (n_data_points, n_params)
-                 y is (n_data_points, ), and ycov (n_data_points, n_data_points)
+                 y is (n_data_points, ), yerr is (n_data_points)
+                 and ycov (n_scale_bins, n_scale_bins), the average covariance matrix
         """
 
         input_params = {}
@@ -179,7 +180,7 @@ class Emu(object):
                 x[idx * scale_nbins:(idx + 1) * scale_nbins, :] = np.stack(file_params).T
 
                 y[idx * scale_nbins:(idx + 1) * scale_nbins], _cov = self._iv_transform(independent_variable, obs, cov)
-                yerr[idx * scale_nbins:(idx + 1) * scale_nbins] = np.sqrt(np.diag(_cov)
+                yerr[idx * scale_nbins:(idx + 1) * scale_nbins] = np.sqrt(np.diag(_cov))
                 ycov += _cov
 
             # remove rows that were skipped due to the fixed thing
@@ -204,7 +205,7 @@ class Emu(object):
             self._ordered_params['z'] = (np.min(self.redshift_bin_centers), np.max(self.redshift_bin_centers))
 
         # TODO sort?
-        return np.vstack(all_x), np.hstack(all_y), np.hstack(all_yerr), block_diag(*all_ycov)
+        return np.vstack(all_x), np.hstack(all_y), np.hstack(all_yerr), np.vstack(all_ycov).mean(axis = 0)
 
     def get_plot_data(self, em_params, training_dir, independent_variable=None, fixed_params={},
                       dependent_variable='r'):
@@ -224,9 +225,7 @@ class Emu(object):
         :return: log_r (or z), y, yerr for the independent variable at the points specified by fixed nad em params.
         """
 
-        x, y, ycov = self.get_data(training_dir, em_params, fixed_params, independent_variable)
-
-        yerr = np.sqrt(np.diag(ycov))
+        x, y,yerr, _ = self.get_data(training_dir, em_params, fixed_params, independent_variable)
 
         sort_idxs = self._sort_params(x, argsort=True)
 
@@ -249,9 +248,9 @@ class Emu(object):
         if type(training_dir) is not list:
             training_dir = [training_dir]
 
-        xs, ys, ycovs = [], [], []
+        xs, ys,yerrs, ycovs = [], [], [], []
         for td in training_dir:
-            x, y, ycov = self.get_data(td, {}, self.fixed_params, self.independent_variable)
+            x, y,yerr, ycov = self.get_data(td, {}, self.fixed_params, self.independent_variable)
             xs.append(x)
             ys.append(y)
             ycovs.append(ycov)
@@ -259,16 +258,8 @@ class Emu(object):
         self.x = np.vstack(xs)
         # hstack for 1-D
         self.y = np.hstack(ys)
-        fullcov = block_diag(*ycovs)
-        self.yerr = np.sqrt(np.diag(fullcov))
-
-        #compute the average covariance matrix
-        avgcov = np.zeros((self.scale_bin_centers.shape[0], self.scale_bin_centers.shape[0]))
-        N = fullcov.shape[0]/self.scale_bin_centers.shape[0]
-        for i in xrange(N):
-            avgcov+=fullcov[i*self.scale_bin_centers.shape[0]: (i+1)*self.scale_bin_centers.shape[0], i*self.scale_bin_centers.shape[0]: (i+1)*self.scale_bin_centers.shape[0] ]
-
-        self.ycov = avgcov/N
+        self.yerr = yerr
+        self.ycov = np.vstack(ycovs).mean(axis = 0)
 
         # for now, no mean subtraction
         self.y_hat = np.zeros(self.y.shape[1]) if len(y.shape) > 1 else 0  # self.y.mean(axis = 0)
@@ -840,7 +831,7 @@ class Emu(object):
         if N is not None:
             assert N > 0 and int(N) == N
 
-        x, y, _ = self.get_data(truth_dir, {}, self.fixed_params, self.independent_variable)
+        x, y, _, _ = self.get_data(truth_dir, {}, self.fixed_params, self.independent_variable)
 
         bins, _, _, _ = global_file_reader(truth_dir)
         bin_centers = (bins[1:] + bins[:-1]) / 2
