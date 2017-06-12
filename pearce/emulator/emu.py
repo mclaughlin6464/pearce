@@ -189,7 +189,7 @@ class Emu(object):
             # TODO could I use Nonzero, or, better, keep track of the index I need??
             # Yeah isn't this just num_used?
             # No, cuz there can be gaps. Also it'd be num_used * n_scalebins
-            zeros_slice = np.all(x == 0.0, axis=1)
+            zeros_slice = np.any(x != 0.0, axis=1)
 
             all_x.append(x[zeros_slice])
             all_y.append(y[zeros_slice])
@@ -831,9 +831,11 @@ class Emu(object):
         if N is not None:
             assert N > 0 and int(N) == N
 
+        sub_dirs, _  = self._get_z_subdirs(truth_dir, fixed_zs=self.fixed_params.get('z', None))
+
         x, y, _, _ = self.get_data(truth_dir, {}, self.fixed_params, self.independent_variable)
 
-        bins, _, _, _ = global_file_reader(truth_dir)
+        bins, _, _, _ = global_file_reader(sub_dirs[0])
         bin_centers = (bins[1:] + bins[:-1]) / 2
         scale_nbins = len(bin_centers)
 
