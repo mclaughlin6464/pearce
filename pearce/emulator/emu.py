@@ -99,7 +99,7 @@ class Emu(object):
         # we store redshifts, not scale factors
         self.redshift_bin_centers = 1 / sub_dirs_as - 1
 
-        all_x, all_y, all_ycov = [], [], []
+        all_x, all_y, all_yerr, all_ycov = [], [], [], []
 
         for sub_dir, z in izip(sub_dirs, self.redshift_bin_centers):
 
@@ -142,7 +142,8 @@ class Emu(object):
             ndim = len(self._ordered_params)
             x = np.zeros((npoints, ndim))
             y = np.zeros((npoints,))
-            ycov = np.zeros((npoints, npoints))
+            yerr = np.zeros((npoints,))
+            ycov = np.zeros((scale_nbins, scale_nbins))
 
             warned = False
             num_skipped = 0
@@ -178,8 +179,8 @@ class Emu(object):
                 x[idx * scale_nbins:(idx + 1) * scale_nbins, :] = np.stack(file_params).T
 
                 y[idx * scale_nbins:(idx + 1) * scale_nbins], _cov = self._iv_transform(independent_variable, obs, cov)
-
-                ycov[idx * scale_nbins:(idx + 1) * scale_nbins, idx * scale_nbins:(idx + 1) * scale_nbins] = _cov
+                yerr[idx * scale_nbins:(idx + 1) * scale_nbins] = np.sqrt(np.diag(_cov)
+                ycov += _cov
 
             # remove rows that were skipped due to the fixed thing
             # NOTE: HACK
@@ -191,7 +192,8 @@ class Emu(object):
 
             all_x.append(x[zeros_slice])
             all_y.append(y[zeros_slice])
-            all_ycov.append(ycov[zeros_slice, zeros_slice])
+            all_yerr.append(yerr[zeros_slice])
+            all_ycov.append(ycov/num_used) #add the average
 
         self.scale_bin_centers = scale_bin_centers
 
@@ -202,7 +204,7 @@ class Emu(object):
             self._ordered_params['z'] = (np.min(self.redshift_bin_centers), np.max(self.redshift_bin_centers))
 
         # TODO sort?
-        return np.vstack(all_x), np.hstack(all_y), block_diag(*all_ycov)
+        return np.vstack(all_x), np.hstack(all_y), np.hstack(all_yerr), block_diag(*all_ycov)
 
     def get_plot_data(self, em_params, training_dir, independent_variable=None, fixed_params={},
                       dependent_variable='r'):
@@ -264,7 +266,7 @@ class Emu(object):
         avgcov = np.zeros((self.scale_bin_centers.shape[0], self.scale_bin_centers.shape[0]))
         N = fullcov.shape[0]/self.scale_bin_centers.shape[0]
         for i in xrange(N):
-            avgcov+=fullcov[i*self.scale_bin_centers.shape[0]: (i+1)*self.scale_bin_centers.shape[0]]
+            avgcov+=fullcov[i*self.scale_bin_centers.shape[0]: (i+1)*self.scale_bin_centers.shape[0], i*self.scale_bin_centers.shape[0]: (i+1)*self.scale_bin_centers.shape[0] ]
 
         self.ycov = avgcov/N
 
@@ -490,7 +492,7 @@ class Emu(object):
             y = np.log10(obs)
             # Approximately true, may need to revisit
             # yerr[idx * NBINS:(idx + 1) * NBINS] = np.sqrt(np.diag(cov)) / (xi * np.log(10))
-            y_cov = cov/np.outer(obs * np.log(10))
+            y_cov = cov/np.outer(obs * np.log(10), obs*np.log(10))
         elif independent_variable == 'r2':  # r2xi
             y = obs * self.scale_bin_centers * self.scale_bin_centers
             y_cov = cov* np.outer(self.scale_bin_centers, self.scale_bin_centers)
