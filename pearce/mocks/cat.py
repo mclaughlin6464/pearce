@@ -315,7 +315,7 @@ class Cat(object):
 
             reader.halo_table['halo_local_density_%d'%(int(r))] = densities[:, r_idx]
 
-    def load(self, scale_factor, HOD='redMagic', tol=0.05):
+    def load(self, scale_factor, HOD='redMagic', tol=0.05, hod_kwargs = {}):
         '''
         Load both a halocat and a model to prepare for population and calculation.
         :param scale_factor:
@@ -328,7 +328,7 @@ class Cat(object):
         if a is None:
             raise ValueError('Scale factor %.3f not within given tolerance.' % scale_factor)
         self.load_catalog(a, tol, check_sf=False)
-        self.load_model(a, HOD, check_sf=False)
+        self.load_model(a, HOD, check_sf=False, hod_kwargs=hod_kwargs)
 
     def load_catalog(self, scale_factor, tol=0.05, check_sf=True):
         '''
@@ -353,7 +353,7 @@ class Cat(object):
                                          version_name=self.version_name, redshift=z)
 
     # TODO not sure if assembias should be boolean, or keep it as separate HODs?
-    def load_model(self, scale_factor, HOD='redMagic', check_sf=True):
+    def load_model(self, scale_factor, HOD='redMagic', check_sf=True, hod_kwargs={}):
         '''
         Load an HOD model. Not reccomended to be used separately from the load function. It
         is possible for the scale_factor of the model and catalog to be different.
@@ -363,6 +363,8 @@ class Cat(object):
             HOD model to load. Currently available options are redMagic, stepFunc, and the halotools defatuls.
         :param check_sf:
             Boolean whether or not to use the passed in scale_factor blindly. Default is false.
+        :param hod_kwargs:
+            Kwargs to pass into the HOD model being loaded. Default is none.
         :return: None
         '''
 
@@ -374,45 +376,30 @@ class Cat(object):
             a = scale_factor  # YOLO
         z = 1.0 / a - 1
 
-        assert HOD in {'redMagic', 'hsabRedMagic','abRedMagic', 'stepFunc', 'zheng07', 'leauthaud11', 'tinker13', 'hearin15'}
-
-        # TODO could compactify this a bit, esp if I add anymore custom models.
-        if HOD == 'redMagic':
-            cens_occ = RedMagicCens(redshift=z)
-            sats_occ = RedMagicSats(redshift=z, cenocc_model=cens_occ)
-
-            self.model = HodModelFactory(
-                centrals_occupation=cens_occ,
-                centrals_profile=TrivialPhaseSpace(redshift=z),
-                satellites_occupation=sats_occ,
-                satellites_profile=NFWPhaseSpace(redshift=z))
-
-        elif HOD == 'abRedMagic':
-
-            cens_occ = AssembiasRedMagicCens(redshift=z)
-            sats_occ = AssembiasRedMagicSats(redshift=z, cenocc_model=cens_occ)
-
-            self.model = HodModelFactory(
-                centrals_occupation=cens_occ,
-                centrals_profile=TrivialPhaseSpace(redshift=z),
-                satellites_occupation=sats_occ,
-                satellites_profile=NFWPhaseSpace(redshift=z))
-
-        elif HOD == 'hsabRedMagic':
-
-            cens_occ = HSAssembiasRedMagicCens(redshift=z)
-            sats_occ = HSAssembiasRedMagicSats(redshift=z, cenocc_model=cens_occ)
-
-            self.model = HodModelFactory(
-                centrals_occupation=cens_occ,
-                centrals_profile=TrivialPhaseSpace(redshift=z),
-                satellites_occupation=sats_occ,
-                satellites_profile=NFWPhaseSpace(redshift=z))
+        assert HOD in {'redMagic', 'hsabRedMagic','abRedMagic', 'reddick14','stepFunc',\
+                       'zheng07', 'leauthaud11', 'tinker13', 'hearin15',}
 
 
-        elif HOD == 'stepFunc':
-            cens_occ = StepFuncCens(redshift=z)
-            sats_occ = StepFuncSats(redshift=z)
+        if HOD in {'redMagic', 'hsabRedMagic','abRedMagic', 'reddick14','stepFunc'}: #my custom ones:
+            if HOD == 'redMagic':
+                cens_occ = RedMagicCens(redshift=z, **hod_kwargs)
+                sats_occ = RedMagicSats(redshift=z, cenocc_model=cens_occ, **hod_kwargs)
+
+            elif HOD == 'abRedMagic':
+                cens_occ = AssembiasRedMagicCens(redshift=z, **hod_kwargs)
+                sats_occ = AssembiasRedMagicSats(redshift=z, cenocc_model=cens_occ, **hod_kwargs)
+
+            elif HOD == 'hsabRedMagic':
+                cens_occ = HSAssembiasRedMagicCens(redshift=z, **hod_kwargs)
+                sats_occ = HSAssembiasRedMagicSats(redshift=z, cenocc_model=cens_occ, **hod_kwargs)
+
+            elif HOD == 'reddick14':
+                cens_occ = Reddick14Cens(redshift=z, **hod_kwargs)
+                sats_occ = Reddick14Sats(redshift=z, **hod_kwargs) # no modulation
+
+            elif HOD == 'stepFunc':
+                cens_occ = StepFuncCens(redshift=z, **hod_kwargs)
+                sats_occ = StepFuncSats(redshift=z, **hod_kwargs)
 
             self.model = HodModelFactory(
                 centrals_occupation=cens_occ,
@@ -421,7 +408,7 @@ class Cat(object):
                 satellites_profile=NFWPhaseSpace(redshift=z))
 
         else:
-            self.model = PrebuiltHodModelFactory(HOD)
+            self.model = PrebuiltHodModelFactory(HOD, **hod_kwargs)
 
     def get_assembias_key(self, gal_type):
         '''
