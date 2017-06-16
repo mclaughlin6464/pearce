@@ -9,6 +9,7 @@ from halotools.empirical_models import HeavisideAssembias
 from halotools.custom_exceptions import HalotoolsError
 from continuousAssembias import ContinuousAssembias
 
+
 # TODO change this to use get_published_parameters and add these params in.
 class RedMagicCens(Zheng07Cens):
     '''Tweak of the Zheng model to add a new parameter, f_c, denoting a modified central fraction.'''
@@ -25,8 +26,10 @@ class RedMagicCens(Zheng07Cens):
         '''See Zheng07 for details.'''
         return self.param_dict['f_c'] * super(RedMagicCens, self).mean_occupation(**kwargs)
 
+
 class AssembiasRedMagicCens(RedMagicCens, ContinuousAssembias):
     '''RedMagic Cens with Continuous Assembly bias'''
+
     def __init__(self, **kwargs):
         '''See halotools docs for more info. '''
         super(AssembiasRedMagicCens, self).__init__(**kwargs)
@@ -36,14 +39,17 @@ class AssembiasRedMagicCens(RedMagicCens, ContinuousAssembias):
             sec_haloprop_key = kwargs['sec_haloprop_key']
 
         ContinuousAssembias.__init__(self,
-            lower_assembias_bound=self._lower_occupation_bound,
-            upper_assembias_bound=self._upper_occupation_bound,
-            method_name_to_decorate='mean_occupation', 
-            sec_haloprop_key = sec_haloprop_key, #TODO I'm hardcoding this in. Need error handling and also an option to change!  
-            **kwargs)
+                                     lower_assembias_bound=self._lower_occupation_bound,
+                                     upper_assembias_bound=self._upper_occupation_bound,
+                                     method_name_to_decorate='mean_occupation',
+                                     sec_haloprop_key=sec_haloprop_key,
+                                     # TODO I'm hardcoding this in. Need error handling and also an option to change!
+                                     **kwargs)
+
 
 class HSAssembiasRedMagicCens(RedMagicCens, HeavisideAssembias):
     '''RedMagic Cens with Heaviside Assembly bias'''
+
     def __init__(self, **kwargs):
         '''See halotools docs for more info. '''
         super(HSAssembiasRedMagicCens, self).__init__(**kwargs)
@@ -53,11 +59,13 @@ class HSAssembiasRedMagicCens(RedMagicCens, HeavisideAssembias):
             sec_haloprop_key = kwargs['sec_haloprop_key']
 
         HeavisideAssembias.__init__(self,
-            lower_assembias_bound=self._lower_occupation_bound,
-            upper_assembias_bound=self._upper_occupation_bound,
-            method_name_to_decorate='mean_occupation', 
-            sec_haloprop_key = sec_haloprop_key, #TODO I'm hardcoding this in. Need error handling and also an option to change!  
-            **kwargs)
+                                    lower_assembias_bound=self._lower_occupation_bound,
+                                    upper_assembias_bound=self._upper_occupation_bound,
+                                    method_name_to_decorate='mean_occupation',
+                                    sec_haloprop_key=sec_haloprop_key,
+                                    # TODO I'm hardcoding this in. Need error handling and also an option to change!
+                                    **kwargs)
+
 
 class RedMagicSats(Zheng07Sats):
     '''Tweak of Zheng model to add a new parameter, f_c, denoting a modified central fraction.'''
@@ -79,9 +87,11 @@ class RedMagicSats(Zheng07Sats):
 
         return super(RedMagicSats, self).mean_occupation(**kwargs) / f_c
 
+
 class AssembiasRedMagicSats(RedMagicSats, ContinuousAssembias):
     '''RedMagic Cens with Assembly bias'''
-    def __init__(self, cenocc_model,**kwargs):
+
+    def __init__(self, cenocc_model, **kwargs):
         '''See halotools docs for more info. '''
         super(AssembiasRedMagicSats, self).__init__(cenocc_model, **kwargs)
         sec_haloprop_key = 'halo_nfw_conc'
@@ -89,14 +99,17 @@ class AssembiasRedMagicSats(RedMagicSats, ContinuousAssembias):
             sec_haloprop_key = kwargs['sec_haloprop_key']
 
         ContinuousAssembias.__init__(self,
-            lower_assembias_bound=self._lower_occupation_bound,
-            upper_assembias_bound=self._upper_occupation_bound,
-            method_name_to_decorate='mean_occupation',  
-            sec_haloprop_key = sec_haloprop_key, #TODO I'm hardcoding this in. Need error handling and also an option to change!  
-            **kwargs)
+                                     lower_assembias_bound=self._lower_occupation_bound,
+                                     upper_assembias_bound=self._upper_occupation_bound,
+                                     method_name_to_decorate='mean_occupation',
+                                     sec_haloprop_key=sec_haloprop_key,
+                                     # TODO I'm hardcoding this in. Need error handling and also an option to change!
+                                     **kwargs)
+
 
 class HSAssembiasRedMagicSats(RedMagicSats, HeavisideAssembias):
     '''RedMagic Cens with Assembly bias'''
+
     def __init__(self, cenocc_model, **kwargs):
         '''See halotools docs for more info. '''
         super(HSAssembiasRedMagicSats, self).__init__(cenocc_model, **kwargs)
@@ -105,11 +118,13 @@ class HSAssembiasRedMagicSats(RedMagicSats, HeavisideAssembias):
             sec_haloprop_key = kwargs['sec_haloprop_key']
 
         HeavisideAssembias.__init__(self,
-            lower_assembias_bound=self._lower_occupation_bound,
-            upper_assembias_bound=self._upper_occupation_bound,
-            method_name_to_decorate='mean_occupation',  
-            sec_haloprop_key = sec_haloprop_key, #TODO I'm hardcoding this in. Need error handling and also an option to change!  
-            **kwargs)
+                                    lower_assembias_bound=self._lower_occupation_bound,
+                                    upper_assembias_bound=self._upper_occupation_bound,
+                                    method_name_to_decorate='mean_occupation',
+                                    sec_haloprop_key=sec_haloprop_key,
+                                    # TODO I'm hardcoding this in. Need error handling and also an option to change!
+                                    **kwargs)
+
 
 class Reddick14Cens(OccupationComponent):
     r""" ``Erf`` function model for the occupation statistics of central galaxies,
@@ -144,9 +159,9 @@ class Reddick14Cens(OccupationComponent):
         # Call the super class constructor, which binds all the
         # arguments to the instance.
         super(Reddick14Cens, self).__init__(gal_type='centrals',
-                                          threshold=threshold, upper_occupation_bound=upper_occupation_bound,
-                                          prim_haloprop_key=prim_haloprop_key,
-                                          **kwargs)
+                                            threshold=threshold, upper_occupation_bound=upper_occupation_bound,
+                                            prim_haloprop_key=prim_haloprop_key,
+                                            **kwargs)
 
         self.param_dict = self.get_published_parameters()
 
@@ -214,8 +229,8 @@ class Reddick14Cens(OccupationComponent):
 
         logM = np.log10(mass)
         mean_ncen = 0.5 * (1.0 + erf(
-            (logM - self.param_dict['logMmin']) / self.param_dict['sigma_logM']))*\
-            self.param_dict['f_cen']*(logM-self.param_dict['logMlin'])
+            (logM - self.param_dict['logMmin']) / self.param_dict['sigma_logM'])) * \
+                    self.param_dict['f_cen'] * (logM - self.param_dict['logMlin'])
 
         return mean_ncen
 
@@ -241,9 +256,10 @@ class Reddick14Cens(OccupationComponent):
 
         """
         return {'logMmin': 12.9,
-                'sigma_logM':0.75,
+                'sigma_logM': 0.75,
                 'f_cen': 0.05,
-                'logMlin':14.0}
+                'logMlin': 14.0}
+
 
 class Reddick14Sats(OccupationComponent):
     r""" Power law model for the occupation statistics of satellite galaxies,
@@ -254,9 +270,9 @@ class Reddick14Sats(OccupationComponent):
     """
 
     def __init__(self,
-            threshold=model_defaults.default_luminosity_threshold,
-            prim_haloprop_key=model_defaults.prim_haloprop_key,
-            modulate_with_cenocc=False, cenocc_model=None, **kwargs):
+                 threshold=model_defaults.default_luminosity_threshold,
+                 prim_haloprop_key=model_defaults.prim_haloprop_key,
+                 modulate_with_cenocc=False, cenocc_model=None, **kwargs):
         r"""
         Parameters
         ----------
@@ -339,10 +355,10 @@ class Reddick14Sats(OccupationComponent):
         else:
             if modulate_with_cenocc is False:
                 msg = ("You chose to input a ``cenocc_model``, but you set the \n"
-                    "``modulate_with_cenocc`` keyword to False, so your "
-                    "``cenocc_model`` will have no impact on the model's behavior.\n"
-                    "Be sure this is what you intend before proceeding.\n"
-                    "Refer to the Zheng et al. (2007) composite model tutorial for details.\n")
+                       "``modulate_with_cenocc`` keyword to False, so your "
+                       "``cenocc_model`` will have no impact on the model's behavior.\n"
+                       "Be sure this is what you intend before proceeding.\n"
+                       "Refer to the Zheng et al. (2007) composite model tutorial for details.\n")
                 warnings.warn(msg)
 
         self.modulate_with_cenocc = modulate_with_cenocc
@@ -351,7 +367,7 @@ class Reddick14Sats(OccupationComponent):
                 assert isinstance(cenocc_model, OccupationComponent)
             except AssertionError:
                 msg = ("The input ``cenocc_model`` must be an instance of \n"
-                    "``OccupationComponent`` or one of its sub-classes.\n")
+                       "``OccupationComponent`` or one of its sub-classes.\n")
                 raise HalotoolsError(msg)
 
             self.central_occupation_model = cenocc_model
@@ -361,117 +377,116 @@ class Reddick14Sats(OccupationComponent):
         self.publications = ['arXiv:0308519']
 
     def mean_occupation(self, **kwargs):
-            r"""Expected number of satellite galaxies in a halo of mass logM.
-            See Equation 5 of arXiv:0308519.
+        r"""Expected number of satellite galaxies in a halo of mass logM.
+        See Equation 5 of arXiv:0308519.
 
-            Parameters
-            ----------
-            prim_haloprop : array, optional
-                Array storing a mass-like variable that governs the occupation statistics.
-                If ``prim_haloprop`` is not passed, then ``table``
-                keyword arguments must be passed.
+        Parameters
+        ----------
+        prim_haloprop : array, optional
+            Array storing a mass-like variable that governs the occupation statistics.
+            If ``prim_haloprop`` is not passed, then ``table``
+            keyword arguments must be passed.
 
-            table : object, optional
-                Data table storing halo catalog.
-                If ``table`` is not passed, then ``prim_haloprop``
-                keyword arguments must be passed.
+        table : object, optional
+            Data table storing halo catalog.
+            If ``table`` is not passed, then ``prim_haloprop``
+            keyword arguments must be passed.
 
-            Returns
-            -------
-            mean_nsat : float or array
-                Mean number of satellite galaxies in a host halo of the specified mass.
+        Returns
+        -------
+        mean_nsat : float or array
+            Mean number of satellite galaxies in a host halo of the specified mass.
 
-            :math:`\langle N_{\mathrm{sat}} \rangle_{M} = \left(\frac{M_{vir}}{M_1}\right)^{\alpha}\exp(\frac{-M_{cut}}{M_{vir}}).
- \langle N_{\mathrm{cen}} \rangle_{M}`
+        :math:`\langle N_{\mathrm{sat}} \rangle_{M} = \left(\frac{M_{vir}}{M_1}\right)^{\alpha}\exp(\frac{-M_{cut}}{M_{vir}}).
+\langle N_{\mathrm{cen}} \rangle_{M}`
 
-            or
+        or
 
-            :math:`\langle N_{\mathrm{sat}} \rangle_{M} = \left(\frac{M_{vir}}{M_1}\right)^{\alpha}\exp(\frac{-M_{cut}}{M_{vir}}).
+        :math:`\langle N_{\mathrm{sat}} \rangle_{M} = \left(\frac{M_{vir}}{M_1}\right)^{\alpha}\exp(\frac{-M_{cut}}{M_{vir}}).
 
 
-            depending on whether a central model was passed to the constructor.
+        depending on whether a central model was passed to the constructor.
 
-            Examples
-            --------
-            The `mean_occupation` method of all OccupationComponent instances supports
-            two different options for arguments. The first option is to directly
-            pass the array of the primary halo property:
+        Examples
+        --------
+        The `mean_occupation` method of all OccupationComponent instances supports
+        two different options for arguments. The first option is to directly
+        pass the array of the primary halo property:
 
-            >>> sat_model = Reddick14Sats()
-            >>> testmass = np.logspace(10, 15, num=50)
-            >>> mean_nsat = sat_model.mean_occupation(prim_haloprop = testmass)
+        >>> sat_model = Reddick14Sats()
+        >>> testmass = np.logspace(10, 15, num=50)
+        >>> mean_nsat = sat_model.mean_occupation(prim_haloprop = testmass)
 
-            The second option is to pass `mean_occupation` a full halo catalog.
-            In this case, the array storing the primary halo property will be selected
-            by accessing the ``sat_model.prim_haloprop_key`` column of the input halo catalog.
-            For illustration purposes, we'll use a fake halo catalog rather than a
-            (much larger) full one:
+        The second option is to pass `mean_occupation` a full halo catalog.
+        In this case, the array storing the primary halo property will be selected
+        by accessing the ``sat_model.prim_haloprop_key`` column of the input halo catalog.
+        For illustration purposes, we'll use a fake halo catalog rather than a
+        (much larger) full one:
 
-            >>> from halotools.sim_manager import FakeSim
-            >>> fake_sim = FakeSim()
-            >>> mean_nsat = sat_model.mean_occupation(table=fake_sim.halo_table)
+        >>> from halotools.sim_manager import FakeSim
+        >>> fake_sim = FakeSim()
+        >>> mean_nsat = sat_model.mean_occupation(table=fake_sim.halo_table)
 
-            """
+        """
 
-            if self.modulate_with_cenocc:
-                for key, value in self.param_dict.items():
-                    if key in self.central_occupation_model.param_dict:
-                        self.central_occupation_model.param_dict[key] = value
+        if self.modulate_with_cenocc:
+            for key, value in self.param_dict.items():
+                if key in self.central_occupation_model.param_dict:
+                    self.central_occupation_model.param_dict[key] = value
 
-            # Retrieve the array storing the mass-like variable
-            if 'table' in list(kwargs.keys()):
-                mass = kwargs['table'][self.prim_haloprop_key]
-            elif 'prim_haloprop' in list(kwargs.keys()):
-                mass = np.atleast_1d(kwargs['prim_haloprop'])
-            else:
-                msg = ("\nYou must pass either a ``table`` or ``prim_haloprop`` argument \n"
-                    "to the ``mean_occupation`` function of the ``Zheng07Sats`` class.\n")
-                raise HalotoolsError(msg)
+        # Retrieve the array storing the mass-like variable
+        if 'table' in list(kwargs.keys()):
+            mass = kwargs['table'][self.prim_haloprop_key]
+        elif 'prim_haloprop' in list(kwargs.keys()):
+            mass = np.atleast_1d(kwargs['prim_haloprop'])
+        else:
+            msg = ("\nYou must pass either a ``table`` or ``prim_haloprop`` argument \n"
+                   "to the ``mean_occupation`` function of the ``Zheng07Sats`` class.\n")
+            raise HalotoolsError(msg)
 
-            Mcut = 10.**self.param_dict['logMcut']
-            M1 = 10.**self.param_dict['logM1']
+        Mcut = 10. ** self.param_dict['logMcut']
+        M1 = 10. ** self.param_dict['logM1']
 
-            # Call to np.where raises a harmless RuntimeWarning exception if
-            # there are entries of input logM for which mean_nsat = 0
-            # Evaluating mean_nsat using the catch_warnings context manager
-            # suppresses this warning
+        # Call to np.where raises a harmless RuntimeWarning exception if
+        # there are entries of input logM for which mean_nsat = 0
+        # Evaluating mean_nsat using the catch_warnings context manager
+        # suppresses this warning
 
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore", RuntimeWarning)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
 
-                mean_nsat= (mass/M1)**self.param_dict['alpha']*np.exp(-Mcut/mass)
+            mean_nsat = (mass / M1) ** self.param_dict['alpha'] * np.exp(-Mcut / mass)
 
-            # If a central occupation model was passed to the constructor,
-            # multiply mean_nsat by an overall factor of mean_ncen
-            if self.modulate_with_cenocc:
-                mean_ncen = self.central_occupation_model.mean_occupation(**kwargs)
-                mean_nsat *= mean_ncen
+        # If a central occupation model was passed to the constructor,
+        # multiply mean_nsat by an overall factor of mean_ncen
+        if self.modulate_with_cenocc:
+            mean_ncen = self.central_occupation_model.mean_occupation(**kwargs)
+            mean_nsat *= mean_ncen
 
-            return mean_nsat
-
+        return mean_nsat
 
     def get_published_parameters(self):
-            r"""
-            No published best-fit paramaters for this model, so making an educated guess.
+        r"""
+        No published best-fit paramaters for this model, so making an educated guess.
 
-            Parameters
-            ----------
-            None
+        Parameters
+        ----------
+        None
 
-            -------
-            param_dict : dict
-                Dictionary of model parameters whose values have been set to
-                the values taken from Table 1 of Zheng et al. 2007.
+        -------
+        param_dict : dict
+            Dictionary of model parameters whose values have been set to
+            the values taken from Table 1 of Zheng et al. 2007.
 
-            Examples
-            --------
-            >>> sat_model = Reddick14Sats()
-            >>> sat_model.param_dict = sat_model.get_published_parameters(sat_model.threshold)
-            """
+        Examples
+        --------
+        >>> sat_model = Reddick14Sats()
+        >>> sat_model.param_dict = sat_model.get_published_parameters(sat_model.threshold)
+        """
 
-            return {'logM1': 14.3,
-                    'alpha': 1.06,
-                    'logMcut':12.5}
+        return {'logM1': 14.3,
+                'alpha': 1.06,
+                'logMcut': 12.5}
 
 
 class StepFuncCens(Zheng07Cens):
