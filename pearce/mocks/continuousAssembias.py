@@ -328,6 +328,7 @@ class ContinuousAssembias(HeavisideAssembias):
                                             prim_haloprop_key=self.prim_haloprop_key,
                                             sec_haloprop_key=self.sec_haloprop_key)
 
+    # NOTE don't remember if this worked or not w.r.t making things pickle.
     def _bind_new_haloprop_func_dict(self):
         """
         """
@@ -340,7 +341,6 @@ class ContinuousAssembias(HeavisideAssembias):
         
         self._methods_to_inherit.extend(['assembias_strength'])
 
-#TODO testme
     def _galprop_perturbation(self, **kwargs):
         """
         Method determines hwo much to boost the baseline function

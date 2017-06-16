@@ -20,6 +20,7 @@ from scipy.spatial import KDTree
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 from sklearn.kernel_ridge import KernelRidge
 from sklearn.svm import SVR
+from sklearn.linear_model import LinearRegression
 
 from .ioHelpers import *
 
@@ -29,7 +30,10 @@ class Emu(object):
        controls all loading, manipulation, and emulation of data.'''
 
     __metaclass__ = ABCMeta
-    valid_methods = {'gp', 'svr', 'gbdt', 'rf', 'krr'}  # could add more, coud even check if they exist in sklearn
+    valid_methods = {'gp', 'svr', 'gbdt', 'rf', 'krr', 'linear'}  # could add more, coud even check if they exist in sklearn
+    skl_methods = {'gbdt': GradientBoostingRegressor, 'rf': RandomForestRegressor, \
+                       'svr': SVR, 'krr': KernelRidge, 'linear': LinearRegression}
+
 
     def __init__(self, training_dir, method='gp', hyperparams={}, fixed_params={}, independent_variable=None):
         '''
@@ -71,6 +75,7 @@ class Emu(object):
         self.build_emulator(hyperparams)
 
     ###Data Loading and Manipulation####################################################################################
+    # TODO this function automatically attaches ordered params. Maybe we don't want that?
     def get_data(self, data_dir, em_params, fixed_params, independent_variable):
         """
         Read data in the format compatible with this object and return it
@@ -830,9 +835,8 @@ class Emu(object):
 
         x, y, _ = self.get_data(truth_dir, {}, self.fixed_params, self.independent_variable)
 
-
-
-        bins, _, _, _ = global_file_reader(truth_dir)
+        sub_dirs, _  = self._get_z_subdirs(truth_dir, fixed_zs=self.fixed_params.get('z', None))
+        bins, _, _, _ = global_file_reader(sub_dirs[0])
         bin_centers = (bins[1:] + bins[:-1]) / 2
         scale_nbins = len(bin_centers)
 
@@ -845,7 +849,7 @@ class Emu(object):
 
             x, y = x[idxs], y[idxs]
 
-        pred_y = self._emulate_helper(x)
+        pred_y = self._emulate_helper(x, False)
         pred_y = pred_y.reshape((-1, scale_nbins))
 
         # TODO untested
@@ -867,21 +871,27 @@ class Emu(object):
 
         # TODO sklearn methods can do this themselves. But i've already tone the prediction!
         elif statistic == 'r2':  # r2
-            SSR = np.sum((pred_y - y) ** 2, axis=0)
-            SST = np.sum((y - y.mean(axis=0)) ** 2, axis=0)
+            #SSR = np.sum((pred_y - y) ** 2, axis=0)
+            #SST = np.sum((y - y.mean(axis=0)) ** 2, axis=0)
+            y = y.reshape((-1,))
+            pred_y = pred_y.reshape((-1,))
+            SSR = np.sum((pred_y-y)**2)
+            SST = np.sum((y-y.mean())**2)
 
             return 1 - SSR / SST
 
         elif statistic == 'abs':
-            return np.mean(10 ** pred_y - 10 ** y, axis = 0)
+            return 10 ** pred_y - 10 ** y
+            #return np.mean(10 ** pred_y - 10 ** y, axis = 0)
         elif statistic == 'log_abs':
-            return np.mean(pred_y - y, axis = 0)
+            return pred_y - y
             # return np.mean((pred_y - y), axis=0)
         elif statistic == 'log_frac':  # 'rel'
-            return np.mean( (pred_y - y) / y, axis = 0)
+            return (pred_y - y) / y
             # return np.mean((pred_y - y) / y, axis=0)
         else:  # 'frac'
-            return  np.mean( (10 ** pred_y - 10 ** y) / (10 ** y), axis = 0)
+            return   (10 ** pred_y - 10 ** y) / (10 ** y)
+            #return  np.mean( (10 ** pred_y - 10 ** y) / (10 ** y), axis = 0)
 
     @abstractmethod
     def train_metric(self, **kwargs):
@@ -1101,8 +1111,6 @@ class OriginalRecipe(Emu):
             Key word parameters for the emulator
         :return: None
         """
-        skl_methods = {'gbdt': GradientBoostingRegressor, 'rf': RandomForestRegressor, \
-                       'svr': SVR, 'krr': KernelRidge}
 
         if self.method in {'svr', 'krr'}:  # kernel based method
             metric = hyperparams['metric'] if 'metric' in hyperparams else {}
@@ -1115,7 +1123,7 @@ class OriginalRecipe(Emu):
             else:  # krr
                 hyperparams['kernel'] = lambda x1, x2: kernel.value(np.array([x1]), np.array([x2]))
 
-        self._emulator = skl_methods[self.method](**hyperparams)
+        self._emulator = self.skl_methods[self.method](**hyperparams)
         self._emulator.fit(self.x, self.y)
 
     def _emulate_helper(self, t, gp_errs):
@@ -1364,8 +1372,6 @@ class ExtraCrispy(Emu):
             Key word parameters for the emulator
         :return: None
         """
-        skl_methods = {'gbdt': GradientBoostingRegressor, 'rf': RandomForestRegressor, \
-                       'svr': SVR, 'krr': KernelRidge}
 
         # Same kernel concerns as above.
         if self.method in {'svr', 'krr'}:  # kernel based method
@@ -1378,7 +1384,7 @@ class ExtraCrispy(Emu):
             else:  # krr
                 hyperparams['kernel'] = lambda x1, x2: kernel.value(np.array([x1]), np.array([x2]))
 
-        self._emulators = [skl_methods[self.method](**hyperparams) for i in xrange(self.experts)]
+        self._emulators = [self.skl_methods[self.method](**hyperparams) for i in xrange(self.experts)]
 
         for i, (emulator, _x, _y) in enumerate(izip(self._emulators, self.x, self.y)):
             emulator.fit(_x, _y)
