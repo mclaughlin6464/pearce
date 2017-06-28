@@ -170,8 +170,6 @@ class Cat(object):
                 # do nothing, we're good.
         elif 'scale_factors' in user_kwargs:
             user_kwargs['filenames'] = []
-            print user_kwargs['scale_factors']
-            print tmp_scale_factors
             for a in user_kwargs['scale_factors']:
                 idx = tmp_scale_factors.index(a)  # will raise an error if it's not there
                 sf_idxs.append(idx)
@@ -309,7 +307,6 @@ class Cat(object):
                 densities[:, r_idx] = densities[:, r_idx]/ (p * 4 * np.pi / 3 * r ** 3)
                 for idx, halo_pos in enumerate(
                         izip(reader.halo_table['halo_x'], reader.halo_table['halo_y'], reader.halo_table['halo_z'])):
-                    # print idx, time()-t0, 's'
                     particle_idxs = tree.query_radius(halo_pos, r, periodic=True)
                     densities[idx,r_idx] *= reader.particle_mass * len(particle_idxs)
 

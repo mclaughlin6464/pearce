@@ -5,9 +5,9 @@ import numpy as np
 from scipy.special import erf
 import warnings
 from halotools.empirical_models import Zheng07Cens, Zheng07Sats, OccupationComponent, model_defaults
-from halotools.empirical_models import HeavisideAssembias
+from halotools.empirical_models import HeavisideAssembias, ContinuousAssembias
 from halotools.custom_exceptions import HalotoolsError
-from continuousAssembias import ContinuousAssembias
+#from continuousAssembias import ContinuousAssembias
 
 
 # TODO change this to use get_published_parameters and add these params in.
@@ -34,17 +34,17 @@ class AssembiasRedMagicCens(RedMagicCens, ContinuousAssembias):
         '''See halotools docs for more info. '''
         super(AssembiasRedMagicCens, self).__init__(**kwargs)
 
-        sec_haloprop_key = 'halo_nfw_conc'
-        if 'sec_haloprop_key' in kwargs:
-            sec_haloprop_key = kwargs['sec_haloprop_key']
+        fkwargs = kwargs.copy()
+        if 'sec_haloprop_key' not in fkwargs:
+            fkwargs['sec_haloprop_key'] = 'halo_nfw_conc'
+
+        if 'method_name_to_decorate' not in fkwargs:
+            fkwargs['method_name_to_decorate'] = 'mean_occupation'
 
         ContinuousAssembias.__init__(self,
                                      lower_assembias_bound=self._lower_occupation_bound,
                                      upper_assembias_bound=self._upper_occupation_bound,
-                                     method_name_to_decorate='mean_occupation',
-                                     sec_haloprop_key=sec_haloprop_key,
-                                     # TODO I'm hardcoding this in. Need error handling and also an option to change!
-                                     **kwargs)
+                                     **fkwargs)
 
 
 class HSAssembiasRedMagicCens(RedMagicCens, HeavisideAssembias):
@@ -94,17 +94,18 @@ class AssembiasRedMagicSats(RedMagicSats, ContinuousAssembias):
     def __init__(self, cenocc_model, **kwargs):
         '''See halotools docs for more info. '''
         super(AssembiasRedMagicSats, self).__init__(cenocc_model, **kwargs)
-        sec_haloprop_key = 'halo_nfw_conc'
-        if 'sec_haloprop_key' in kwargs:
-            sec_haloprop_key = kwargs['sec_haloprop_key']
+
+        fkwargs = kwargs.copy()
+        if 'sec_haloprop_key' not in fkwargs:
+            fkwargs['sec_haloprop_key'] = 'halo_nfw_conc'
+
+        if 'method_name_to_decorate' not in fkwargs:
+            fkwargs['method_name_to_decorate'] = 'mean_occupation'
 
         ContinuousAssembias.__init__(self,
                                      lower_assembias_bound=self._lower_occupation_bound,
                                      upper_assembias_bound=self._upper_occupation_bound,
-                                     method_name_to_decorate='mean_occupation',
-                                     sec_haloprop_key=sec_haloprop_key,
-                                     # TODO I'm hardcoding this in. Need error handling and also an option to change!
-                                     **kwargs)
+                                     **fkwargs)
 
 
 class HSAssembiasRedMagicSats(RedMagicSats, HeavisideAssembias):
@@ -230,8 +231,9 @@ class Reddick14Cens(OccupationComponent):
         logM = np.log10(mass)
         mean_ncen = 0.5 * (1.0 + erf(
             (logM - self.param_dict['logMmin']) / self.param_dict['sigma_logM'])) * \
-                    self.param_dict['f_cen'] * (logM - self.param_dict['logMlin'])
-
+                    (1.0+ self.param_dict['f_cen'] * (logM - self.param_dict['logMlin']))
+        # enforce upper limit
+        mean_ncen[mean_ncen > self._upper_occupation_bound] = self._upper_occupation_bound
         return mean_ncen
 
     # TODO add parameters/threshold here
@@ -258,7 +260,7 @@ class Reddick14Cens(OccupationComponent):
         return {'logMmin': 12.9,
                 'sigma_logM': 0.75,
                 'f_cen': 0.05,
-                'logMlin': 14.0}
+                'logMlin': 16.0}
 
 
 class Reddick14Sats(OccupationComponent):
@@ -455,7 +457,7 @@ class Reddick14Sats(OccupationComponent):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", RuntimeWarning)
 
-            mean_nsat = (mass / M1) ** self.param_dict['alpha'] * np.exp(-Mcut / mass)
+            mean_nsat = ((mass / M1) ** self.param_dict['alpha'])* np.exp(-1.0*Mcut / mass)
 
         # If a central occupation model was passed to the constructor,
         # multiply mean_nsat by an overall factor of mean_ncen
