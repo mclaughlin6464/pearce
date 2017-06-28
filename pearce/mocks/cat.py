@@ -374,10 +374,10 @@ class Cat(object):
         z = 1.0 / a - 1
 
         assert HOD in {'redMagic', 'hsabRedMagic','abRedMagic', 'reddick14','stepFunc',\
-                       'zheng07', 'leauthaud11', 'tinker13', 'hearin15',}
+                       'zheng07', 'leauthaud11', 'tinker13', 'hearin15', 'reddick14+redMagic'}
 
 
-        if HOD in {'redMagic', 'hsabRedMagic','abRedMagic', 'reddick14','stepFunc'}: #my custom ones:
+        if HOD in {'redMagic', 'hsabRedMagic','abRedMagic', 'reddick14','stepFunc', 'reddick14+redMagic'}: #my custom ones:
             if HOD == 'redMagic':
                 cens_occ = RedMagicCens(redshift=z, **hod_kwargs)
                 sats_occ = RedMagicSats(redshift=z, cenocc_model=cens_occ, **hod_kwargs)
@@ -397,6 +397,11 @@ class Cat(object):
             elif HOD == 'stepFunc':
                 cens_occ = StepFuncCens(redshift=z, **hod_kwargs)
                 sats_occ = StepFuncSats(redshift=z, **hod_kwargs)
+            # TODO make it so I can pass in custom HODs like this.
+            # This will be obtuse when I include assembly bias
+            elif HOD == 'reddick14+redMagic':
+                cens_occ = Reddick14Cens(redshift=z, **hod_kwargs) 
+                sats_occ = RedMagicSats(redshift=z, cenocc_model = cens_occ, **hod_kwargs)
 
             self.model = HodModelFactory(
                 centrals_occupation=cens_occ,
