@@ -1,24 +1,18 @@
-def run_mcmc(self, y, cov, bin_centers, nwalkers=1000, nsteps=100, nburn=20, n_cores='all'):
-    """
-    Run an MCMC sampler, using the emulator. Uses emcee to perform sampling.
-    :param y:
-        A true y value to recover the parameters of theta. NOTE: The emulator emulates some indepedant variables in
-        log space, others in linear. Make sure y is in the same space!
-    :param cov:
-        The measurement covariance matrix of y
-    :param bin_centers:
-        The centers of the bins y is measured in (radial or angular).
-    :param nwalkers:
-        Optional. Number of walkers for emcee. Default is 1000.
-    :param nsteps:
-        Optional. Number of steps for emcee. Default is 100.
-    :param nburn:
-        Optional. Number of burn-in steps for emcee. Default is 20.
-    :param n_cores:
-        Number of cores, either an iteger or 'all'. Default is 'all'.
-    :return:
-        chain, a numpy array of the sample chain.
-    """
+#!/bin/bash
+"""This file hold the function run_mcmc, which  takes a trained emulator and a set of truth data and runs
+    and MCMC analysis with a predefined number of steps and walkers."""
+
+
+from multiprocessing import cpu_count
+import warnings
+
+import numpy as np
+import emcee as mc
+from scipy.linalg import inv
+
+from .defaultProb import lnprob
+
+def run_mcmc(emu,param_names, y, cov, r_bin_centers, fixed_params = {},  nwalkers=1000, nsteps=100, nburn=20, n_cores='all'):
 
     assert n_cores == 'all' or n_cores > 0
     if type(n_cores) is not str:
@@ -33,20 +27,28 @@ def run_mcmc(self, y, cov, bin_centers, nwalkers=1000, nsteps=100, nburn=20, n_c
         # else, we're good!
 
     assert y.shape[0] == cov.shape[0] and cov.shape[1] == cov.shape[0]
-    assert y.shape[0] == bin_centers.shape[0]
+    assert y.shape[0] == r_bin_centers.shape[0]
 
-    sampler = mc.EnsembleSampler(nwalkers, self.sampling_ndim, lnprob,
-                                 threads=n_cores, args=(self, y, cov, bin_centers))
+    # check we've defined all necessary params
+    assert emu.sampling_ndim == len(fixed_params) + len(param_names)
+    tmp = param_names[:]
+    tmp.extend(fixed_params.keys())
+    assert emu.check_param_names(tmp, ignore = ['r'])
 
-    pos0 = np.zeros((nwalkers, self.sampling_ndim))
-    # The zip ensures we don't use the params that are only for the emulator
-    for idx, (p, _) in enumerate(izip(self._ordered_params, xrange(self.sampling_ndim))):
-        # pos0[:, idx] = np.random.uniform(p.low, p.high, size=nwalkers)
-        pos0[:, idx] = np.random.normal(loc=(p.high + p.low) / 2, scale=(p.high + p.low) / 10, size=nwalkers)
+    num_params = len(param_names)
+
+    combined_inv_cov = inv(emu.ycov + cov)
+
+    sampler = mc.EnsembleSampler(nwalkers, num_params, lnprob,
+                                 threads=n_cores, args=(param_names, emu, r_bin_centers, y, combined_inv_cov))
+
+    pos0 = np.zeros((nwalkers, num_params))
+    for idx, pname in enumerate(param_names):
+        low, high = emu.get_param_bounds(pname)
+        pos0[:,idx] = np.random.randn(size = nwalkers)*(np.abs(high-low)/6.0) + (low+high)/2.0
 
     sampler.run_mcmc(pos0, nsteps)
 
-    # Note, still an issue of param label ordering here.
-    chain = sampler.chain[:, nburn:, :].reshape((-1, self.sampling_ndim))
+    chain = sampler.chain[:, nburn:, :].reshape((-1, num_params))
 
     return chain

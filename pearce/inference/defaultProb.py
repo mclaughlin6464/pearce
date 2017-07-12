@@ -52,6 +52,7 @@ def lnprior(theta, param_names, emu, *args):
 # TODO is param_names necessary? The reason why is that theta doesn't include possible fixed params or 'r', so
 # it is not the same as all the parameters the emulator predicts. This the issue where the emulator predicts over more
 # dimensions than we are trying to constrain.
+# TODO how to do this with number density?
 def lnlike(theta, param_names, emu, r_bin_centers, y, combined_inv_cov):
     """
     The liklihood of parameters theta given the other parameters and the emulator.
@@ -71,6 +72,7 @@ def lnlike(theta, param_names, emu, r_bin_centers, y, combined_inv_cov):
     :return:
         The log liklihood of theta given the measurements and the emulator.
     """
+    # NOTE this could be generalized to emulate beyond wrt_r if I wanted
     y_bar = emu.emulate_wrt_r({izip(param_names, theta)}, r_bin_centers)
     # should chi2 be calculated in log or linear?
     # answer: the user is responsible for taking the log before it comes here.

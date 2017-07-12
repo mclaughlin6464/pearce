@@ -348,6 +348,26 @@ class Emu(object):
         if with_fixed_params:
             return op_with_fixed
 
+    # TODO Should I unify some syntax between this and the one below?
+    def check_param_names(self, param_names, ignore=[]):
+        """
+        Checks that all parameter names in param_names are defined in the emulator, and vice versa.
+        :param param_names:
+            List of strings of parameter names to compare to _ordered_params
+        :param ignore"
+            A list of parameters to ignore. There are many use cases where parameters like 'r' are definedi n the
+            emulator but not used in the emulator, so we wouldn't want params to define them.
+        :return:
+            True if all param_names are in ordered_params, and vice verse. False otherwise
+        """
+        op_set = set(self._ordered_params.iterkeys())
+        for ig in ignore:
+            op_set.remove(ig)
+
+        ip_set = set(param_names)
+
+        return len(op_set ^ ip_set) == 0
+
     def _check_params(self, params):
         """
         Assert that all keys in params are defined in ordered params, and vice versa. Raises an AssertionError otherwise.
@@ -358,14 +378,15 @@ class Emu(object):
         :return: None
         """
         try:
-            # make sure they contain the exact same keys.
-            op_set = set(self._ordered_params.iterkeys())
-            ip_set = set(params.iterkeys())
-            assert len(op_set ^ ip_set) == 0
+            assert self.check_param_names(params.keys())
         except AssertionError:
             output = "The input_params passed into get_data did not match those the Emu knows about. \
                                               It's possible fixed_params is missing a parameter, or you defined an extra one. \
                                               Additionally, orded_params could be wrong too!\n"
+
+            op_set = set(self._ordered_params.iterkeys())
+            ip_set = set(params.iterkeys())
+
             ip_not_op = ip_set - op_set
             op_not_ip = op_set - ip_set
 
