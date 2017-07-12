@@ -95,7 +95,7 @@ def calc_training_points(hod_params, bins,obs, cosmo_params,ordered_params, dirn
     for id, hod in enumerate(hod_params):
         #construct a dictionary for the parameters
         # Could store the param ordering in the file so it doesn't need to be imported.
-        hod_dict = {p.name: val for p, val in zip(ordered_params, hod)}
+        hod_dict = {p: val for p, val in zip(ordered_params, hod)}
         #Populating the same cat over and over is faster than making a new one over and over!
         if n_repops ==1:
             cat.populate(hod_dict)
