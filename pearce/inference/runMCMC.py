@@ -30,7 +30,7 @@ def run_mcmc(emu,param_names, y, cov, r_bin_centers, fixed_params = {},  nwalker
     assert y.shape[0] == r_bin_centers.shape[0]
 
     # check we've defined all necessary params
-    assert emu.sampling_ndim == len(fixed_params) + len(param_names)
+    assert emu.emulator_ndim == len(fixed_params) + len(param_names)
     tmp = param_names[:]
     tmp.extend(fixed_params.keys())
     assert emu.check_param_names(tmp, ignore = ['r'])
