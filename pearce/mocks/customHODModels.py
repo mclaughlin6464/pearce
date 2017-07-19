@@ -7,7 +7,9 @@ import warnings
 from halotools.empirical_models import Zheng07Cens, Zheng07Sats, OccupationComponent, model_defaults
 from halotools.empirical_models import HeavisideAssembias, ContinuousAssembias
 from halotools.custom_exceptions import HalotoolsError
-#from continuousAssembias import ContinuousAssembias
+
+
+# from continuousAssembias import ContinuousAssembias
 
 
 # TODO change this to use get_published_parameters and add these params in.
@@ -231,7 +233,7 @@ class Reddick14Cens(OccupationComponent):
         logM = np.log10(mass)
         mean_ncen = 0.5 * (1.0 + erf(
             (logM - self.param_dict['logMmin']) / self.param_dict['sigma_logM'])) * \
-                    (1.0+ self.param_dict['f_cen'] * (logM - self.param_dict['logMlin']))
+                    (1.0 + self.param_dict['f_cen'] * (logM - self.param_dict['logMlin']))
         # enforce upper limit
         mean_ncen[mean_ncen > self._upper_occupation_bound] = self._upper_occupation_bound
         return mean_ncen
@@ -261,6 +263,7 @@ class Reddick14Cens(OccupationComponent):
                 'sigma_logM': 0.75,
                 'f_cen': 0.05,
                 'logMlin': 16.0}
+
 
 class AssembiasReddick14Cens(Reddick14Cens, ContinuousAssembias):
     '''Reddick14 Cens with Continuous Assembly bias'''
@@ -496,7 +499,7 @@ class Reddick14Sats(OccupationComponent):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", RuntimeWarning)
 
-            mean_nsat = ((mass / M1) ** self.param_dict['alpha'])* np.exp(-1.0*Mcut / mass)
+            mean_nsat = ((mass / M1) ** self.param_dict['alpha']) * np.exp(-1.0 * Mcut / mass)
 
         # If a central occupation model was passed to the constructor,
         # multiply mean_nsat by an overall factor of mean_ncen
@@ -566,6 +569,7 @@ class HSAssembiasReddick14Sats(Reddick14Sats, HeavisideAssembias):
                                     sec_haloprop_key=sec_haloprop_key,
                                     # TODO I'm hardcoding this in. Need error handling and also an option to change!
                                     **kwargs)
+
 
 class StepFuncCens(Zheng07Cens):
     '''HOD model mainly for test purposes; a step function in centrals.'''
