@@ -394,6 +394,10 @@ class Emu(object):
             try:
                 # check if they're in bounds, else raise an informative warning
                 val = params[pname]
+                # TODO wish i didn't have to hardcode this
+                if pname == 'r':
+                    val = 10**val
+
                 assert np.all(plow <= val) and np.all(val <= phigh)
             except AssertionError:
                 if type(val) is float:
