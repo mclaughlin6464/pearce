@@ -260,6 +260,45 @@ class Reddick14Cens(OccupationComponent):
                 'f_cen': 0.05,
                 'logMlin': 14.0}
 
+class AssembiasReddick14Cens(Reddick14Cens, ContinuousAssembias):
+    '''Reddick14 Cens with Continuous Assembly bias'''
+
+    def __init__(self, **kwargs):
+        '''See halotools docs for more info. '''
+        super(AssembiasReddick14Cens, self).__init__(**kwargs)
+
+        sec_haloprop_key = 'halo_nfw_conc'
+        if 'sec_haloprop_key' in kwargs:
+            sec_haloprop_key = kwargs['sec_haloprop_key']
+
+        ContinuousAssembias.__init__(self,
+                                     lower_assembias_bound=self._lower_occupation_bound,
+                                     upper_assembias_bound=self._upper_occupation_bound,
+                                     method_name_to_decorate='mean_occupation',
+                                     sec_haloprop_key=sec_haloprop_key,
+                                     # TODO I'm hardcoding this in. Need error handling and also an option to change!
+                                     **kwargs)
+
+
+class HSAssembiasReddick14Cens(Reddick14Cens, HeavisideAssembias):
+    '''Reddick14 Cens with Heaviside Assembly bias'''
+
+    def __init__(self, **kwargs):
+        '''See halotools docs for more info. '''
+        super(HSAssembiasReddick14Cens, self).__init__(**kwargs)
+
+        sec_haloprop_key = 'halo_nfw_conc'
+        if 'sec_haloprop_key' in kwargs:
+            sec_haloprop_key = kwargs['sec_haloprop_key']
+
+        HeavisideAssembias.__init__(self,
+                                    lower_assembias_bound=self._lower_occupation_bound,
+                                    upper_assembias_bound=self._upper_occupation_bound,
+                                    method_name_to_decorate='mean_occupation',
+                                    sec_haloprop_key=sec_haloprop_key,
+                                    # TODO I'm hardcoding this in. Need error handling and also an option to change!
+                                    **kwargs)
+
 
 class Reddick14Sats(OccupationComponent):
     r""" Power law model for the occupation statistics of satellite galaxies,
@@ -488,6 +527,43 @@ class Reddick14Sats(OccupationComponent):
                 'alpha': 1.06,
                 'logMcut': 12.5}
 
+
+class AssembiasReddick14Sats(Reddick14Sats, ContinuousAssembias):
+    '''Reddick14 Cens with Assembly bias'''
+
+    def __init__(self, cenocc_model, **kwargs):
+        '''See halotools docs for more info. '''
+        super(AssembiasReddick14Sats, self).__init__(cenocc_model, **kwargs)
+        sec_haloprop_key = 'halo_nfw_conc'
+        if 'sec_haloprop_key' in kwargs:
+            sec_haloprop_key = kwargs['sec_haloprop_key']
+
+        ContinuousAssembias.__init__(self,
+                                     lower_assembias_bound=self._lower_occupation_bound,
+                                     upper_assembias_bound=self._upper_occupation_bound,
+                                     method_name_to_decorate='mean_occupation',
+                                     sec_haloprop_key=sec_haloprop_key,
+                                     # TODO I'm hardcoding this in. Need error handling and also an option to change!
+                                     **kwargs)
+
+
+class HSAssembiasReddick14Sats(Reddick14Sats, HeavisideAssembias):
+    '''Reddick14 Cens with Assembly bias'''
+
+    def __init__(self, cenocc_model, **kwargs):
+        '''See halotools docs for more info. '''
+        super(HSAssembiasReddick14Sats, self).__init__(cenocc_model, **kwargs)
+        sec_haloprop_key = 'halo_nfw_conc'
+        if 'sec_haloprop_key' in kwargs:
+            sec_haloprop_key = kwargs['sec_haloprop_key']
+
+        HeavisideAssembias.__init__(self,
+                                    lower_assembias_bound=self._lower_occupation_bound,
+                                    upper_assembias_bound=self._upper_occupation_bound,
+                                    method_name_to_decorate='mean_occupation',
+                                    sec_haloprop_key=sec_haloprop_key,
+                                    # TODO I'm hardcoding this in. Need error handling and also an option to change!
+                                    **kwargs)
 
 class StepFuncCens(Zheng07Cens):
     '''HOD model mainly for test purposes; a step function in centrals.'''
