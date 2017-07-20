@@ -31,7 +31,7 @@ def lnprior(theta, param_names, *args):
     return 0
 
 
-def lnlike(theta, param_names, r_bin_centers, y, combined_inv_cov):
+def lnlike(theta, param_names, r_bin_centers, y, combined_inv_cov, obs_nd, obs_nd_err, nd_func):
     """
     :param theta:
         Proposed parameters.
@@ -44,16 +44,24 @@ def lnlike(theta, param_names, r_bin_centers, y, combined_inv_cov):
     :param combined_inv_cov:
         The inverse covariance matrix. Explicitly, the inverse of the sum of the mesurement covaraince matrix
         and the matrix from the emulator. Both are independent of emulator parameters, so can be precomputed.
+    :param obs_nd
+        Observed number density
+    :param obs_nd_err
+        Uncertainty in the observed nd
+    :param nd_func
+        Function that can compute the number density given a dictionary of HOD params.
     :return:
         The log liklihood of theta given the measurements and the emulator.
     """
-    y_bar = _emu.emulate_wrt_r(dict(izip(param_names, theta)), r_bin_centers)[0]
+    param_dict = dict(izip(param_names, theta))
+    y_bar = _emu.emulate_wrt_r(param_dict, r_bin_centers)[0]
     # should chi2 be calculated in log or linear?
     # answer: the user is responsible for taking the log before it comes here.
     delta = y_bar - y
-    print y
-    print y_bar
-    return -0.5 * np.dot(delta, np.dot(combined_inv_cov, delta))
+
+    chi2 = -0.5 * np.dot(delta, np.dot(combined_inv_cov, delta))
+
+    return chi2 - ((obs_nd-nd_func(param_dict))/obs_nd_err)**2
 
 
 def lnprob(theta, *args):
@@ -72,7 +80,8 @@ def lnprob(theta, *args):
 
     return lp + lnlike(theta, *args)
 
-def run_mcmc(emu, param_names, y, cov, r_bin_centers, fixed_params = {},  nwalkers=1000, nsteps=100, nburn=20, ncores='all'):
+def run_mcmc(emu, param_names, y, cov, r_bin_centers, obs_nd, obs_nd_err, nd_func,\
+             fixed_params = {},  nwalkers=1000, nsteps=100, nburn=20, ncores='all'):
     """
     Run an MCMC using emcee and the emu. Includes some sanity checks and does some precomputation.
     Also optimized to be more efficient than using emcee naively with the emulator.
@@ -87,6 +96,12 @@ def run_mcmc(emu, param_names, y, cov, r_bin_centers, fixed_params = {},  nwalke
         measured covariance of y
     :param r_bin_centers:
         The scale bins corresponding to y
+    :param obs_nd
+        Observed number density
+    :param obs_nd_err
+        Uncertainty in the observed nd
+    :param nd_func
+        Function that can compute the number density given a dictionary of HOD params.
     :param fixed_params:
         Any values held fixed during the emulation, default is {}
     :param nwalkers:
@@ -130,7 +145,8 @@ def run_mcmc(emu, param_names, y, cov, r_bin_centers, fixed_params = {},  nwalke
     combined_inv_cov = inv(_emu.ycov + cov)
 
     sampler = mc.EnsembleSampler(nwalkers, num_params, lnprob,
-                                 threads=ncores, args=(param_names, r_bin_centers, y, combined_inv_cov))
+                                 threads=ncores, args=(param_names, r_bin_centers, y, combined_inv_cov,\
+                                                       obs_nd, obs_nd_err, nd_func))
 
     pos0 = np.zeros((nwalkers, num_params))
     for idx, pname in enumerate(param_names):
