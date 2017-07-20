@@ -439,10 +439,10 @@ class Cat(object):
             assert self.halocat is not None
         except AssertionError:
             raise AssertionError("Please load a halocat before calling calc_mf.")
-        masses = self.halocat['halo_mvir']
-        masses = np.log10(masses[masses > min_ptcl*self.pmass])
+        masses = self.halocat.halo_table['halo_mvir']
+        masses = masses[masses > min_ptcl*self.pmass]
 
-        bins = np.arange(mass_bin_range[0], mass_bin_range[1], mass_bin_size)
+        bins = np.logspace(mass_bin_range[0], mass_bin_range[1], int( (mass_bin_range[1]-mass_bin_range[0])/mass_bin_size )+1 )
 
         return np.histogram(masses, bins)[0]
     # TODO same concerns as above
@@ -467,18 +467,19 @@ class Cat(object):
         except AssertionError:
             raise AssertionError("Please load a model before calling calc_hod.")
 
-        bins = np.logspace(mass_bin_range[0], mass_bin_range[1], int( (mass_bin_range[1]-mass_bin_range[0])/mass_bin_size ) )
+        bins = np.logspace(mass_bin_range[0], mass_bin_range[1], int( (mass_bin_range[1]-mass_bin_range[0])/mass_bin_size )+1 )
+        bin_centers = (bins[:-1]+bins[1:])/2
         self.model.param_dict.update(params)
         cens_occ, sats_occ = self.model.model_dictionary['centrals_occupation'], self.model.model_dictionary['satellites_occupation']
 
         if component == 'all' or component == 'central':
-            cen_hod = getattr(cens_occ, "baseline_mean_occupation", "mean_occupation")(prim_haloprop=bins)
+            cen_hod = getattr(cens_occ, "baseline_mean_occupation", cens_occ.mean_occupation)(prim_haloprop=bin_centers)
 
             if component == 'central':
                 return cen_hod
         if component == 'all' or component == 'satellite':
 
-            sat_hod = getattr(sats_occ, "baseline_mean_occupation", "mean_occupation")(prim_haloprop=bins)
+            sat_hod = getattr(sats_occ, "baseline_mean_occupation", sats_occ.mean_occupation)(prim_haloprop=bin_centers)
             if component == 'satellite':
                 return sat_hod
 
