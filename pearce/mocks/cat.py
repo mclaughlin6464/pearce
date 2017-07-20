@@ -422,6 +422,81 @@ class Cat(object):
         assert gal_type in {'centrals', 'satellites'}
         return self.model.input_model_dictionary['%s_occupation' % gal_type]._get_assembias_param_dict_key(0)
 
+    # TODO this isn't a traditional observable, so I can't use the same decorator. Not sure how to handle that.
+    def calc_mf(self, mass_bin_range = (9,16), mass_bin_size=0.1, min_ptcl=200):
+        """
+        Get the mass function of the halo catalog.
+        :param mass_bin_range
+            A tuple of the lwoer and upper bounds of the log mass bins. Default is (9,16)
+        :param mass_bin_size:
+            Mass binnig size to use. Default is 0.1 dex
+        :param min_ptcl:
+            Minimum number of particles in a halo. Default is 200
+        :return:
+            mass_function, the mass function of halocat.
+        """
+        try:
+            assert self.halocat is not None
+        except AssertionError:
+            raise AssertionError("Please load a halocat before calling calc_mf.")
+        masses = self.halocat['halo_mvir']
+        masses = np.log10(masses[masses > min_ptcl*self.pmass])
+
+        bins = np.arange(mass_bin_range[0], mass_bin_range[1], mass_bin_size)
+
+        return np.histogram(masses, bins)[0]
+    # TODO same concerns as above
+
+    def calc_hod(self, params={}, mass_bin_range = (9,16), mass_bin_size=0.1, component='all'):
+        """
+        Calculate the analytic HOD for a set of parameters
+        :param params:
+            HOD parameters. Only those that are changed from the original are required; the rest will remain the default.
+        :param mass_bin_range
+            A tuple of the lwoer and upper bounds of the log mass bins. Default is (9,16)
+        :param mass_bin_size:
+            Mass binnig size to use. Default is 0.1 dex
+        :param component:
+            Which HOD component to compute for. Acceptable are "all" (default), "central" or "satellite"
+        :return:
+        """
+
+        assert component in {'all','central','satellite'}
+        try:
+            assert self.model is not None
+        except AssertionError:
+            raise AssertionError("Please load a model before calling calc_hod.")
+
+        bins = np.logspace(mass_bin_range[0], mass_bin_range[1], int( (mass_bin_range[1]-mass_bin_range[0])/mass_bin_size ) )
+        self.model.param_dict.update(params)
+        cens_occ, sats_occ = self.model.model_dictionary['centrals_occupation'], self.model.model_dictionary['satellites_occupation']
+
+        if component == 'all' or component == 'central':
+            cen_hod = getattr(cens_occ, "baseline_mean_occupation", "mean_occupation")(prim_haloprop=bins)
+
+            if component == 'central':
+                return cen_hod
+        if component == 'all' or component == 'satellite':
+
+            sat_hod = getattr(sats_occ, "baseline_mean_occupation", "mean_occupation")(prim_haloprop=bins)
+            if component == 'satellite':
+                return sat_hod
+
+        return cen_hod+sat_hod
+
+    def calc_analytic_nd(self, params={}):
+        """
+        Calculate the number density from the HOD and Mass function, rather than recovering from a populatedd catalog.
+        :param params:
+            HOD parameters. Only those that are changed from the original are required; the rest will remain the default.
+        :return: nd, a float that represents the analytic number density
+        """
+        mf = self.calc_mf()
+        hod = self.calc_hod(params)
+
+        return np.sum(mf*hod)/((self.h*self.Lbox)**3)
+
+
     def populate(self, params={}, min_ptcl=200):
         '''
         Populate the stored halocatalog with a new realization. Load must be called first.
@@ -444,8 +519,9 @@ class Cat(object):
             self.model.populate_mock(self.halocat, Num_ptcl_requirement=min_ptcl)
             self.populated_once = True
 
+    # TODO how to handle analytic v observed nd
     @observable
-    def calc_number_density(self, halo=False):
+    def calc_number_density(self):
         '''
         Return the number density for a populated box.
         :param: halo
@@ -453,9 +529,7 @@ class Cat(object):
         :return: Number density of a populated box.
         '''
         # TODO I think i'm missing little h's here
-        if halo:
-            return len(self.model.mock.halo_table['halo_x']) / (self.Lbox ** 3)
-        return len(self.model.mock.galaxy_table['x']) / (self.Lbox ** 3)
+        return self.model.mock.number_density
 
     # TODO do_jackknife to cov?
     @observable
