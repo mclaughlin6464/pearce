@@ -423,7 +423,7 @@ class Cat(object):
         return self.model.input_model_dictionary['%s_occupation' % gal_type]._get_assembias_param_dict_key(0)
 
     # TODO this isn't a traditional observable, so I can't use the same decorator. Not sure how to handle that.
-    def calc_mf(self, mass_bin_range = (9,16), mass_bin_size=0.1, min_ptcl=200):
+    def calc_mf(self, mass_bin_range = (9,16), mass_bin_size=0.01, min_ptcl=200):
         """
         Get the mass function of the halo catalog.
         :param mass_bin_range
@@ -447,7 +447,7 @@ class Cat(object):
         return np.histogram(masses, bins)[0]
     # TODO same concerns as above
 
-    def calc_hod(self, params={}, mass_bin_range = (9,16), mass_bin_size=0.1, component='all'):
+    def calc_hod(self, params={}, mass_bin_range = (9,16), mass_bin_size=0.01, component='all'):
         """
         Calculate the analytic HOD for a set of parameters
         :param params:
@@ -471,6 +471,12 @@ class Cat(object):
         bin_centers = (bins[:-1]+bins[1:])/2
         self.model.param_dict.update(params)
         cens_occ, sats_occ = self.model.model_dictionary['centrals_occupation'], self.model.model_dictionary['satellites_occupation']
+        for key,val in params.iteritems():
+            if key in cens_occ.param_dict:
+                cens_occ.param_dict[key] = val 
+            if key in sats_occ.param_dict:
+                sats_occ.param_dict[key] = val 
+
 
         if component == 'all' or component == 'central':
             cen_hod = getattr(cens_occ, "baseline_mean_occupation", cens_occ.mean_occupation)(prim_haloprop=bin_centers)
@@ -494,8 +500,8 @@ class Cat(object):
         """
         mf = self.calc_mf()
         hod = self.calc_hod(params)
-
-        return np.sum(mf*hod)/((self.h*self.Lbox)**3)
+        print np.sum(mf*hod)
+        return np.sum(mf*hod)/((self.Lbox)**3)
 
 
     def populate(self, params={}, min_ptcl=200):
