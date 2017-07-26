@@ -373,11 +373,12 @@ class Cat(object):
             a = scale_factor  # YOLO
         z = 1.0 / a - 1
 
-        assert HOD in {'redMagic', 'hsabRedMagic','abRedMagic', 'reddick14','stepFunc',\
+        assert HOD in {'redMagic', 'hsabRedMagic','abRedMagic', 'reddick14','hsabReddick14','abReddick14','stepFunc',\
                        'zheng07', 'leauthaud11', 'tinker13', 'hearin15', 'reddick14+redMagic'}
 
 
-        if HOD in {'redMagic', 'hsabRedMagic','abRedMagic', 'reddick14','stepFunc', 'reddick14+redMagic'}: #my custom ones:
+        if HOD in {'redMagic', 'hsabRedMagic','abRedMagic', 'reddick14','stepFunc', 'reddick14+redMagic',\
+                    'hsabReddick14','abReddick14'}: #my custom ones:
             if HOD == 'redMagic':
                 cens_occ = RedMagicCens(redshift=z, **hod_kwargs)
                 sats_occ = RedMagicSats(redshift=z, cenocc_model=cens_occ, **hod_kwargs)
@@ -392,8 +393,13 @@ class Cat(object):
 
             elif HOD == 'reddick14':
                 cens_occ = Reddick14Cens(redshift=z, **hod_kwargs)
-                sats_occ = Reddick14Sats(redshift=z, **hod_kwargs) # no modulation
-
+                sats_occ = Reddick14Sats(redshift=z, cenocc_model = cens_occ,**hod_kwargs) # no modulation
+            elif HOD == 'hsabReddick14':
+                cens_occ = HSAssembiasReddick14Cens(redshift=z, **hod_kwargs)
+                sats_occ = HSAssembiasReddick14Sats(redshift=z, cenocc_model = cens_occ,**hod_kwargs) # no modulation
+            elif HOD == 'abReddick14':
+                cens_occ = AssembiasReddick14Cens(redshift=z, **hod_kwargs)
+                sats_occ = AssembiasReddick14Sats(redshift=z, cenocc_model = cens_occ,**hod_kwargs) # no modulation
             elif HOD == 'stepFunc':
                 cens_occ = StepFuncCens(redshift=z, **hod_kwargs)
                 sats_occ = StepFuncSats(redshift=z, **hod_kwargs)

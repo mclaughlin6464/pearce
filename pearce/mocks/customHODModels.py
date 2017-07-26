@@ -316,7 +316,7 @@ class Reddick14Sats(OccupationComponent):
     def __init__(self,
                  threshold=model_defaults.default_luminosity_threshold,
                  prim_haloprop_key=model_defaults.prim_haloprop_key,
-                 modulate_with_cenocc=False, cenocc_model=None, **kwargs):
+                 modulate_with_cenocc=True, cenocc_model=None, **kwargs):
         r"""
         Parameters
         ----------
@@ -536,9 +536,9 @@ class Reddick14Sats(OccupationComponent):
 class AssembiasReddick14Sats(Reddick14Sats, ContinuousAssembias):
     '''Reddick14 Cens with Assembly bias'''
 
-    def __init__(self, cenocc_model, **kwargs):
+    def __init__(self, cenocc_model=None, **kwargs):
         '''See halotools docs for more info. '''
-        super(AssembiasReddick14Sats, self).__init__(cenocc_model, **kwargs)
+        super(AssembiasReddick14Sats, self).__init__(cenocc_model=cenocc_model, **kwargs)
         sec_haloprop_key = 'halo_nfw_conc'
         if 'sec_haloprop_key' in kwargs:
             sec_haloprop_key = kwargs['sec_haloprop_key']
@@ -557,7 +557,7 @@ class HSAssembiasReddick14Sats(Reddick14Sats, HeavisideAssembias):
 
     def __init__(self, cenocc_model, **kwargs):
         '''See halotools docs for more info. '''
-        super(HSAssembiasReddick14Sats, self).__init__(cenocc_model, **kwargs)
+        super(HSAssembiasReddick14Sats, self).__init__(cenocc_model=cenocc_model, **kwargs)
         sec_haloprop_key = 'halo_nfw_conc'
         if 'sec_haloprop_key' in kwargs:
             sec_haloprop_key = kwargs['sec_haloprop_key']
