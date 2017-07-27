@@ -16,6 +16,7 @@ from halotools.sim_manager import RockstarHlistReader, CachedHaloCatalog
 from halotools.empirical_models import PrebuiltHodModelFactory
 from halotools.empirical_models import HodModelFactory, TrivialPhaseSpace, NFWPhaseSpace
 from halotools.mock_observables import *  # i'm importing so much this is just easier
+from halotools.utils.table_utils import compute_prim_haloprop_bins
 
 from .customHODModels import *
 
@@ -170,8 +171,6 @@ class Cat(object):
                 # do nothing, we're good.
         elif 'scale_factors' in user_kwargs:
             user_kwargs['filenames'] = []
-            print user_kwargs['scale_factors']
-            print tmp_scale_factors
             for a in user_kwargs['scale_factors']:
                 idx = tmp_scale_factors.index(a)  # will raise an error if it's not there
                 sf_idxs.append(idx)
@@ -442,9 +441,19 @@ class Cat(object):
         masses = self.halocat.halo_table['halo_mvir']
         masses = masses[masses > min_ptcl*self.pmass]
 
-        bins = np.logspace(mass_bin_range[0], mass_bin_range[1], int( (mass_bin_range[1]-mass_bin_range[0])/mass_bin_size )+1 )
+        mass_bins = np.logspace(mass_bin_range[0], mass_bin_range[1], int( (mass_bin_range[1]-mass_bin_range[0])/mass_bin_size )+1 )
+        mass_bin_idxs = compute_prim_haloprop_bins(prim_haloprop_bin_boundaries=mass_bins, prim_haloprop = masses)
+        mass_bin_nos = set(mass_bin_idxs)
 
-        return np.histogram(masses, bins)[0]
+        mf = np.zeros((mass_bins.shape[0]-1,))
+
+        for mb in mass_bin_nos:
+            indices_of_mb = np.where(mass_bin_idxs == mb)[0]
+            mf[mb-1] = len(indices_of_mb)
+                                                    
+        return mf
+        
+        #return np.histogram(masses,mass_bins)[0]
     # TODO same concerns as above
 
     def calc_hod(self, params={}, mass_bin_range = (9,16), mass_bin_size=0.01, component='all'):
