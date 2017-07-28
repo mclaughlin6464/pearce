@@ -31,7 +31,7 @@ def lnprior(theta, param_names, *args):
     return 0
 
 
-def lnlike(theta, param_names, r_bin_centers, y, combined_inv_cov, obs_nd, obs_nd_err, nd_func):
+def lnlike(theta, param_names, r_bin_centers, y, combined_inv_cov, obs_nd, obs_nd_err, nd_func_name):
     """
     :param theta:
         Proposed parameters.
@@ -61,7 +61,7 @@ def lnlike(theta, param_names, r_bin_centers, y, combined_inv_cov, obs_nd, obs_n
 
     chi2 = -0.5 * np.dot(delta, np.dot(combined_inv_cov, delta))
 
-    return chi2 - ((obs_nd-nd_func(param_dict))/obs_nd_err)**2
+    return chi2 - 0.5*((obs_nd-getattr(_cat, nd_func_name)(param_dict))/obs_nd_err)**2
 
 
 def lnprob(theta, *args):
@@ -80,7 +80,7 @@ def lnprob(theta, *args):
 
     return lp + lnlike(theta, *args)
 
-def run_mcmc(emu, param_names, y, cov, r_bin_centers, obs_nd, obs_nd_err, nd_func,\
+def run_mcmc(emu, cat, param_names, y, cov, r_bin_centers, obs_nd, obs_nd_err, nd_func_name,\
              fixed_params = {},  nwalkers=1000, nsteps=100, nburn=20, ncores='all'):
     """
     Run an MCMC using emcee and the emu. Includes some sanity checks and does some precomputation.
@@ -117,7 +117,9 @@ def run_mcmc(emu, param_names, y, cov, r_bin_centers, obs_nd, obs_nd_err, nd_fun
     """
     #make emu global so it can be accessed by the liklihood functions
     _emu = emu
+    _cat = cat
     global _emu
+    global _cat
 
     assert ncores == 'all' or ncores > 0
     if type(ncores) is not str:
@@ -140,13 +142,15 @@ def run_mcmc(emu, param_names, y, cov, r_bin_centers, obs_nd, obs_nd_err, nd_fun
     tmp.extend(fixed_params.keys())
     assert _emu.check_param_names(tmp, ignore = ['r'])
 
+    assert hasattr(_cat, nd_func_name)
+
     num_params = len(param_names)
 
     combined_inv_cov = inv(_emu.ycov + cov)
 
     sampler = mc.EnsembleSampler(nwalkers, num_params, lnprob,
                                  threads=ncores, args=(param_names, r_bin_centers, y, combined_inv_cov,\
-                                                       obs_nd, obs_nd_err, nd_func))
+                                                       obs_nd, obs_nd_err, nd_func_name))
 
     pos0 = np.zeros((nwalkers, num_params))
     for idx, pname in enumerate(param_names):

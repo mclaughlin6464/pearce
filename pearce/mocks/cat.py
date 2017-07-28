@@ -438,22 +438,19 @@ class Cat(object):
             assert self.halocat is not None
         except AssertionError:
             raise AssertionError("Please load a halocat before calling calc_mf.")
-        masses = self.halocat.halo_table['halo_mvir']
+        if hasattr(self,'_last_halocat_id'):
+            if self._last_halocat_id == id(self.halocat):
+                return self._last_mf
+        masses = self.halocat.halo_table[self.halocat.halo_table['halo_upid']==-1]['halo_mvir']
         masses = masses[masses > min_ptcl*self.pmass]
 
         mass_bins = np.logspace(mass_bin_range[0], mass_bin_range[1], int( (mass_bin_range[1]-mass_bin_range[0])/mass_bin_size )+1 )
-        mass_bin_idxs = compute_prim_haloprop_bins(prim_haloprop_bin_boundaries=mass_bins, prim_haloprop = masses)
-        mass_bin_nos = set(mass_bin_idxs)
 
-        mf = np.zeros((mass_bins.shape[0]-1,))
+        mf = np.histogram(masses,mass_bins)[0]
+        self._last_mf = mf
+        self._last_halocat_id = id(self.halocat)
 
-        for mb in mass_bin_nos:
-            indices_of_mb = np.where(mass_bin_idxs == mb)[0]
-            mf[mb-1] = len(indices_of_mb)
-                                                    
         return mf
-        
-        #return np.histogram(masses,mass_bins)[0]
     # TODO same concerns as above
 
     def calc_hod(self, params={}, mass_bin_range = (9,16), mass_bin_size=0.01, component='all'):
