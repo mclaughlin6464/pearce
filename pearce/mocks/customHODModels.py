@@ -624,16 +624,16 @@ class TabulatedCens(OccupationComponent):
     with a fixed, observed relationship.
     """
 
-    def __init__(self, prim_haloprop_vals, hod_vals,
+    def __init__(self, prim_haloprop_vals, cen_hod_vals,
                  threshold=model_defaults.default_luminosity_threshold,
                  prim_haloprop_key=model_defaults.prim_haloprop_key, **kwargs):
         r"""
         Parameters
         ----------
         prim_haloprop_vals: array
-            Values of the prim haloprop that hod_vals were observed
+            Values of the prim haloprop that cen_hod_vals were observed
 
-        hod_vals: array
+        cen_hod_vals: array
             The values of the hod observed at prim_haloprop_vals. Is interoplated to give the HOD
 
         threshold : float, optional
@@ -653,14 +653,14 @@ class TabulatedCens(OccupationComponent):
 
         upper_occupation_bound = 1.0
 
-        assert np.all(hod_vals >=0) and np.all(upper_occupation_bound>=hod_vals)
-        assert hod_vals.shape == prim_haloprop_vals.shape
+        assert np.all(cen_hod_vals >=0) and np.all(upper_occupation_bound>=cen_hod_vals)
+        assert cen_hod_vals.shape == prim_haloprop_vals.shape
         assert np.all(prim_haloprop_vals>=0)
 
         self._prim_haloprop_vals = prim_haloprop_vals
-        self._hod_vals = hod_vals
+        self._cen_hod_vals = cen_hod_vals
 
-        self._mean_occupation = interp1d(np.log10(prim_haloprop_vals), hod_vals, kind='cubic')
+        self._mean_occupation = interp1d(np.log10(prim_haloprop_vals), cen_hod_vals, kind='cubic')
 
         # Call the super class constructor, which binds all the
         # arguments to the instance.
@@ -760,9 +760,9 @@ class TabulatedCens(OccupationComponent):
 class AssembiasTabulatedCens(TabulatedCens, ContinuousAssembias):
     '''Tabulated Cens with Continuous Assembly bias'''
 
-    def __init__(self,prim_haloprop_vals, hod_vals, **kwargs):
+    def __init__(self,prim_haloprop_vals, cen_hod_vals, **kwargs):
         '''See halotools docs for more info. '''
-        super(AssembiasTabulatedCens, self).__init__(prim_haloprop_vals, hod_vals,**kwargs)
+        super(AssembiasTabulatedCens, self).__init__(prim_haloprop_vals, cen_hod_vals,**kwargs)
 
         sec_haloprop_key = 'halo_nfw_conc'
         if 'sec_haloprop_key' in kwargs:
@@ -780,9 +780,9 @@ class AssembiasTabulatedCens(TabulatedCens, ContinuousAssembias):
 class HSAssembiasTabulatedCens(TabulatedCens, HeavisideAssembias):
     '''Reddick14 Cens with Heaviside Assembly bias'''
 
-    def __init__(self,prim_haloprop_vals, hod_vals, **kwargs):
+    def __init__(self,prim_haloprop_vals, cen_hod_vals, **kwargs):
         '''See halotools docs for more info. '''
-        super(HSAssembiasTabulatedCens, self).__init__(prim_haloprop_vals, hod_vals,**kwargs)
+        super(HSAssembiasTabulatedCens, self).__init__(prim_haloprop_vals, cen_hod_vals,**kwargs)
 
         sec_haloprop_key = 'halo_nfw_conc'
         if 'sec_haloprop_key' in kwargs:
@@ -801,16 +801,16 @@ class TabulatedSats(OccupationComponent):
     with a fixed, observed relationship.
     """
 
-    def __init__(self, prim_haloprop_vals, hod_vals,
+    def __init__(self, prim_haloprop_vals, sat_hod_vals,
                  threshold=model_defaults.default_luminosity_threshold,
                  prim_haloprop_key=model_defaults.prim_haloprop_key, **kwargs):
         r"""
         Parameters
         ----------
         prim_haloprop_vals: array
-            Values of the prim haloprop that hod_vals were observed
+            Values of the prim haloprop that sat_hod_vals were observed
 
-        hod_vals: array
+        sat_hod_vals: array
             The values of the hod observed at prim_haloprop_vals. Is interoplated to give the HOD
 
         threshold : float, optional
@@ -829,14 +829,14 @@ class TabulatedSats(OccupationComponent):
         """
         upper_occupation_bound = float("inf")
 
-        assert np.all(hod_vals >= 0)
-        assert hod_vals.shape == prim_haloprop_vals.shape
+        assert np.all(sat_hod_vals >= 0)
+        assert sat_hod_vals.shape == prim_haloprop_vals.shape
         assert np.all(prim_haloprop_vals >= 0)
 
         self._prim_haloprop_vals = prim_haloprop_vals
-        self._hod_vals = hod_vals
+        self._sat_hod_vals = sat_hod_vals
 
-        self._mean_occupation = interp1d(np.log10(prim_haloprop_vals), hod_vals, kind='cubic')
+        self._mean_occupation = interp1d(np.log10(prim_haloprop_vals), sat_hod_vals, kind='cubic')
 
         # Call the super class constructor, which binds all the
         # arguments to the instance.
@@ -935,9 +935,9 @@ class TabulatedSats(OccupationComponent):
 class AssembiasTabulatedSats(TabulatedSats, ContinuousAssembias):
     '''Tabulated Sats with Assembly bias'''
 
-    def __init__(self,prim_haloprop_vals, hod_vals, **kwargs):
+    def __init__(self,prim_haloprop_vals, sat_hod_vals, **kwargs):
         '''See halotools docs for more info. '''
-        super(AssembiasTabulatedSats, self).__init__(prim_haloprop_vals, hod_vals,cenocc_model=None, **kwargs)
+        super(AssembiasTabulatedSats, self).__init__(prim_haloprop_vals, sat_hod_vals,cenocc_model=None, **kwargs)
         sec_haloprop_key = 'halo_nfw_conc'
         if 'sec_haloprop_key' in kwargs:
             sec_haloprop_key = kwargs['sec_haloprop_key']
@@ -954,9 +954,9 @@ class AssembiasTabulatedSats(TabulatedSats, ContinuousAssembias):
 class HSAssembiasTabulatedSats(TabulatedSats, HeavisideAssembias):
     '''Tabulated Sats with Assembly bias'''
 
-    def __init__(self,prim_haloprop_vals, hod_vals, **kwargs):
+    def __init__(self,prim_haloprop_vals, sat_hod_vals, **kwargs):
         '''See halotools docs for more info. '''
-        super(HSAssembiasTabulatedSats, self).__init__(prim_haloprop_vals, hod_vals,cenocc_model=None, **kwargs)
+        super(HSAssembiasTabulatedSats, self).__init__(prim_haloprop_vals, sat_hod_vals,cenocc_model=None, **kwargs)
         sec_haloprop_key = 'halo_nfw_conc'
         if 'sec_haloprop_key' in kwargs:
             sec_haloprop_key = kwargs['sec_haloprop_key']
