@@ -358,6 +358,7 @@ class Cat(object):
             Scale factor for the model
         :param HOD:
             HOD model to load. Currently available options are redMagic, stepFunc, and the halotools defatuls.
+            Also may pass in a tuple of cens and sats classes, which will be instantiated here.
         :param check_sf:
             Boolean whether or not to use the passed in scale_factor blindly. Default is false.
         :param hod_kwargs:
@@ -372,51 +373,58 @@ class Cat(object):
         else:
             a = scale_factor  # YOLO
         z = 1.0 / a - 1
+        if type(HOD) is str:
+            assert HOD in {'redMagic', 'hsabRedMagic','abRedMagic', 'reddick14','hsabReddick14','abReddick14','stepFunc',\
+                           'zheng07', 'leauthaud11', 'tinker13', 'hearin15', 'reddick14+redMagic'}
 
-        assert HOD in {'redMagic', 'hsabRedMagic','abRedMagic', 'reddick14','hsabReddick14','abReddick14','stepFunc',\
-                       'zheng07', 'leauthaud11', 'tinker13', 'hearin15', 'reddick14+redMagic'}
+            if HOD in {'redMagic', 'hsabRedMagic','abRedMagic', 'reddick14','stepFunc', 'reddick14+redMagic',\
+                        'hsabReddick14','abReddick14'}: #my custom ones:
+                if HOD == 'redMagic':
+                    cens_occ = RedMagicCens(redshift=z, **hod_kwargs)
+                    sats_occ = RedMagicSats(redshift=z, cenocc_model=cens_occ, **hod_kwargs)
 
+                elif HOD == 'abRedMagic':
+                    cens_occ = AssembiasRedMagicCens(redshift=z, **hod_kwargs)
+                    sats_occ = AssembiasRedMagicSats(redshift=z, cenocc_model=cens_occ, **hod_kwargs)
 
-        if HOD in {'redMagic', 'hsabRedMagic','abRedMagic', 'reddick14','stepFunc', 'reddick14+redMagic',\
-                    'hsabReddick14','abReddick14'}: #my custom ones:
-            if HOD == 'redMagic':
-                cens_occ = RedMagicCens(redshift=z, **hod_kwargs)
-                sats_occ = RedMagicSats(redshift=z, cenocc_model=cens_occ, **hod_kwargs)
+                elif HOD == 'hsabRedMagic':
+                    cens_occ = HSAssembiasRedMagicCens(redshift=z, **hod_kwargs)
+                    sats_occ = HSAssembiasRedMagicSats(redshift=z, cenocc_model=cens_occ, **hod_kwargs)
 
-            elif HOD == 'abRedMagic':
-                cens_occ = AssembiasRedMagicCens(redshift=z, **hod_kwargs)
-                sats_occ = AssembiasRedMagicSats(redshift=z, cenocc_model=cens_occ, **hod_kwargs)
+                elif HOD == 'reddick14':
+                    cens_occ = Reddick14Cens(redshift=z, **hod_kwargs)
+                    sats_occ = Reddick14Sats(redshift=z, cenocc_model = cens_occ,**hod_kwargs) # no modulation
+                elif HOD == 'hsabReddick14':
+                    cens_occ = HSAssembiasReddick14Cens(redshift=z, **hod_kwargs)
+                    sats_occ = HSAssembiasReddick14Sats(redshift=z, cenocc_model = cens_occ,**hod_kwargs) # no modulation
+                elif HOD == 'abReddick14':
+                    cens_occ = AssembiasReddick14Cens(redshift=z, **hod_kwargs)
+                    sats_occ = AssembiasReddick14Sats(redshift=z, cenocc_model = cens_occ,**hod_kwargs) # no modulation
+                elif HOD == 'stepFunc':
+                    cens_occ = StepFuncCens(redshift=z, **hod_kwargs)
+                    sats_occ = StepFuncSats(redshift=z, **hod_kwargs)
+                # TODO make it so I can pass in custom HODs like this.
+                # This will be obtuse when I include assembly bias
+                elif HOD == 'reddick14+redMagic':
+                    cens_occ = Reddick14Cens(redshift=z, **hod_kwargs)
+                    sats_occ = RedMagicSats(redshift=z, cenocc_model = cens_occ, **hod_kwargs)
 
-            elif HOD == 'hsabRedMagic':
-                cens_occ = HSAssembiasRedMagicCens(redshift=z, **hod_kwargs)
-                sats_occ = HSAssembiasRedMagicSats(redshift=z, cenocc_model=cens_occ, **hod_kwargs)
+                self.model = HodModelFactory(
+                    centrals_occupation=cens_occ,
+                    centrals_profile=TrivialPhaseSpace(redshift=z),
+                    satellites_occupation=sats_occ,
+                    satellites_profile=NFWPhaseSpace(redshift=z))
 
-            elif HOD == 'reddick14':
-                cens_occ = Reddick14Cens(redshift=z, **hod_kwargs)
-                sats_occ = Reddick14Sats(redshift=z, cenocc_model = cens_occ,**hod_kwargs) # no modulation
-            elif HOD == 'hsabReddick14':
-                cens_occ = HSAssembiasReddick14Cens(redshift=z, **hod_kwargs)
-                sats_occ = HSAssembiasReddick14Sats(redshift=z, cenocc_model = cens_occ,**hod_kwargs) # no modulation
-            elif HOD == 'abReddick14':
-                cens_occ = AssembiasReddick14Cens(redshift=z, **hod_kwargs)
-                sats_occ = AssembiasReddick14Sats(redshift=z, cenocc_model = cens_occ,**hod_kwargs) # no modulation
-            elif HOD == 'stepFunc':
-                cens_occ = StepFuncCens(redshift=z, **hod_kwargs)
-                sats_occ = StepFuncSats(redshift=z, **hod_kwargs)
-            # TODO make it so I can pass in custom HODs like this.
-            # This will be obtuse when I include assembly bias
-            elif HOD == 'reddick14+redMagic':
-                cens_occ = Reddick14Cens(redshift=z, **hod_kwargs) 
-                sats_occ = RedMagicSats(redshift=z, cenocc_model = cens_occ, **hod_kwargs)
-
+            else:
+                self.model = PrebuiltHodModelFactory(HOD, **hod_kwargs)
+        else:
+            cens_occ = HOD[0](redshift=z, **hod_kwargs)
+            sats_occ = HOD[1](redshift=z, **hod_kwargs)
             self.model = HodModelFactory(
                 centrals_occupation=cens_occ,
                 centrals_profile=TrivialPhaseSpace(redshift=z),
                 satellites_occupation=sats_occ,
                 satellites_profile=NFWPhaseSpace(redshift=z))
-
-        else:
-            self.model = PrebuiltHodModelFactory(HOD, **hod_kwargs)
 
     def get_assembias_key(self, gal_type):
         '''

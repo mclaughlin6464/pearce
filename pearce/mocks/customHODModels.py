@@ -3,6 +3,7 @@
 
 import numpy as np
 from scipy.special import erf
+from scipy.interpolate import interp1d
 import warnings
 from halotools.empirical_models import Zheng07Cens, Zheng07Sats, OccupationComponent, model_defaults
 from halotools.empirical_models import HeavisideAssembias, ContinuousAssembias
@@ -616,3 +617,354 @@ class StepFuncSats(Zheng07Sats):
             mass = np.array([mass])
 
         return np.zeros_like(mass)
+
+
+class TabulatedCens(OccupationComponent):
+    r""" Central occupation that is fixed at observed values. Rather than being parameterized, populate with an HOD
+    with a fixed, observed relationship.
+    """
+
+    def __init__(self, prim_haloprop_vals, hod_vals,
+                 threshold=model_defaults.default_luminosity_threshold,
+                 prim_haloprop_key=model_defaults.prim_haloprop_key, **kwargs):
+        r"""
+        Parameters
+        ----------
+        prim_haloprop_vals: array
+            Values of the prim haloprop that hod_vals were observed
+
+        hod_vals: array
+            The values of the hod observed at prim_haloprop_vals. Is interoplated to give the HOD
+
+        threshold : float, optional
+            Currently doesn't do anything. Will add in later.
+
+        prim_haloprop_key : string, optional
+            String giving the column name of the primary halo property governing
+            the occupation statistics of gal_type galaxies.
+            Default value is specified in the `~halotools.empirical_models.model_defaults` module.
+
+
+        Examples
+        --------
+        >>> cen_model = TabulatedCens()
+        >>> cen_model = TabulatedCens(threshold = -21)
+        """
+
+        upper_occupation_bound = 1.0
+
+        assert np.all(hod_vals >=0) and np.all(upper_occupation_bound>=hod_vals)
+        assert hod_vals.shape == prim_haloprop_vals.shape
+        assert np.all(prim_haloprop_vals>=0)
+
+        self._prim_haloprop_vals = prim_haloprop_vals
+        self._hod_vals = hod_vals
+
+        self._mean_occupation = interp1d(np.log10(prim_haloprop_vals), hod_vals, kind='cubic')
+
+        # Call the super class constructor, which binds all the
+        # arguments to the instance.
+        super(TabulatedCens, self).__init__(
+            gal_type='centrals', threshold=threshold,
+            upper_occupation_bound=upper_occupation_bound,
+            prim_haloprop_key=prim_haloprop_key,
+            **kwargs)
+
+        self.param_dict = self.get_published_parameters()
+
+        self.publications = []
+
+    def mean_occupation(self, **kwargs):
+        r"""Expected number of satellite galaxies in a halo of mass logM.
+        See Equation 5 of arXiv:0308519.
+
+        Parameters
+        ----------
+        prim_haloprop : array, optional
+            Array storing a mass-like variable that governs the occupation statistics.
+            If ``prim_haloprop`` is not passed, then ``table``
+            keyword arguments must be passed.
+
+        table : object, optional
+            Data table storing halo catalog.
+            If ``table`` is not passed, then ``prim_haloprop``
+            keyword arguments must be passed.
+
+        Returns
+        -------
+        mean_ncen : float or array
+            Mean number of central galaxies in a host halo of the specified mass, from the above interpolation
+
+        Examples
+        --------
+        The `mean_occupation` method of all OccupationComponent instances supports
+        two different options for arguments. The first option is to directly
+        pass the array of the primary halo property:
+
+        >>> cen_model = TabulatedCens()
+        >>> testmass = np.logspace(10, 15, num=50)
+        >>> mean_ncen = cen_model.mean_occupation(prim_haloprop = testmass)
+
+        The second option is to pass `mean_occupation` a full halo catalog.
+        In this case, the array storing the primary halo property will be selected
+        by accessing the ``sat_model.prim_haloprop_key`` column of the input halo catalog.
+        For illustration purposes, we'll use a fake halo catalog rather than a
+        (much larger) full one:
+
+        >>> from halotools.sim_manager import FakeSim
+        >>> fake_sim = FakeSim()
+        >>> mean_ncen = cen_model.mean_occupation(table=fake_sim.halo_table)
+
+        """
+
+        # Retrieve the array storing the mass-like variable
+        if 'table' in list(kwargs.keys()):
+            mass = kwargs['table'][self.prim_haloprop_key]
+        elif 'prim_haloprop' in list(kwargs.keys()):
+            mass = np.atleast_1d(kwargs['prim_haloprop'])
+        else:
+            msg = ("\nYou must pass either a ``table`` or ``prim_haloprop`` argument \n"
+                   "to the ``mean_occupation`` function of the ``Zheng07Sats`` class.\n")
+            raise HalotoolsError(msg)
+        over_idxs = mass <=np.max(self._prim_haloprop_vals)
+        under_idxs = mass>=np.min(self._prim_haloprop_vals)
+        contained_indices = np.logical_and(under_idxs, over_idxs) #indexs contained by the interpolator
+        mean_ncen = np.zeros_like(mass)
+        mean_ncen[over_idxs] = self._upper_occupation_bound
+        mean_ncen[under_idxs] = self._lower_occupation_bound
+        mean_ncen[contained_indices] = self._mean_occupation(mass[contained_indices])
+
+        return mean_ncen
+
+
+    def get_published_parameters(self):
+        r"""
+        No parameters for this model, so returns empty dict
+
+        Parameters
+        ----------
+        None
+
+        -------
+        param_dict : dict
+            Empty dictionary
+
+        Examples
+        --------
+        >>> cen_model = TabulatedCens()
+        >>> cen_model.param_dict = cen_model.get_published_parameters(cen_model.threshold)
+        """
+
+        return dict()
+
+class AssembiasTabulatedCens(TabulatedCens, ContinuousAssembias):
+    '''Tabulated Cens with Continuous Assembly bias'''
+
+    def __init__(self,prim_haloprop_vals, hod_vals, **kwargs):
+        '''See halotools docs for more info. '''
+        super(AssembiasTabulatedCens, self).__init__(prim_haloprop_vals, hod_vals,**kwargs)
+
+        sec_haloprop_key = 'halo_nfw_conc'
+        if 'sec_haloprop_key' in kwargs:
+            sec_haloprop_key = kwargs['sec_haloprop_key']
+
+        ContinuousAssembias.__init__(self,
+                                     lower_assembias_bound=self._lower_occupation_bound,
+                                     upper_assembias_bound=self._upper_occupation_bound,
+                                     method_name_to_decorate='mean_occupation',
+                                     sec_haloprop_key=sec_haloprop_key,
+                                     # TODO I'm hardcoding this in. Need error handling and also an option to change!
+                                     **kwargs)
+
+
+class HSAssembiasTabulatedCens(TabulatedCens, HeavisideAssembias):
+    '''Reddick14 Cens with Heaviside Assembly bias'''
+
+    def __init__(self,prim_haloprop_vals, hod_vals, **kwargs):
+        '''See halotools docs for more info. '''
+        super(HSAssembiasTabulatedCens, self).__init__(prim_haloprop_vals, hod_vals,**kwargs)
+
+        sec_haloprop_key = 'halo_nfw_conc'
+        if 'sec_haloprop_key' in kwargs:
+            sec_haloprop_key = kwargs['sec_haloprop_key']
+
+        HeavisideAssembias.__init__(self,
+                                    lower_assembias_bound=self._lower_occupation_bound,
+                                    upper_assembias_bound=self._upper_occupation_bound,
+                                    method_name_to_decorate='mean_occupation',
+                                    sec_haloprop_key=sec_haloprop_key,
+                                    # TODO I'm hardcoding this in. Need error handling and also an option to change!
+                                    **kwargs)
+
+class TabulatedSats(OccupationComponent):
+    r""" Satellite ccupation that is fixed at observed values. Rather than being parameterized, populate with an HOD
+    with a fixed, observed relationship.
+    """
+
+    def __init__(self, prim_haloprop_vals, hod_vals,
+                 threshold=model_defaults.default_luminosity_threshold,
+                 prim_haloprop_key=model_defaults.prim_haloprop_key, **kwargs):
+        r"""
+        Parameters
+        ----------
+        prim_haloprop_vals: array
+            Values of the prim haloprop that hod_vals were observed
+
+        hod_vals: array
+            The values of the hod observed at prim_haloprop_vals. Is interoplated to give the HOD
+
+        threshold : float, optional
+            Currently doesn't do anything. Will add in later.
+
+        prim_haloprop_key : string, optional
+            String giving the column name of the primary halo property governing
+            the occupation statistics of gal_type galaxies.
+            Default value is specified in the `~halotools.empirical_models.model_defaults` module.
+
+        Examples
+        --------
+        >>> sat_model = TabulatedSats()
+        >>> sat_model = TabulatedSats(threshold = -21)
+
+        """
+        upper_occupation_bound = float("inf")
+
+        assert np.all(hod_vals >= 0)
+        assert hod_vals.shape == prim_haloprop_vals.shape
+        assert np.all(prim_haloprop_vals >= 0)
+
+        self._prim_haloprop_vals = prim_haloprop_vals
+        self._hod_vals = hod_vals
+
+        self._mean_occupation = interp1d(np.log10(prim_haloprop_vals), hod_vals, kind='cubic')
+
+        # Call the super class constructor, which binds all the
+        # arguments to the instance.
+        super(TabulatedSats, self).__init__(
+            gal_type='satellites', threshold=threshold,
+            upper_occupation_bound=upper_occupation_bound,
+            prim_haloprop_key=prim_haloprop_key,modulated_with_cenocc=False,
+            **kwargs)
+
+        self.param_dict = self.get_published_parameters()
+
+        self.publications = []
+
+    def mean_occupation(self, **kwargs):
+        r"""Expected number of satellite galaxies in a halo of mass logM.
+
+        Parameters
+        ----------
+        prim_haloprop : array, optional
+            Array storing a mass-like variable that governs the occupation statistics.
+            If ``prim_haloprop`` is not passed, then ``table``
+            keyword arguments must be passed.
+
+        table : object, optional
+            Data table storing halo catalog.
+            If ``table`` is not passed, then ``prim_haloprop``
+            keyword arguments must be passed.
+
+        Returns
+        -------
+        mean_nsat : float or array
+            Mean number of satellite galaxies in a host halo of the specified mass.
+
+        Examples
+        --------
+        The `mean_occupation` method of all OccupationComponent instances supports
+        two different options for arguments. The first option is to directly
+        pass the array of the primary halo property:
+
+        >>> sat_model = TabulatedSats()
+        >>> testmass = np.logspace(10, 15, num=50)
+        >>> mean_nsat = sat_model.mean_occupation(prim_haloprop = testmass)
+
+        The second option is to pass `mean_occupation` a full halo catalog.
+        In this case, the array storing the primary halo property will be selected
+        by accessing the ``sat_model.prim_haloprop_key`` column of the input halo catalog.
+        For illustration purposes, we'll use a fake halo catalog rather than a
+        (much larger) full one:
+
+        >>> from halotools.sim_manager import FakeSim
+        >>> fake_sim = FakeSim()
+        >>> mean_nsat = sat_model.mean_occupation(table=fake_sim.halo_table)
+
+        """
+
+        # Retrieve the array storing the mass-like variable
+        if 'table' in list(kwargs.keys()):
+            mass = kwargs['table'][self.prim_haloprop_key]
+        elif 'prim_haloprop' in list(kwargs.keys()):
+            mass = np.atleast_1d(kwargs['prim_haloprop'])
+        else:
+            msg = ("\nYou must pass either a ``table`` or ``prim_haloprop`` argument \n"
+                   "to the ``mean_occupation`` function of the ``Zheng07Sats`` class.\n")
+            raise HalotoolsError(msg)
+
+        over_idxs = mass <= np.max(self._prim_haloprop_vals)
+        under_idxs = mass >= np.min(self._prim_haloprop_vals)
+        contained_indices = np.logical_and(under_idxs, over_idxs)  # indexs contained by the interpolator
+        mean_nsat = np.zeros_like(mass)
+        mean_nsat[over_idxs] = self._prim_haloprop_vals[-1] #not happy abotu this, no better guess
+        mean_nsat[under_idxs] = self._lower_occupation_bound
+        mean_nsat[contained_indices] = self._mean_occupation(mass[contained_indices])
+
+        return mean_nsat
+
+    def get_published_parameters(self):
+        r"""
+        No published best-fit paramaters for this model, so empty dict
+        ----------
+        None
+
+        -------
+        param_dict : dict
+            Dictionary of model parameters whose values have been set to
+            the values taken from Table 1 of Zheng et al. 2007.
+
+        Examples
+        --------
+        >>> sat_model = TabulatedSats()
+        >>> sat_model.param_dict = sat_model.get_published_parameters(sat_model.threshold)
+        """
+
+        return dict()
+
+
+class AssembiasTabulatedSats(TabulatedSats, ContinuousAssembias):
+    '''Tabulated Sats with Assembly bias'''
+
+    def __init__(self,prim_haloprop_vals, hod_vals, **kwargs):
+        '''See halotools docs for more info. '''
+        super(AssembiasTabulatedSats, self).__init__(prim_haloprop_vals, hod_vals,cenocc_model=None, **kwargs)
+        sec_haloprop_key = 'halo_nfw_conc'
+        if 'sec_haloprop_key' in kwargs:
+            sec_haloprop_key = kwargs['sec_haloprop_key']
+
+        ContinuousAssembias.__init__(self,
+                                     lower_assembias_bound=self._lower_occupation_bound,
+                                     upper_assembias_bound=self._upper_occupation_bound,
+                                     method_name_to_decorate='mean_occupation',
+                                     sec_haloprop_key=sec_haloprop_key,
+                                     # TODO I'm hardcoding this in. Need error handling and also an option to change!
+                                     **kwargs)
+
+
+class HSAssembiasTabulatedSats(TabulatedSats, HeavisideAssembias):
+    '''Tabulated Sats with Assembly bias'''
+
+    def __init__(self,prim_haloprop_vals, hod_vals, **kwargs):
+        '''See halotools docs for more info. '''
+        super(HSAssembiasTabulatedSats, self).__init__(prim_haloprop_vals, hod_vals,cenocc_model=None, **kwargs)
+        sec_haloprop_key = 'halo_nfw_conc'
+        if 'sec_haloprop_key' in kwargs:
+            sec_haloprop_key = kwargs['sec_haloprop_key']
+
+        HeavisideAssembias.__init__(self,
+                                    lower_assembias_bound=self._lower_occupation_bound,
+                                    upper_assembias_bound=self._upper_occupation_bound,
+                                    method_name_to_decorate='mean_occupation',
+                                    sec_haloprop_key=sec_haloprop_key,
+                                    # TODO I'm hardcoding this in. Need error handling and also an option to change!
+                                    **kwargs)
