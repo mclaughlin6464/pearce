@@ -61,7 +61,9 @@ def lnlike(theta, param_names, r_bin_centers, y, combined_inv_cov, obs_nd, obs_n
 
     chi2 = -0.5 * np.dot(delta, np.dot(combined_inv_cov, delta))
 
-    return chi2 - 0.5*((obs_nd-getattr(_cat, nd_func_name)(param_dict))/obs_nd_err)**2
+    
+
+    return chi2# - 0.5*((obs_nd-getattr(_cat, nd_func_name)(param_dict))/obs_nd_err)**2
 
 
 def lnprob(theta, *args):
@@ -146,7 +148,7 @@ def run_mcmc(emu, cat, param_names, y, cov, r_bin_centers, obs_nd, obs_nd_err, n
 
     num_params = len(param_names)
 
-    combined_inv_cov = inv(_emu.ycov + cov)
+    combined_inv_cov = inv(np.diag(_emu.ycov) + cov)
 
     sampler = mc.EnsembleSampler(nwalkers, num_params, lnprob,
                                  threads=ncores, args=(param_names, r_bin_centers, y, combined_inv_cov,\
@@ -157,6 +159,7 @@ def run_mcmc(emu, cat, param_names, y, cov, r_bin_centers, obs_nd, obs_nd_err, n
         low, high = _emu.get_param_bounds(pname)
         pos0[:,idx] = np.random.randn(nwalkers)*(np.abs(high-low)/6.0) + (low+high)/2.0
 
+    #TODO turn this into a generator
     sampler.run_mcmc(pos0, nsteps)
 
 

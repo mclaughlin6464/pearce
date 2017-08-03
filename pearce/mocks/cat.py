@@ -506,7 +506,6 @@ class Cat(object):
         """
         mf = self.calc_mf()
         hod = self.calc_hod(params)
-        print np.sum(mf*hod)
         return np.sum(mf*hod)/((self.Lbox)**3)
 
 
