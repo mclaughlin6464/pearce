@@ -726,9 +726,9 @@ class TabulatedCens(OccupationComponent):
             msg = ("\nYou must pass either a ``table`` or ``prim_haloprop`` argument \n"
                    "to the ``mean_occupation`` function of the ``Zheng07Sats`` class.\n")
             raise HalotoolsError(msg)
-        over_idxs = mass <=np.max(self._prim_haloprop_vals)
-        under_idxs = mass>=np.min(self._prim_haloprop_vals)
-        contained_indices = np.logical_and(under_idxs, over_idxs) #indexs contained by the interpolator
+        over_idxs = mass >np.max(self._prim_haloprop_vals)
+        under_idxs = mass< np.min(self._prim_haloprop_vals)
+        contained_indices = ~np.logical_or(under_idxs, over_idxs) #indexs contained by the interpolator
         mean_ncen = np.zeros_like(mass)
         mean_ncen[over_idxs] = self._upper_occupation_bound
         mean_ncen[under_idxs] = self._lower_occupation_bound
@@ -902,11 +902,11 @@ class TabulatedSats(OccupationComponent):
                    "to the ``mean_occupation`` function of the ``Zheng07Sats`` class.\n")
             raise HalotoolsError(msg)
 
-        over_idxs = mass <= np.max(self._prim_haloprop_vals)
-        under_idxs = mass >= np.min(self._prim_haloprop_vals)
-        contained_indices = np.logical_and(under_idxs, over_idxs)  # indexs contained by the interpolator
+        over_idxs = mass > np.max(self._prim_haloprop_vals)
+        under_idxs = mass < np.min(self._prim_haloprop_vals)
+        contained_indices = ~np.logical_or(under_idxs, over_idxs)  # indexs contained by the interpolator
         mean_nsat = np.zeros_like(mass)
-        mean_nsat[over_idxs] = self._prim_haloprop_vals[-1] #not happy abotu this, no better guess
+        mean_nsat[over_idxs] = self._sat_hod_vals[-1] #not happy abotu this, no better guess
         mean_nsat[under_idxs] = self._lower_occupation_bound
         mean_nsat[contained_indices] = self._mean_occupation(np.log10(mass[contained_indices]) )
 
