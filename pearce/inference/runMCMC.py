@@ -83,7 +83,7 @@ def lnprob(theta, *args):
     return lp + lnlike(theta, *args)
 
 def run_mcmc(emu, cat, param_names, y, cov, r_bin_centers, obs_nd, obs_nd_err, nd_func_name,\
-             fixed_params = {},  nwalkers=1000, nsteps=100, nburn=20, ncores='all'):
+             fixed_params = {},resume_from_previous=None, nwalkers=1000, nsteps=100, nburn=20, ncores='all'):
     """
     Run an MCMC using emcee and the emu. Includes some sanity checks and does some precomputation.
     Also optimized to be more efficient than using emcee naively with the emulator.
@@ -154,10 +154,21 @@ def run_mcmc(emu, cat, param_names, y, cov, r_bin_centers, obs_nd, obs_nd_err, n
                                  threads=ncores, args=(param_names, r_bin_centers, y, combined_inv_cov,\
                                                        obs_nd, obs_nd_err, nd_func_name))
 
-    pos0 = np.zeros((nwalkers, num_params))
-    for idx, pname in enumerate(param_names):
-        low, high = _emu.get_param_bounds(pname)
-        pos0[:,idx] = np.random.randn(nwalkers)*(np.abs(high-low)/6.0) + (low+high)/2.0
+    if resume_from_previous is not None:
+        #load a previous chain 
+        # TODO add error messages here
+        assert nburn == 0        
+        old_chain = np.loadtxt(resume_from_previous)
+        if len(old_chain.shape) == 2:
+            c = old_chain.reshape((nwalkers, -1, num_params))
+            pos0 = c[:,-1,:]
+        else: #3
+            pos0 = old_chain[:,-1,:]
+    else:
+        pos0 = np.zeros((nwalkers, num_params))
+        for idx, pname in enumerate(param_names):
+            low, high = _emu.get_param_bounds(pname)
+            pos0[:,idx] = np.random.randn(nwalkers)*(np.abs(high-low)/6.0) + (low+high)/2.0
 
     #TODO turn this into a generator
     sampler.run_mcmc(pos0, nsteps)
