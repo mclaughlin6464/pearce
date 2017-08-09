@@ -99,7 +99,7 @@ class Cat(object):
         self.columns_to_keep = columns_to_keep
 
         # TODO allow the user access to this? Probably.
-        self.columns_to_convert = set(["halo_rvir", "halo_rs"])
+        self.columns_to_convert = set(["halo_rvir", "halo_rs","halo_rs_klypin"])
         self.columns_to_convert = list(self.columns_to_convert & set(self.columns_to_keep.keys()))
 
         self.halo_finder = halo_finder
