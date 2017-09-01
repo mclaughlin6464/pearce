@@ -114,7 +114,7 @@ class Emu(object):
                 fp_keys = fixed_params.keys()
                 # could maybe do this with sets
                 # Problem is r and z are both acceptable in an LHC, no others.
-                valid_LHC_fp = fp_keys == ['r'] or fp_keys==['z', 'r'] or fp_keys['r','z']
+                valid_LHC_fp = fp_keys == ['r'] or fp_keys==['z', 'r'] or fp_keys==['r','z']
                 if sampling_method == 'LHC' and valid_LHC_fp:  # not allowed
                     raise ValueError('Fixed parameters is not empty, but the data in data_dir is form a Latin Hypercube. \
                                     Cannot performs slices on a LHC.')
