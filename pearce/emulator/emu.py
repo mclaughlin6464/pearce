@@ -147,6 +147,7 @@ class Emu(object):
                 scale_bin_centers = np.array([fixed_params['r']])
                 scale_nbins = 1
                 npoints = len(obs_files)
+                rbin_idx = np.argwhere(fixed_params['r'] == tmp_scale_bin_centers)
 
             if hasattr(self, "scale_bin_centers"):
                 if scale_bin_centers.shape != self.scale_bin_centers.shape or \
@@ -166,6 +167,10 @@ class Emu(object):
 
             for idx, (obs_file, cov_file) in enumerate(izip(obs_files, cov_files)):
                 params, obs, cov = obs_file_reader(obs_file, cov_file)
+
+                if 'r' in fixed_params:
+                    obs = obs[rbin_idx]
+                    cov = cov[rbin_idx, :][:, rbin_idx]
 
                 # skip NaNs
                 if np.any(np.isnan(cov)) or np.any(np.isnan(obs)):
