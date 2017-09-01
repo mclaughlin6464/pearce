@@ -134,9 +134,19 @@ class Emu(object):
 
             # store the binning for the scale_bins
             # assumes that it's the same for each box, which should be true.
-            scale_bin_centers = (bins[:-1] + bins[1:]) / 2
-            scale_nbins = scale_bin_centers.shape[0]
-            npoints = len(obs_files) * scale_nbins  # each file contains NBINS points in r, and each file is a 6-d point
+            if 'r' not in fixed_params:
+                scale_bin_centers = (bins[:-1] + bins[1:]) / 2
+                scale_nbins = scale_bin_centers.shape[0]
+                npoints = len(obs_files) * scale_nbins  # each file contains NBINS points in r, and each file is a 6-d point
+            else:
+                tmp_scale_bin_centers = (bins[:-1] + bins[1:]) / 2
+                try:
+                    assert fixed_params['r'] in tmp_scale_bin_centers
+                except AssertionError:
+                    raise AssertionError("r=%.2f is not a valid fixed parameter value."%fixed_params['r'])
+                scale_bin_centers = np.array([fixed_params['r']])
+                scale_nbins = 1
+                npoints = len(obs_files)
 
             if hasattr(self, "scale_bin_centers"):
                 if scale_bin_centers.shape != self.scale_bin_centers.shape or \
