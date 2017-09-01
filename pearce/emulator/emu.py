@@ -505,10 +505,12 @@ class Emu(object):
             y, y_cov the transformed iv's for the emulator
         """
         if independent_variable is None:
-            y = np.log10(obs)
+            #y = np.log10(obs)
             # Approximately true, may need to revisit
             # yerr[idx * NBINS:(idx + 1) * NBINS] = np.sqrt(np.diag(cov)) / (xi * np.log(10))
-            y_cov = cov/np.outer(obs * np.log(10), obs*np.log(10))
+            #y_cov = cov/np.outer(obs * np.log(10), obs*np.log(10))
+            y = obs
+            y_cov = cov
 
         elif independent_variable == 'r2':  # r2xi
             y = obs * self.scale_bin_centers * self.scale_bin_centers
