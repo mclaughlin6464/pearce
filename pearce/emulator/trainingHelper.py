@@ -111,7 +111,7 @@ def calc_training_points(hod_params, bins,obs, cosmo_params,ordered_params, dirn
             #obs_val = np.mean(obs_repops, axis=0)
             #obs_cov = np.cov(obs_repops, rowvar=False)/np.sqrt(n_repops)#error on mean # TODO make sure is right?
             obs_val = np.mean(obs_repops, axis=0)
-            obs_cov = np.cov(obs_repops, rowvar=False)
+            obs_cov = np.cov(obs_repops, rowvar=False)/n_repops
 
         # Consider storing them all and writing them all at once. May be faster.
         # Writing the hod params as a header. Could possibly recover them from the same file I used to read these in.

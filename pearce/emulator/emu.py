@@ -170,7 +170,7 @@ class Emu(object):
 
                 if 'r' in fixed_params:
                     obs = obs[rbin_idx]
-                    cov = cov[rbin_idx, :][:, rbin_idx]
+                    cov = cov[rbin_idx,rbin_idx]
 
                 # skip NaNs
                 if np.any(np.isnan(cov)) or np.any(np.isnan(obs)):
@@ -278,10 +278,14 @@ class Emu(object):
         # hstack for 1-D
         self.y = np.hstack(ys)
         self.yerr = yerr
+        # TODO delete?
+        #self.yerr/=np.sqrt(10)
         self.ycov = np.vstack(ycovs).mean(axis = 0)
+        #self.ycov/=10
 
         # for now, no mean subtraction
-        self.y_hat = np.zeros(self.y.shape[1]) if len(y.shape) > 1 else 0  # self.y.mean(axis = 0)
+        #self.y_hat = np.zeros(self.y.shape[1]) if len(y.shape) > 1 else 0  #
+        self.y_hat = self.y.mean(axis = 0)
         self.y -= self.y_hat
 
         ndim = self.x.shape[1]
@@ -669,6 +673,8 @@ class Emu(object):
         a = metric[0]
         # TODO other kernels?
         return a * ExpSquaredKernel(metric[1:], ndim=self.emulator_ndim)
+        #return a * Matern32Kernel(metric[1:], ndim=self.emulator_ndim)
+
 
     ###Emulation and methods that Utilize it############################################################################
     def emulate(self, em_params, gp_errs=False):
@@ -1066,11 +1072,11 @@ class OriginalRecipe(Emu):
         if self.method == 'gp':
             if gp_errs:
                 mu, cov = self._emulator.predict(self.y, t, mean_only=False)
-                return mu, np.diag(cov)
+                return mu+self.y_hat, np.diag(cov)
             else:
-                return self._emulator.predict(self.y, t, mean_only=True)
+                return self._emulator.predict(self.y, t, mean_only=True)+self.y_hat
         else:
-            return self._emulator.predict(t)
+            return self._emulator.predict(t)+self.y_hat
 
     def train_metric(self, **kwargs):
         """
@@ -1267,6 +1273,8 @@ class ExtraCrispy(Emu):
         self.x = _x
         self.y = _y
         self.yerr = _yerr
+        self.y_hat = self.y.mean(axis = 1)
+        self.y-=self.y_hat
 
     def _build_gp(self, hyperparams):
         """
@@ -1331,7 +1339,7 @@ class ExtraCrispy(Emu):
         mu = np.zeros((self.experts, t.shape[0]))  # experts down, t deep
         err = np.zeros_like(mu)
 
-        for i, (emulator, _y) in enumerate(izip(self._emulators, self.y)):
+        for i, (emulator, _y,_yhat) in enumerate(izip(self._emulators, self.y, self.y_hat)):
             if self.method == 'gp':
                 local_mu, local_cov = emulator.predict(_y, t, mean_only=False)
                 local_err = np.sqrt(np.diag(local_cov))
@@ -1339,7 +1347,7 @@ class ExtraCrispy(Emu):
                 local_mu = emulator.predict(t)
                 local_err = 1.0  # weight with this instead of the errors.
 
-            mu[i, :] = local_mu
+            mu[i, :] = local_mu+_yhat
             err[i, :] = local_err
 
         # now, combine with weighted average
