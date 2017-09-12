@@ -279,9 +279,7 @@ class Emu(object):
         self.y = np.hstack(ys)
         self.yerr = yerr
         # TODO delete?
-        #self.yerr/=np.sqrt(10)
         self.ycov = np.vstack(ycovs).mean(axis = 0)
-        #self.ycov/=10
 
         # for now, no mean subtraction
         #self.y_hat = np.zeros(self.y.shape[1]) if len(y.shape) > 1 else 0  #
