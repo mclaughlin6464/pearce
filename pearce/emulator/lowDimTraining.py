@@ -30,13 +30,14 @@ def low_dim_train(training_dir, ordered_params, independent_variable, n_params =
 
     emu_obj = OriginalRecipe if emu_type == 'OriginalRecipe' else ExtraCrispy
 
-    #TODO change 'r' to something more general
-    if ordered_params[-1].name == 'r':
+    varied_params = ordered_params.keys()
+    if 'r' in ordered_params:
         #we don' do combinations in 'r'
-        varied_params = ordered_params[:-1]
-    else:
-        varied_params = ordered_params[:]
-    hyper_params = {p.name: [] for p in ordered_params}
+        varied_params.remove('r')
+    if 'z' in ordered_params:
+        varied_params.remove('z') 
+
+    hyper_params = {p: [] for p in ordered_params}
     hyper_params['amp'] = [] #special case
     #unique values in the training data
     unique_values = get_unique_values(training_dir)#{p.name:list(set(emu.x[:, idx])) for idx, p in enumerate(varied_params)}
@@ -51,8 +52,8 @@ def low_dim_train(training_dir, ordered_params, independent_variable, n_params =
         #we're being very thorough
         #these are unique values of the params were holding fixed, those not in pc
         fixed_pc = [p for p in varied_params if p not in pc]
-        unique_values_pc = product(*[list(unique_values[p.name]) for p in fixed_pc])
-        n_uv = np.prod([len(list(unique_values[p.name])) for p in fixed_pc])
+        unique_values_pc = product(*[list(unique_values[p]) for p in fixed_pc])
+        n_uv = np.prod([len(list(unique_values[p])) for p in fixed_pc])
 
         if n_uv > n_max:
             #select a subsample
@@ -66,21 +67,21 @@ def low_dim_train(training_dir, ordered_params, independent_variable, n_params =
                 continue
             print uv
             #hold these parameters fixed
-            fixed_params = {p.name:uv[idx] for idx, p in enumerate(fixed_pc)}
+            fixed_params = {p:uv[idx] for idx, p in enumerate(fixed_pc)}
             if emu is None:
-                emu = emu_obj(training_dir, ordered_params, independent_variable, fixed_params)
+                emu = emu_obj(training_dir,independent_variable=independent_variable, fixed_params=fixed_params)
             else:
-                emu.get_training_data(training_dir, independent_variable, fixed_params)
-                emu.build_emulator(independent_variable, fixed_params)
-            success = emu.train()
+                emu.load_training_data(training_dir)
+                emu.build_emulator()
+            success = emu.train_metric()
 
             if not success:
                 continue
 
             for p, m in zip(pc, emu.metric[1:]):
-                hyper_params[p.name].append(m)
+                hyper_params[p].append(m)
             hyper_params['amp'].append(emu.metric[0])
-            if ordered_params[-1].name == 'r': #has 'r'
+            if 'r' in ordered_params: #has 'r'
                 hyper_params['r'].append(emu.metric[-1])
         print
 
