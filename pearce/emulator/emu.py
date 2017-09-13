@@ -1272,7 +1272,7 @@ class ExtraCrispy(Emu):
         self.y = _y
         self.yerr = _yerr
         self.y_hat = self.y.mean(axis = 1)
-        self.y-=self.y_hat
+        self.y-=self.y_hat.reshape((-1, 1))
 
     def _build_gp(self, hyperparams):
         """

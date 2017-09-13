@@ -9,7 +9,7 @@ from collections import defaultdict
 import numpy as np
 
 from .emu import OriginalRecipe, ExtraCrispy
-from .ioHelpers import obs_file_reader
+from .ioHelpers import training_file_loc_reader, params_file_reader, global_file_reader
 
 #TODO does this need to be in a separate file here? Can I attach it to emu?
 def low_dim_train(training_dir, ordered_params, independent_variable, n_params = 3, emu_type = 'OriginalRecipe'):
@@ -41,6 +41,7 @@ def low_dim_train(training_dir, ordered_params, independent_variable, n_params =
     hyper_params['amp'] = [] #special case
     #unique values in the training data
     unique_values = get_unique_values(training_dir)#{p.name:list(set(emu.x[:, idx])) for idx, p in enumerate(varied_params)}
+    assert len(unique_values)>=0
     #all unique combinations to train
     param_combinations = combinations(varied_params, n_params)
 
@@ -72,7 +73,7 @@ def low_dim_train(training_dir, ordered_params, independent_variable, n_params =
                 emu = emu_obj(training_dir,independent_variable=independent_variable, fixed_params=fixed_params)
             else:
                 emu.load_training_data(training_dir)
-                emu.build_emulator()
+                emu.build_emulator({})
             success = emu.train_metric()
 
             if not success:
@@ -83,7 +84,7 @@ def low_dim_train(training_dir, ordered_params, independent_variable, n_params =
             hyper_params['amp'].append(emu.metric[0])
             if 'r' in ordered_params: #has 'r'
                 hyper_params['r'].append(emu.metric[-1])
-        print
+        print '*'
 
     for key in hyper_params:
         hyper_params[key] = np.array(hyper_params[key])
@@ -91,8 +92,13 @@ def low_dim_train(training_dir, ordered_params, independent_variable, n_params =
     for key, val in hyper_params.iteritems():
         print key,val.shape,np.median(val), val.mean(), val.std()
     print
-
-    return {key:val.mean() for key, val in hyper_params.iteritems()}
+    output = dict()
+    for key, val in hyper_params.iteritems():
+        if len(val)==0:
+            output[key] = 'None'
+        else:
+            output[key] = val.mean()
+    return output#{key:val.mean() for key, val in hyper_params.iteritems()}
 
 def get_unique_values(training_dir):
     '''
@@ -107,10 +113,22 @@ def get_unique_values(training_dir):
         the parameters in the training file.
     '''
     unique_values = defaultdict(set)
-    obs_files = glob(path.join(training_dir, 'obs*.npy'))
-    for obs_file in obs_files:
-        params, _ = obs_file_reader(obs_file)
-        for key, val in params.iteritems():
-            unique_values[key].add(val)
+    scale_factor_dirs = glob(path.join(training_dir, '*/'))
+    for sfd in scale_factor_dirs:
+        #dict where each key is a tuple of params in the file
+        tfl = training_file_loc_reader(sfd)
+        ordered_params = params_file_reader(sfd)
+        pnames = ordered_params.keys()
+        for key in tfl:
+            for p, val in zip(pnames, key):
+                unique_values[p].add(val)
+        
+        #bins, _, _, _ = global_file_reader(sfd)
+        #rbc = (bins[1:]+bins[:-1])/2.0
+        #for r in rbc:
+        #    unique_values['r'].add(r)
+        #a = float(sfd.split('/')[-1][2:])
+        #z = 1.0/a-1
+        #unique_values['z'].add(z)
 
     return unique_values
