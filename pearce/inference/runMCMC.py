@@ -141,7 +141,7 @@ def run_mcmc(emu, cat, param_names, y, cov, r_bin_centers, obs_nd, obs_nd_err, n
     assert _emu.emulator_ndim == len(fixed_params) + len(param_names) +1 #for r
     tmp = param_names[:]
     assert not any([key in param_names for key in fixed_params]) #param names can't include the
-    #tmp.extend(fixed_params.keys())
+    tmp.extend(fixed_params.keys())
     assert _emu.check_param_names(tmp, ignore = ['r'])
 
     assert hasattr(_cat, nd_func_name)
@@ -151,7 +151,7 @@ def run_mcmc(emu, cat, param_names, y, cov, r_bin_centers, obs_nd, obs_nd_err, n
     combined_inv_cov = inv(np.diag(_emu.ycov) + cov)
 
     sampler = mc.EnsembleSampler(nwalkers, num_params, lnprob,
-                                 threads=ncores, args=(param_names, r_bin_centers, fixed_params,y, combined_inv_cov,\
+                                 threads=ncores, args=(param_names, fixed_params, r_bin_centers, y, combined_inv_cov,\
                                                        obs_nd, obs_nd_err, nd_func_name))
 
     if resume_from_previous is not None:
