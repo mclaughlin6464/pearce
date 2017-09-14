@@ -1179,7 +1179,7 @@ class OriginalRecipe(Emu):
         results = op.minimize(nll, p0, jac=grad_nll, **kwargs)
         # results = op.minimize(nll, p0, jac=grad_nll, method='TNC', bounds =\
         #   [(np.log(0.01), np.log(10)) for i in xrange(ndim+1)],options={'maxiter':50})
-        print results
+        #print results
 
         self._emulator.kernel[:] = results.x
         self._emulator.recompute()
