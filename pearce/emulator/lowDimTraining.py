@@ -48,6 +48,8 @@ def low_dim_train(training_dir, ordered_params, independent_variable, n_params =
     emu = None
     n_max = 20#
 
+    print len(param_combinations)*n_max
+
     for pc in param_combinations:
         #for each combination, also train for each combination of unique values
         #we're being very thorough

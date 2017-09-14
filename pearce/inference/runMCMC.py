@@ -31,7 +31,7 @@ def lnprior(theta, param_names, *args):
     return 0
 
 
-def lnlike(theta, param_names, r_bin_centers, y, combined_inv_cov, obs_nd, obs_nd_err, nd_func_name):
+def lnlike(theta, param_names,fixed_params, r_bin_centers, y, combined_inv_cov, obs_nd, obs_nd_err, nd_func_name):
     """
     :param theta:
         Proposed parameters.
@@ -54,6 +54,7 @@ def lnlike(theta, param_names, r_bin_centers, y, combined_inv_cov, obs_nd, obs_n
         The log liklihood of theta given the measurements and the emulator.
     """
     param_dict = dict(izip(param_names, theta))
+    param_dict.update(fixed_params)
     y_bar = _emu.emulate_wrt_r(param_dict, r_bin_centers)[0]
     # should chi2 be calculated in log or linear?
     # answer: the user is responsible for taking the log before it comes here.
@@ -139,7 +140,8 @@ def run_mcmc(emu, cat, param_names, y, cov, r_bin_centers, obs_nd, obs_nd_err, n
     # check we've defined all necessary params
     assert _emu.emulator_ndim == len(fixed_params) + len(param_names) +1 #for r
     tmp = param_names[:]
-    tmp.extend(fixed_params.keys())
+    assert not any([key in param_names for key in fixed_params]) #param names can't include the
+    #tmp.extend(fixed_params.keys())
     assert _emu.check_param_names(tmp, ignore = ['r'])
 
     assert hasattr(_cat, nd_func_name)
@@ -149,7 +151,7 @@ def run_mcmc(emu, cat, param_names, y, cov, r_bin_centers, obs_nd, obs_nd_err, n
     combined_inv_cov = inv(np.diag(_emu.ycov) + cov)
 
     sampler = mc.EnsembleSampler(nwalkers, num_params, lnprob,
-                                 threads=ncores, args=(param_names, r_bin_centers, y, combined_inv_cov,\
+                                 threads=ncores, args=(param_names, r_bin_centers, fixed_params,y, combined_inv_cov,\
                                                        obs_nd, obs_nd_err, nd_func_name))
 
     if resume_from_previous is not None:
