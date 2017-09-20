@@ -1182,6 +1182,7 @@ class ExtraCrispy(Emu):
         :return: None
         """
         super(ExtraCrispy, self).load_training_data(training_dir)
+        self.y+=self.y_hat #need to change this later
 
         # now, parition the data as specified by the user
         # note that ppe does not include overlap
