@@ -228,14 +228,12 @@ def run_mcmc(emu, cat, param_names, y, cov, r_bin_centers, obs_nd, obs_nd_err, n
     return chain
 
 def run_mcmc_iterator(emu, cat, param_names, y, cov, r_bin_centers, obs_nd, obs_nd_err, nd_func_name, \
-             fixed_params={}, resume_from_previous=None, nwalkers=1000, nsteps=100, nburn=20, ncores='all',\
-                      iterations = 100):
+             fixed_params={}, resume_from_previous=None, nwalkers=1000, nsteps=100, nburn=20, ncores='all'):
     """
     Run an MCMC using emcee and the emu. Includes some sanity checks and does some precomputation.
     Also optimized to be more efficient than using emcee naively with the emulator.
 
-    As opposed to run_mcmc, this function also yields every 100 steps of the sampler, to write to file or print
-    incrementally. More safe if you're running a long chain that you're worried about timing out.
+    This version, as opposed to run_mcmc, "yields" each step of the chain, to write to file or to print.
 
     :param emu:
         A trained instance of the Emu object
@@ -263,8 +261,6 @@ def run_mcmc_iterator(emu, cat, param_names, y, cov, r_bin_centers, obs_nd, obs_
         Number of burn in steps, default is 20
     :param ncores:
         Number of cores. Default is 'all', which will use all cores available
-    :param: iterations:
-        Number of iterations to yield each step of the chain. Default is 100.
     :yield:
         chain, collaposed to the shape ((nsteps-nburn)*nwalkers, len(param_names))
     """
@@ -293,5 +289,5 @@ def run_mcmc_iterator(emu, cat, param_names, y, cov, r_bin_centers, obs_nd, obs_
     else:
         pos0 = _random_initial_guess(param_names, nwalkers, num_params)
 
-    for result in sampler.sample(pos0, iterations=iterations, storechain=False):
+    for result in sampler.sample(pos0, iterations=nsteps, storechain=False):
         yield result[0]
