@@ -2,7 +2,6 @@
 """This file hold the function run_mcmc, which  takes a trained emulator and a set of truth data and runs
     and MCMC analysis with a predefined number of steps and walkers."""
 
-
 from multiprocessing import cpu_count
 import warnings
 from itertools import izip
@@ -11,7 +10,8 @@ import numpy as np
 import emcee as mc
 from scipy.linalg import inv
 
-#liklihood functions need to be defined here because the emulator will be made global
+
+# liklihood functions need to be defined here because the emulator will be made global
 
 def lnprior(theta, param_names, *args):
     """
@@ -31,7 +31,7 @@ def lnprior(theta, param_names, *args):
     return 0
 
 
-def lnlike(theta, param_names,fixed_params, r_bin_centers, y, combined_inv_cov, obs_nd, obs_nd_err, nd_func_name):
+def lnlike(theta, param_names, fixed_params, r_bin_centers, y, combined_inv_cov, obs_nd, obs_nd_err, nd_func_name):
     """
     :param theta:
         Proposed parameters.
@@ -62,7 +62,7 @@ def lnlike(theta, param_names,fixed_params, r_bin_centers, y, combined_inv_cov, 
 
     chi2 = -0.5 * np.dot(delta, np.dot(combined_inv_cov, delta))
 
-    return chi2 - 0.5*((obs_nd-getattr(_cat, nd_func_name)(param_dict))/obs_nd_err)**2
+    return chi2 - 0.5 * ((obs_nd - getattr(_cat, nd_func_name)(param_dict)) / obs_nd_err) ** 2
 
 
 def lnprob(theta, *args):
@@ -81,8 +81,9 @@ def lnprob(theta, *args):
 
     return lp + lnlike(theta, *args)
 
-def run_mcmc(emu, cat, param_names, y, cov, r_bin_centers, obs_nd, obs_nd_err, nd_func_name,\
-             fixed_params = {},resume_from_previous=None, nwalkers=1000, nsteps=100, nburn=20, ncores='all'):
+
+def run_mcmc(emu, cat, param_names, y, cov, r_bin_centers, obs_nd, obs_nd_err, nd_func_name, \
+             fixed_params={}, resume_from_previous=None, nwalkers=1000, nsteps=100, nburn=20, ncores='all'):
     """
     Run an MCMC using emcee and the emu. Includes some sanity checks and does some precomputation.
     Also optimized to be more efficient than using emcee naively with the emulator.
@@ -116,7 +117,7 @@ def run_mcmc(emu, cat, param_names, y, cov, r_bin_centers, obs_nd, obs_nd_err, n
     :return:
         chain, collaposed to the shape ((nsteps-nburn)*nwalkers, len(param_names))
     """
-    #make emu global so it can be accessed by the liklihood functions
+    # make emu global so it can be accessed by the liklihood functions
     _emu = emu
     _cat = cat
     global _emu
@@ -138,11 +139,11 @@ def run_mcmc(emu, cat, param_names, y, cov, r_bin_centers, obs_nd, obs_nd_err, n
     assert y.shape[0] == r_bin_centers.shape[0]
 
     # check we've defined all necessary params
-    assert _emu.emulator_ndim == len(fixed_params) + len(param_names) +1 #for r
+    assert _emu.emulator_ndim == len(fixed_params) + len(param_names) + 1  # for r
     tmp = param_names[:]
-    assert not any([key in param_names for key in fixed_params]) #param names can't include the
+    assert not any([key in param_names for key in fixed_params])  # param names can't include the
     tmp.extend(fixed_params.keys())
-    assert _emu.check_param_names(tmp, ignore = ['r'])
+    assert _emu.check_param_names(tmp, ignore=['r'])
 
     assert hasattr(_cat, nd_func_name)
 
@@ -151,28 +152,27 @@ def run_mcmc(emu, cat, param_names, y, cov, r_bin_centers, obs_nd, obs_nd_err, n
     combined_inv_cov = inv(np.diag(_emu.ycov) + cov)
 
     sampler = mc.EnsembleSampler(nwalkers, num_params, lnprob,
-                                 threads=ncores, args=(param_names, fixed_params, r_bin_centers, y, combined_inv_cov,\
+                                 threads=ncores, args=(param_names, fixed_params, r_bin_centers, y, combined_inv_cov, \
                                                        obs_nd, obs_nd_err, nd_func_name))
 
     if resume_from_previous is not None:
-        #load a previous chain 
+        # load a previous chain
         # TODO add error messages here
-        assert nburn == 0        
+        assert nburn == 0
         old_chain = np.loadtxt(resume_from_previous)
         if len(old_chain.shape) == 2:
             c = old_chain.reshape((nwalkers, -1, num_params))
-            pos0 = c[:,-1,:]
-        else: #3
-            pos0 = old_chain[:,-1,:]
+            pos0 = c[:, -1, :]
+        else:  # 3
+            pos0 = old_chain[:, -1, :]
     else:
         pos0 = np.zeros((nwalkers, num_params))
         for idx, pname in enumerate(param_names):
             low, high = _emu.get_param_bounds(pname)
-            pos0[:,idx] = np.random.randn(nwalkers)*(np.abs(high-low)/6.0) + (low+high)/2.0
+            pos0[:, idx] = np.random.randn(nwalkers) * (np.abs(high - low) / 6.0) + (low + high) / 2.0
 
-    #TODO turn this into a generator
+    # TODO turn this into a generator
     sampler.run_mcmc(pos0, nsteps)
-
 
     chain = sampler.chain[:, nburn:, :].reshape((-1, num_params))
 
