@@ -977,7 +977,7 @@ class Emu(object):
         """
         Run an MCMC sampler, using the emulator. Uses emcee to perform sampling.
         :param y:
-            A true y value to recover the parameters of theta. NOTE: The emulator emulates some indepedant variables in 
+            A true y value to recover the parameters of theta. NOTE: The emulator emulates some indepedant variables in
             log space, others in linear. Make sure y is in the same space!
         :param cov:
             The measurement covariance matrix of y
