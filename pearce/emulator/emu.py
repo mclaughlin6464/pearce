@@ -898,7 +898,6 @@ class Emu(object):
             idxs = np.random.choice(x.shape[0], N, replace=False)
 
             x, y = x[idxs], y[idxs]
-
         pred_y = self._emulate_helper(x, False)
         pred_y = pred_y.reshape((-1, scale_nbins))
 
