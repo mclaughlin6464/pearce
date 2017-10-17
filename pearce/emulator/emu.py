@@ -193,8 +193,6 @@ class Emu(object):
             # Yeah isn't this just num_used?
             zeros_slice = np.any(x != 0.0, axis=1)
 
-            print np.any(np.isnan(all_x))
-
             all_x.append(x[zeros_slice])
             all_y.append(y[zeros_slice])
             all_yerr.append(yerr[zeros_slice])
@@ -208,7 +206,6 @@ class Emu(object):
             self._ordered_params['z'] = (np.min(self.redshift_bin_centers), np.max(self.redshift_bin_centers))
 
         # TODO sort?
-        print np.any(np.isnan(np.vstack(all_x)))
         return np.vstack(all_x), np.hstack(all_y), np.hstack(all_yerr)
 
     def get_plot_data(self, em_params, training_dir, independent_variable=None, fixed_params={},
@@ -837,7 +834,6 @@ class Emu(object):
             assert N > 0 and int(N) == N
 
         x, y, _ = self.get_data(truth_dir, {}, self.fixed_params, self.independent_variable)
-        print np.any(np.isnan(x))
 
         sub_dirs, _  = self._get_z_subdirs(truth_dir, fixed_zs=self.fixed_params.get('z', None))
         bins, _, _, _ = global_file_reader(sub_dirs[0])
@@ -852,7 +848,6 @@ class Emu(object):
             idxs = np.random.choice(x.shape[0], N, replace=False)
 
             x, y = x[idxs], y[idxs]
-        print np.any(np.isnan(x))
         pred_y = self._emulate_helper(x, False)
         pred_y = pred_y.reshape((-1, scale_nbins))
 

@@ -58,15 +58,13 @@ class HSAssembiasRedMagicCens(RedMagicCens, HeavisideAssembias):
         super(HSAssembiasRedMagicCens, self).__init__(**kwargs)
 
         sec_haloprop_key = 'halo_nfw_conc'
-        if 'sec_haloprop_key' in kwargs:
-            sec_haloprop_key = kwargs['sec_haloprop_key']
+        if 'sec_haloprop_key' not in kwargs:
+            kwargs['sec_haloprop_key'] = sec_haloprop_key
 
         HeavisideAssembias.__init__(self,
                                     lower_assembias_bound=self._lower_occupation_bound,
                                     upper_assembias_bound=self._upper_occupation_bound,
                                     method_name_to_decorate='mean_occupation',
-                                    sec_haloprop_key=sec_haloprop_key,
-                                    # TODO I'm hardcoding this in. Need error handling and also an option to change!
                                     **kwargs)
 
 
@@ -118,15 +116,13 @@ class HSAssembiasRedMagicSats(RedMagicSats, HeavisideAssembias):
         '''See halotools docs for more info. '''
         super(HSAssembiasRedMagicSats, self).__init__(cenocc_model, **kwargs)
         sec_haloprop_key = 'halo_nfw_conc'
-        if 'sec_haloprop_key' in kwargs:
-            sec_haloprop_key = kwargs['sec_haloprop_key']
+        if 'sec_haloprop_key' not in kwargs:
+            kwargs['sec_haloprop_key'] = sec_haloprop_key
 
         HeavisideAssembias.__init__(self,
                                     lower_assembias_bound=self._lower_occupation_bound,
                                     upper_assembias_bound=self._upper_occupation_bound,
                                     method_name_to_decorate='mean_occupation',
-                                    sec_haloprop_key=sec_haloprop_key,
-                                    # TODO I'm hardcoding this in. Need error handling and also an option to change!
                                     **kwargs)
 
 
@@ -274,15 +270,13 @@ class AssembiasReddick14Cens(Reddick14Cens, ContinuousAssembias):
         super(AssembiasReddick14Cens, self).__init__(**kwargs)
 
         sec_haloprop_key = 'halo_nfw_conc'
-        if 'sec_haloprop_key' in kwargs:
-            sec_haloprop_key = kwargs['sec_haloprop_key']
+        if 'sec_haloprop_key' not in kwargs:
+            kwargs['sec_haloprop_key'] = sec_haloprop_key
 
         ContinuousAssembias.__init__(self,
                                      lower_assembias_bound=self._lower_occupation_bound,
                                      upper_assembias_bound=self._upper_occupation_bound,
                                      method_name_to_decorate='mean_occupation',
-                                     sec_haloprop_key=sec_haloprop_key,
-                                     # TODO I'm hardcoding this in. Need error handling and also an option to change!
                                      **kwargs)
 
 
@@ -294,15 +288,13 @@ class HSAssembiasReddick14Cens(Reddick14Cens, HeavisideAssembias):
         super(HSAssembiasReddick14Cens, self).__init__(**kwargs)
 
         sec_haloprop_key = 'halo_nfw_conc'
-        if 'sec_haloprop_key' in kwargs:
-            sec_haloprop_key = kwargs['sec_haloprop_key']
+        if 'sec_haloprop_key' not in kwargs:
+            kwargs['sec_haloprop_key'] = sec_haloprop_key
 
         HeavisideAssembias.__init__(self,
                                     lower_assembias_bound=self._lower_occupation_bound,
                                     upper_assembias_bound=self._upper_occupation_bound,
                                     method_name_to_decorate='mean_occupation',
-                                    sec_haloprop_key=sec_haloprop_key,
-                                    # TODO I'm hardcoding this in. Need error handling and also an option to change!
                                     **kwargs)
 
 
@@ -541,15 +533,13 @@ class AssembiasReddick14Sats(Reddick14Sats, ContinuousAssembias):
         '''See halotools docs for more info. '''
         super(AssembiasReddick14Sats, self).__init__(cenocc_model=cenocc_model, **kwargs)
         sec_haloprop_key = 'halo_nfw_conc'
-        if 'sec_haloprop_key' in kwargs:
-            sec_haloprop_key = kwargs['sec_haloprop_key']
+        if 'sec_haloprop_key' not in kwargs:
+                kwargs['sec_haloprop_key'] = sec_haloprop_key
 
         ContinuousAssembias.__init__(self,
                                      lower_assembias_bound=self._lower_occupation_bound,
                                      upper_assembias_bound=self._upper_occupation_bound,
                                      method_name_to_decorate='mean_occupation',
-                                     sec_haloprop_key=sec_haloprop_key,
-                                     # TODO I'm hardcoding this in. Need error handling and also an option to change!
                                      **kwargs)
 
 
@@ -560,15 +550,13 @@ class HSAssembiasReddick14Sats(Reddick14Sats, HeavisideAssembias):
         '''See halotools docs for more info. '''
         super(HSAssembiasReddick14Sats, self).__init__(cenocc_model=cenocc_model, **kwargs)
         sec_haloprop_key = 'halo_nfw_conc'
-        if 'sec_haloprop_key' in kwargs:
-            sec_haloprop_key = kwargs['sec_haloprop_key']
+        if 'sec_haloprop_key' not in kwargs:
+            kwargs['sec_haloprop_key'] = sec_haloprop_key
 
         HeavisideAssembias.__init__(self,
                                     lower_assembias_bound=self._lower_occupation_bound,
                                     upper_assembias_bound=self._upper_occupation_bound,
                                     method_name_to_decorate='mean_occupation',
-                                    sec_haloprop_key=sec_haloprop_key,
-                                    # TODO I'm hardcoding this in. Need error handling and also an option to change!
                                     **kwargs)
 
 
@@ -765,15 +753,13 @@ class AssembiasTabulatedCens(TabulatedCens, ContinuousAssembias):
         super(AssembiasTabulatedCens, self).__init__(prim_haloprop_vals, cen_hod_vals,**kwargs)
 
         sec_haloprop_key = 'halo_nfw_conc'
-        if 'sec_haloprop_key' in kwargs:
-            sec_haloprop_key = kwargs['sec_haloprop_key']
+        if 'sec_haloprop_key' not in kwargs:
+            kwargs['sec_haloprop_key'] = sec_haloprop_key
 
         ContinuousAssembias.__init__(self,
                                      lower_assembias_bound=self._lower_occupation_bound,
                                      upper_assembias_bound=self._upper_occupation_bound,
                                      method_name_to_decorate='mean_occupation',
-                                     sec_haloprop_key=sec_haloprop_key,
-                                     # TODO I'm hardcoding this in. Need error handling and also an option to change!
                                      **kwargs)
 
 
@@ -785,15 +771,13 @@ class HSAssembiasTabulatedCens(TabulatedCens, HeavisideAssembias):
         super(HSAssembiasTabulatedCens, self).__init__(prim_haloprop_vals, cen_hod_vals,**kwargs)
 
         sec_haloprop_key = 'halo_nfw_conc'
-        if 'sec_haloprop_key' in kwargs:
-            sec_haloprop_key = kwargs['sec_haloprop_key']
+        if 'sec_haloprop_key' not in kwargs:
+            kwargs['sec_haloprop_key'] = sec_haloprop_key
 
         HeavisideAssembias.__init__(self,
                                     lower_assembias_bound=self._lower_occupation_bound,
                                     upper_assembias_bound=self._upper_occupation_bound,
                                     method_name_to_decorate='mean_occupation',
-                                    sec_haloprop_key=sec_haloprop_key,
-                                    # TODO I'm hardcoding this in. Need error handling and also an option to change!
                                     **kwargs)
 
 class TabulatedSats(OccupationComponent):
@@ -939,15 +923,13 @@ class AssembiasTabulatedSats(TabulatedSats, ContinuousAssembias):
         '''See halotools docs for more info. '''
         super(AssembiasTabulatedSats, self).__init__(prim_haloprop_vals, sat_hod_vals,cenocc_model=None, **kwargs)
         sec_haloprop_key = 'halo_nfw_conc'
-        if 'sec_haloprop_key' in kwargs:
-            sec_haloprop_key = kwargs['sec_haloprop_key']
+        if 'sec_haloprop_key' not in kwargs:
+            kwargs['sec_haloprop_key'] = sec_haloprop_key
 
         ContinuousAssembias.__init__(self,
                                      lower_assembias_bound=self._lower_occupation_bound,
                                      upper_assembias_bound=self._upper_occupation_bound,
                                      method_name_to_decorate='mean_occupation',
-                                     sec_haloprop_key=sec_haloprop_key,
-                                     # TODO I'm hardcoding this in. Need error handling and also an option to change!
                                      **kwargs)
 
 
@@ -958,13 +940,11 @@ class HSAssembiasTabulatedSats(TabulatedSats, HeavisideAssembias):
         '''See halotools docs for more info. '''
         super(HSAssembiasTabulatedSats, self).__init__(prim_haloprop_vals, sat_hod_vals,cenocc_model=None, **kwargs)
         sec_haloprop_key = 'halo_nfw_conc'
-        if 'sec_haloprop_key' in kwargs:
-            sec_haloprop_key = kwargs['sec_haloprop_key']
+        if 'sec_haloprop_key' not in kwargs:
+            kwargs['sec_haloprop_key'] = sec_haloprop_key
 
         HeavisideAssembias.__init__(self,
                                     lower_assembias_bound=self._lower_occupation_bound,
                                     upper_assembias_bound=self._upper_occupation_bound,
                                     method_name_to_decorate='mean_occupation',
-                                    sec_haloprop_key=sec_haloprop_key,
-                                    # TODO I'm hardcoding this in. Need error handling and also an option to change!
                                     **kwargs)
