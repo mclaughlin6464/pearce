@@ -693,7 +693,6 @@ class Emu(object):
             if type(z_bin_centers) is float:
                 z_bin_centers = np.array([z_bin_centers])
             del ep['z']
-
         out = self.emulate_wrt_r_z(ep, r_bin_centers, z_bin_centers, gp_errs)
 
         # Extract depending on if there are errors
