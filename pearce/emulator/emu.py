@@ -61,7 +61,9 @@ class Emu(object):
 
         if independent_variable == 'bias':
             raise NotImplementedError("I have to work on how to do xi_mm first.")
-        assert independent_variable in {None, 'r2'}  # no bias for now.
+        assert independent_variable in {None, 'r2', 'wt'}  # no bias for now.
+        # TODO this is a hack for this week. I need to change how Iv works
+        # We don't want to take the log of wt in the training data... 
 
         # TODO I hate the assembly bias parameter keys. It'd be nice if the use could pass in something
         # else and I make a change
@@ -487,6 +489,11 @@ class Emu(object):
         elif independent_variable == 'r2':  # r2xi
             y = obs * self.scale_bin_centers * self.scale_bin_centers
             y_err = np.sqrt(np.diag(cov)) * self.scale_bin_centers
+        elif independent_variable == 'wt': #w(theta)
+            # TODO Need to fix this in a future build.
+            # This is inconsistent with other builds and a poor way to do it.
+            y = obs
+            y_err = np.sqrt(np.diag(cov))
         else:
             raise ValueError('Invalid independent variable %s' % independent_variable)
 
