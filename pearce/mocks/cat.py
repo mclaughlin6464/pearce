@@ -348,7 +348,7 @@ class Cat(object):
         z = 1.0 / a - 1
 
         self.halocat = CachedHaloCatalog(simname=self.simname, halo_finder=self.halo_finder,
-                                         version_name=self.version_name, redshift=z)
+                                         version_name=self.version_name, redshift=z, dz_tol = 0.01)
 
     # TODO not sure if assembias should be boolean, or keep it as separate HODs?
     def load_model(self, scale_factor, HOD='redMagic', check_sf=True, hod_kwargs={}):
