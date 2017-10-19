@@ -422,6 +422,7 @@ class Cat(object):
         return self.model.input_model_dictionary['%s_occupation' % gal_type]._get_assembias_param_dict_key(0)
 
     # TODO this isn't a traditional observable, so I can't use the same decorator. Not sure how to handle that.
+    # TODO little h's here and in hod?
     def calc_mf(self, mass_bin_range = (9,16), mass_bin_size=0.01, min_ptcl=200):
         """
         Get the mass function of the halo catalog.
@@ -506,7 +507,7 @@ class Cat(object):
         """
         mf = self.calc_mf()
         hod = self.calc_hod(params)
-        return np.sum(mf*hod)/((self.Lbox)**3)
+        return np.sum(mf*hod)/((self.Lbox*self.h)**3)
 
 
     def populate(self, params={}, min_ptcl=200):
