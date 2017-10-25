@@ -20,6 +20,7 @@ from scipy.spatial import KDTree
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 from sklearn.kernel_ridge import KernelRidge
 from sklearn.svm import SVR
+from sklearn.linear_model import LinearRegression
 
 from .ioHelpers import *
 
@@ -29,7 +30,10 @@ class Emu(object):
        controls all loading, manipulation, and emulation of data.'''
 
     __metaclass__ = ABCMeta
-    valid_methods = {'gp', 'svr', 'gbdt', 'rf', 'krr'}  # could add more, coud even check if they exist in sklearn
+    valid_methods = {'gp', 'svr', 'gbdt', 'rf', 'krr', 'linear'}  # could add more, coud even check if they exist in sklearn
+    skl_methods = {'gbdt': GradientBoostingRegressor, 'rf': RandomForestRegressor, \
+                       'svr': SVR, 'krr': KernelRidge, 'linear': LinearRegression}
+
 
     def __init__(self, training_dir, method='gp', hyperparams={}, fixed_params={}, independent_variable=None):
         '''
@@ -71,6 +75,7 @@ class Emu(object):
         self.build_emulator(hyperparams)
 
     ###Data Loading and Manipulation####################################################################################
+    # TODO this function automatically attaches ordered params. Maybe we don't want that?
     def get_data(self, data_dir, em_params, fixed_params, independent_variable):
         """
         Read data in the format compatible with this object and return it
@@ -130,7 +135,7 @@ class Emu(object):
                 cov_files = sorted(glob(path.join(sub_dir, 'cov*.npy')))
 
             for key in em_params:  # assert defined params are in ordered
-                assert any([pname == key for pname in self._ordered_params])
+                assert key in self._ordered_params
 
             # store the binning for the scale_bins
             # assumes that it's the same for each box, which should be true.
@@ -416,6 +421,7 @@ class Emu(object):
                 # check if they're in bounds, else raise an informative warning
                 val = params[pname]
                 # TODO wish i didn't have to hardcode this
+                # NOTE insert from merge, not sure if bad
                 if pname == 'r':
                     val = 10**val
 
@@ -525,6 +531,7 @@ class Emu(object):
         :return:
             y, y_cov the transformed iv's for the emulator
         """
+        # NOTE this invalidates old training data
         if independent_variable is None:
             #y = np.log10(obs)
             # Approximately true, may need to revisit
@@ -630,10 +637,12 @@ class Emu(object):
                 # leave this structure in case I make more later
                 pass
         elif self.obs == 'wp':
+            # TODO parameter name has changed, update
             if independent_variable is None:
-                ig = {'logMmin': 1.7348042925, 'f_c': 0.327508062386, 'logM0': 15.8416094906,
+                ig.update({'logMmin': 1.7348042925, 'f_c': 0.327508062386, 'logM0': 15.8416094906,
                       'sigma_logM': 5.36288382789, 'alpha': 3.63498762588, 'r': 0.306139450843,
-                      'logM1': 1.66509412286, 'amp': 1.18212664544, 'z': 1.0}
+                      'logM1': 1.66509412286, 'amp': 1.18212664544, 'z': 1.0,
+                      'disp_func_slope_centrals': 10.0,'disp_func_slope_satellites': 10.0} )
         else:
             pass  # no other guesses saved yet.
 
@@ -927,6 +936,7 @@ class Emu(object):
 
         elif statistic == 'abs':
             return 10 ** pred_y - 10 ** y
+            #return np.mean(10 ** pred_y - 10 ** y, axis = 0)
         elif statistic == 'log_abs':
             return pred_y - y
             # return np.mean((pred_y - y), axis=0)
@@ -1038,8 +1048,6 @@ class OriginalRecipe(Emu):
             Key word parameters for the emulator
         :return: None
         """
-        skl_methods = {'gbdt': GradientBoostingRegressor, 'rf': RandomForestRegressor, \
-                       'svr': SVR, 'krr': KernelRidge}
 
         if self.method in {'svr', 'krr'}:  # kernel based method
             metric = hyperparams['metric'] if 'metric' in hyperparams else {}
@@ -1052,7 +1060,7 @@ class OriginalRecipe(Emu):
             else:  # krr
                 hyperparams['kernel'] = lambda x1, x2: kernel.value(np.array([x1]), np.array([x2]))
 
-        self._emulator = skl_methods[self.method](**hyperparams)
+        self._emulator = self.skl_methods[self.method](**hyperparams)
         self._emulator.fit(self.x, self.y)
 
     def _emulate_helper(self, t, gp_errs):
@@ -1318,7 +1326,7 @@ class ExtraCrispy(Emu):
             else:  # krr
                 hyperparams['kernel'] = lambda x1, x2: kernel.value(np.array([x1]), np.array([x2]))
 
-        self._emulators = [skl_methods[self.method](**hyperparams) for i in xrange(self.experts)]
+        self._emulators = [self.skl_methods[self.method](**hyperparams) for i in xrange(self.experts)]
 
         for i, (emulator, _x, _y) in enumerate(izip(self._emulators, self.x, self.y)):
             emulator.fit(_x, _y)
