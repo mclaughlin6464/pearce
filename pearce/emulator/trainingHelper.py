@@ -78,6 +78,7 @@ def calc_training_points(hod_params, bins,obs, cosmo_params,ordered_params, dirn
             calc_observable = cat.calc_xi
             obs = 'xi'
 
+
     #check to see if there are kwargs for calc_observable
     args = calc_observable.args #get function args
     kwargs = {}
