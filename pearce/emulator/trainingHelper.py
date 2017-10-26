@@ -11,6 +11,7 @@ import numpy as np
 #from ..mocks.kittens import cat_dict
 #Not happy about this, look into a change.
 
+
 sys.path.append('..')
 from pearce.emulator import global_file_reader, params_file_reader, parameter
 from pearce.mocks import cat_dict
