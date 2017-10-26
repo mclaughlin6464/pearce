@@ -170,6 +170,7 @@ class Cat(object):
                 # do nothing, we're good.
         elif 'scale_factors' in user_kwargs:
             user_kwargs['filenames'] = []
+            # TODO be able to smartly round inputs 
             for a in user_kwargs['scale_factors']:
                 idx = tmp_scale_factors.index(a)  # will raise an error if it's not there
                 sf_idxs.append(idx)
@@ -347,7 +348,7 @@ class Cat(object):
         z = 1.0 / a - 1
 
         self.halocat = CachedHaloCatalog(simname=self.simname, halo_finder=self.halo_finder,
-                                         version_name=self.version_name, redshift=z)
+                                         version_name=self.version_name, redshift=z, dz_tol = 0.01)
 
     # TODO not sure if assembias should be boolean, or keep it as separate HODs?
     def load_model(self, scale_factor, HOD='redMagic', check_sf=True, hod_kwargs={}):
