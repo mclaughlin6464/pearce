@@ -6,7 +6,6 @@ on catalogs. '''
 from os import path
 from itertools import izip
 from multiprocessing import cpu_count
-import warnings
 import inspect
 from time import time
 from glob import glob
@@ -27,6 +26,9 @@ try:
 except ImportError:
     CORRFUNC_AVAILABLE = False
 
+VALID_HODS = {'redMagic', 'hsabRedMagic','abRedMagic', 'reddick14','hsabReddick14','abReddick14','stepFunc',\
+              'zheng07', 'leauthaud11', 'tinker13', 'hearin15', 'reddick14+redMagic', 'tabulated',\
+              'hsabTabulated', 'abTabulated'}
 
 def observable(func):
     '''
@@ -375,11 +377,10 @@ class Cat(object):
             a = scale_factor  # YOLO
         z = 1.0 / a - 1
         if type(HOD) is str:
-            assert HOD in {'redMagic', 'hsabRedMagic','abRedMagic', 'reddick14','hsabReddick14','abReddick14','stepFunc',\
-                           'zheng07', 'leauthaud11', 'tinker13', 'hearin15', 'reddick14+redMagic'}
+            assert HOD in VALID_HODS
 
             if HOD in {'redMagic', 'hsabRedMagic','abRedMagic', 'reddick14','stepFunc', 'reddick14+redMagic',\
-                        'hsabReddick14','abReddick14'}: #my custom ones:
+                        'hsabReddick14','abReddick14', 'tabulated', 'hsabTabulated', 'abTabulated'}: #my custom ones:
                 if HOD == 'redMagic':
                     cens_occ = RedMagicCens(redshift=z, **hod_kwargs)
                     sats_occ = RedMagicSats(redshift=z, cenocc_model=cens_occ, **hod_kwargs)
@@ -401,6 +402,15 @@ class Cat(object):
                 elif HOD == 'abReddick14':
                     cens_occ = AssembiasReddick14Cens(redshift=z, **hod_kwargs)
                     sats_occ = AssembiasReddick14Sats(redshift=z, cenocc_model = cens_occ,**hod_kwargs) # no modulation
+                elif HOD == 'tabulated':
+                    cens_occ = TabulatedCens(redshift=z, **hod_kwargs)
+                    sats_occ = TabulatedSats(redshift=z,**hod_kwargs) # no modulation
+                elif HOD == 'hsabTabulated':
+                    cens_occ = HSAssembiasTabulatedCens(redshift=z, **hod_kwargs)
+                    sats_occ = HSAssembiasTabulatedSats(redshift=z, **hod_kwargs)  # no modulation
+                elif HOD == 'abTabulated':
+                    cens_occ = AssembiasTabulatedCens(redshift=z, **hod_kwargs)
+                    sats_occ = AssembiasTabulatedSats(redshift=z,**hod_kwargs) # no modulation
                 elif HOD == 'stepFunc':
                     cens_occ = StepFuncCens(redshift=z, **hod_kwargs)
                     sats_occ = StepFuncSats(redshift=z, **hod_kwargs)
