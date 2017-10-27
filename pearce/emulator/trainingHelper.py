@@ -4,7 +4,6 @@
 from os import path
 import sys
 import warnings
-import cPickle as pickle
 import numpy as np
 #from trainingData import PARAMS, GLOBAL_FILENAME
 #from ioHelpers import global_file_reader
@@ -12,8 +11,9 @@ import numpy as np
 #Not happy about this, look into a change.
 
 sys.path.append('..')
-from pearce.emulator import global_file_reader, params_file_reader, parameter
+from pearce.emulator import global_file_reader, params_file_reader
 from pearce.mocks import cat_dict
+
 
 # TODO to ioHelpers?
 def load_training_params(param_file):
@@ -54,11 +54,18 @@ def calc_training_points(hod_params, bins,obs, cosmo_params,ordered_params, dirn
     #Could add a **kwargs to load to shorten this.
     #That makes things a little messier though IMO
     # TODO tol?
-    # TODO check that if 'HOD' is not an assembias one, and assembias params are passed in, throw an error.
+    hod_kwargs = cosmo_params['hod_kwargs'] if 'hod_kwargs' in cosmo_params else dict()
+    # TODO this is a BAD idea delete tomorrow
+    for key, val in hod_kwargs.iteritems():
+        if type(val) is str and val.split('.')[-1] == 'npy': #may god have mercy on my soul
+            #with open(val, 'r') as f:
+            #   hod_kwargs[key] = pickle.load(f)
+            hod_kwargs[key] = np.loadtxt(val)
+
     if 'HOD' in cosmo_params:
-        cat.load(cosmo_params['scale_factor'], cosmo_params['HOD'])
+        cat.load(cosmo_params['scale_factor'], cosmo_params['HOD'], hod_kwargs=hod_kwargs)
     else:
-        cat.load(cosmo_params['scale_factor'])
+        cat.load(cosmo_params['scale_factor'], hod_kwargs=hod_kwargs)
 
     #Number of repopulations to do
     n_repops=1

@@ -6,6 +6,7 @@ from time import time
 from os import path, mkdir
 from subprocess import call
 from itertools import izip
+from ast import literal_eval
 import warnings
 import cPickle as pickle
 from collections import OrderedDict
@@ -177,9 +178,8 @@ def training_config_reader(filename):
         n_jobs = int(config['n_jobs'])
         max_time = int(config['max_time'])
         outputdir = config['outputdir'].strip()
-        bins_str = config['bins']
         # need to do a little work to get this right
-        bins = [float(r.strip()) for r in bins_str.strip('[ ]').split(',')]
+        bins = literal_eval(config['bins'])#[float(r.strip()) for r in bins_str.strip('[ ]').split(',')]
 
         # cosmology information assumed to be in the remaining ones!
         # Delete the ones we've removed.
@@ -193,19 +193,14 @@ def training_config_reader(filename):
         # if fails, will throw a KeyError
         cosmo_params['simname']
         # TODO change to scale factors?
-        if '[' in cosmo_params['scale_factor']:  # user passed in a list
-            sf_str = cosmo_params['scale_factor']
-            cosmo_params['scale_factor'] = [float(a.strip()) for a in sf_str.strip('[ ]').split(',')]
-        elif cosmo_params['scale_factor'] == 'all':
-            cosmo_params['scale_factor'] = [cosmo_params['scale_factor'].strip()]
-        else:  # float
-            cosmo_params['scale_factor'] = float(cosmo_params['scale_factor'].strip())
+        cosmo_params['scale_factor'] =literal_eval(cosmo_params['scale_factor'])# [float(a.strip()) for a in sf_str.strip('[ ]').split(',')]
 
-        for cp, t in zip(['Lbox', 'npart', 'n_repops'], [float, int, int]):
+        for key in cosmo_params.iterkeys():
             try:
-                cosmo_params[cp] = t(cosmo_params[cp])
-            except KeyError:
-                continue
+                cosmo_params[key] = literal_eval(cosmo_params[key])
+            except ValueError:
+                cosmo_params[key] = str(cosmo_params[key])
+
 
     except KeyError:
         raise KeyError("The config file %s is missing a parameter." % filename)
