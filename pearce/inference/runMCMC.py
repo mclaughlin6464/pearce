@@ -111,6 +111,8 @@ def _run_tests(y, cov, r_bin_centers, param_names, fixed_params, ncores, nd_func
     tmp = param_names[:]
     assert not any([key in param_names for key in fixed_params])  # param names can't include the
     tmp.extend(fixed_params.keys())
+    print tmp
+    print _emu._ordered_params.keys()
     assert _emu.check_param_names(tmp, ignore=['r'])
 
     assert hasattr(_cat, nd_func_name)
