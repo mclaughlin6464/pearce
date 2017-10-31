@@ -130,7 +130,8 @@ def global_file_reader(dirname, fname=GLOBAL_FILENAME):
                 continue
             elif i == 2:
                 log_obs = any( t in splitLine[1] for t in ('t', 'T', 'y', 'Y'))
-            elif line[0] != '#' or i < 3:
+                continue
+            elif line[0] != '#' or i < 4:
                 continue  # only looking at comments, and first two lines don't have params. Note: Does have cosmo!
             try:
                 cosmo_params[splitLine[0]] = literal_eval(splitLine[1])
