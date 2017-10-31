@@ -311,7 +311,6 @@ def make_training_data(config_filename, ordered_params=None):
             command = make_command(jobname, max_time, outputdir)
             # the odd shell call is to deal with minute differences in the systems.
             call(command, shell=system == 'sherlock')
-            break
 
         #dump the locations
         with open(path.join(outputdir, TRAINING_FILE_LOC_FILENAME), 'w') as f:
