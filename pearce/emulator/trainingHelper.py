@@ -25,15 +25,16 @@ def load_training_params(param_file):
     :return: hod parameters, bins, obs, cosmo paraemters, job id
     '''
     hod_params = np.loadtxt(param_file)
+    if len(hod_params.shape) == 1:
+        hod_params = np.array([hod_params]) #needs to have 2 dims
     dirname = path.dirname(param_file)
-    bins, cosmo_params, obs, _ = global_file_reader(dirname)
+    bins, cosmo_params, obs,log_obs, _ = global_file_reader(dirname)
     ordered_params = params_file_reader(dirname)
-    print param_file
     job_id = int(param_file.split('.')[-2][-3:]) #last 3 digits of paramfile is a unique id.
 
-    return hod_params, bins,obs, cosmo_params,ordered_params, dirname, job_id
+    return hod_params, bins,obs, log_obs, cosmo_params,ordered_params, dirname, job_id
 
-def calc_training_points(hod_params, bins,obs, cosmo_params,ordered_params, dirname, job_id):
+def calc_training_points(hod_params, bins,obs, cosmo_params,ordered_params, dirname, job_id,log_obs=True):
     '''
     given an array of hod parameters (and a few other things) populate a catalog and calculate an observable at those points.
     :param hod_params:
@@ -41,6 +42,10 @@ def calc_training_points(hod_params, bins,obs, cosmo_params,ordered_params, dirn
         points anc calculates the observable at each of them.
     :param bins:
         Radial (or angular) bins for the observable calculation.
+    :param obs:
+        The name of the observable to calculate. String. 
+    :param log_obs: 
+        Bool. Take the log of the observable. Should be true for xi and wp
     :param cosmo_params:
         cosmology information, used for loading a catalog. Required is simname, scale_factor, and anything required to load
         a specific catalog (Lbox, npart, etc.)
@@ -84,7 +89,11 @@ def calc_training_points(hod_params, bins,obs, cosmo_params,ordered_params, dirn
             warnings.warn('WARNING: Observable %s invalid; using default xi' % (obs))
             calc_observable = cat.calc_xi
             obs = 'xi'
-
+    # TODO should be a better way to do this
+    # take the log of some observables, but not all
+    transform_func = lambda x : x
+    if log_obs:#obs in {'xi', 'wp'}: 
+        transform_func = np.log10
 
     #check to see if there are kwargs for calc_observable
     args = calc_observable.args #get function args
@@ -99,6 +108,7 @@ def calc_training_points(hod_params, bins,obs, cosmo_params,ordered_params, dirn
     if kwargs: #if there are kwargs to pass in.
         _calc_observable = calc_observable #might not have to do this, but play it safe.
         calc_observable = lambda bins: _calc_observable(bins, **kwargs)#make it so kwargs are default.
+
 
     for id, hod in enumerate(hod_params):
         #construct a dictionary for the parameters
@@ -140,5 +150,5 @@ if __name__ == '__main__':
 
     args = vars(parser.parse_args())
 
-    hod_params, bins,obs, cosmo_params, ordered_params, dirname, job_id = load_training_params(args['param_file'])
-    calc_training_points(hod_params, bins,obs, cosmo_params,ordered_params, dirname, job_id)
+    hod_params, bins,obs,log_obs, cosmo_params, ordered_params, dirname, job_id = load_training_params(args['param_file'])
+    calc_training_points(hod_params, bins,obs, cosmo_params,ordered_params, dirname, job_id,log_obs=log_obs)

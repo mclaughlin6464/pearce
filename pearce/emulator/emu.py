@@ -104,6 +104,7 @@ class Emu(object):
 
         # If redshfit is fixed, we don't need to open the subdirs for other redshifts.
         sub_dirs, sub_dirs_as = self._get_z_subdirs(data_dir, fixed_zs=fixed_params.get('z', None))
+        
         # we store redshifts, not scale factors
         self.redshift_bin_centers = 1 / sub_dirs_as - 1
 
@@ -111,8 +112,9 @@ class Emu(object):
 
         for sub_dir, z in izip(sub_dirs, self.redshift_bin_centers):
 
-            bins, cosmo_params, obs, sampling_method = global_file_reader(sub_dir)
+            bins, cosmo_params, obs,log_obs, sampling_method = global_file_reader(sub_dir)
             self.obs = obs
+            self._log_obs = log_obs 
 
             # Depending on if this is a full or latin hypercube, and if params are supposed to be fixed, do different
             # things.
@@ -231,7 +233,13 @@ class Emu(object):
             self._ordered_params['z'] = (np.min(self.redshift_bin_centers), np.max(self.redshift_bin_centers))
 
         # TODO sort?
-        return np.vstack(all_x), np.hstack(all_y), np.hstack(all_yerr), np.vstack(all_ycov).mean(axis = 0)
+        stacked_ycov = np.vstack(all_ycov)
+        if len(stacked_ycov.shape) > 2:
+            final_ycov = stacked_ycov.mean(axis=0)
+        else:
+            final_ycov = stacked_ycov
+
+        return np.vstack(all_x), np.hstack(all_y), np.hstack(all_yerr), final_ycov 
 
     def get_plot_data(self, em_params, training_dir, independent_variable=None, fixed_params={},
                       dependent_variable='r'):
@@ -273,7 +281,6 @@ class Emu(object):
         """
         if type(training_dir) is not list:
             training_dir = [training_dir]
-
         xs, ys,yerrs, ycovs = [], [], [], []
         for td in training_dir:
             x, y,yerr, ycov = self.get_data(td, {}, self.fixed_params, self.independent_variable)
@@ -286,7 +293,8 @@ class Emu(object):
         self.y = np.hstack(ys)
         self.yerr = yerr
         # TODO delete?
-        self.ycov = np.vstack(ycovs).mean(axis = 0)
+        stacked_ycov = np.vstack(ycovs)
+        self.ycov = stacked_ycov if len(stacked_ycov.shape) == 2 else stacked_ycov.mean(axis=0)
 
         # for now, no mean subtraction
         #self.y_hat = np.zeros(self.y.shape[1]) if len(y.shape) > 1 else 0  #
@@ -468,7 +476,7 @@ class Emu(object):
         # check the fixed z's against the a's we have in training data
         # only keep dirs that match
         for z in fixed_zs:
-            input_a = 1 / (1 + z)
+            input_a = 1.0 / (1.0 + z)
             idx = np.argmin(np.abs(sub_dirs_as - input_a))
             a = sub_dirs_as[idx]
             if np.abs(a - input_a) > tol:  # tolerance
@@ -534,7 +542,7 @@ class Emu(object):
             y, y_cov the transformed iv's for the emulator
         """
         # NOTE this invalidates old training data
-        if independent_variable is None:
+        if independent_variable is None or independent_variable == 'wt':
             #y = np.log10(obs)
             # Approximately true, may need to revisit
             # yerr[idx * NBINS:(idx + 1) * NBINS] = np.sqrt(np.diag(cov)) / (xi * np.log(10))
@@ -545,11 +553,6 @@ class Emu(object):
         elif independent_variable == 'r2':  # r2xi
             y = obs * self.scale_bin_centers * self.scale_bin_centers
             y_cov = cov * np.outer(self.scale_bin_centers, self.scale_bin_centers)
-        elif independent_variable == 'wt': #w(theta)
-            # TODO Need to fix this in a future build.
-            # This is inconsistent with other builds and a poor way to do it.
-            y = obs
-            y_err = np.sqrt(np.diag(cov))
         else:
             raise ValueError('Invalid independent variable %s' % independent_variable)
 
@@ -1122,7 +1125,6 @@ class OriginalRecipe(Emu):
         results = op.minimize(nll, p0, jac=grad_nll, **kwargs)
         # results = op.minimize(nll, p0, jac=grad_nll, method='TNC', bounds =\
         #   [(np.log(0.01), np.log(10)) for i in xrange(ndim+1)],options={'maxiter':50})
-        print results
 
         self._emulator.kernel[:] = results.x
         self._emulator.recompute()
