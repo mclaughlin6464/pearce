@@ -61,8 +61,13 @@ def lnlike(theta, param_names, fixed_params, r_bin_centers, y, combined_inv_cov,
     delta = y_bar - y
 
     chi2 = -0.5 * np.dot(delta, np.dot(combined_inv_cov, delta))
+    print param_dict
+    print y_bar
+    print y
+    print chi2
+    print '*'*20
 
-    return chi2# - 0.5 * ((obs_nd - getattr(_cat, nd_func_name)(param_dict)) / obs_nd_err) ** 2
+    return chi2 - 0.5 * ((obs_nd - getattr(_cat, nd_func_name)(param_dict)) / obs_nd_err) ** 2
 
 
 def lnprob(theta, *args):
@@ -203,7 +208,6 @@ def run_mcmc(emu, cat, param_names, y, cov, r_bin_centers, obs_nd, obs_nd_err, n
 
     ncores= _run_tests(y, cov, r_bin_centers,param_names, fixed_params, ncores, nd_func_name)
     num_params = len(param_names)
-
     combined_inv_cov = inv(np.diag(_emu.ycov) + cov)
 
     sampler = mc.EnsembleSampler(nwalkers, num_params, lnprob,
