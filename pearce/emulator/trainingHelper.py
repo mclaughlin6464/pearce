@@ -125,7 +125,7 @@ def calc_training_points(hod_params, bins,obs, cosmo_params,ordered_params, dirn
             for repop in xrange(n_repops):
                 cat.populate(hod_dict)
                 obs_i = calc_observable(bins)
-                obs_repops[repop, :] = np.log10(obs_i) #TODO i suppose this may want to be a flag, or rolled into the func?
+                obs_repops[repop, :] = transform_func(obs_i) #TODO i suppose this may want to be a flag, or rolled into the func?
 
             #obs_val = np.mean(obs_repops, axis=0)
             #obs_cov = np.cov(obs_repops, rowvar=False)/np.sqrt(n_repops)#error on mean # TODO make sure is right?

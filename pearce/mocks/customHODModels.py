@@ -6,7 +6,7 @@ from scipy.special import erf
 from scipy.interpolate import interp1d
 import warnings
 from halotools.empirical_models import Zheng07Cens, Zheng07Sats, OccupationComponent, model_defaults
-from halotools.empirical_models import HeavisideAssembias, ContinuousAssembias
+from halotools.empirical_models import HeavisideAssembias, ContinuousAssembias, FreeSplitAssembias
 from halotools.custom_exceptions import HalotoolsError
 
 
@@ -67,6 +67,22 @@ class HSAssembiasRedMagicCens(RedMagicCens, HeavisideAssembias):
                                     method_name_to_decorate='mean_occupation',
                                     **kwargs)
 
+class FSAssembiasRedMagicCens(RedMagicCens, FreeSplitAssembias):
+    '''RedMagic Cens with Heaviside Assembly bias'''
+
+    def __init__(self, **kwargs):
+        '''See halotools docs for more info. '''
+        super(FSAssembiasRedMagicCens, self).__init__(**kwargs)
+
+        sec_haloprop_key = 'halo_nfw_conc'
+        if 'sec_haloprop_key' not in kwargs:
+            kwargs['sec_haloprop_key'] = sec_haloprop_key
+
+        FreeSplitAssembias.__init__(self,
+                                    lower_assembias_bound=self._lower_occupation_bound,
+                                    upper_assembias_bound=self._upper_occupation_bound,
+                                    method_name_to_decorate='mean_occupation',
+                                    **kwargs)
 
 class RedMagicSats(Zheng07Sats):
     '''Tweak of Zheng model to add a new parameter, f_c, denoting a modified central fraction.'''
@@ -124,6 +140,23 @@ class HSAssembiasRedMagicSats(RedMagicSats, HeavisideAssembias):
                                     upper_assembias_bound=self._upper_occupation_bound,
                                     method_name_to_decorate='mean_occupation',
                                     **kwargs)
+
+class FSAssembiasRedMagicSats(RedMagicSats, FreeSplitAssembias):
+    '''RedMagic Cens with Assembly bias'''
+
+    def __init__(self, cenocc_model, **kwargs):
+        '''See halotools docs for more info. '''
+        super(FSAssembiasRedMagicSats, self).__init__(cenocc_model, **kwargs)
+        sec_haloprop_key = 'halo_nfw_conc'
+        if 'sec_haloprop_key' not in kwargs:
+            kwargs['sec_haloprop_key'] = sec_haloprop_key
+
+        FreeSplitAssembias.__init__(self,
+                                    lower_assembias_bound=self._lower_occupation_bound,
+                                    upper_assembias_bound=self._upper_occupation_bound,
+                                    method_name_to_decorate='mean_occupation',
+                                    **kwargs)
+
 
 
 class Reddick14Cens(OccupationComponent):
@@ -296,6 +329,24 @@ class HSAssembiasReddick14Cens(Reddick14Cens, HeavisideAssembias):
                                     upper_assembias_bound=self._upper_occupation_bound,
                                     method_name_to_decorate='mean_occupation',
                                     **kwargs)
+
+class FSAssembiasReddick14Cens(Reddick14Cens, FreeSplitAssembias):
+    '''Reddick14 Cens with Heaviside Assembly bias'''
+
+    def __init__(self, **kwargs):
+        '''See halotools docs for more info. '''
+        super(FSAssembiasReddick14Cens, self).__init__(**kwargs)
+
+        sec_haloprop_key = 'halo_nfw_conc'
+        if 'sec_haloprop_key' not in kwargs:
+            kwargs['sec_haloprop_key'] = sec_haloprop_key
+
+        FreeSplitAssembias.__init__(self,
+                                    lower_assembias_bound=self._lower_occupation_bound,
+                                    upper_assembias_bound=self._upper_occupation_bound,
+                                    method_name_to_decorate='mean_occupation',
+                                    **kwargs)
+
 
 
 class Reddick14Sats(OccupationComponent):
@@ -559,6 +610,22 @@ class HSAssembiasReddick14Sats(Reddick14Sats, HeavisideAssembias):
                                     method_name_to_decorate='mean_occupation',
                                     **kwargs)
 
+class FSAssembiasReddick14Sats(Reddick14Sats, FreeSplitAssembias):
+    '''Reddick14 Cens with Assembly bias'''
+
+    def __init__(self, cenocc_model, **kwargs):
+        '''See halotools docs for more info. '''
+        super(FSAssembiasReddick14Sats, self).__init__(cenocc_model=cenocc_model, **kwargs)
+        sec_haloprop_key = 'halo_nfw_conc'
+        if 'sec_haloprop_key' not in kwargs:
+            kwargs['sec_haloprop_key'] = sec_haloprop_key
+
+        FreeSplitAssembias.__init__(self,
+                                    lower_assembias_bound=self._lower_occupation_bound,
+                                    upper_assembias_bound=self._upper_occupation_bound,
+                                    method_name_to_decorate='mean_occupation',
+                                    **kwargs)
+
 
 class StepFuncCens(Zheng07Cens):
     '''HOD model mainly for test purposes; a step function in centrals.'''
@@ -780,6 +847,25 @@ class HSAssembiasTabulatedCens(TabulatedCens, HeavisideAssembias):
                                     method_name_to_decorate='mean_occupation',
                                     **kwargs)
 
+class FSAssembiasTabulatedCens(TabulatedCens, FreeSplitAssembias):
+    '''Reddick14 Cens with Heaviside Assembly bias'''
+
+    def __init__(self,prim_haloprop_vals, cen_hod_vals, **kwargs):
+        '''See halotools docs for more info. '''
+        super(FSAssembiasTabulatedCens, self).__init__(prim_haloprop_vals, cen_hod_vals,**kwargs)
+
+        sec_haloprop_key = 'halo_nfw_conc'
+        if 'sec_haloprop_key' not in kwargs:
+            kwargs['sec_haloprop_key'] = sec_haloprop_key
+
+        FreeSplitAssembias.__init__(self,
+                                    lower_assembias_bound=self._lower_occupation_bound,
+                                    upper_assembias_bound=self._upper_occupation_bound,
+                                    method_name_to_decorate='mean_occupation',
+                                    **kwargs)
+
+
+
 class TabulatedSats(OccupationComponent):
     r""" Satellite ccupation that is fixed at observed values. Rather than being parameterized, populate with an HOD
     with a fixed, observed relationship.
@@ -944,6 +1030,22 @@ class HSAssembiasTabulatedSats(TabulatedSats, HeavisideAssembias):
             kwargs['sec_haloprop_key'] = sec_haloprop_key
 
         HeavisideAssembias.__init__(self,
+                                    lower_assembias_bound=self._lower_occupation_bound,
+                                    upper_assembias_bound=self._upper_occupation_bound,
+                                    method_name_to_decorate='mean_occupation',
+                                    **kwargs)
+
+class FSAssembiasTabulatedSats(TabulatedSats, FreeSplitAssembias):
+    '''Tabulated Sats with Assembly bias'''
+
+    def __init__(self,prim_haloprop_vals, sat_hod_vals, **kwargs):
+        '''See halotools docs for more info. '''
+        super(FSAssembiasTabulatedSats, self).__init__(prim_haloprop_vals, sat_hod_vals,cenocc_model=None, **kwargs)
+        sec_haloprop_key = 'halo_nfw_conc'
+        if 'sec_haloprop_key' not in kwargs:
+            kwargs['sec_haloprop_key'] = sec_haloprop_key
+
+        FreeSplitAssembias.__init__(self,
                                     lower_assembias_bound=self._lower_occupation_bound,
                                     upper_assembias_bound=self._upper_occupation_bound,
                                     method_name_to_decorate='mean_occupation',
