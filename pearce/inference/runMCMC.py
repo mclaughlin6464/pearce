@@ -61,11 +61,12 @@ def lnlike(theta, param_names, fixed_params, r_bin_centers, y, combined_inv_cov,
     delta = y_bar - y
 
     chi2 = -0.5 * np.dot(delta, np.dot(combined_inv_cov, delta))
-    print param_dict
-    print y_bar
-    print y
-    print chi2
-    print '*'*20
+    #print param_dict
+    #print y_bar
+    #print y
+    #print obs_nd, getattr(_cat, nd_func_name)(param_dict)
+    #print chi2
+    #print '*'*20
 
     return chi2 - 0.5 * ((obs_nd - getattr(_cat, nd_func_name)(param_dict)) / obs_nd_err) ** 2
 
