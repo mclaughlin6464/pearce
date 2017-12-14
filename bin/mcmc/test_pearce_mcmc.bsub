@@ -1,0 +1,8 @@
+###!/bin/bash
+#BSUB -q kipac-ibq 
+#BSUB -W 96:00
+#BSUB -J test_mcmc
+#BSUB -oo /u/ki/swmclau2/Git/pearce/bin/mcmc/test_pearce_mcmc.out    
+#BSUB -n 8 
+
+python /u/ki/swmclau2/Git/pearce/bin/mcmc/test_pearce_mcmc.py 

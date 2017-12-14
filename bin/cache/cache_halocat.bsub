@@ -1,0 +1,7 @@
+###!/bin/bash
+#BSUB -W 8:00
+#BSUB -J test_cache
+#BSUB -oo /u/ki/swmclau2/Git/pearce/bin/test_cache.out    
+#BSUB -n 16 
+
+python /u/ki/swmclau2/Git/pearce/bin/test_cache.py 

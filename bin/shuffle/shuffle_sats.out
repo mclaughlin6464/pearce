@@ -1,0 +1,91 @@
+WARNING: path= was not specified but multiple tables are present, reading in first available table (path=abmatched_halos.hdf5) [astropy.io.misc.hdf5]
+0
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+
+------------------------------------------------------------
+Sender: LSF System <lsf@orange001>
+Subject: Job 262780: <shuffle_sats> in cluster <slac> Done
+
+Job <shuffle_sats> was submitted from host <ki-ls07> by user <swmclau2> in cluster <slac> at Mon Oct 16 15:40:24 2017.
+Job was executed on host(s) <8*orange001>, in queue <kipac-ibq>, as user <swmclau2> in cluster <slac> at Mon Oct 16 15:40:26 2017.
+                            <8*orange004>
+</u/ki/swmclau2> was used as the home directory.
+</u/ki/swmclau2/Git/pearce/bin> was used as the working directory.
+Started at Mon Oct 16 15:40:26 2017.
+Terminated at Mon Oct 16 21:25:52 2017.
+Results reported at Mon Oct 16 21:25:52 2017.
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+###!/bin/bash
+#BSUB -q kipac-ibq 
+#BSUB -W 24:00
+#BSUB -J shuffle_sats
+#BSUB -oo /u/ki/swmclau2/Git/pearce/bin/shuffle_sats.out    
+#BSUB -n 16 
+
+python /u/ki/swmclau2/Git/pearce/bin/shuffle_sats.py 
+
+------------------------------------------------------------
+
+Successfully completed.
+
+Resource usage summary:
+
+    CPU time :                                   20730.54 sec.
+    Max Memory :                                 2253 MB
+    Average Memory :                             1428.81 MB
+    Total Requested Memory :                     -
+    Delta Memory :                               -
+    Max Swap :                                   3063 MB
+    Max Processes :                              4
+    Max Threads :                                5
+    Run time :                                   20726 sec.
+    Turnaround time :                            20728 sec.
+
+The output (if any) is above this job summary.
+

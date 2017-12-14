@@ -1,0 +1,8 @@
+###!/bin/bash
+#BSUB -q kipac-ibq 
+#BSUB -W 72:00
+#BSUB -J test_low_dim
+#BSUB -oo /u/ki/swmclau2/Git/pearce/bin/test_low_dim.out    
+#BSUB -n 16 
+
+python /u/ki/swmclau2/Git/pearce/bin/test_low_dim.py 

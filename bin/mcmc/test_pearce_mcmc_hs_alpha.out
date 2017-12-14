@@ -1,0 +1,65 @@
+WARNING: path= was not specified but multiple tables are present, reading in first available table (path=abmatched_halos.hdf5) [astropy.io.misc.hdf5]
+/u/ki/swmclau2/.conda/envs/hodemulator/lib/python2.7/site-packages/pearce/emulator/emu.py:445: UserWarning: One value for r is outside the bounds (0.096, 33.997) of the emulator.
+  pname, plow, phigh))
+/u/ki/swmclau2/.conda/envs/hodemulator/lib/python2.7/site-packages/pearce/emulator/emu.py:445: UserWarning: One value for r is outside the bounds (0.096, 33.997) of the emulator.
+  pname, plow, phigh))
+/u/ki/swmclau2/.conda/envs/hodemulator/lib/python2.7/site-packages/pearce/emulator/emu.py:445: UserWarning: One value for r is outside the bounds (0.096, 33.997) of the emulator.
+  pname, plow, phigh))
+/u/ki/swmclau2/.conda/envs/hodemulator/lib/python2.7/site-packages/pearce/emulator/emu.py:445: UserWarning: One value for r is outside the bounds (0.096, 33.997) of the emulator.
+  pname, plow, phigh))
+/u/ki/swmclau2/.conda/envs/hodemulator/lib/python2.7/site-packages/pearce/emulator/emu.py:445: UserWarning: One value for r is outside the bounds (0.096, 33.997) of the emulator.
+  pname, plow, phigh))
+/u/ki/swmclau2/.conda/envs/hodemulator/lib/python2.7/site-packages/pearce/emulator/emu.py:445: UserWarning: One value for r is outside the bounds (0.096, 33.997) of the emulator.
+  pname, plow, phigh))
+/u/ki/swmclau2/.conda/envs/hodemulator/lib/python2.7/site-packages/pearce/emulator/emu.py:445: UserWarning: One value for r is outside the bounds (0.096, 33.997) of the emulator.
+  pname, plow, phigh))
+/u/ki/swmclau2/.conda/envs/hodemulator/lib/python2.7/site-packages/pearce/emulator/emu.py:445: UserWarning: One value for r is outside the bounds (0.096, 33.997) of the emulator.
+  pname, plow, phigh))
+User defined signal 2
+
+------------------------------------------------------------
+Sender: LSF System <lsf@orange007>
+Subject: Job 616312: <test_mcmc_hs_alpha> in cluster <slac> Exited
+
+Job <test_mcmc_hs_alpha> was submitted from host <ki-ls09> by user <swmclau2> in cluster <slac> at Wed Nov 22 11:02:31 2017.
+Job was executed on host(s) <8*orange007>, in queue <kipac-ibq>, as user <swmclau2> in cluster <slac> at Wed Nov 22 11:02:34 2017.
+</u/ki/swmclau2> was used as the home directory.
+</u/ki/swmclau2/Git/pearce/bin/mcmc> was used as the working directory.
+Started at Wed Nov 22 11:02:34 2017.
+Terminated at Thu Nov 23 11:02:55 2017.
+Results reported at Thu Nov 23 11:02:55 2017.
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+###!/bin/bash
+#BSUB -q kipac-ibq 
+#BSUB -W 24:00
+#BSUB -J test_mcmc_hs_alpha
+#BSUB -oo /u/ki/swmclau2/Git/pearce/bin/mcmc/test_pearce_mcmc_hs_alpha.out    
+#BSUB -n 8 
+#BSUB -x
+
+python /u/ki/swmclau2/Git/pearce/bin/mcmc/test_pearce_mcmc_hs_alpha.py 
+
+------------------------------------------------------------
+
+TERM_RUNLIMIT: job killed after reaching LSF run time limit.
+Exited with exit code 140.
+
+Resource usage summary:
+
+    CPU time :                                   687611.00 sec.
+    Max Memory :                                 15583 MB
+    Average Memory :                             15554.60 MB
+    Total Requested Memory :                     -
+    Delta Memory :                               -
+    Max Swap :                                   55219 MB
+    Max Processes :                              12
+    Max Threads :                                79
+    Run time :                                   86419 sec.
+    Turnaround time :                            86424 sec.
+
+The output (if any) is above this job summary.
+
