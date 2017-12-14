@@ -26,6 +26,10 @@ def lnprior(theta, param_names, *args):
     """
     for p, t in izip(param_names, theta):
         low, high = _emu.get_param_bounds(p)
+        #low = 0
+        #high = 17
+        #if p[:3] != 'log':
+        #    high = 1.2
         if np.isnan(t) or t < low or t > high:
             return -np.inf
     return 0
@@ -55,18 +59,20 @@ def lnlike(theta, param_names, fixed_params, r_bin_centers, y, combined_inv_cov,
     """
     param_dict = dict(izip(param_names, theta))
     param_dict.update(fixed_params)
+
+    #return - 0.5 * ((obs_nd - getattr(_cat, nd_func_name)(param_dict)) / obs_nd_err) ** 2
+
     y_bar = _emu.emulate_wrt_r(param_dict, r_bin_centers)[0]
     # should chi2 be calculated in log or linear?
     # answer: the user is responsible for taking the log before it comes here.
     delta = y_bar - y
-
-    chi2 = -0.5 * np.dot(delta, np.dot(combined_inv_cov, delta))
-    #print param_dict
     #print y_bar
     #print y
-    #print obs_nd, getattr(_cat, nd_func_name)(param_dict)
-    #print chi2
-    #print '*'*20
+    #print getattr(_cat, nd_func_name)(param_dict)
+    #print obs_nd
+    #print '*'*10
+
+    chi2 = -0.5 * np.dot(delta, np.dot(combined_inv_cov, delta))
 
     return chi2 - 0.5 * ((obs_nd - getattr(_cat, nd_func_name)(param_dict)) / obs_nd_err) ** 2
 
@@ -209,7 +215,7 @@ def run_mcmc(emu, cat, param_names, y, cov, r_bin_centers, obs_nd, obs_nd_err, n
 
     ncores= _run_tests(y, cov, r_bin_centers,param_names, fixed_params, ncores, nd_func_name)
     num_params = len(param_names)
-    combined_inv_cov = inv(np.diag(_emu.ycov) + cov)
+    combined_inv_cov = inv(_emu.ycov + cov)
 
     sampler = mc.EnsembleSampler(nwalkers, num_params, lnprob,
                                  threads=ncores, args=(param_names, fixed_params, r_bin_centers, y, combined_inv_cov, \
@@ -229,6 +235,8 @@ def run_mcmc(emu, cat, param_names, y, cov, r_bin_centers, obs_nd, obs_nd_err, n
     sampler.run_mcmc(pos0, nsteps)
 
     chain = sampler.chain[:, nburn:, :].reshape((-1, num_params))
+
+    #TODO make use of the liklihood in some way too so i can do a BIC analysis
 
     return chain
 

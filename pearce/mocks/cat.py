@@ -664,7 +664,7 @@ class Cat(object):
     # TODO use Joe's code. Remember to add sensible asserts when I do.
     # TODO Jackknife? A way to do it without Joe's code?
     @observable
-    def calc_wp(self, rp_bins, pi_max=40, do_jackknife=True, use_corrfunc=False, n_cores='all', RSD=True, halo=False):
+    def calc_wp(self, rp_bins, pi_max=40, do_jackknife=True, use_corrfunc=False, n_cores='all', RSD=False, halo=False):
         '''
         Calculate the projected correlation on a populated catalog
         :param rp_bins:
@@ -739,7 +739,7 @@ class Cat(object):
         ang_pos = np.vstack((np.degrees(ra), np.degrees(dec))).T
 
         n_rands = 5
-        rand_pos = np.random.random((pos.shape[0] * n_rands, 3)) * self.Lbox * self.h
+        rand_pos = np.random.random((pos.shape[0] * n_rands, 3)) * self.Lbox#*self.h
         rand_vels = np.zeros((pos.shape[0] * n_rands, 3))
 
         rand_ra, rand_dec, rand_z = mock_survey.ra_dec_z(rand_pos * self.h, rand_vels * self.h, cosmo=self.cosmology)

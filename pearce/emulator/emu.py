@@ -652,7 +652,11 @@ class Emu(object):
                 ig.update({'logMmin': 1.7348042925, 'f_c': 0.327508062386, 'logM0': 15.8416094906,
                       'sigma_logM': 5.36288382789, 'alpha': 3.63498762588, 'r': 0.306139450843,
                       'logM1': 1.66509412286, 'amp': 1.18212664544, 'z': 1.0,
-                      'disp_func_slope_centrals': 10.0,'disp_func_slope_satellites': 10.0} )
+                      'disp_func_slope_centrals': 10.0,'disp_func_slope_satellites': 10.0,
+                      'mean_occupation_satellites_assembias_split1':6.63e-3,
+                      'mean_occupation_satellites_assembias_param1':5.484e-1,
+                      'mean_occupation_centrals_assembias_split1':1.2367e2,
+                      'mean_occupation_centrals_assembias_param1':1.123e2} )
         else:
             pass  # no other guesses saved yet.
 
@@ -751,6 +755,7 @@ class Emu(object):
                 mu has shape (n_points, len(r_bin_centers))
                 errs, if returned, has the same shape
         """
+        # TODO this should have scale bin centers as teh default, duh!
         ep = {}
         ep.update(em_params)
         # extract z from the emulator params, if it's there
@@ -904,7 +909,7 @@ class Emu(object):
 
         x, y, _, _ = self.get_data(truth_dir, {}, self.fixed_params, self.independent_variable)
 
-        bins, _, _, _ = global_file_reader(sub_dirs[0])
+        bins, _, _, _,_ = global_file_reader(sub_dirs[0])
         bin_centers = (bins[1:] + bins[:-1]) / 2
         scale_nbins = len(bin_centers)
 
