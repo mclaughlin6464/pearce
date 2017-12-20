@@ -7,6 +7,7 @@ from scipy.interpolate import interp1d
 import warnings
 from halotools.empirical_models import Zheng07Cens, Zheng07Sats, OccupationComponent, model_defaults
 from halotools.empirical_models import HeavisideAssembias, ContinuousAssembias, FreeSplitAssembias, FreeSplitContinuousAssembias
+from halotools.empirical_models import CorrelationAssembias
 from halotools.custom_exceptions import HalotoolsError
 
 
@@ -84,6 +85,42 @@ class FSAssembiasRedMagicCens(RedMagicCens, FreeSplitAssembias):
                                     method_name_to_decorate='mean_occupation',
                                     **kwargs)
 
+class FSCAssembiasRedMagicCens(RedMagicCens, FreeSplitContinuousAssembias):
+    '''RedMagic Cens with Heaviside Assembly bias'''
+
+    def __init__(self, **kwargs):
+        '''See halotools docs for more info. '''
+        super(FSCAssembiasRedMagicCens, self).__init__(**kwargs)
+
+        sec_haloprop_key = 'halo_nfw_conc'
+        if 'sec_haloprop_key' not in kwargs:
+            kwargs['sec_haloprop_key'] = sec_haloprop_key
+
+        FreeSplitContinuousAssembias.__init__(self,
+                                    lower_assembias_bound=self._lower_occupation_bound,
+                                    upper_assembias_bound=self._upper_occupation_bound,
+                                    method_name_to_decorate='mean_occupation',
+                                    **kwargs)
+
+
+
+class CorrAssembiasRedMagicCens(RedMagicCens, CorrelationAssembias):
+    '''RedMagic Cens with Heaviside Assembly bias'''
+
+    def __init__(self, **kwargs):
+        '''See halotools docs for more info. '''
+        super(CorrAssembiasRedMagicCens, self).__init__(**kwargs)
+
+        sec_haloprop_key = 'halo_nfw_conc'
+        if 'sec_haloprop_key' not in kwargs:
+            kwargs['sec_haloprop_key'] = sec_haloprop_key
+
+        CorrelationAssembias.__init__(self,
+                                    lower_assembias_bound=self._lower_occupation_bound,
+                                    upper_assembias_bound=self._upper_occupation_bound,
+                                    method_name_to_decorate='mean_occupation',
+                                    **kwargs)
+
 class RedMagicSats(Zheng07Sats):
     '''Tweak of Zheng model to add a new parameter, f_c, denoting a modified central fraction.'''
 
@@ -152,6 +189,22 @@ class FSAssembiasRedMagicSats(RedMagicSats, FreeSplitAssembias):
             kwargs['sec_haloprop_key'] = sec_haloprop_key
 
         FreeSplitAssembias.__init__(self,
+                                    lower_assembias_bound=self._lower_occupation_bound,
+                                    upper_assembias_bound=self._upper_occupation_bound,
+                                    method_name_to_decorate='mean_occupation',
+                                    **kwargs)
+
+class CorrAssembiasRedMagicSats(RedMagicSats, CorrelationAssembias):
+    '''RedMagic Cens with Assembly bias'''
+
+    def __init__(self, cenocc_model, **kwargs):
+        '''See halotools docs for more info. '''
+        super(CorrAssembiasRedMagicSats, self).__init__(cenocc_model, **kwargs)
+        sec_haloprop_key = 'halo_nfw_conc'
+        if 'sec_haloprop_key' not in kwargs:
+            kwargs['sec_haloprop_key'] = sec_haloprop_key
+
+        CorrelationAssembias.__init__(self,
                                     lower_assembias_bound=self._lower_occupation_bound,
                                     upper_assembias_bound=self._upper_occupation_bound,
                                     method_name_to_decorate='mean_occupation',
@@ -342,6 +395,23 @@ class FSAssembiasReddick14Cens(Reddick14Cens, FreeSplitAssembias):
             kwargs['sec_haloprop_key'] = sec_haloprop_key
 
         FreeSplitAssembias.__init__(self,
+                                    lower_assembias_bound=self._lower_occupation_bound,
+                                    upper_assembias_bound=self._upper_occupation_bound,
+                                    method_name_to_decorate='mean_occupation',
+                                    **kwargs)
+
+class CorrAssembiasReddick14Cens(Reddick14Cens, CorrelationAssembias):
+    '''Reddick14 Cens with Heaviside Assembly bias'''
+
+    def __init__(self, **kwargs):
+        '''See halotools docs for more info. '''
+        super(CorrAssembiasReddick14Cens, self).__init__(**kwargs)
+
+        sec_haloprop_key = 'halo_nfw_conc'
+        if 'sec_haloprop_key' not in kwargs:
+            kwargs['sec_haloprop_key'] = sec_haloprop_key
+
+        CorrelationAssembias.__init__(self,
                                     lower_assembias_bound=self._lower_occupation_bound,
                                     upper_assembias_bound=self._upper_occupation_bound,
                                     method_name_to_decorate='mean_occupation',
@@ -626,6 +696,22 @@ class FSAssembiasReddick14Sats(Reddick14Sats, FreeSplitAssembias):
                                     method_name_to_decorate='mean_occupation',
                                     **kwargs)
 
+class CorrAssembiasReddick14Sats(Reddick14Sats, CorrelationAssembias):
+    '''Reddick14 Cens with Assembly bias'''
+
+    def __init__(self, cenocc_model, **kwargs):
+        '''See halotools docs for more info. '''
+        super(CorrAssembiasReddick14Sats, self).__init__(cenocc_model=cenocc_model, **kwargs)
+        sec_haloprop_key = 'halo_nfw_conc'
+        if 'sec_haloprop_key' not in kwargs:
+            kwargs['sec_haloprop_key'] = sec_haloprop_key
+
+        CorrelationAssembias.__init__(self,
+                                    lower_assembias_bound=self._lower_occupation_bound,
+                                    upper_assembias_bound=self._upper_occupation_bound,
+                                    method_name_to_decorate='mean_occupation',
+                                    **kwargs)
+
 
 class StepFuncCens(Zheng07Cens):
     '''HOD model mainly for test purposes; a step function in centrals.'''
@@ -864,6 +950,23 @@ class FSAssembiasTabulatedCens(TabulatedCens, FreeSplitAssembias):
                                     method_name_to_decorate='mean_occupation',
                                     **kwargs)
 
+class CorrAssembiasTabulatedCens(TabulatedCens, CorrelationAssembias):
+    '''Reddick14 Cens with Heaviside Assembly bias'''
+
+    def __init__(self,prim_haloprop_vals, cen_hod_vals, **kwargs):
+        '''See halotools docs for more info. '''
+        super(CorrAssembiasTabulatedCens, self).__init__(prim_haloprop_vals, cen_hod_vals,**kwargs)
+
+        sec_haloprop_key = 'halo_nfw_conc'
+        if 'sec_haloprop_key' not in kwargs:
+            kwargs['sec_haloprop_key'] = sec_haloprop_key
+
+        CorrelationAssembias.__init__(self,
+                                    lower_assembias_bound=self._lower_occupation_bound,
+                                    upper_assembias_bound=self._upper_occupation_bound,
+                                    method_name_to_decorate='mean_occupation',
+                                    **kwargs)
+
 
 
 class TabulatedSats(OccupationComponent):
@@ -1046,6 +1149,22 @@ class FSAssembiasTabulatedSats(TabulatedSats, FreeSplitAssembias):
             kwargs['sec_haloprop_key'] = sec_haloprop_key
 
         FreeSplitAssembias.__init__(self,
+                                    lower_assembias_bound=self._lower_occupation_bound,
+                                    upper_assembias_bound=self._upper_occupation_bound,
+                                    method_name_to_decorate='mean_occupation',
+                                    **kwargs)
+
+class CorrAssembiasTabulatedSats(TabulatedSats, CorrelationAssembias):
+    '''Tabulated Sats with Assembly bias'''
+
+    def __init__(self,prim_haloprop_vals, sat_hod_vals, **kwargs):
+        '''See halotools docs for more info. '''
+        super(CorrAssembiasTabulatedSats, self).__init__(prim_haloprop_vals, sat_hod_vals,cenocc_model=None, **kwargs)
+        sec_haloprop_key = 'halo_nfw_conc'
+        if 'sec_haloprop_key' not in kwargs:
+            kwargs['sec_haloprop_key'] = sec_haloprop_key
+
+        CorrelationAssembias.__init__(self,
                                     lower_assembias_bound=self._lower_occupation_bound,
                                     upper_assembias_bound=self._upper_occupation_bound,
                                     method_name_to_decorate='mean_occupation',

@@ -26,9 +26,12 @@ try:
 except ImportError:
     CORRFUNC_AVAILABLE = False
 
-VALID_HODS = {'redMagic', 'hsabRedMagic','abRedMagic', 'reddick14','hsabReddick14','abReddick14','stepFunc',\
+VALID_HODS = {'redMagic', 'hsabRedMagic','abRedMagic','fsabRedMagic', 'fscabRedMagic','corrRedMagic',\
+              'reddick14','hsabReddick14','abReddick14','fsabReddick14', 'fscabReddick14','corrReddick14','stepFunc',\
               'zheng07', 'leauthaud11', 'tinker13', 'hearin15', 'reddick14+redMagic', 'tabulated',\
-              'hsabTabulated', 'abTabulated','fsabRedMagic','fsabReddick14', 'fsabTabulated'}
+              'hsabTabulated', 'abTabulated','fsabTabulated','fscabTabulated','corrTabulated'}
+
+DEFAULT_HODS = {'zheng07', 'leauthaud11', 'tinker13', 'hearin15'}
 
 
 def observable(func):
@@ -380,9 +383,7 @@ class Cat(object):
         if type(HOD) is str:
             assert HOD in VALID_HODS
 
-            if HOD in {'redMagic', 'hsabRedMagic','abRedMagic', 'reddick14','stepFunc', 'reddick14+redMagic',\
-                        'hsabReddick14','abReddick14', 'tabulated', 'hsabTabulated', 'abTabulated', 'fsabRedMagic',\
-                        'fsabReddick14', 'fsabTabulated'}: #my custom ones:
+            if HOD in  VALID_HODS-DEFAULT_HODS: # my custom ones
                 # TODO this should be a dict of tuples, maybe two to define the modulation behavior
                 if HOD == 'redMagic':
                     cens_occ = RedMagicCens(redshift=z, **hod_kwargs)
@@ -396,6 +397,12 @@ class Cat(object):
                 elif HOD == 'fsabRedMagic':
                     cens_occ = FSAssembiasRedMagicCens(redshift=z, **hod_kwargs)
                     sats_occ = FSAssembiasRedMagicSats(redshift=z, cenocc_model=cens_occ, **hod_kwargs)
+                elif HOD == 'fscabRedMagic':
+                    cens_occ = FSCAssembiasRedMagicCens(redshift=z, **hod_kwargs)
+                    sats_occ = FSCAssembiasRedMagicSats(redshift=z, cenocc_model=cens_occ, **hod_kwargs)
+                elif HOD == 'corrRedMagic':
+                    cens_occ = CorrAssembiasRedMagicCens(redshift=z, **hod_kwargs)
+                    sats_occ = CorrAssembiasRedMagicSats(redshift=z, cenocc_model=cens_occ, **hod_kwargs)
                 elif HOD == 'reddick14':
                     cens_occ = Reddick14Cens(redshift=z, **hod_kwargs)
                     sats_occ = Reddick14Sats(redshift=z, cenocc_model = cens_occ,**hod_kwargs) # no modulation
@@ -405,6 +412,12 @@ class Cat(object):
                 elif HOD == 'fsabReddick14':
                     cens_occ = FSAssembiasReddick14Cens(redshift=z, **hod_kwargs)
                     sats_occ = FSAssembiasReddick14Sats(redshift=z, cenocc_model = cens_occ,**hod_kwargs) # no modulation
+                elif HOD == 'fscabReddick14':
+                    cens_occ = FSCAssembiasReddick14Cens(redshift=z, **hod_kwargs)
+                    sats_occ = FSCAssembiasReddick14Sats(redshift=z, cenocc_model = cens_occ,**hod_kwargs) # no modulation
+                elif HOD == 'corrReddick14':
+                    cens_occ = CorrAssembiasReddick14Cens(redshift=z, **hod_kwargs)
+                    sats_occ = CorrAssembiasReddick14Sats(redshift=z, cenocc_model = cens_occ,**hod_kwargs) # no modulation
                 elif HOD == 'abReddick14':
                     cens_occ = AssembiasReddick14Cens(redshift=z, **hod_kwargs)
                     sats_occ = AssembiasReddick14Sats(redshift=z, cenocc_model = cens_occ,**hod_kwargs) # no modulation
@@ -420,6 +433,12 @@ class Cat(object):
                 elif HOD == 'fsabTabulated':
                     cens_occ = FSAssembiasTabulatedCens(redshift=z, **hod_kwargs)
                     sats_occ = FSAssembiasTabulatedSats(redshift=z,**hod_kwargs) # no modulation
+                elif HOD == 'fscabTabulated':
+                    cens_occ = FSCAssembiasTabulatedCens(redshift=z, **hod_kwargs)
+                    sats_occ = FSCAssembiasTabulatedSats(redshift=z,**hod_kwargs) # no modulation
+                elif HOD == 'corrTabulated':
+                    cens_occ = CorrAssembiasTabulatedCens(redshift=z, **hod_kwargs)
+                    sats_occ = CorrAssembiasTabulatedSats(redshift=z,**hod_kwargs) # no modulation
                 elif HOD == 'stepFunc':
                     cens_occ = StepFuncCens(redshift=z, **hod_kwargs)
                     sats_occ = StepFuncSats(redshift=z, **hod_kwargs)
