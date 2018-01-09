@@ -388,6 +388,7 @@ class Cat(object):
                 if HOD == 'redMagic':
                     cens_occ = RedMagicCens(redshift=z, **hod_kwargs)
                     sats_occ = RedMagicSats(redshift=z, cenocc_model=cens_occ, **hod_kwargs)
+                # the ab ones need to modulated with the baseline model
                 elif HOD == 'abRedMagic':
                     cens_occ = AssembiasRedMagicCens(redshift=z, **hod_kwargs)
                     sats_occ = AssembiasRedMagicSats(redshift=z, cenocc_model=cens_occ, **hod_kwargs)
@@ -405,22 +406,22 @@ class Cat(object):
                     sats_occ = CorrAssembiasRedMagicSats(redshift=z, cenocc_model=cens_occ, **hod_kwargs)
                 elif HOD == 'reddick14':
                     cens_occ = Reddick14Cens(redshift=z, **hod_kwargs)
-                    sats_occ = Reddick14Sats(redshift=z, cenocc_model = cens_occ,**hod_kwargs) # no modulation
+                    sats_occ = Reddick14Sats(redshift=z, **hod_kwargs) # no modulation
                 elif HOD == 'hsabReddick14':
                     cens_occ = HSAssembiasReddick14Cens(redshift=z, **hod_kwargs)
-                    sats_occ = HSAssembiasReddick14Sats(redshift=z, cenocc_model = cens_occ,**hod_kwargs) # no modulation
+                    sats_occ = HSAssembiasReddick14Sats(redshift=z, **hod_kwargs) # no modulation
                 elif HOD == 'fsabReddick14':
                     cens_occ = FSAssembiasReddick14Cens(redshift=z, **hod_kwargs)
-                    sats_occ = FSAssembiasReddick14Sats(redshift=z, cenocc_model = cens_occ,**hod_kwargs) # no modulation
+                    sats_occ = FSAssembiasReddick14Sats(redshift=z, **hod_kwargs) # no modulation
                 elif HOD == 'fscabReddick14':
                     cens_occ = FSCAssembiasReddick14Cens(redshift=z, **hod_kwargs)
-                    sats_occ = FSCAssembiasReddick14Sats(redshift=z, cenocc_model = cens_occ,**hod_kwargs) # no modulation
+                    sats_occ = FSCAssembiasReddick14Sats(redshift=z, **hod_kwargs) # no modulation
                 elif HOD == 'corrReddick14':
                     cens_occ = CorrAssembiasReddick14Cens(redshift=z, **hod_kwargs)
-                    sats_occ = CorrAssembiasReddick14Sats(redshift=z, cenocc_model = cens_occ,**hod_kwargs) # no modulation
+                    sats_occ = CorrAssembiasReddick14Sats(redshift=z, **hod_kwargs) # no modulation
                 elif HOD == 'abReddick14':
                     cens_occ = AssembiasReddick14Cens(redshift=z, **hod_kwargs)
-                    sats_occ = AssembiasReddick14Sats(redshift=z, cenocc_model = cens_occ,**hod_kwargs) # no modulation
+                    sats_occ = AssembiasReddick14Sats(redshift=z, **hod_kwargs) # no modulation
                 elif HOD == 'tabulated':
                     cens_occ = TabulatedCens(redshift=z, **hod_kwargs)
                     sats_occ = TabulatedSats(redshift=z,**hod_kwargs) # no modulation

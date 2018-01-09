@@ -7,7 +7,7 @@ from halotools.mock_observables import wp
 import numpy as np
 from os import path
 
-training_dir = '/u/ki/swmclau2/des/PearceLHC_wp_z_sham_emulator/'
+training_dir = '/home/swmclau2/scratch/PearceLHC_wp_z_sham_emulator/'
 
 em_method = 'gp'
 split_method = 'random'
@@ -19,7 +19,7 @@ emu = ExtraCrispy(training_dir,10, 2, split_method, method=em_method, fixed_para
 #Remember if training data is an LHC can't load a fixed set, do that after
 fixed_params = {'f_c':1.0}#,'logM1': 13.8 }# 'z':0.0}
 
-cosmo_params = {'simname':'chinchilla', 'Lbox':400.0, 'scale_factors':[1.0]}
+cosmo_params = {'simname':'chinchilla', 'Lbox':400.0, 'scale_factors':[1.0], 'system': 'sherlock'}
 cat = cat_dict[cosmo_params['simname']](**cosmo_params)#construct the specified catalog!
 #mbc = np.loadtxt('/nfs/slac/g/ki/ki18/des/swmclau2/AB_tests/mbc.npy')
 #cen_hod = np.loadtxt('/nfs/slac/g/ki/ki18/des/swmclau2/AB_tests/cen_hod.npy')
@@ -49,12 +49,17 @@ rp_bins = np.loadtxt(training_dir+'a_1.00000/global_file.npy')
 rpoints = (rp_bins[1:]+rp_bins[:-1])/2.0
 
 #compute the sham clustering and nd here unambiguously
-shuffle_type = 'sh_shuffled'
+#shuffle_type = 'sh_shuffled'
+shuffle_type = ''
 mag_type = 'vpeak'
-mag_key = 'halo_%s_%s_mag'%(shuffle_type, mag_type)
+if shuffle_type:
+    mag_key = 'halo_%s_%s_mag'%(shuffle_type, mag_type)
+else:
+    mag_key = 'halo_%s_mag'%(mag_type)
+
 
 PMASS = 591421440.0000001 #chinchilla 400/ 2048
-halo_catalog = Table.read('/u/ki/swmclau2/des/AB_tests/abmatched_halos.hdf5', format = 'hdf5')
+halo_catalog = Table.read('/home/swmclau2/scratch/abmatched_halos.hdf5', format = 'hdf5')
 
 mag_cut = -21
 min_ptcl = 200
@@ -62,9 +67,15 @@ min_ptcl = 200
 halo_catalog = halo_catalog[halo_catalog['halo_mvir'] > min_ptcl*cat.pmass] #mass cut
 galaxy_catalog = halo_catalog[ halo_catalog[mag_key] < mag_cut ] # mag cut
 
-sham_pos = np.c_[galaxy_catalog['halo_%s_x'%shuffle_type],\
+if shuffle_type:
+    sham_pos = np.c_[galaxy_catalog['halo_%s_x'%shuffle_type],\
                  galaxy_catalog['halo_%s_y'%shuffle_type],\
                  galaxy_catalog['halo_%s_z'%shuffle_type]]
+else:
+    sham_pos = np.c_[galaxy_catalog['halo_x'],\
+                 galaxy_catalog['halo_y'],\
+                 galaxy_catalog['halo_z']]
+
 y = np.log10(wp(sham_pos*cat.h, rp_bins, 40.0*cat.h, period=cat.Lbox*cat.h, num_threads=1))
 obs_nd = len(galaxy_catalog)*1.0/((cat.Lbox*cat.h)**3)
 
@@ -87,14 +98,14 @@ nwalkers = 200
 nsteps = 5000
 nburn = 0 
 
-savedir = '/u/ki/swmclau2/des/PearceMCMC/'
-chain_fname = path.join(savedir, '%d_walkers_%d_steps_chain_shuffled_sham2.npy'%(nwalkers, nsteps))
+savedir = '/home/swmclau2/scratch/PearceMCMC/'
+chain_fname = path.join(savedir, '%d_walkers_%d_steps_chain_vpeak_sham_no_ab_2.npy'%(nwalkers, nsteps))
 
 with open(chain_fname, 'w') as f:
     f.write('#' + '\t'.join(param_names)+'\n')
 
-for pos in run_mcmc_iterator(emu, cat, param_names, y, cov, rpoints,obs_nd, obs_nd_err,'calc_analytic_nd', fixed_params = fixed_params,nwalkers = nwalkers, nsteps = nsteps, nburn = nburn):#,\
-        #resume_from_previous = '/u/ki/swmclau2/des/PearceMCMC/100_walkers_1000_steps_chain_shuffled_sham.npy')#, ncores = 1)
+for pos in run_mcmc_iterator(emu, cat, param_names, y, cov, rpoints,obs_nd, obs_nd_err,'calc_analytic_nd', fixed_params = fixed_params,nwalkers = nwalkers, nsteps = nsteps, nburn = nburn,\
+        resume_from_previous = path.join(savedir, '%d_walkers_%d_steps_chain_vpeak_sham_no_ab.npy'%(nwalkers, nsteps))):
 
         with open(chain_fname, 'a') as f:
             np.savetxt(f, pos)

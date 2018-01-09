@@ -184,7 +184,7 @@ def training_config_reader(filename):
 
         # cosmology information assumed to be in the remaining ones!
         # Delete the ones we've removed.
-        for key in ['method', 'obs', 'n_points', 'system', 'n_jobs', 'max_time',
+        for key in ['method', 'obs', 'n_points', 'n_jobs', 'max_time',
                     'outputdir', 'bins']:
             del config[key]
 

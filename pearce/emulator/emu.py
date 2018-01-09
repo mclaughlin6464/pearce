@@ -9,7 +9,6 @@ from os import path
 from time import time
 from abc import ABCMeta, abstractmethod
 
-import emcee as mc
 import numpy as np
 import george
 from george.kernels import *
@@ -1315,7 +1314,7 @@ class ExtraCrispy(Emu):
         for _x, _yerr in izip(self.x, self.yerr):
             emulator = george.GP(kernel)
 
-            emulator.compute(_x, _yerr, sort=False, **hyperparams)  # NOTE I'm using a modified version of george!
+            emulator.compute(_x, _yerr,sort=False,**hyperparams)  # NOTE I'm using a modified version of george!
             self._emulators.append(emulator)
 
     def _build_skl(self, hyperparams):
