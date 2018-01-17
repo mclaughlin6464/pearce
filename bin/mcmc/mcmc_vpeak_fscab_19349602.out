@@ -1,0 +1,49 @@
+WARNING: path= was not specified but multiple tables are present, reading in first available table (path=abmatched_halos.hdf5) [astropy.io.misc.hdf5]
+slurmstepd: error: _get_pss: ferror() indicates error on file /proc/30445/smaps
+/home/swmclau2/.local/lib/python2.7/site-packages/pearce/emulator/emu.py:444: UserWarning: One value for r is outside the bounds (0.096, 33.997) of the emulator.
+  pname, plow, phigh))
+/home/swmclau2/.local/lib/python2.7/site-packages/pearce/emulator/emu.py:444: UserWarning: One value for r is outside the bounds (0.096, 33.997) of the emulator.
+  pname, plow, phigh))
+/home/swmclau2/.local/lib/python2.7/site-packages/pearce/emulator/emu.py:444: UserWarning: One value for r is outside the bounds (0.096, 33.997) of the emulator.
+  pname, plow, phigh))
+/home/swmclau2/.local/lib/python2.7/site-packages/pearce/emulator/emu.py:444: UserWarning: One value for r is outside the bounds (0.096, 33.997) of the emulator.
+  pname, plow, phigh))
+/home/swmclau2/.local/lib/python2.7/site-packages/pearce/emulator/emu.py:444: UserWarning: One value for r is outside the bounds (0.096, 33.997) of the emulator.
+  pname, plow, phigh))
+/home/swmclau2/.local/lib/python2.7/site-packages/pearce/emulator/emu.py:444: UserWarning: One value for r is outside the bounds (0.096, 33.997) of the emulator.
+  pname, plow, phigh))
+/home/swmclau2/.local/lib/python2.7/site-packages/pearce/emulator/emu.py:444: UserWarning: One value for r is outside the bounds (0.096, 33.997) of the emulator.
+  pname, plow, phigh))
+/home/swmclau2/.local/lib/python2.7/site-packages/pearce/emulator/emu.py:444: UserWarning: One value for r is outside the bounds (0.096, 33.997) of the emulator.
+  pname, plow, phigh))
+/home/swmclau2/.local/lib/python2.7/site-packages/pearce/emulator/emu.py:444: UserWarning: One value for r is outside the bounds (0.096, 33.997) of the emulator.
+  pname, plow, phigh))
+/home/swmclau2/.local/lib/python2.7/site-packages/pearce/emulator/emu.py:444: UserWarning: One value for r is outside the bounds (0.096, 33.997) of the emulator.
+  pname, plow, phigh))
+/home/swmclau2/.local/lib/python2.7/site-packages/pearce/emulator/emu.py:444: UserWarning: One value for r is outside the bounds (0.096, 33.997) of the emulator.
+  pname, plow, phigh))
+/home/swmclau2/.local/lib/python2.7/site-packages/pearce/emulator/emu.py:444: UserWarning: One value for r is outside the bounds (0.096, 33.997) of the emulator.
+  pname, plow, phigh))
+/home/swmclau2/.local/lib/python2.7/site-packages/pearce/emulator/emu.py:444: UserWarning: One value for r is outside the bounds (0.096, 33.997) of the emulator.
+  pname, plow, phigh))
+/home/swmclau2/.local/lib/python2.7/site-packages/pearce/emulator/emu.py:444: UserWarning: One value for r is outside the bounds (0.096, 33.997) of the emulator.
+  pname, plow, phigh))
+/home/swmclau2/.local/lib/python2.7/site-packages/pearce/emulator/emu.py:444: UserWarning: One value for r is outside the bounds (0.096, 33.997) of the emulator.
+  pname, plow, phigh))
+/home/swmclau2/.local/lib/python2.7/site-packages/pearce/emulator/emu.py:444: UserWarning: One value for r is outside the bounds (0.096, 33.997) of the emulator.
+  pname, plow, phigh))
+/home/swmclau2/.local/lib/python2.7/site-packages/pearce/emulator/emu.py:444: UserWarning: One value for r is outside the bounds (0.096, 33.997) of the emulator.
+  pname, plow, phigh))
+/home/swmclau2/.local/lib/python2.7/site-packages/pearce/emulator/emu.py:444: UserWarning: One value for r is outside the bounds (0.096, 33.997) of the emulator.
+  pname, plow, phigh))
+/home/swmclau2/.local/lib/python2.7/site-packages/pearce/emulator/emu.py:444: UserWarning: One value for r is outside the bounds (0.096, 33.997) of the emulator.
+  pname, plow, phigh))
+/home/swmclau2/.local/lib/python2.7/site-packages/pearce/emulator/emu.py:444: UserWarning: One value for r is outside the bounds (0.096, 33.997) of the emulator.
+  pname, plow, phigh))
+/home/swmclau2/.local/lib/python2.7/site-packages/pearce/emulator/emu.py:444: UserWarning: One value for r is outside the bounds (0.096, 33.997) of the emulator.
+  pname, plow, phigh))
+/home/swmclau2/.local/lib/python2.7/site-packages/pearce/emulator/emu.py:444: UserWarning: One value for r is outside the bounds (0.096, 33.997) of the emulator.
+  pname, plow, phigh))
+slurmstepd: error: *** JOB 19349602 ON sh-1-1 CANCELLED AT 2018-01-05T22:21:24 DUE TO TIME LIMIT ***
+slurmstepd: error: Exceeded step memory limit at some point.
+slurmstepd: error: Exceeded job memory limit at some point.
