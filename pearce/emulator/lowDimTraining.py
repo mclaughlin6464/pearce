@@ -66,7 +66,7 @@ def low_dim_train(training_dir, independent_variable, n_params = 3, emu_type = '
             else:
                 emu.get_training_data(training_dir, independent_variable, fixed_params)
                 emu.build_emulator(independent_variable, fixed_params)
-            success = emu.train()
+            success = emu.train_metric()
 
             if not success:
                 print 'Failed'

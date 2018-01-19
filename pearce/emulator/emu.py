@@ -651,11 +651,15 @@ class Emu(object):
                 ig.update({'logMmin': 1.7348042925, 'f_c': 0.327508062386, 'logM0': 15.8416094906,
                       'sigma_logM': 5.36288382789, 'alpha': 3.63498762588, 'r': 0.306139450843,
                       'logM1': 1.66509412286, 'amp': 1.18212664544, 'z': 1.0,
-                      'disp_func_slope_centrals': 10.0,'disp_func_slope_satellites': 10.0,
-                      'mean_occupation_satellites_assembias_split1':6.63e-3,
-                      'mean_occupation_satellites_assembias_param1':5.484e-1,
-                      'mean_occupation_centrals_assembias_split1':1.2367e2,
-                      'mean_occupation_centrals_assembias_param1':1.123e2} )
+                      'mean_occupation_satellites_assembias_split1':21.02835102,
+                      'mean_occupation_satellites_assembias_slope1':225.64738711,
+                      'mean_occupation_satellites_assembias_param1':89.17850468,
+                      'mean_occupation_satellites_assembias_corr1':1.15892e3,
+                      'mean_occupation_centrals_assembias_split1': 66.97808312,
+                      'mean_occupation_centrals_assembias_slope1':179.90950523,
+                      'mean_occupation_centrals_assembias_param1':80.75541473,
+                      'mean_occupation_centrals_assembias_corr1':3.9659e6} )
+                     
         else:
             pass  # no other guesses saved yet.
 

@@ -7,9 +7,9 @@ ordered_params['sigma_logM'] = (0.2, 1.0)
 ordered_params['logM1'] = (13.0, 16.0)
 ordered_params['logM0'] = (10.0, 14.0)
 
-ordered_params.update({'mean_occupation_centrals_assembias_param1':( -1.0, 1.0),
-                  'mean_occupation_satellites_assembias_param1':( -1.0, 1.0)})
+ordered_params.update({'mean_occupation_centrals_assembias_corr1':( -1.0, 1.0),
+                  'mean_occupation_satellites_assembias_corr1':( -1.0, 1.0)})
 
-make_training_data('/home/swmclau2/Git/pearce/bin/training_data/corrab_emulator.cfg',ordered_params)
+make_training_data('/u/ki/swmclau2/Git/pearce/bin/training_data/corrab_emulator.cfg',ordered_params)
 
 

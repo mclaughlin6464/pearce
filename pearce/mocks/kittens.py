@@ -30,6 +30,7 @@ OUTLIST_COLS = {'halo_id': (0, 'i8'), 'halo_upid': (36, 'i8'),
 #The user shouldn't be updating thee cosmology, simname, etc. The only thing they can change
 #are the scale factors that are loaded/cached (or their filenames). The only other thing
 #maybe worth changing is hlist_cols, but I find that unlikely.
+
 class Aardvark(Cat):
     # Lbox technically required, but I don't even have access to anything besides 400. Ignore for now.
     def __init__(self, system='ki-ls', **kwargs):
@@ -42,6 +43,8 @@ class Aardvark(Cat):
         columns_to_keep = HLIST_COLS
 
         locations = {'ki-ls': '/nfs/slac/g/ki/ki18/des/mbusha/simulations/Aardvark-2PS/Lb400/rockstar/hlists/'}
+        locations['long'] = locations['ki-ls']
+
         assert system in locations
         loc = locations[system]
 
@@ -101,6 +104,7 @@ class Chinchilla(Cat):
         else:
             locations = {'ki-ls': '/nfs/slac/g/ki/ki21/cosmo/yymao/sham_test/resolution-test/',
                          'sherlock':'/scratch/users/swmclau2/hlists/Chinchilla/'}
+            locations['long'] = locations['ki-ls']
 
             assert system in locations
             loc = locations[system]
@@ -121,7 +125,7 @@ class Chinchilla(Cat):
             #add a subdirectory
             loc += 'c%d-%d/' % (int(Lbox), int(npart))
 
-            if system == 'ki-ls': # differences in how the files are stored
+            if system == 'ki-ls' or system == 'long': # differences in how the files are stored
                 gadget_loc = loc
                 loc += '/rockstar/hlists/'
                 gadget_loc+='/output/'
@@ -144,6 +148,7 @@ class Chinchilla(Cat):
         #Chinchillas also have to be cached differently.
         cache_locs = {'ki-ls':'/u/ki/swmclau2/des/halocats/hlist_%.2f.list.%s_%s.hdf5',
                       'sherlock':'/scratch/users/swmclau2/halocats/hlist_%.2f.list.%s_%s.hdf5' }
+        cache_locs['long'] = cache_locs['ki-ls']
         self.cache_filenames = [cache_locs[system] % (a, self.simname, self.version_name)
                            for a in self.scale_factors]  # make sure we don't have redunancies.
 

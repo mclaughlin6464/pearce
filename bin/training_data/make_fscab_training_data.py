@@ -14,6 +14,6 @@ ordered_params.update({'mean_occupation_centrals_assembias_param1':( -1.0, 1.0),
                   'mean_occupation_centrals_assembias_split1':( 0.0, 1.0),
                   'mean_occupation_satellites_assembias_split1':( 0.0, 1.0)} )
 
-make_training_data('/home/swmclau2/Git/pearce/bin/training_data/fscab_emulator.cfg',ordered_params)
+make_training_data('/u/ki/swmclau2/Git/pearce/bin/training_data/fscab_emulator.cfg',ordered_params)
 
 

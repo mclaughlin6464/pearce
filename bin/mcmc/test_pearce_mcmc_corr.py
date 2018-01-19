@@ -7,7 +7,7 @@ from halotools.mock_observables import wp
 import numpy as np
 from os import path
 
-training_dir = '/home/swmclau2/scratch/PearceLHC_wp_z_corrab_emulator/'
+training_dir = '/u/ki/swmclau2/des/PearceLHC_wp_z_corrab_emulator/'
 
 em_method = 'gp'
 split_method = 'random'
@@ -59,7 +59,7 @@ else:
 
 
 PMASS = 591421440.0000001 #chinchilla 400/ 2048
-halo_catalog = Table.read('/home/swmclau2/scratch/abmatched_halos.hdf5', format = 'hdf5')
+halo_catalog = Table.read('/u/ki/swmclau2/des/AB_tests/abmatched_halos.hdf5', format = 'hdf5')
 
 mag_cut = -21
 min_ptcl = 200
@@ -98,7 +98,7 @@ nwalkers = 200
 nsteps = 5000
 nburn = 0 
 
-savedir = '/home/swmclau2/scratch/PearceMCMC/'
+savedir = '/u/ki/swmclau2/des/PearceMCMC/'
 chain_fname = path.join(savedir, '%d_walkers_%d_steps_chain_vpeak_sham_corr.npy'%(nwalkers, nsteps))
 
 with open(chain_fname, 'w') as f:
