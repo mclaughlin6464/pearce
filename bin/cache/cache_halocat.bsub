@@ -1,7 +1,8 @@
 ###!/bin/bash
-#BSUB -W 4:00
+#BSUB -q short
+#BSUB -W 1:00
 #BSUB -J test_cache
-#BSUB -oo /u/ki/swmclau2/Git/pearce/bin/cache_halocat.out    
+#BSUB -oo /u/ki/swmclau2/Git/pearce/bin/cache/cache_halocat.out    
 #BSUB -n 4 
 
 python /u/ki/swmclau2/Git/pearce/bin/cache/cache_halocat.py 

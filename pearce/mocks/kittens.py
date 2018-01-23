@@ -42,6 +42,15 @@ class Aardvark(Cat):
         Lbox = 400.0
         columns_to_keep = HLIST_COLS
 
+        #some of the columns here are different
+        columns_to_keep['halo_vpeak'] = (52, 'f4')
+        columns_to_keep['halo_mpeak'] = (50, 'f4')
+        try:
+            del columns_to_keep['halo_halfmass_scale']
+        except KeyError:
+            pass
+
+
         locations = {'ki-ls': '/nfs/slac/g/ki/ki18/des/mbusha/simulations/Aardvark-2PS/Lb400/rockstar/hlists/'}
         locations['long'] = locations['ki-ls']
 
@@ -62,6 +71,7 @@ class Aardvark(Cat):
         for key in ['simname', 'loc', 'columns_to_keep', 'Lbox','pmass', 'cosmo']:
             if key in new_kwargs:
                 del new_kwargs[key]
+
 
         super(Aardvark, self).__init__(simname, loc,columns_to_keep=columns_to_keep,Lbox=Lbox,\
                                        pmass=pmass,cosmo=cosmo, **new_kwargs)
