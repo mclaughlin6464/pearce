@@ -25,6 +25,11 @@ OUTLIST_COLS = {'halo_id': (0, 'i8'), 'halo_upid': (36, 'i8'),
                 'halo_vx': (11, 'f4'), 'halo_vy': (12, 'f4'), 'halo_vz': (13, 'f4'),
                 'halo_mvir': (2, 'f4'), 'halo_rvir': (5, 'f4'), 'halo_rs': (6, 'f4')}
 
+OUTLIST_BGC2_COLS = {'halo_id':(0,'i8'), 'halo_upid':(14, 'i8'),
+                     'halo_x':(8,'f4'), 'halo_y':(9,'f4'), 'halo_z':(10,'f4'),
+                     'halo_vx': (11, 'f4'), 'halo_vy': (12, 'f4'), 'halo_vz': (13, 'f4'),
+                     'halo_m200b':(2, 'f4'), 'halo_r200b':(5, 'f4'), 'halo_rs':(6, 'f4')}
+
 #Previously, I had Lbox and Npart be required for all, even tho it isn't actually. I don't know why now...
 #I've also removed the updating of the kwargs with the defaults.
 #The user shouldn't be updating thee cosmology, simname, etc. The only thing they can change
@@ -297,6 +302,56 @@ class MDHR(Cat):
 
         super(MDHR, self).__init__(simname, loc=loc,columns_to_keep=columns_to_keep, Lbox=Lbox,
                                    pmass=pmass **new_kwargs)
+
+class TestBox(Cat):
+
+    comsmos = [cosmology.core.FlatwCDM(H0=100 * 0.632317, Om0=0.327876, Ode0=0.672124, w0=-0.726513),
+               cosmology.core.FlatwCDM(H0=100 * 0.657317, Om0=0.313825, Ode0=0.686175, w0=-0.861513),
+               cosmology.core.FlatwCDM(H0=100 * 0.682317, Om0=0.300915, Ode0=0.699085, w0=-0.996513),
+               cosmology.core.FlatwCDM(H0=100 * 0.707317, Om0=0.289014, Ode0=0.710986, w0=-1.13151),
+               cosmology.core.FlatwCDM(H0=100 * 0.732317, Om0=0.278009, Ode0=0.721991, w0=-1.26651),
+               cosmology.core.FlatwCDM(H0=100 * 0.697317, Om0=0.281939, Ode0=0.718061, w0=-1.08911),
+               cosmology.core.FlatwCDM(H0=100 * 0.667317, Om0=0.321332, Ode0=0.678668, w0=-0.90392)]
+
+
+    def __init__(self,boxno, realization, system='ki-ls', **kwargs):
+
+        assert 0<=boxno<=6
+        assert 0<=realization<=4
+
+        simname = 'testbox' #not sure if something with Emu would work better, but wanna separate from Emu..
+        columns_to_keep = OUTLIST_BGC2_COLS
+        Lbox = 1050.0 #Mpc
+        cosmo = self.cosmos[boxno]
+        pmass = 3.83914e10*cosmo.Om0/self.cosmos[0].Om0
+
+        self.prim_haloprop_key = 'halo_m200b'
+
+        locations = {'ki-ls': ['/nfs/slac/des/fs1/g/sims/beckermr/tinkers_emu/TestBox00%d-00%d/halos/m200b/',
+                               '/nfs/slac/g/ki/ki22/cosmo/beckermr/tinkers_emu/TestBox00%d-00%d/halos/m200b/',
+                               '/nfs/slac/g/ki/ki23/des/beckermr/tinkers_emu/TestBox00%d-00%d/halos/m200b/']}
+        assert system in locations
+        loc_list = locations[system]
+
+        if boxno < 2:
+            loc = loc_list[0]%(boxno, realization)
+        elif 2 <= boxno < 4:
+            loc = loc_list[1]%(boxno, realization)
+        else:
+            loc = loc_list[2]%(boxno, realization)
+
+        tmp_fnames = ['out_%d.list' % i for i in xrange(10)]
+        tmp_scale_factors = [0.25, 0.333, 0.5, 0.540541, 0.588235, 0.645161, 0.714286, 0.8, 0.909091, 1.0]
+
+        self._update_lists(kwargs, tmp_fnames, tmp_scale_factors)
+
+        new_kwargs = kwargs.copy()
+        for key in ['simname', 'loc', 'columns_to_keep', 'Lbox', 'pmass', 'cosmo']:
+            if key in new_kwargs:
+                del new_kwargs[key]
+
+        super(TestBox, self).__init__(simname=simname, loc=loc, columns_to_keep=columns_to_keep, Lbox=Lbox,
+                                  pmass=pmass, cosmo=cosmo, **kwargs)
 
 #a dict that maps the default simnames to objects, which makes construction easier.
 #TODO kitten_dict

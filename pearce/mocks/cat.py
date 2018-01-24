@@ -105,7 +105,7 @@ class Cat(object):
         self.columns_to_keep = columns_to_keep
 
         # TODO allow the user access to this? Probably.
-        self.columns_to_convert = set(["halo_rvir", "halo_rs","halo_rs_klypin"])
+        self.columns_to_convert = set(["halo_rvir", "halo_rs","halo_rs_klypin", "halo_200b"])
         self.columns_to_convert = list(self.columns_to_convert & set(self.columns_to_keep.keys()))
 
         self.halo_finder = halo_finder
@@ -121,6 +121,9 @@ class Cat(object):
         self.h = self.cosmology.H(0).value / 100.0
 
         self.gadget_loc = gadget_loc  # location of original gadget files.
+
+        if not hasattr(self, 'prim_haloprop_key'):
+            self.prim_haloprop_key = 'halo_mvir'
 
         # TODO Well this makes me think loc doesn't do anything...
         # I use it in the subclasses though. Doesn't mean I need it here though.
