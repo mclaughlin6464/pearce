@@ -29,7 +29,7 @@ except ImportError:
 VALID_HODS = {'redMagic', 'hsabRedMagic','abRedMagic','fsabRedMagic', 'fscabRedMagic','corrRedMagic',\
               'reddick14','hsabReddick14','abReddick14','fsabReddick14', 'fscabReddick14','corrReddick14','stepFunc',\
               'zheng07', 'leauthaud11', 'tinker13', 'hearin15', 'reddick14+redMagic', 'tabulated',\
-              'hsabTabulated', 'abTabulated','fsabTabulated','fscabTabulated','corrTabulated'}
+              'hsabTabulated', 'abTabulated','fsabTabulated','fscabTabulated','corrTabulated', 'tabulated2D'}
 
 DEFAULT_HODS = {'zheng07', 'leauthaud11', 'tinker13', 'hearin15'}
 
@@ -443,6 +443,9 @@ class Cat(object):
                 elif HOD == 'corrTabulated':
                     cens_occ = CorrAssembiasTabulatedCens(redshift=z, **hod_kwargs)
                     sats_occ = CorrAssembiasTabulatedSats(redshift=z,**hod_kwargs) # no modulation
+                elif HOD == 'tabulated2D':
+                    cens_occ = Tabulated2DCens(redshift=z, **hod_kwargs)
+                    sats_occ = Tabulated2DSats(redshift=z, **hod_kwargs)  # no modulation
                 elif HOD == 'stepFunc':
                     cens_occ = StepFuncCens(redshift=z, **hod_kwargs)
                     sats_occ = StepFuncSats(redshift=z, **hod_kwargs)
