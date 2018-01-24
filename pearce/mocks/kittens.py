@@ -357,4 +357,4 @@ class TestBox(Cat):
 #TODO kitten_dict
 cat_dict = {'bolshoi': Bolshoi, 'multidark': Multidark, 'emu': Emu, 'fox': Fox, 'multidark_highres': MDHR,
             'chinchilla': Chinchilla,
-            'aardvark': Aardvark, 'guppy': Guppy}
+            'aardvark': Aardvark, 'guppy': Guppy, 'testbox':TestBox}
