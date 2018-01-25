@@ -305,13 +305,13 @@ class MDHR(Cat):
 
 class TestBox(Cat):
 
-    comsmos = [cosmology.core.FlatwCDM(H0=100 * 0.632317, Om0=0.327876, Ode0=0.672124, w0=-0.726513),
-               cosmology.core.FlatwCDM(H0=100 * 0.657317, Om0=0.313825, Ode0=0.686175, w0=-0.861513),
-               cosmology.core.FlatwCDM(H0=100 * 0.682317, Om0=0.300915, Ode0=0.699085, w0=-0.996513),
-               cosmology.core.FlatwCDM(H0=100 * 0.707317, Om0=0.289014, Ode0=0.710986, w0=-1.13151),
-               cosmology.core.FlatwCDM(H0=100 * 0.732317, Om0=0.278009, Ode0=0.721991, w0=-1.26651),
-               cosmology.core.FlatwCDM(H0=100 * 0.697317, Om0=0.281939, Ode0=0.718061, w0=-1.08911),
-               cosmology.core.FlatwCDM(H0=100 * 0.667317, Om0=0.321332, Ode0=0.678668, w0=-0.90392)]
+    cosmos = [cosmology.core.FlatwCDM(H0=100 * 0.632317, Om0=0.327876, w0=-0.726513),
+               cosmology.core.FlatwCDM(H0=100 * 0.657317, Om0=0.313825, w0=-0.861513),
+               cosmology.core.FlatwCDM(H0=100 * 0.682317, Om0=0.300915, w0=-0.996513),
+               cosmology.core.FlatwCDM(H0=100 * 0.707317, Om0=0.289014, w0=-1.13151),
+               cosmology.core.FlatwCDM(H0=100 * 0.732317, Om0=0.278009, w0=-1.26651),
+               cosmology.core.FlatwCDM(H0=100 * 0.697317, Om0=0.281939, w0=-1.08911),
+               cosmology.core.FlatwCDM(H0=100 * 0.667317, Om0=0.321332, w0=-0.90392)]
 
 
     def __init__(self,boxno, realization, system='ki-ls', **kwargs):
@@ -340,7 +340,7 @@ class TestBox(Cat):
         else:
             loc = loc_list[2]%(boxno, realization)
 
-        tmp_fnames = ['out_%d.list' % i for i in xrange(10)]
+        tmp_fnames = ['outbgc2_%d.list' % i for i in xrange(10)]
         tmp_scale_factors = [0.25, 0.333, 0.5, 0.540541, 0.588235, 0.645161, 0.714286, 0.8, 0.909091, 1.0]
 
         self._update_lists(kwargs, tmp_fnames, tmp_scale_factors)

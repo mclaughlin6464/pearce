@@ -3,12 +3,13 @@
 
 import numpy as np
 from scipy.special import erf
-from scipy.interpolate import interp1d, interp2d
+from scipy.interpolate import interp1d, RectBivariateSpline 
 import warnings
 from halotools.empirical_models import Zheng07Cens, Zheng07Sats, OccupationComponent, model_defaults
 from halotools.empirical_models import HeavisideAssembias, ContinuousAssembias, FreeSplitAssembias, FreeSplitContinuousAssembias
 from halotools.empirical_models import CorrelationAssembias
 from halotools.custom_exceptions import HalotoolsError
+from halotools.utils.table_utils import compute_conditional_percentiles
 
 
 # from continuousAssembias import ContinuousAssembias
@@ -1222,22 +1223,23 @@ class FSCAssembiasTabulatedSats(TabulatedSats, FreeSplitContinuousAssembias):
                                     **kwargs)
 
 #considered subclassing but doesn't seem like i actually want that?
+# TODO TabulatedHODComponent should be a class and Cens and Sats should be subclassed. 
 class Tabulated2DCens(OccupationComponent):
     r""" Central occupation that is fixed at observed values. Rather than being parameterized, populate with an HOD
     with a fixed, observed relationship.
     """
-    def __init__(self, prim_haloprop_vals, sec_haloprop_vals, cen_hod_vals,
+    def __init__(self, prim_haloprop_bins, sec_haloprop_perc_bins, cen_hod_vals,
                  threshold=model_defaults.default_luminosity_threshold,
                  prim_haloprop_key=model_defaults.prim_haloprop_key,
                  sec_haloprop_key=model_defaults.sec_haloprop_key, **kwargs):
         r"""
         Parameters
         ----------
-        prim_haloprop_vals: array
-            Values of the prim haloprop that cen_hod_vals were observed
+        prim_haloprop_bins: array
+            Bin edges of the prim haloprop that cen_hod_vals were observed
 
-        sec_haloprop_vals: arrray
-            Values of the sec haloprop where cen_hod_vals were observeved
+        sec_haloprop_perc_bins: arrray
+            Bin edges of the sec haloprop where cen_hod_vals were observeved
 
         cen_hod_vals: array
             The values of the hod observed at prim_haloprop_vals. Is interoplated to give the HOD.
@@ -1267,15 +1269,17 @@ class Tabulated2DCens(OccupationComponent):
         upper_occupation_bound = 1.0
 
         assert np.all(cen_hod_vals >=0) and np.all(upper_occupation_bound>=cen_hod_vals)
-        assert cen_hod_vals.shape[0] == prim_haloprop_vals.shape[0]
-        assert cen_hod_vals.shape[1] == sec_haloprop_vals.shape[0]
-        assert np.all(prim_haloprop_vals>=0)
+        assert cen_hod_vals.shape[0] == prim_haloprop_bins.shape[0]-1
+        assert cen_hod_vals.shape[1] == sec_haloprop_perc_bins.shape[0]-1
+        assert np.all(prim_haloprop_bins>=0)
+        try:
+            assert np.all(sec_haloprop_perc_bins >=0) and np.all(sec_haloprop_perc_bins <=1)
+        except AssertionError:
+            raise("sec_haloprop_perc_bins are not between 0 and 1. Maybe you passed in sec_haloprop_bins instead?")
 
-        self._prim_haloprop_vals = prim_haloprop_vals
-        self._sec_haloprop_vals = sec_haloprop_vals
+        self._prim_haloprop_bins = prim_haloprop_bins
+        self._sec_haloprop_perc_bins = sec_haloprop_perc_bins
         self._cen_hod_vals = cen_hod_vals
-
-        self._mean_occupation = interp2d(np.log10(prim_haloprop_vals), sec_haloprop_vals,  cen_hod_vals, kind='cubic')
 
         # Call the super class constructor, which binds all the
         # arguments to the instance.
@@ -1283,12 +1287,15 @@ class Tabulated2DCens(OccupationComponent):
             gal_type='centrals', threshold=threshold,
             upper_occupation_bound=upper_occupation_bound,
             prim_haloprop_key=prim_haloprop_key,
-            sec_haloprop_key = sec_haloprop_key
+            sec_haloprop_key = sec_haloprop_key,
             **kwargs)
 
         self.param_dict = self.get_published_parameters()
 
         self.publications = []
+
+        self.sec_haloprop_key = sec_haloprop_key #wont be added automatically
+
 
     def mean_occupation(self, **kwargs):
         r"""Expected number of satellite galaxies in a halo of mass logM.
@@ -1335,21 +1342,41 @@ class Tabulated2DCens(OccupationComponent):
 
         # Retrieve the array storing the mass-like variable
         if 'table' in list(kwargs.keys()):
-            mass = kwargs['table'][self.prim_haloprop_key]
-            sec = kwargs['table'][self.sec_haloprop_key]
-        elif 'prim_haloprop' in list(kwargs.keys()):
-            mass = np.atleast_1d(kwargs['prim_haloprop'])
-            if 'sec_haloprop' in list(kwargs.keys()):
-                sec = np.atleast_1d(kwargs['sec_haloprop'])
+            table = kwargs['table']
+            mass = table[self.prim_haloprop_key]
+            if self.sec_haloprop_key + '_percentile' in list(table.keys()):
+                sec_perc = table[self.sec_haloprop_key + '_percentile']
+            else:
+                # the value of sec_haloprop_percentile will be computed from scratch
+                sec_perc = compute_conditional_percentiles(
+                              prim_haloprop=mass,
+                              sec_haloprop=table[self.sec_haloprop_key])
         else:
-            msg = ("\nYou must pass either a ``table`` or ``prim_haloprop`` argument \n"
-                   "to the ``mean_occupation`` function of the ``Zheng07Sats`` class.\n")
-            raise HalotoolsError(msg)
+            try:
+                mass = np.atleast_1d(kwargs['prim_haloprop'])
+            except KeyError:
+                msg = ("\nIf not passing an input ``table`` to the "
+                       "``mean_occupation`` method,\n"
+                       "you must pass ``prim_haloprop`` argument.\n")
+                raise HalotoolsError(msg)
+            try:
+                sec_perc = np.atleast_1d(kwargs['sec_haloprop_percentile'])
+            except KeyError:
+                if 'sec_haloprop' not in kwargs:
+                    msg = ("\nIf not passing an input ``table`` to the "
+                           "``mean_occupation`` method,\n"
+                           "you must pass either a ``sec_haloprop`` or "
+                           "``sec_haloprop_percentile`` argument.\n")
+                    raise HalotoolsError(msg)
+                else:
+                        sec_perc = compute_conditional_percentiles(
+                              prim_haloprop=mass,
+                              sec_haloprop=kwargs['sec_haloprop'])
 
-        prim_over_idxs = mass >np.max(self._prim_haloprop_vals)
-        prim_under_idxs = mass< np.min(self._prim_haloprop_vals)
+        prim_over_idxs = mass >np.max(self._prim_haloprop_bins)
+        prim_under_idxs = mass< np.min(self._prim_haloprop_bins)
         #prim_contained_indices = ~np.logical_or(prim_under_idxs, prim_over_idxs) #indexs contained by the interpolator
-        contained_indices = ~np.logical_or(prim_under_idxs, prim_over_idxs) #indexs contained by the interpolator
+        contained_idxs = ~np.logical_or(prim_under_idxs, prim_over_idxs) #indexs contained by the interpolator
 
         #sec_over_idxs = sec > np.max(self._sec_haloprop_vals)
         #sec_under_idxs = sec < np.min(self._sec_haloprop_vals)
@@ -1363,7 +1390,12 @@ class Tabulated2DCens(OccupationComponent):
         mean_ncen = np.zeros_like(mass)
         mean_ncen[prim_over_idxs] = self._upper_occupation_bound
         mean_ncen[prim_under_idxs] = self._lower_occupation_bound
-        mean_ncen[contained_indices] = self._mean_occupation(np.log10(mass[contained_indices]), sec[contained_indices] )
+
+        prim_haloprop_idxs = np.digitize(mass, self._prim_haloprop_bins)
+        sec_haloprop_idxs = np.digitize(sec_perc, self._sec_haloprop_perc_bins)
+        print np.unique(prim_haloprop_idxs)
+        print np.unique(sec_haloprop_idxs)
+        mean_ncen[contained_idxs] = self._cen_hod_vals[prim_haloprop_idxs[contained_idxs], sec_haloprop_idxs[contained_idxs]]
 
         #TODO dunno how i feel about this..
         #mean_sec = np.mean(sec[contained_indices])
@@ -1400,15 +1432,18 @@ class Tabulated2DSats(OccupationComponent):
     with a fixed, observed relationship.
     """
 
-    def __init__(self, prim_haloprop_vals, sec_haloprop_vals, sat_hod_vals,
+    def __init__(self, prim_haloprop_bins, sec_haloprop_perc_bins, sat_hod_vals,
                  threshold=model_defaults.default_luminosity_threshold,
                  prim_haloprop_key=model_defaults.prim_haloprop_key,
                  sec_haloprop_key = model_defaults.sec_haloprop_key, **kwargs):
         r"""
         Parameters
         ----------
-        prim_haloprop_vals: array
-            Values of the prim haloprop that sat_hod_vals were observed
+        prim_haloprop_bins: array
+            Bin edges of the prim haloprop that sat_hod_vals were observed
+
+        sec_haloprop_perc_bins:
+            Bin edges of the sec haloprop percentile that sat_hod_vals were observed
 
         sat_hod_vals: array
             The values of the hod observed at prim_haloprop_vals. Is interoplated to give the HOD
@@ -1430,15 +1465,17 @@ class Tabulated2DSats(OccupationComponent):
         upper_occupation_bound = float("inf")
 
         assert np.all(sat_hod_vals >= 0) and np.all(upper_occupation_bound >= sat_hod_vals)
-        assert sat_hod_vals.shape[0] == prim_haloprop_vals.shape[0]
-        assert sat_hod_vals.shape[1] == sec_haloprop_vals.shape[0]
-        assert np.all(prim_haloprop_vals >= 0)
+        assert sat_hod_vals.shape[0] == prim_haloprop_bins.shape[0]-1
+        assert sat_hod_vals.shape[1] == sec_haloprop_perc_bins.shape[0] -1
+        assert np.all(prim_haloprop_bins >= 0)
+        try:
+            assert np.all(sec_haloprop_perc_bins >=0) and np.all(sec_haloprop_perc_bins <=1)
+        except AssertionError:
+            raise("sec_haloprop_perc_bins are not between 0 and 1. Maybe you passed in sec_haloprop_bins instead?")
 
-        self._prim_haloprop_vals = prim_haloprop_vals
-        self._sec_haloprop_vals = sec_haloprop_vals
-        self._cen_hod_vals = sat_hod_vals
-
-        self._mean_occupation = interp2d(np.log10(prim_haloprop_vals), sec_haloprop_vals, sat_hod_vals, kind='cubic')
+        self._prim_haloprop_bins = prim_haloprop_bins
+        self._sec_haloprop_perc_bins = sec_haloprop_perc_bins
+        self._sat_hod_vals = sat_hod_vals
 
         # Call the super class constructor, which binds all the
         # arguments to the instance.
@@ -1446,12 +1483,14 @@ class Tabulated2DSats(OccupationComponent):
             gal_type='satellites', threshold=threshold,
             upper_occupation_bound=upper_occupation_bound,
             prim_haloprop_key=prim_haloprop_key,
-            sec_haloprop_key=sec_haloprop_key
+            sec_haloprop_key=sec_haloprop_key,
                              ** kwargs)
 
         self.param_dict = self.get_published_parameters()
 
         self.publications = []
+
+        self.sec_haloprop_key = sec_haloprop_key #wont be added automatically
 
     def mean_occupation(self, **kwargs):
         r"""Expected number of satellite galaxies in a halo of mass logM.
@@ -1494,43 +1533,65 @@ class Tabulated2DSats(OccupationComponent):
         >>> mean_nsat = sat_model.mean_occupation(table=fake_sim.halo_table)
 
         """
-
         # Retrieve the array storing the mass-like variable
         if 'table' in list(kwargs.keys()):
-            mass = kwargs['table'][self.prim_haloprop_key]
-            sec = kwargs['table'][self.sec_haloprop_key]
-        elif 'prim_haloprop' in list(kwargs.keys()):
-            mass = np.atleast_1d(kwargs['prim_haloprop'])
-            if 'sec_haloprop' in list(kwargs.keys()):
-                sec = np.atleast_1d(kwargs['sec_haloprop'])
+            table = kwargs['table']
+            mass = table[self.prim_haloprop_key]
+            if self.sec_haloprop_key + '_percentile' in list(table.keys()):
+                sec_perc = table[self.sec_haloprop_key + '_percentile']
+            else:
+                # the value of sec_haloprop_percentile will be computed from scratch
+                sec_perc = compute_conditional_percentiles(
+                              prim_haloprop=mass,
+                              sec_haloprop=table[self.sec_haloprop_key])
         else:
-            msg = ("\nYou must pass either a ``table`` or ``prim_haloprop`` argument \n"
-                   "to the ``mean_occupation`` function of the ``Zheng07Sats`` class.\n")
-            raise HalotoolsError(msg)
+            try:
+                mass = np.atleast_1d(kwargs['prim_haloprop'])
+            except KeyError:
+                msg = ("\nIf not passing an input ``table`` to the "
+                       "``mean_occupation`` method,\n"
+                       "you must pass ``prim_haloprop`` argument.\n")
+                raise HalotoolsError(msg)
+            try:
+                sec_perc = np.atleast_1d(kwargs['sec_haloprop_percentile'])
+            except KeyError:
+                if 'sec_haloprop' not in kwargs:
+                    msg = ("\nIf not passing an input ``table`` to the "
+                           "``mean_occupation`` method,\n"
+                           "you must pass either a ``sec_haloprop`` or "
+                           "``sec_haloprop_percentile`` argument.\n")
+                    raise HalotoolsError(msg)
+                else:
+                        sec_perc = compute_conditional_percentiles(
+                              prim_haloprop=mass,
+                              sec_haloprop=kwargs['sec_haloprop'])
 
-        prim_over_idxs = mass > np.max(self._prim_haloprop_vals)
-        prim_under_idxs = mass < np.min(self._prim_haloprop_vals)
-        # prim_contained_indices = ~np.logical_or(prim_under_idxs, prim_over_idxs) #indexs contained by the interpolator
-        contained_indices = ~np.logical_or(prim_under_idxs, prim_over_idxs)  # indexs contained by the interpolator
+        prim_over_idxs = mass >np.max(self._prim_haloprop_bins)
+        prim_under_idxs = mass< np.min(self._prim_haloprop_bins)
+        #prim_contained_indices = ~np.logical_or(prim_under_idxs, prim_over_idxs) #indexs contained by the interpolator
+        contained_idxs = ~np.logical_or(prim_under_idxs, prim_over_idxs) #indexs contained by the interpolator
 
-        # sec_over_idxs = sec > np.max(self._sec_haloprop_vals)
-        # sec_under_idxs = sec < np.min(self._sec_haloprop_vals)
-        # sec_contained_indices = ~np.logical_or(sec_under_idxs, sec_over_idxs)  # indexs contained by the interpolator
+        #sec_over_idxs = sec > np.max(self._sec_haloprop_vals)
+        #sec_under_idxs = sec < np.min(self._sec_haloprop_vals)
+        #sec_contained_indices = ~np.logical_or(sec_under_idxs, sec_over_idxs)  # indexs contained by the interpolator
 
-        # over_idxs = np.logical_or(prim_over_idxs, sec_over_idxs)
-        # under_idxs = np.logical_or(prim_under_idxs, sec_under_idxs)
+        #over_idxs = np.logical_or(prim_over_idxs, sec_over_idxs)
+        #under_idxs = np.logical_or(prim_under_idxs, sec_under_idxs)
 
-        # contained_indices = ~np.logical_or(under_idxs, over_idxs)
+        #contained_indices = ~np.logical_or(under_idxs, over_idxs)
 
         mean_nsat = np.zeros_like(mass)
         mean_nsat[prim_over_idxs] = self._sat_hod_vals[-1] #not happy abotu this, no better guess
         mean_nsat[prim_under_idxs] = self._lower_occupation_bound
-        mean_nsat[contained_indices] = self._mean_occupation(np.log10(mass[contained_indices]), sec[contained_indices])
 
-        # TODO dunno how i feel about this..
-        # mean_sec = np.mean(sec[contained_indices])
-        # mean_ncen[sec_over_idxs] = self._mean_occupation(np.log10(mass[sec_over_idxs]), mean_sec*np.ones_like(sec_over_idxs) )
-        # mean_ncen[sec_under_idxs] = self._mean_occupation(np.log10(mass[sec_under_idxs]), mean_sec*np.ones_like(sec_under_idxs) )
+        prim_haloprop_idxs = np.digitize(mass, self._prim_haloprop_bins)
+        sec_haloprop_idxs = np.digitize(sec_perc, self._sec_haloprop_perc_bins)
+        mean_nsat[contained_idxs] = self._sat_hod_vals[prim_haloprop_idxs[contained_idxs], sec_haloprop_idxs[contained_idxs]]
+
+        #TODO dunno how i feel about this..
+        #mean_sec = np.mean(sec[contained_indices])
+        #mean_ncen[sec_over_idxs] = self._mean_occupation(np.log10(mass[sec_over_idxs]), mean_sec*np.ones_like(sec_over_idxs) )
+        #mean_ncen[sec_under_idxs] = self._mean_occupation(np.log10(mass[sec_under_idxs]), mean_sec*np.ones_like(sec_under_idxs) )
 
 
         return mean_nsat
