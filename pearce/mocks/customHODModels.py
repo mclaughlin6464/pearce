@@ -1391,10 +1391,9 @@ class Tabulated2DCens(OccupationComponent):
         mean_ncen[prim_over_idxs] = self._upper_occupation_bound
         mean_ncen[prim_under_idxs] = self._lower_occupation_bound
 
-        prim_haloprop_idxs = np.digitize(mass, self._prim_haloprop_bins)
-        sec_haloprop_idxs = np.digitize(sec_perc, self._sec_haloprop_perc_bins)
-        print np.unique(prim_haloprop_idxs)
-        print np.unique(sec_haloprop_idxs)
+        prim_haloprop_idxs = np.digitize(mass, self._prim_haloprop_bins, right=True)-1
+        sec_haloprop_idxs = np.digitize(sec_perc, self._sec_haloprop_perc_bins, right = True) -1
+
         mean_ncen[contained_idxs] = self._cen_hod_vals[prim_haloprop_idxs[contained_idxs], sec_haloprop_idxs[contained_idxs]]
 
         #TODO dunno how i feel about this..
@@ -1581,11 +1580,11 @@ class Tabulated2DSats(OccupationComponent):
         #contained_indices = ~np.logical_or(under_idxs, over_idxs)
 
         mean_nsat = np.zeros_like(mass)
-        mean_nsat[prim_over_idxs] = self._sat_hod_vals[-1] #not happy abotu this, no better guess
+        mean_nsat[prim_over_idxs] = self._sat_hod_vals[-1,:].mean() #not happy abotu this, no better guess
         mean_nsat[prim_under_idxs] = self._lower_occupation_bound
 
-        prim_haloprop_idxs = np.digitize(mass, self._prim_haloprop_bins)
-        sec_haloprop_idxs = np.digitize(sec_perc, self._sec_haloprop_perc_bins)
+        prim_haloprop_idxs = np.digitize(mass, self._prim_haloprop_bins,right = True) -1
+        sec_haloprop_idxs = np.digitize(sec_perc, self._sec_haloprop_perc_bins,right = True) -1
         mean_nsat[contained_idxs] = self._sat_hod_vals[prim_haloprop_idxs[contained_idxs], sec_haloprop_idxs[contained_idxs]]
 
         #TODO dunno how i feel about this..
