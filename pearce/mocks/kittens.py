@@ -316,33 +316,46 @@ class TestBox(Cat):
 
     def __init__(self,boxno, realization, system='ki-ls', **kwargs):
 
-        assert 0<=boxno<=6
-        assert 0<=realization<=4
+
+#       I'm writing a hack to work for the CMASS catalogs I'm making. I have to do something better in the future.
+# The hack is due to the bgc2 cats not having concetrations, and not being possible to match againts the outlists.
+# I ran findparents on 3 of the catalogs. ALl other catalogs will be in accessible for now
+        assert realization == 0
+        assert 0 <= boxno <= 2
+#        assert 0<=boxno<=6
+#        assert 0<=realization<=4
 
         simname = 'testbox' #not sure if something with Emu would work better, but wanna separate from Emu..
-        columns_to_keep = OUTLIST_BGC2_COLS
+        columns_to_keep = OUTLIST_COLS.copy()#OUTLIST_BGC2_COLS
+        del columns_to_keep['halo_mvir']
+        columns_to_keep['halo_m200b'] = (2, 'f4')
+        del columns_to_keep['halo_rvir']
+        columns_to_keep['halo_r200b'] = (5, 'f4') 
+
         Lbox = 1050.0 #Mpc
         cosmo = self.cosmos[boxno]
         pmass = 3.83914e10*cosmo.Om0/self.cosmos[0].Om0
 
         self.prim_haloprop_key = 'halo_m200b'
-
-        locations = {'ki-ls': ['/nfs/slac/des/fs1/g/sims/beckermr/tinkers_emu/TestBox00%d-00%d/halos/m200b/',
-                               '/nfs/slac/g/ki/ki22/cosmo/beckermr/tinkers_emu/TestBox00%d-00%d/halos/m200b/',
-                               '/nfs/slac/g/ki/ki23/des/beckermr/tinkers_emu/TestBox00%d-00%d/halos/m200b/']}
+        locations = {'ki-ls': ['/u/ki/swmclau2/des/testbox_findparents/']}
+#        locations = {'ki-ls': ['/nfs/slac/des/fs1/g/sims/beckermr/tinkers_emu/TestBox00%d-00%d/halos/m200b/',
+#                               '/nfs/slac/g/ki/ki22/cosmo/beckermr/tinkers_emu/TestBox00%d-00%d/halos/m200b/',
+#                               '/nfs/slac/g/ki/ki23/des/beckermr/tinkers_emu/TestBox00%d-00%d/halos/m200b/']}
         assert system in locations
-        loc_list = locations[system]
+        loc = locations[system][0]
+        #loc_list = locations[system]
 
-        if boxno < 2:
-            loc = loc_list[0]%(boxno, realization)
-        elif 2 <= boxno < 4:
-            loc = loc_list[1]%(boxno, realization)
-        else:
-            loc = loc_list[2]%(boxno, realization)
+#        if boxno < 2:
+#            loc = loc_list[0]%(boxno, realization)
+#        elif 2 <= boxno < 4:
+#            loc = loc_list[1]%(boxno, realization)
+#        else:
+#            loc = loc_list[2]%(boxno, realization)
 
-        tmp_fnames = ['outbgc2_%d.list' % i for i in xrange(10)]
-        tmp_scale_factors = [0.25, 0.333, 0.5, 0.540541, 0.588235, 0.645161, 0.714286, 0.8, 0.909091, 1.0]
-
+#        tmp_fnames = ['outbgc2_%d.list' % i for i in xrange(10)]
+        tmp_fnames =  ['TestBox00%d-000_out_parents_5.list'%boxno]
+#        tmp_scale_factors = [0.25, 0.333, 0.5, 0.540541, 0.588235, 0.645161, 0.714286, 0.8, 0.909091, 1.0]
+        tmp_scale_factors = [0.645161]
         self._update_lists(kwargs, tmp_fnames, tmp_scale_factors)
 
         new_kwargs = kwargs.copy()
