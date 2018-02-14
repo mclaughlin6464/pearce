@@ -93,7 +93,7 @@ class Bolshoi(Cat):
 
 class Chinchilla(Cat):
     'The most complicated (and biggest) subclass'
-    def __init__(self, Lbox, npart=2048, system='ki-ls', **kwargs):
+    def __init__(self, Lbox, npart=2048, system='ki-ls', updated_hlists=False, **kwargs):
         #Lbox required, npart should be if Lbox is not 1050!
         simname = 'chinchilla'
         cosmo = cosmology.core.LambdaCDM(H0=100 * 0.7, Om0=0.286, Ode0=0.714)
@@ -102,6 +102,8 @@ class Chinchilla(Cat):
         if Lbox not in {125.0, 250.0, 400.0, 1050.0}:
             raise ValueError("Invalid boxsize %.1f for Chinchilla"%Lbox)
 
+        if updated_hlists and (Lbox!=400 or npart!=2048 or (system!='ki-ls' or system!='long')):
+            raise ValueError("The updated_hlists option is only available for Chinchilla Lb400-2048")
 
         #the different box sizes are in differenct locations, among other things.
         if Lbox==1050:
@@ -116,6 +118,27 @@ class Chinchilla(Cat):
 
             tmp_scale_factors = [0.1429, 0.1667, 0.2, 0.25, 0.3333, 0.4, 0.5, 0.6667, 0.8, 1.0]
             tmp_fnames = ['out_%d.list' % i for i in xrange(10)]
+
+        elif updated_hlists:
+            locations = {'ki-ls': '~jderose/desims/BCCSims/c400-2048/rockstar/hlists_new/'}
+            locations['long'] = locations['ki-ls']
+
+            loc = locations[system]
+            columns_to_keep = UPDATED_HLIST_COLS
+
+            # may also work for 1050 too.
+            pmass = 1.44390e+08 * ((Lbox / 125.0) ** 3) * ((1024.0 / npart) ** 3)
+
+            # check that this combination of lbox and npart exists
+            version_name = 'Lb%d-%d' % (int(Lbox), npart)
+
+            #particles still in the other directory
+            gadget_loc = '/nfs/slac/g/ki/ki21/cosmo/yymao/sham_test/resolution-test/'
+            gadget_loc += '/output/'
+
+            tmp_fnames = sorted(glob(loc + 'hlist_[0,1].*.list'))  # snag all the hlists
+            tmp_fnames = [fname[len(loc):] for fname in tmp_fnames]  # just want the names in the dir
+            tmp_scale_factors = [float(fname[6:-5]) for fname in tmp_fnames]  # pull out scale factors
         else:
             locations = {'ki-ls': '/nfs/slac/g/ki/ki21/cosmo/yymao/sham_test/resolution-test/',
                          'sherlock':'/scratch/users/swmclau2/hlists/Chinchilla/'}

@@ -11,7 +11,7 @@ from time import time
 from glob import glob
 
 from astropy import cosmology
-from halotools.sim_manager import RockstarHlistReader, CachedHaloCatalog
+from halotools.sim_manager import RockstarHlistReader, CachedHaloCatalog, UserSuppliedPtclCatalog
 from halotools.empirical_models import PrebuiltHodModelFactory
 from halotools.empirical_models import HodModelFactory, TrivialPhaseSpace, NFWPhaseSpace
 from halotools.mock_observables import *  # i'm importing so much this is just easier
@@ -241,7 +241,7 @@ class Cat(object):
         else:
             return n_cores
 
-    def cache(self, scale_factors='all', overwrite=False, add_local_density=False):
+    def cache(self, scale_factors='all', overwrite=False, add_local_density=False, add_particles = False):
         '''
         Cache a halo catalog in the halotools format, for later use.
         :param scale_factors:
@@ -252,10 +252,11 @@ class Cat(object):
         '''
         try:
             assert not add_local_density or self.gadget_loc  # gadget loc must be nonzero here!
+            assert not add_particles or self.gadget_loc
         except:
-            raise AssertionError('Cannot add local density without gadget location for %s' % self.simname)
+            raise AssertionError('Particle location not specified; please specify gadget location for %s' % self.simname)
 
-        if add_local_density:
+        if add_local_density or add_particles:
             all_snapdirs = glob(path.join(self.gadget_loc, 'snapdir*'))
             snapdirs = [all_snapdirs[idx] for idx in self.sf_idxs]#only the snapdirs for the scale factors were interested in .
         else:
@@ -269,13 +270,61 @@ class Cat(object):
                                          self.halo_finder, z, self.version_name, self.Lbox, self.pmass,
                                          overwrite=overwrite)
             reader.read_halocat(self.columns_to_convert)
-            if add_local_density:
-                self.add_local_density(reader, snapdir)  # TODO how to add radius?
+            if add_local_density or add_particles:
+                particles = self._read_particles(snapdir) #TODO add downsample factor as an arg
+                if add_local_density:
+                    self.add_local_density(reader, particles)  # TODO how to add radius?
 
             reader.write_to_disk()  # do these after so we have a halo table to work off of
             reader.update_cache_log()
 
-    def add_local_density(self, reader, snapdir, radius=[1, 5]):#[1,5,10]
+            if add_particles:
+                self.cache_particles(particles, a)
+
+    def _read_particles(self, snapdir, downsample_factor = 1e-3):
+        """
+        Read in particles from a snapshot, and return them.
+        :param snapdir:
+            location of hte particles
+        :param downsample_factor:
+            The amount by which to downsample the particles. Default is 1e-3
+        :return: all_particles, a numpy arrany of shape (N,3) that lists all particle positions.
+        """
+        from .readGadgetSnapshot import readGadgetSnapshot
+        assert 0<= downsample_factor <=1
+        np.random.seed(0)
+        all_particles = np.array([], dtype='float32')
+        # TODO should fail gracefully if memory is exceeded or if p is too small.
+        for file in glob(path.join(snapdir, 'snapshot*')):
+            # TODO should find out which is "fast" axis and use that.
+            # Numpy uses fortran ordering.
+            particles = readGadgetSnapshot(file, read_pos=True)[1]  # Think this returns some type of tuple; should check
+            downsample_idxs = np.random.choice(particles.shape[0], size=int(particles.shape[0] * downsample_factor))
+            particles = particles[downsample_idxs, :]
+            # particles = particles[np.random.rand(particles.shape[0]) < p]  # downsample
+            if particles.shape[0] == 0:
+                continue
+
+            all_particles = np.resize(all_particles, (all_particles.shape[0] + particles.shape[0], 3))
+            all_particles[-particles.shape[0]:, :] = particles
+
+        return all_particles
+
+    def cache_particles(self,particles, scale_factor ):
+        """
+        Add the particle to the halocatalog, so loading it will load the corresponding particles.
+        :param particles:
+            A (N,3) shaped numpy array of all particle positions
+        """
+        z = 1./scale_factor-1.0
+        ptcl_catalog = UserSuppliedPtclCatalog(redshift=z, Lbox=self.Lbox, particle_mass=self.pmass, \
+                                               x=particles[:, 0], y=particles[:, 1], z=particles[:, 2])
+        ptcl_cache_loc = '/u/ki/swmclau2/des/halocats/ptcl_%.2f.list.%s_%s.hdf5'
+        ptcl_cache_filename = ptcl_cache_loc % (scale_factor, self.simname, self.version_name)  # make sure we don't have redunancies.
+        ptcl_catalog.add_ptclcat_to_cache(ptcl_cache_filename, self.simname, self.version_name)
+
+
+    def add_local_density(self, reader, all_particles, radius=[1, 5]):#[1,5,10]
         """
         Calculates the local density around each halo and adds it to the halo table, to be cached.
         :param reader:
@@ -288,23 +337,8 @@ class Cat(object):
         """
         #doing imports here since these are both files i've stolen from Yao
         #Possible this will be slow
-        from .readGadgetSnapshot import readGadgetSnapshot
-        from fast3tree import fast3tree
-        p = 1e-2
-        all_particles = np.array([], dtype='float32')
-        # TODO should fail gracefully if memory is exceeded or if p is too small.
-        for file in glob(path.join(snapdir, 'snapshot*')):
-            # TODO should find out which is "fast" axis and use that.
-            # Numpy uses fortran ordering.
-            particles = readGadgetSnapshot(file, read_pos=True)[1]  # Think this returns some type of tuple; should check
-            downsample_idxs = np.random.choice(particles.shape[0], size =int( particles.shape[0]*p))
-            particles = particles[downsample_idxs, :]
-            #particles = particles[np.random.rand(particles.shape[0]) < p]  # downsample
-            if particles.shape[0] == 0:
-                continue
 
-            all_particles = np.resize(all_particles, (all_particles.shape[0] + particles.shape[0], 3))
-            all_particles[-particles.shape[0]:, :] = particles
+        from fast3tree import fast3tree
 
         if type(radius) == float:
             radius = np.array([radius])
@@ -571,6 +605,60 @@ class Cat(object):
         hod = self.calc_hod(params)
         return np.sum(mf*hod)/((self.Lbox*self.h)**3)
 
+    def calc_xi_mm(self, rbins, n_cores='all', use_corrfunc=True):
+
+        n_cores = self._check_cores(n_cores)
+
+        x, y, z = [self.model.mock.galaxy_table[c] for c in ['x', 'y', 'z']]
+        pos = return_xyz_formatted_array(x, y, z, period=self.Lbox)
+
+        if use_corrfunc:
+            '''
+            # write bins to file
+            # unforunately how corrfunc has to work
+            # TODO A custom binfile, or one that's already written?
+            bindir = path.dirname(path.abspath(__file__))  # location of files with bin edges
+            with open(path.join(bindir, './binfile'), 'w') as f:
+                for low, high in zip(rbins[:-1], rbins[1:]):
+                    f.write('\t%f\t%f\n' % (low, high))
+
+            # countpairs requires casting in order to work right.
+            xi_all = countpairs_xi(self.model.mock.Lbox * self.h, n_cores, path.join(bindir, './binfile'),
+                                   x.astype('float32') * self.h, y.astype('float32') * self.h,
+                                   z.astype('float32') * self.h)
+            xi_all = np.array(xi_all, dtype='float64')[:, 3]
+            '''
+            out = xi(self.model.mock.Lbox * self.h, n_cores, rbins,
+                     x.astype('float32') * self.h, y.astype('float32') * self.h,
+                     z.astype('float32') * self.h)
+
+            xi_all = out[4]  # returns a lot of irrelevant info
+            # TODO jackknife with corrfunc?
+
+        else:
+            if do_jackknife:
+                np.random.seed(int(time()))
+                if not jk_args:
+                    # TODO customize these?
+                    n_rands = 5
+                    n_sub = 5
+                else:
+                    n_rands = jk_args['n_rands']
+                    n_sub = jk_args['n_sub']
+
+                randoms = np.random.random((pos.shape[0] * n_rands,
+                                            3)) * self.Lbox * self.h  # Solution to NaNs: Just fuck me up with randoms
+                xi_all, xi_cov = tpcf_jackknife(pos * self.h, randoms, rbins, period=self.Lbox * self.h,
+                                                num_threads=n_cores, Nsub=n_sub, estimator='Landy-Szalay')
+            else:
+                xi_all = tpcf(pos * self.h, rbins, period=self.Lbox * self.h, num_threads=n_cores,
+                              estimator='Landy-Szalay')
+
+        # TODO 1, 2 halo terms?
+
+        if do_jackknife:
+            return xi_all, xi_cov
+        return xi_all
 
     def populate(self, params={}, min_ptcl=200):
         '''
