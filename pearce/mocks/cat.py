@@ -321,7 +321,7 @@ class Cat(object):
                                                x=particles[:, 0], y=particles[:, 1], z=particles[:, 2])
         ptcl_cache_loc = '/u/ki/swmclau2/des/halocats/ptcl_%.2f.list.%s_%s.hdf5'
         ptcl_cache_filename = ptcl_cache_loc % (scale_factor, self.simname, self.version_name)  # make sure we don't have redunancies.
-        ptcl_catalog.add_ptclcat_to_cache(ptcl_cache_filename, self.simname, self.version_name)
+        ptcl_catalog.add_ptclcat_to_cache(ptcl_cache_filename, self.simname, self.version_name, '')#TODO would be nice to make a note of the downsampling without having to do some voodoo to get it.
 
 
     def add_local_density(self, reader, all_particles, radius=[1, 5]):#[1,5,10]
