@@ -58,6 +58,7 @@ def observable(func):
 
     # store the arguments, as the decorator destroys the spec
     _func.args = inspect.getargspec(func)[0]
+    _func.__doc__ = func.__doc__
 
     return _func
 
@@ -391,7 +392,8 @@ class Cat(object):
         z = 1.0 / a - 1
 
         self.halocat = CachedHaloCatalog(simname=self.simname, halo_finder=self.halo_finder,
-                                         version_name=self.version_name, redshift=z, dz_tol = 0.01)
+                                         version_name=self.version_name,
+                                         ptcl_version_name=self.version_name, redshift=z, dz_tol = 0.01)
 
     # TODO not sure if assembias should be boolean, or keep it as separate HODs?
     def load_model(self, scale_factor, HOD='redMagic', check_sf=True, hod_kwargs={}):
@@ -606,29 +608,30 @@ class Cat(object):
         return np.sum(mf*hod)/((self.Lbox*self.h)**3)
 
     def calc_xi_mm(self, rbins, n_cores='all', use_corrfunc=True):
+        """
+        Calculate the matter-matter realspace autocorrelation function
+        :param rbins:
+            radial binning to use during computation
+        :param n_cores:
+            number of cores to use during compuation. Must be an integer or 'all'. Default is 'all'
+        :param use_corrfunc:
+            Boolean, whether or not to use corrfunc if it is available. Default is true. If false, will use
+            halotools.
+        :return:
+        """
+        if hasattr(self, '_xi_mm_bins') and self._xi_mm_bins == rbins:# we have this one cached
+            return self._xi_mm
+
+        if use_corrfunc:
+            assert CORRFUNC_AVAILABLE
 
         n_cores = self._check_cores(n_cores)
 
-        x, y, z = [self.model.mock.galaxy_table[c] for c in ['x', 'y', 'z']]
+        x, y, z = [self.halocat.ptcl_table[c] for c in ['x', 'y', 'z']]
         pos = return_xyz_formatted_array(x, y, z, period=self.Lbox)
 
         if use_corrfunc:
-            '''
-            # write bins to file
-            # unforunately how corrfunc has to work
-            # TODO A custom binfile, or one that's already written?
-            bindir = path.dirname(path.abspath(__file__))  # location of files with bin edges
-            with open(path.join(bindir, './binfile'), 'w') as f:
-                for low, high in zip(rbins[:-1], rbins[1:]):
-                    f.write('\t%f\t%f\n' % (low, high))
-
-            # countpairs requires casting in order to work right.
-            xi_all = countpairs_xi(self.model.mock.Lbox * self.h, n_cores, path.join(bindir, './binfile'),
-                                   x.astype('float32') * self.h, y.astype('float32') * self.h,
-                                   z.astype('float32') * self.h)
-            xi_all = np.array(xi_all, dtype='float64')[:, 3]
-            '''
-            out = xi(self.model.mock.Lbox * self.h, n_cores, rbins,
+            out = xi(self.Lbox * self.h, n_cores, rbins,
                      x.astype('float32') * self.h, y.astype('float32') * self.h,
                      z.astype('float32') * self.h)
 
@@ -636,28 +639,13 @@ class Cat(object):
             # TODO jackknife with corrfunc?
 
         else:
-            if do_jackknife:
-                np.random.seed(int(time()))
-                if not jk_args:
-                    # TODO customize these?
-                    n_rands = 5
-                    n_sub = 5
-                else:
-                    n_rands = jk_args['n_rands']
-                    n_sub = jk_args['n_sub']
+            xi_all = tpcf(pos * self.h, rbins, period=self.Lbox * self.h, num_threads=n_cores,
+                          estimator='Landy-Szalay')
 
-                randoms = np.random.random((pos.shape[0] * n_rands,
-                                            3)) * self.Lbox * self.h  # Solution to NaNs: Just fuck me up with randoms
-                xi_all, xi_cov = tpcf_jackknife(pos * self.h, randoms, rbins, period=self.Lbox * self.h,
-                                                num_threads=n_cores, Nsub=n_sub, estimator='Landy-Szalay')
-            else:
-                xi_all = tpcf(pos * self.h, rbins, period=self.Lbox * self.h, num_threads=n_cores,
-                              estimator='Landy-Szalay')
+        #cache, so we don't ahve to repeat this calculation several times.
+        self._xi_mm_bins = rbins
+        self._xi_mm = xi_all
 
-        # TODO 1, 2 halo terms?
-
-        if do_jackknife:
-            return xi_all, xi_cov
         return xi_all
 
     def populate(self, params={}, min_ptcl=200):
@@ -774,6 +762,28 @@ class Cat(object):
         if do_jackknife:
             return xi_all, xi_cov
         return xi_all
+
+    @observable
+    def calc_bias(self,rbins, n_cores='all', use_corrfunc=False, **xi_kwargs):
+        """
+        Calculate the bias in a clustering sample. Computes the clustering and divides by the matter clustering,
+        which is cached so repeated computations do not occur.
+        :param rbins:
+            radial bins to use for both calculations.
+        :param n_cores:
+            number of cores to use for both calculations. Must be a nonzero integer or 'all'. Default is 'all'
+        :param use_corrfunc:
+            Boolean for wheter or not to use corrfunc, if it is available. Default is False.
+        :param xi_kwargs:
+            Optional kwargs for the xi calculation.
+        :return: bias, an array of shape(rbins.shape[0]-1) of the galaxy bias.
+        """
+        try:
+            assert 'do_jackknife' not in xi_kwargs and 'jk_kwargs' not in xi_kwargs
+        except AssertionError:
+            raise NotImplementedError("Jackknife functionality is currently unavailable for bias.")
+
+        return self.calc_xi(rbins, n_cores, use_corrfunc, **xi_kwargs)/self.calc_xi_mm(rbins, n_cores, use_corrfunc)
 
     # TODO use Joe's code. Remember to add sensible asserts when I do.
     # TODO Jackknife? A way to do it without Joe's code?
