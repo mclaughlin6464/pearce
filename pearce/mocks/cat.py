@@ -20,7 +20,8 @@ from .customHODModels import *
 
 # try to import corrfunc, determine if it was successful
 try:
-    from Corrfunc.theory import xi, wp
+    from Corrfunc.theory import xi, wp, DD
+    from Corrfunc.utils import convert_3d_counts_to_cf
 
     CORRFUNC_AVAILABLE = True
 except ImportError:
@@ -785,6 +786,49 @@ class Cat(object):
 
         return self.calc_xi(rbins, n_cores, use_corrfunc, **xi_kwargs)/self.calc_xi_mm(rbins, n_cores, use_corrfunc)
 
+    @observable
+    def calc_xi_gm(self, rbins, n_cores='all', use_corrfunc=True): #TODO add in halo? may not be worth it.
+
+        n_cores = self._check_cores(n_cores)
+
+        x_g, y_g, z_g = [self.model.mock.galaxy_table[c] for c in ['x', 'y', 'z']]
+        pos_g = return_xyz_formatted_array(x_g, y_g, z_g, period=self.Lbox)
+
+        x_m, y_m, z_m = [self.halocat.ptcl_table[c] for c in ['x', 'y', 'z']]
+        pos_m = return_xyz_formatted_array(x_m, y_m, z_m, period=self.Lbox)
+
+        if use_corrfunc:
+            #corrfunc doesn't have built in cross correlations
+            rand_N1 = 3 * len(x_g)
+
+            rand_X1 = np.random.uniform(0, self.Lbox*self.h, rand_N1)
+            rand_Y1 = np.random.uniform(0, self.Lbox*self.h, rand_N1)
+            rand_Z1 = np.random.uniform(0, self.Lbox*self.h, rand_N1)
+
+            rand_N2 = 3 * len(x_m)
+
+            rand_X2 = np.random.uniform(0, self.Lbox * self.h, rand_N2)
+            rand_Y2 = np.random.uniform(0, self.Lbox * self.h, rand_N2)
+            rand_Z2 = np.random.uniform(0, self.Lbox * self.h, rand_N2)
+
+            autocorr = False
+            D1D2 = DD(autocorr, n_cores, rbins, x_g.astype('float32'),  y_g.astype('float32'),  z_g.astype('float32'),
+                      X2= x_m.astype('float32'), Y2 = y_m.astype('float32'), Z2 = z_m.astype('float32'))
+            D1R2 = DD(autocorr, n_cores, rbins, x_g.astype('float32'), y_g.astype('float32'), z_g.astype('float32'),
+                      X2=rand_X2.astype('float32'), Y2=rand_Y2.astype('float32'), Z2=rand_Z2.astype('float32'))
+            D2R1 = DD(autocorr, n_cores, rbins, x_m.astype('float32'), y_m.astype('float32'), z_m.astype('float32'),
+                      X2=rand_X1.astype('float32'), Y2=rand_Y1.astype('float32'), Z2=rand_Z1.astype('float32'))
+            R1R2 = DD(autocorr, n_cores, rbins,rand_X1.astype('float32'),rand_Y1.astype('float32'), rand_Z1.astype('float32'),
+                      X2=rand_X2.astype('float32'), Y2=rand_Y2.astype('float32'), Z2=rand_Z2.astype('float32'))
+
+            xi_all = convert_3d_counts_to_cf(len(x_g), len(x_m), rand_N1, rand_N2,
+                                             D1D2, D1R2, D2R1, R1R2)
+        else:
+            xi_all = tpcf(pos_g * self.h, rbins, sample2 = pos_m*self.h, period=self.Lbox * self.h, num_threads=n_cores,
+                          estimator='Landy-Szalay', do_auto=False)
+
+        return xi_all
+
     # TODO use Joe's code. Remember to add sensible asserts when I do.
     # TODO Jackknife? A way to do it without Joe's code?
     @observable
@@ -872,3 +916,5 @@ class Cat(object):
         # NOTE I can transform coordinates and not have to use randoms at all. Consider?
         wt_all = angular_tpcf(ang_pos, theta_bins, randoms=rand_ang_pos, num_threads=n_cores)
         return wt_all
+
+
