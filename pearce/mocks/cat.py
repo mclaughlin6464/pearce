@@ -620,7 +620,7 @@ class Cat(object):
             halotools.
         :return:
         """
-        if hasattr(self, '_xi_mm_bins') and self._xi_mm_bins == rbins:# we have this one cached
+        if hasattr(self, '_xi_mm_bins') and np.all(self._xi_mm_bins == rbins):# we have this one cached
             return self._xi_mm
 
         if use_corrfunc:
