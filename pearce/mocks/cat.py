@@ -7,10 +7,17 @@ from os import path
 from itertools import izip
 from multiprocessing import cpu_count
 import inspect
+import warnings
 from time import time
 from glob import glob
+from multiprocessing import Pool
+
+import numpy as np
+from scipy.interpolate import interp1d
+from scipy.stats import linregress
 
 from astropy import cosmology
+from astropy import constants as const, units as units
 from halotools.sim_manager import RockstarHlistReader, CachedHaloCatalog, UserSuppliedPtclCatalog
 from halotools.empirical_models import PrebuiltHodModelFactory
 from halotools.empirical_models import HodModelFactory, TrivialPhaseSpace, NFWPhaseSpace
@@ -395,6 +402,9 @@ class Cat(object):
         self.halocat = CachedHaloCatalog(simname=self.simname, halo_finder=self.halo_finder,
                                          version_name=self.version_name,
                                          ptcl_version_name=self.version_name, redshift=z, dz_tol = 0.01)
+        # refelct the current catalog
+        self.z = z
+        self.a = a
 
     # TODO not sure if assembias should be boolean, or keep it as separate HODs?
     def load_model(self, scale_factor, HOD='redMagic', check_sf=True, hod_kwargs={}):
@@ -608,7 +618,7 @@ class Cat(object):
         hod = self.calc_hod(params)
         return np.sum(mf*hod)/((self.Lbox*self.h)**3)
 
-    def calc_xi_mm(self, rbins, n_cores='all', use_corrfunc=True):
+    def calc_xi_mm(self, rbins, n_cores='all', use_corrfunc=False):
         """
         Calculate the matter-matter realspace autocorrelation function
         :param rbins:
@@ -787,7 +797,7 @@ class Cat(object):
         return self.calc_xi(rbins, n_cores, use_corrfunc, **xi_kwargs)/self.calc_xi_mm(rbins, n_cores, use_corrfunc)
 
     @observable
-    def calc_xi_gm(self, rbins, n_cores='all', use_corrfunc=True): #TODO add in halo? may not be worth it.
+    def calc_xi_gm(self, rbins, n_cores='all', use_corrfunc=False): #TODO add in halo? may not be worth it.
 
         n_cores = self._check_cores(n_cores)
 
@@ -880,9 +890,11 @@ class Cat(object):
         return wp_all
 
     @observable
-    def calc_wt(self, theta_bins, do_jackknife=True, n_cores='all', halo = False):
+    def calc_wt_projected(self, theta_bins, do_jackknife=True, n_cores='all', halo = False):
         '''
         Calculate the angular correlation function, w(theta), from a populated catalog.
+        NOTE this is depreceated, because projecting a snapshot does not provide consistent results.
+        Use calc_wt instead.
         :param theta_bins:
             The bins in theta to use.
         :param n_cores:
@@ -917,4 +929,79 @@ class Cat(object):
         wt_all = angular_tpcf(ang_pos, theta_bins, randoms=rand_ang_pos, num_threads=n_cores)
         return wt_all
 
+    def compute_wt_prefactor(zbins, dNdz):
+        """
+        Helper function to compute the w(theta) prefactor W from the dNdz distribution. 
+        param zbins: the edges of the redshift bins in which dNdz is computed
+        param dNdz: the normalized redshift distribution of the sample. Should have shape (len(zbins)-1,)
+
+        return: W, the result of 2/c*\int_0^{\infty} dz H(z) (dN/dz)^2, in units of inverse Mpc
+        """
+        W = 0 
+        for idx, dN in enumerate(dNdz):
+            dz = zbins[idx+1] - zbins[idx]
+            dNdz = dN/dz
+            H = self.cosmology.H((zbins[idx+1] + zbins[idx])/2.0)
+            W+= dz*H*(dNdz)**2
+                                                                                            
+        return  (2*W/const.c).to("1/Mpc").value
+
+
+    @observable
+    def calc_wt(self, theta_bins, rbins, W, n_cores='all', halo = False, xi_kwargs = {}):
+        """
+        TODO docs
+        """
+        assert 'do_jackknife' not in xi_kwargs
+        n_cores = self._check_cores(n_cores)
+
+        xi = self.calc_xi(rbins,do_jackknife=False,n_cores=n_cores, halo=halo, **xi_kwargs)
+        rpoints = (rbins[:-1]+rbins[1:])/2.0
+        
+        if np.any(xi<=0):
+            warnings.warn("Some values of xi are less than 0. Setting to a small nonzero value. This may have unexpected behavior, check your HOD")
+            xi[xi<=0] = 1e-3
+
+        xi_interp = interp1d(np.log10(rpoints), np.log10(xi))
+
+        xi_mm = self.calc_xi_mm(rbins,n_cores=n_cores) 
+        #if precomputed, will just load the cache
+
+        bias2 = np.mean(xi/xi_mm[-3:]) #estimate the large scale bias from the box
+        #note i don't use the bias builtin cuz i've already computed xi_gg. 
+        
+        #Assume xi_mm doesn't go below 0; will fail catastrophically if it does. but if it does we can't hack around it.
+        m,b,_,_,_ linregress(np.log10(rpoints), np.log10(xi_mm))
+
+        large_scale_model = lambda r: bias2*(10**b)*(r**m) #should i use np.power?
+
+        tpoints = (theta_bins[1:] + theta_bins[:-1])/2.0
+        wt = np.zeros_like(tpoints)
+        x = self.cosmology.comoving_distance(self.z)*self.a
+        #ubins = np.linspace(10**-6, 10**4.0, 1001)
+        ubins = np.logspace(-6, 4.0, 1001)
+        ubc = (ubins[1:]+ubins[:-1])/2.0
+        
+        def integrate_xi(bin_no):#, w_theta, bin_no, ubc, ubins) 
+            int_xi = 0
+            t_med = tpoints[bin_no]
+            for ubin_no, _u in enumerate(ubc):
+                _du = ubins[ubin_no+1]-ubins[ubin_no]
+                u = _u*units.Mpc*self.a
+                du = _du*units.Mpc*self.a
+
+                r = np.sqrt((u**2+(x*t_med)**2))#*cat.h#not sure about the h
+
+                if r > unit.Mpc*self.Lbox/10: 
+                    int_xi+=du*large_scale_model(r)
+                else:
+                    int_xi+=du*(np.power(10, \
+                                xi_interp(np.log10(xi), np.log10(r.value))))
+            wt[bin_no] = int_xi.to("Mpc").value
+
+        p = Pool(n_cores)  
+        p.map(integrate_xi, range(tpoints.shape[0]))
+        p.terminate()
+
+        return wt*W
 
