@@ -929,7 +929,7 @@ class Cat(object):
         wt_all = angular_tpcf(ang_pos, theta_bins, randoms=rand_ang_pos, num_threads=n_cores)
         return wt_all
 
-    def compute_wt_prefactor(zbins, dNdz):
+    def compute_wt_prefactor(self, zbins, dNdz):
         """
         Helper function to compute the w(theta) prefactor W from the dNdz distribution. 
         param zbins: the edges of the redshift bins in which dNdz is computed
@@ -967,24 +967,26 @@ class Cat(object):
         xi_mm = self.calc_xi_mm(rbins,n_cores=n_cores) 
         #if precomputed, will just load the cache
 
-        bias2 = np.mean(xi/xi_mm[-3:]) #estimate the large scale bias from the box
+        bias2 = np.mean(xi[-3:]/xi_mm[-3:]) #estimate the large scale bias from the box
         #note i don't use the bias builtin cuz i've already computed xi_gg. 
         
         #Assume xi_mm doesn't go below 0; will fail catastrophically if it does. but if it does we can't hack around it.
-        m,b,_,_,_ linregress(np.log10(rpoints), np.log10(xi_mm))
+        m,b,_,_,_ =linregress(np.log10(rpoints), np.log10(xi_mm))
 
         large_scale_model = lambda r: bias2*(10**b)*(r**m) #should i use np.power?
 
         tpoints = (theta_bins[1:] + theta_bins[:-1])/2.0
         wt = np.zeros_like(tpoints)
         x = self.cosmology.comoving_distance(self.z)*self.a
+
+        assert tpoints[0]*x.to("Mpc").value >= rbins[0]
         #ubins = np.linspace(10**-6, 10**4.0, 1001)
         ubins = np.logspace(-6, 4.0, 1001)
         ubc = (ubins[1:]+ubins[:-1])/2.0
         
         def integrate_xi(bin_no):#, w_theta, bin_no, ubc, ubins) 
             int_xi = 0
-            t_med = tpoints[bin_no]
+            t_med = np.radians(tpoints[bin_no])
             for ubin_no, _u in enumerate(ubc):
                 _du = ubins[ubin_no+1]-ubins[ubin_no]
                 u = _u*units.Mpc*self.a
@@ -992,16 +994,19 @@ class Cat(object):
 
                 r = np.sqrt((u**2+(x*t_med)**2))#*cat.h#not sure about the h
 
-                if r > unit.Mpc*self.Lbox/10: 
-                    int_xi+=du*large_scale_model(r)
+                if r > units.Mpc*self.Lbox/10: 
+                    int_xi+=du*large_scale_model(r.value)
                 else:
                     int_xi+=du*(np.power(10, \
-                                xi_interp(np.log10(xi), np.log10(r.value))))
+                                xi_interp(np.log10(r.value))))
             wt[bin_no] = int_xi.to("Mpc").value
 
-        p = Pool(n_cores)  
-        p.map(integrate_xi, range(tpoints.shape[0]))
-        p.terminate()
+        #Currently this doesn't work cuz you can't pickle the integrate_xi function.
+        #I'll just ignore for now. This is why i'm making an emulator anyway
+        #p = Pool(n_cores)  
+        map(integrate_xi, range(tpoints.shape[0]))
+        #p.map(integrate_xi, range(tpoints.shape[0]))
+        #p.terminate()
 
         return wt*W
 
