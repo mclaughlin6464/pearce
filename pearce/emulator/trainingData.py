@@ -192,6 +192,7 @@ def training_config_reader(filename):
 
         # check simname and scale_factor (the 100% required ones) are in there!
         # if fails, will throw a KeyError
+        #TODO turn into a assert
         cosmo_params['simname']
         # TODO change to scale factors?
         cosmo_params['scale_factor'] =literal_eval(cosmo_params['scale_factor'])# [float(a.strip()) for a in sf_str.strip('[ ]').split(',')]

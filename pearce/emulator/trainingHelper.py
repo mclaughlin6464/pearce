@@ -87,6 +87,7 @@ def calc_training_points(hod_params, bins,obs, cosmo_params,ordered_params, dirn
             #get the function to calculate the observable
             calc_observable = getattr(cat, 'calc_%s'%obs)
         except AttributeError:
+            #TODO just fail, warning has no purpose.
             warnings.warn('WARNING: Observable %s invalid; using default xi' % (obs))
             calc_observable = cat.calc_xi
             obs = 'xi'
@@ -105,7 +106,7 @@ def calc_training_points(hod_params, bins,obs, cosmo_params,ordered_params, dirn
     if n_repops > 1: #don't do jackknife in this case
         if 'do_jackknife' in cosmo_params and cosmo_params['do_jackknife']:
             warnings.warn('WARNING: Cannot perform jackknife with n_repops>1. Turning off jackknife.')
-        kwargs['do_jackknife']=False
+            kwargs['do_jackknife']=False
     if kwargs: #if there are kwargs to pass in.
         _calc_observable = calc_observable #might not have to do this, but play it safe.
         calc_observable = lambda bins: _calc_observable(bins, **kwargs)#make it so kwargs are default.

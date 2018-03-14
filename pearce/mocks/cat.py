@@ -953,8 +953,10 @@ class Cat(object):
         TODO docs
         """
         assert 'do_jackknife' not in xi_kwargs
-        n_cores = self._check_cores(n_cores)
 
+        if type(rbins) is list:
+            rbins = np.array(rbins)
+        n_cores = self._check_cores(n_cores)
         xi = self.calc_xi(rbins,do_jackknife=False,n_cores=n_cores, halo=halo, **xi_kwargs)
         rpoints = (rbins[:-1]+rbins[1:])/2.0
         
