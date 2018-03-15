@@ -1,0 +1,8 @@
+###!/bin/bash
+#BSUB -q kipac-ibq 
+#BSUB -W 24:00
+#BSUB -J shuffle_cens
+#BSUB -oo /u/ki/swmclau2/Git/pearce/bin/shuffle_cens.out    
+#BSUB -n 16 
+
+python /u/ki/swmclau2/Git/pearce/bin/shuffle_cens.py 

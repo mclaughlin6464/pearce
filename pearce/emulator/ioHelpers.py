@@ -5,6 +5,7 @@ and useful in multiple cases. More specific, one-use functions are generally lef
 
 from os import path
 import cPickle as pickle
+from ast import literal_eval
 import numpy as np
 from itertools import izip
 from collections import OrderedDict, namedtuple
@@ -128,23 +129,29 @@ def global_file_reader(dirname, fname=GLOBAL_FILENAME):
     cosmo_params = {}
     with open(global_filename) as f:
         for i, line in enumerate(f):
+            splitLine = line.strip('# \n').split(':')  # split into key val pair
+            if len(splitLine) > 2: # more colons! 
+                tmp = ':'.join(splitLine[1:])
+                _splitLine = [splitLine[0]]
+                _splitLine.append(tmp)
+                splitLine = _splitLine
             if i == 0:
-                splitLine = line.strip('# \n').split(':')  # split into key val pair
                 method = splitLine[1].strip()
                 continue
             elif i == 1:
-                splitLine = line.strip('# \n').split(':')  # split into key val pair
                 obs = splitLine[1].strip()
                 continue
-            elif line[0] != '#' or i < 3:
+            elif i == 2:
+                log_obs = any( t in splitLine[1] for t in ('t', 'T', 'y', 'Y'))
+                continue
+            elif line[0] != '#' or i < 4:
                 continue  # only looking at comments, and first two lines don't have params. Note: Does have cosmo!
-            splitLine = line.strip('# \n').split(':')  # split into key val pair
             try:
-                cosmo_params[splitLine[0]] = float(splitLine[1])
+                cosmo_params[splitLine[0]] = literal_eval(splitLine[1])
             except ValueError:
-                cosmo_params[splitLine[0]] = splitLine[1].strip()
+                cosmo_params[splitLine[0]] = str(splitLine[1].strip())
 
-    return bins, cosmo_params, obs, method
+    return bins, cosmo_params, obs,log_obs, method
 
 
 # Could use ConfigParser maybe
@@ -161,6 +168,9 @@ def config_reader(filename):
         for line in f:
             line = line.strip()
             splitline = line.split(':')
-            config[splitline[0].strip()] = splitline[1].strip()
+            if len(splitline) > 2: #multiple colons! 
+                config[splitline[0].strip()] = (':'.join(splitline[1:])).strip()
+            else:
+                config[splitline[0].strip()] = splitline[1].strip()
 
     return config

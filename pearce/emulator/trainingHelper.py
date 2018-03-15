@@ -4,16 +4,17 @@
 from os import path
 import sys
 import warnings
-import cPickle as pickle
 import numpy as np
 #from trainingData import PARAMS, GLOBAL_FILENAME
 #from ioHelpers import global_file_reader
 #from ..mocks.kittens import cat_dict
 #Not happy about this, look into a change.
 
+
 sys.path.append('..')
-from pearce.emulator import global_file_reader, params_file_reader, parameter
+from pearce.emulator import global_file_reader, params_file_reader
 from pearce.mocks import cat_dict
+
 
 # TODO to ioHelpers?
 def load_training_params(param_file):
@@ -25,15 +26,16 @@ def load_training_params(param_file):
     :return: hod parameters, bins, obs, cosmo paraemters, job id
     '''
     hod_params = np.loadtxt(param_file)
+    if len(hod_params.shape) == 1:
+        hod_params = np.array([hod_params]) #needs to have 2 dims
     dirname = path.dirname(param_file)
-    bins, cosmo_params, obs, _ = global_file_reader(dirname)
+    bins, cosmo_params, obs,log_obs, _ = global_file_reader(dirname)
     ordered_params = params_file_reader(dirname)
-    print param_file
     job_id = int(param_file.split('.')[-2][-3:]) #last 3 digits of paramfile is a unique id.
 
-    return hod_params, bins,obs, cosmo_params,ordered_params, dirname, job_id
+    return hod_params, bins,obs, log_obs, cosmo_params,ordered_params, dirname, job_id
 
-def calc_training_points(hod_params, bins,obs, cosmo_params,ordered_params, dirname, job_id):
+def calc_training_points(hod_params, bins,obs, cosmo_params,ordered_params, dirname, job_id,log_obs=True):
     '''
     given an array of hod parameters (and a few other things) populate a catalog and calculate an observable at those points.
     :param hod_params:
@@ -41,6 +43,10 @@ def calc_training_points(hod_params, bins,obs, cosmo_params,ordered_params, dirn
         points anc calculates the observable at each of them.
     :param bins:
         Radial (or angular) bins for the observable calculation.
+    :param obs:
+        The name of the observable to calculate. String. 
+    :param log_obs: 
+        Bool. Take the log of the observable. Should be true for xi and wp
     :param cosmo_params:
         cosmology information, used for loading a catalog. Required is simname, scale_factor, and anything required to load
         a specific catalog (Lbox, npart, etc.)
@@ -54,11 +60,18 @@ def calc_training_points(hod_params, bins,obs, cosmo_params,ordered_params, dirn
     #Could add a **kwargs to load to shorten this.
     #That makes things a little messier though IMO
     # TODO tol?
-    # TODO check that if 'HOD' is not an assembias one, and assembias params are passed in, throw an error.
+    hod_kwargs = cosmo_params['hod_kwargs'] if 'hod_kwargs' in cosmo_params else dict()
+    # TODO this is a BAD idea delete tomorrow
+    for key, val in hod_kwargs.iteritems():
+        if type(val) is str and val.split('.')[-1] == 'npy': #may god have mercy on my soul
+            #with open(val, 'r') as f:
+            #   hod_kwargs[key] = pickle.load(f)
+            hod_kwargs[key] = np.loadtxt(val)
+
     if 'HOD' in cosmo_params:
-        cat.load(cosmo_params['scale_factor'], cosmo_params['HOD'])
+        cat.load(cosmo_params['scale_factor'], cosmo_params['HOD'], hod_kwargs=hod_kwargs)
     else:
-        cat.load(cosmo_params['scale_factor'])
+        cat.load(cosmo_params['scale_factor'], hod_kwargs=hod_kwargs)
 
     #Number of repopulations to do
     n_repops=1
@@ -74,9 +87,15 @@ def calc_training_points(hod_params, bins,obs, cosmo_params,ordered_params, dirn
             #get the function to calculate the observable
             calc_observable = getattr(cat, 'calc_%s'%obs)
         except AttributeError:
+            #TODO just fail, warning has no purpose.
             warnings.warn('WARNING: Observable %s invalid; using default xi' % (obs))
             calc_observable = cat.calc_xi
             obs = 'xi'
+    # TODO should be a better way to do this
+    # take the log of some observables, but not all
+    transform_func = lambda x : x
+    if log_obs:#obs in {'xi', 'wp'}: 
+        transform_func = np.log10
 
     #check to see if there are kwargs for calc_observable
     args = calc_observable.args #get function args
@@ -87,15 +106,16 @@ def calc_training_points(hod_params, bins,obs, cosmo_params,ordered_params, dirn
     if n_repops > 1: #don't do jackknife in this case
         if 'do_jackknife' in cosmo_params and cosmo_params['do_jackknife']:
             warnings.warn('WARNING: Cannot perform jackknife with n_repops>1. Turning off jackknife.')
-        kwargs['do_jackknife']=False
+            kwargs['do_jackknife']=False
     if kwargs: #if there are kwargs to pass in.
         _calc_observable = calc_observable #might not have to do this, but play it safe.
         calc_observable = lambda bins: _calc_observable(bins, **kwargs)#make it so kwargs are default.
 
+
     for id, hod in enumerate(hod_params):
         #construct a dictionary for the parameters
         # Could store the param ordering in the file so it doesn't need to be imported.
-        hod_dict = {p.name: val for p, val in zip(ordered_params, hod)}
+        hod_dict = {p: val for p, val in zip(ordered_params, hod)}
         #Populating the same cat over and over is faster than making a new one over and over!
         if n_repops ==1:
             cat.populate(hod_dict)
@@ -106,10 +126,13 @@ def calc_training_points(hod_params, bins,obs, cosmo_params,ordered_params, dirn
             for repop in xrange(n_repops):
                 cat.populate(hod_dict)
                 obs_i = calc_observable(bins)
-                obs_repops[repop, :] = obs_i
+                obs_repops[repop, :] = transform_func(obs_i) #TODO i suppose this may want to be a flag, or rolled into the func?
 
+            #obs_val = np.mean(obs_repops, axis=0)
+            #obs_cov = np.cov(obs_repops, rowvar=False)/np.sqrt(n_repops)#error on mean # TODO make sure is right?
             obs_val = np.mean(obs_repops, axis=0)
-            obs_cov = np.cov(obs_repops, rowvar=False)/np.sqrt(n_repops)#error on mean # TODO make sure is right?
+            obs_cov = np.cov(obs_repops, rowvar=False)
+
 
         # Consider storing them all and writing them all at once. May be faster.
         # Writing the hod params as a header. Could possibly recover them from the same file I used to read these in.
@@ -129,5 +152,5 @@ if __name__ == '__main__':
 
     args = vars(parser.parse_args())
 
-    hod_params, bins,obs, cosmo_params, ordered_params, dirname, job_id = load_training_params(args['param_file'])
-    calc_training_points(hod_params, bins,obs, cosmo_params,ordered_params, dirname, job_id)
+    hod_params, bins,obs,log_obs, cosmo_params, ordered_params, dirname, job_id = load_training_params(args['param_file'])
+    calc_training_points(hod_params, bins,obs, cosmo_params,ordered_params, dirname, job_id,log_obs=log_obs)

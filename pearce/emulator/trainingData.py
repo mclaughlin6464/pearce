@@ -6,8 +6,10 @@ from time import time
 from os import path, mkdir
 from subprocess import call
 from itertools import izip
+from ast import literal_eval
 import warnings
 import cPickle as pickle
+from collections import OrderedDict
 
 import numpy as np
 
@@ -165,24 +167,25 @@ def training_config_reader(filename):
         method,obs n_points, system, n_jobs, max_time, outputdir, bins, cosmo_params
         Config parameters defined explicitly elsewhere.
     '''
+    #TODO need a check that the HOD and params are all kosher
     config = config_reader(filename)
     # I could make some of these have defaults with get()
     # I'm not sure I want to do that.
     try:
         method = config['method'].strip()
         obs = config['obs'].strip()
+        log_obs = config['log_obs'].strip() #save the string for now
         n_points = int(config['n_points'])
         system = config['system']
         n_jobs = int(config['n_jobs'])
         max_time = int(config['max_time'])
         outputdir = config['outputdir'].strip()
-        bins_str = config['bins']
         # need to do a little work to get this right
-        bins = [float(r.strip()) for r in bins_str.strip('[ ]').split(',')]
+        bins = literal_eval(config['bins'])#[float(r.strip()) for r in bins_str.strip('[ ]').split(',')]
 
         # cosmology information assumed to be in the remaining ones!
         # Delete the ones we've removed.
-        for key in ['method', 'obs', 'n_points', 'system', 'n_jobs', 'max_time',
+        for key in ['method', 'obs', 'n_points', 'n_jobs', 'max_time',
                     'outputdir', 'bins']:
             del config[key]
 
@@ -190,26 +193,23 @@ def training_config_reader(filename):
 
         # check simname and scale_factor (the 100% required ones) are in there!
         # if fails, will throw a KeyError
+        #TODO turn into a assert
         cosmo_params['simname']
         # TODO change to scale factors?
-        if '[' in cosmo_params['scale_factor']:  # user passed in a list
-            sf_str = cosmo_params['scale_factor']
-            cosmo_params['scale_factor'] = [float(a.strip()) for a in sf_str.strip('[ ]').split(',')]
-        elif cosmo_params['scale_factor'] == 'all':
-            cosmo_params['scale_factor'] = [cosmo_params['scale_factor'].strip()]
-        else:  # float
-            cosmo_params['scale_factor'] = float(cosmo_params['scale_factor'].strip())
+        cosmo_params['scale_factor'] =literal_eval(cosmo_params['scale_factor'])# [float(a.strip()) for a in sf_str.strip('[ ]').split(',')]
 
-        for cp, t in zip(['Lbox', 'npart', 'n_repops'], [float, int, int]):
-            try:
-                cosmo_params[cp] = t(cosmo_params[cp])
-            except KeyError:
-                continue
+        for key,val in cosmo_params.iteritems():
+            if type(val) == str:
+                try:
+                    cosmo_params[key] = literal_eval(cosmo_params[key])
+                except ValueError:
+                    cosmo_params[key] = str(cosmo_params[key])
+
 
     except KeyError:
         raise KeyError("The config file %s is missing a parameter." % filename)
 
-    return method, obs, n_points, system, n_jobs, max_time, outputdir, bins, cosmo_params
+    return method, obs,log_obs, n_points, system, n_jobs, max_time, outputdir, bins, cosmo_params
 
 
 def make_training_data(config_filename, ordered_params=None):
@@ -227,7 +227,7 @@ def make_training_data(config_filename, ordered_params=None):
         None.
     '''
 
-    method, obs, n_points, system, n_jobs, max_time, base_outputdir, bins, cosmo_params = \
+    method, obs,log_obs, n_points, system, n_jobs, max_time, base_outputdir, bins, cosmo_params = \
         training_config_reader(config_filename)
 
     scale_factors = cosmo_params['scale_factor']
@@ -263,6 +263,8 @@ def make_training_data(config_filename, ordered_params=None):
 
     if system == 'ki-ls':
         make_command = make_kils_command
+    elif system == 'long':
+        make_command = lambda x,y,z : make_kils_command(x,y,z, queue='long')
     elif system == 'sherlock':
         make_command = make_sherlock_command
     else:
@@ -282,7 +284,8 @@ def make_training_data(config_filename, ordered_params=None):
 
         # write the global file used by all params
         # TODO Write system (maybe) and method (definetly) to file!
-        header_start = ['Sampling Method: %s' % method, 'Observable: %s' % obs, 'Cosmology Params:']
+        header_start = ['Sampling Method: %s' % method, 'Observable: %s' % obs,\
+                        'Log Observable: %s' % log_obs, 'Cosmology Params:']
         header_start.extend('%s:%s' % (key, str(val)) for key, val in cosmo_params.iteritems())
         header = '\n'.join(header_start)
         np.savetxt(path.join(outputdir, GLOBAL_FILENAME), bins, header=header)

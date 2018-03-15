@@ -1,0 +1,8 @@
+###!/bin/bash
+#BSUB -q long 
+#BSUB -W 48:00
+#BSUB -J test_sjo
+#BSUB -oo /u/ki/swmclau2/Git/pearce/bin/test_sjo.out    
+#BSUB -n 16 
+
+python /u/ki/swmclau2/Git/pearce/bin/sloppy_joes_optimization.py 
