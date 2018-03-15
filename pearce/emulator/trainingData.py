@@ -167,6 +167,7 @@ def training_config_reader(filename):
         method,obs n_points, system, n_jobs, max_time, outputdir, bins, cosmo_params
         Config parameters defined explicitly elsewhere.
     '''
+    #TODO need a check that the HOD and params are all kosher
     config = config_reader(filename)
     # I could make some of these have defaults with get()
     # I'm not sure I want to do that.
