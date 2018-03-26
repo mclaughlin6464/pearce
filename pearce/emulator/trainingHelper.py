@@ -91,10 +91,10 @@ def calc_training_points(hod_params, bins,obs, cosmo_params,ordered_params, dirn
             warnings.warn('WARNING: Observable %s invalid; using default xi' % (obs))
             calc_observable = cat.calc_xi
             obs = 'xi'
-    # TODO should be a better way to do this
+
     # take the log of some observables, but not all
     transform_func = lambda x : x
-    if log_obs:#obs in {'xi', 'wp'}: 
+    if log_obs:
         transform_func = np.log10
 
     #check to see if there are kwargs for calc_observable

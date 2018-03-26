@@ -5,7 +5,6 @@ import warnings
 from glob import glob
 from itertools import izip
 from collections import OrderedDict
-from multiprocessing import cpu_count
 from os import path
 from time import time
 from abc import ABCMeta, abstractmethod
@@ -30,10 +29,10 @@ class Emu(object):
        controls all loading, manipulation, and emulation of data.'''
 
     __metaclass__ = ABCMeta
-    valid_methods = {'gp', 'svr', 'gbdt', 'rf', 'krr', 'linear'}  # could add more, coud even check if they exist in sklearn
+    valid_methods = {'gp', 'svr', 'gbdt', 'rf', 'krr',
+                     'linear'}  # could add more, coud even check if they exist in sklearn
     skl_methods = {'gbdt': GradientBoostingRegressor, 'rf': RandomForestRegressor, \
-                       'svr': SVR, 'krr': KernelRidge, 'linear': LinearRegression}
-
+                   'svr': SVR, 'krr': KernelRidge, 'linear': LinearRegression}
 
     def __init__(self, training_dir, method='gp', hyperparams={}, fixed_params={}, independent_variable=None):
         '''
@@ -103,9 +102,9 @@ class Emu(object):
         input_params = {}
         input_params.update(em_params)
         # NOTEfixed_paramswill likely not be valid.
-# TODO fixed_params will no longer work when all datasets are necessarily LHC.
+        # TODO fixed_params will no longer work when all datasets are necessarily LHC.
         # Changing fixed_params to represent a fixed HOD or cosmology, which is still possible.
-        #input_params.update(fixed_params)
+        # input_params.update(fixed_params)
 
         # redshift is fixed.
         self.redshift_bin_centers = np.array([0.0])
@@ -120,41 +119,42 @@ class Emu(object):
         HODs = np.loadtxt(glob(path.join(data_dir, 'HOD*.dat'))[0])
 
         cosmo_names = ['Omega_m', 'Omega_b', 'sigma_8', 'h', 'n_s', 'N_eff', 'w_de']
-        HOD_names = ['Msat', 'alpha', 'Mcut', 'sigma_logM','vbias_cen','vbias_sats','conc','v_field_amp']
+        HOD_names = ['Msat', 'alpha', 'Mcut', 'sigma_logM', 'vbias_cen', 'vbias_sats', 'conc', 'v_field_amp']
         if 'HOD' in self.fixed_params:
             if 'cosmo' in self.fixed_params:
                 raise ValueError("Can't fix both HOD and cosmology!")
             min_max_vals = zip(cosmologies.min(axis=0), cosmologies.max(axis=0))
-            ordered_params = OrderedDict(izip(cosmo_names, min_max_vals) )
+            ordered_params = OrderedDict(izip(cosmo_names, min_max_vals))
         elif 'cosmo' in self.fixed_params:
             min_max_vals = zip(HODs.min(axis=0), HODs.max(axis=0))
             ordered_params = OrderedDict(izip(HOD_names, min_max_vals))
         else:
             op_names = HOD_names[:]
             op_names.extend(cosmo_names)
-            min_max_vals = zip(np.r_[HODs.min(axis = 0),cosmologies.min(axis=0)], \
+            min_max_vals = zip(np.r_[HODs.min(axis=0), cosmologies.min(axis=0)], \
                                np.r_[HODs.max(axis=0), cosmologies.max(axis=0)])
             ordered_params = OrderedDict(izip(op_names, min_max_vals))
 
         for key, val in ordered_params.iteritems():
-            if key[0] == 'M': #masses have to have the log taken
+            if key[0] == 'M':  # masses have to have the log taken
                 ordered_params[key] = (np.log10(val[0]), np.log10(val[1]))
 
         if 'z' not in self.fixed_params:
-            ordered_params['z'] = (0,1)
+            ordered_params['z'] = (0, 1)
         if 'r' not in self.fixed_params:
-            ordered_params['r'] = (0,1)
+            ordered_params['r'] = (0, 1)
 
         self._ordered_params = ordered_params
 
         for key in em_params:  # assert defined params are in ordered
-            assert key in  self._ordered_params
+            assert key in self._ordered_params
 
         obs_files = glob(path.join(data_dir, 'wp*.dat'))
 
         # store the binning for the scale_bins
         # assumes that it's the same for each box, which should be true.
-        scale_nbins = 9 #hardcoding
+        # TODO
+        scale_nbins = 9  # hardcoding
         npoints = len(obs_files) * scale_nbins  # each file contains NBINS points in r, and each file is a N-d point
         ndim = len(self._ordered_params)
         x = np.zeros((npoints, ndim))
@@ -166,8 +166,8 @@ class Emu(object):
 
         for idx, obs_file in enumerate(obs_files):
             obs_and_rb = obs_file_reader(obs_file)
-            scale_bin_centers = obs_and_rb[:,0]
-            obs = obs_and_rb[:,1]
+            scale_bin_centers = obs_and_rb[:, 0]
+            obs = obs_and_rb[:, 1]
 
             if hasattr(self, "scale_bin_centers"):
                 if scale_bin_centers.shape != self.scale_bin_centers.shape or \
@@ -184,7 +184,7 @@ class Emu(object):
                 num_skipped += 1
                 continue
 
-            #TODO this structure allows you to hold an HOD or cosmology fixed, which I like.
+            # TODO this structure allows you to hold an HOD or cosmology fixed, which I like.
             split_obs_fname = path.basename(obs_file).split('_')
             cosmo_no, HOD_no = int(split_obs_fname[3]), int(split_obs_fname[5])
 
@@ -192,10 +192,10 @@ class Emu(object):
             HOD = HODs[HOD_no, :]
 
             if 'cosmo' in self.fixed_params:
-                if cosmo_no != self.fixed_params['cosmo'] :
+                if cosmo_no != self.fixed_params['cosmo']:
                     continue
                 else:
-                    params =  HOD[:]
+                    params = HOD[:]
             elif 'HOD' in self.fixed_params:
                 if HOD_no != self.fixed_params['HOD']:
                     continue
@@ -209,11 +209,11 @@ class Emu(object):
             # take the params from the file and put them in the right order and right place
             file_params = []
             for i, pname in enumerate(self._ordered_params):
-                #if pname not in fixed_params and pname not in {'z', 'r'}:  # may need to be input_params
+                # if pname not in fixed_params and pname not in {'z', 'r'}:  # may need to be input_params
                 if pname not in {'z', 'r'}:
                     # note we have to repeat for each scale bin
-                    if pname[0] == 'M': # take the log
-                        file_params.append(np.ones((scale_nbins,))*np.log10(params[i]))
+                    if pname[0] == 'M':  # take the log
+                        file_params.append(np.ones((scale_nbins,)) * np.log10(params[i]))
                     else:
                         file_params.append(np.ones((scale_nbins,)) * params[i])
 
@@ -228,10 +228,10 @@ class Emu(object):
             y[idx * scale_nbins:(idx + 1) * scale_nbins] = self._iv_transform(independent_variable, obs)
         self.scale_bin_centers = scale_bin_centers
 
-        if 'r' in self._ordered_params and self._ordered_params['r'] == (0,1):
+        if 'r' in self._ordered_params and self._ordered_params['r'] == (0, 1):
             self._ordered_params['r'] = (np.min(self.scale_bin_centers), np.max(self.scale_bin_centers))
 
-        if 'z' in self._ordered_params and self._ordered_params['z'] == (0,1):
+        if 'z' in self._ordered_params and self._ordered_params['z'] == (0, 1):
             self._ordered_params['z'] = (np.min(self.redshift_bin_centers), np.max(self.redshift_bin_centers))
 
         # ok, now get the errors in their weird format.
@@ -241,7 +241,7 @@ class Emu(object):
             e2 = np.loadtxt(path.join(data_dir, 'Cosmo_pure_err.dat'))
 
             yerr_1bin = e2 ** 2.0 + (e1 ** 2.0 - e2 ** 2.0) / scale_nbins
-            ycov_1bin = np.diag(yerr_1bin)/np.outer(np.mean(x.reshape((-1, scale_nbins)), axis = 0) * np.log(10))
+            ycov_1bin = np.diag(yerr_1bin) / np.outer(np.mean(x.reshape((-1, scale_nbins)), axis=0) * np.log(10))
         except IOError:
             # a test dir, just create a dummy since it'll be thrown out.
             ycov_1bin = np.eye(scale_nbins)
@@ -269,7 +269,7 @@ class Emu(object):
         :return: log_r (or z), y, yerr for the independent variable at the points specified by fixed nad em params.
         """
 
-        x, y,yerr, _ = self.get_data(training_dir, em_params, fixed_params, independent_variable)
+        x, y, yerr, _ = self.get_data(training_dir, em_params, fixed_params, independent_variable)
 
         sort_idxs = self._sort_params(x, argsort=True)
 
@@ -291,9 +291,9 @@ class Emu(object):
         """
         if type(training_dir) is not list:
             training_dir = [training_dir]
-        xs, ys,yerrs, ycovs = [], [], [], []
+        xs, ys, yerrs, ycovs = [], [], [], []
         for td in training_dir:
-            x, y,yerr, ycov = self.get_data(td, {}, self.fixed_params, self.independent_variable)
+            x, y, yerr, ycov = self.get_data(td, {}, self.fixed_params, self.independent_variable)
             xs.append(x)
             ys.append(y)
             ycovs.append(ycov)
@@ -303,19 +303,19 @@ class Emu(object):
         self.y = np.hstack(ys)
         fullcov = block_diag(*ycovs)
         yerr = np.sqrt(np.diag(fullcov))
-        self.yerr = np.hstack([yerr for i in xrange(self.x.shape[0]/fullcov.shape[0])])
+        self.yerr = np.hstack([yerr for i in xrange(self.x.shape[0] / fullcov.shape[0])])
 
-        #compute the average covariance matrix
+        # compute the average covariance matrix
         avgcov = np.zeros((self.scale_bin_centers.shape[0], self.scale_bin_centers.shape[0]))
-        N = fullcov.shape[0]/self.scale_bin_centers.shape[0]
+        N = fullcov.shape[0] / self.scale_bin_centers.shape[0]
         for i in xrange(N):
-            avgcov+=fullcov[i*self.scale_bin_centers.shape[0]: (i+1)*self.scale_bin_centers.shape[0]]
+            avgcov += fullcov[i * self.scale_bin_centers.shape[0]: (i + 1) * self.scale_bin_centers.shape[0]]
 
-        self.ycov = avgcov/N
+        self.ycov = avgcov / N
 
         # for now, no mean subtraction
-        #self.y_hat = np.zeros(self.y.shape[1]) if len(y.shape) > 1 else 0  #
-        self.y_hat = self.y.mean(axis = 0)
+        # self.y_hat = np.zeros(self.y.shape[1]) if len(y.shape) > 1 else 0  #
+        self.y_hat = self.y.mean(axis=0)
         self.y -= self.y_hat
 
         ndim = self.x.shape[1]
@@ -368,8 +368,8 @@ class Emu(object):
             ordered_params['z'] = (np.min(self.redshift_bin_centers), np.max(self.redshift_bin_centers))
             ordered_params['r'] = (np.min(self.scale_bin_centers), np.max(self.scale_bin_centers))
         else:
-            ordered_params['z'] = (0,1)
-            ordered_params['r'] = (0,1)
+            ordered_params['z'] = (0, 1)
+            ordered_params['r'] = (0, 1)
 
         # store in case we have to return this
         op_with_fixed = ordered_params.copy()
@@ -378,7 +378,7 @@ class Emu(object):
             if pname in ordered_params:
                 del ordered_params[pname]
             else:
-                raise KeyError('Parameter %s is in fixed_params but not in ordered_params!'%pname)
+                raise KeyError('Parameter %s is in fixed_params but not in ordered_params!' % pname)
 
         attached_or = getattr(self, "_ordered_params", None)
         # attach the ordered params if its new. Otherwise, ensure that the ordering in this dir is the same as what
@@ -450,16 +450,16 @@ class Emu(object):
                 # TODO wish i didn't have to hardcode this
                 # NOTE insert from merge, not sure if bad
                 if pname == 'r':
-                    val = 10**val
+                    val = 10 ** val
 
                 assert np.all(plow <= val) and np.all(val <= phigh)
             except AssertionError:
                 if type(val) is float:
                     warnings.warn("Emulator value for %s %.3f is outside the bounds (%.3f, %.3f) of the emulator." % (
-                    pname, val, plow, phigh))
+                        pname, val, plow, phigh))
                 else:
                     warnings.warn("One value for %s is outside the bounds (%.3f, %.3f) of the emulator." % (
-                    pname, plow, phigh))
+                        pname, plow, phigh))
 
     def _get_z_subdirs(self, dirname, fixed_zs=None):
         """
@@ -560,10 +560,10 @@ class Emu(object):
         """
         # NOTE this invalidates old training data
         if independent_variable is None or independent_variable == 'wt':
-            #y = np.log10(obs)
+            # y = np.log10(obs)
             # Approximately true, may need to revisit
             # yerr[idx * NBINS:(idx + 1) * NBINS] = np.sqrt(np.diag(cov)) / (xi * np.log(10))
-            #y_cov = cov/np.outer(obs * np.log(10), obs*np.log(10))
+            # y_cov = cov/np.outer(obs * np.log(10), obs*np.log(10))
             y = obs
             y_cov = cov
 
@@ -668,16 +668,16 @@ class Emu(object):
             # TODO parameter name has changed, update
             if independent_variable is None:
                 ig.update({'logMmin': 1.7348042925, 'f_c': 0.327508062386, 'logM0': 15.8416094906,
-                      'sigma_logM': 5.36288382789, 'alpha': 3.63498762588, 'r': 0.306139450843,
-                      'logM1': 1.66509412286, 'amp': 1.18212664544, 'z': 1.0,
-                      'mean_occupation_satellites_assembias_split1':21.02835102,
-                      'mean_occupation_satellites_assembias_slope1':225.64738711,
-                      'mean_occupation_satellites_assembias_param1':89.17850468,
-                      'mean_occupation_satellites_assembias_corr1':1.15892e3,
-                      'mean_occupation_centrals_assembias_split1': 66.97808312,
-                      'mean_occupation_centrals_assembias_slope1':179.90950523,
-                      'mean_occupation_centrals_assembias_param1':80.75541473,
-                      'mean_occupation_centrals_assembias_corr1':3.9659e6} )
+                           'sigma_logM': 5.36288382789, 'alpha': 3.63498762588, 'r': 0.306139450843,
+                           'logM1': 1.66509412286, 'amp': 1.18212664544, 'z': 1.0,
+                           'mean_occupation_satellites_assembias_split1': 21.02835102,
+                           'mean_occupation_satellites_assembias_slope1': 225.64738711,
+                           'mean_occupation_satellites_assembias_param1': 89.17850468,
+                           'mean_occupation_satellites_assembias_corr1': 1.15892e3,
+                           'mean_occupation_centrals_assembias_split1': 66.97808312,
+                           'mean_occupation_centrals_assembias_slope1': 179.90950523,
+                           'mean_occupation_centrals_assembias_param1': 80.75541473,
+                           'mean_occupation_centrals_assembias_corr1': 3.9659e6})
 
         else:
             pass  # no other guesses saved yet.
@@ -698,7 +698,6 @@ class Emu(object):
         :return:
             A george ExpSquredKernel object with this metric
         """
-
 
         k1_metric = {'Mcut': 12.0649885,
                      'Msat': 5.2580634000000002,
@@ -751,10 +750,10 @@ class Emu(object):
         metric = [ig['amp']]
         for pname in self._ordered_params:
             metric.append(k1_metric.get(pname, 1.0))
-            #try:
+            # try:
             #    metric.append(ig[pname])
-            #except KeyError:
-                #raise KeyError('Key %s was not in the metric.' % pname)
+            # except KeyError:
+            # raise KeyError('Key %s was not in the metric.' % pname)
             #    metric.append(1.0)
 
         metric = np.array(metric)
@@ -762,8 +761,7 @@ class Emu(object):
         a = metric[0]
         # TODO other kernels?
         return a * ExpSquaredKernel(metric[1:], ndim=self.emulator_ndim)
-        #return a * Matern32Kernel(metric[1:], ndim=self.emulator_ndim)
-
+        # return a * Matern32Kernel(metric[1:], ndim=self.emulator_ndim)
 
     ###Emulation and methods that Utilize it############################################################################
     def emulate(self, em_params, gp_errs=False):
@@ -973,11 +971,11 @@ class Emu(object):
         if N is not None:
             assert N > 0 and int(N) == N
 
-        sub_dirs, _  = self._get_z_subdirs(truth_dir, fixed_zs=self.fixed_params.get('z', None))
+        sub_dirs, _ = self._get_z_subdirs(truth_dir, fixed_zs=self.fixed_params.get('z', None))
 
         x, y, _, _ = self.get_data(truth_dir, {}, self.fixed_params, self.independent_variable)
 
-        bins, _, _, _,_ = global_file_reader(sub_dirs[0])
+        bins, _, _, _, _ = global_file_reader(sub_dirs[0])
         bin_centers = (bins[1:] + bins[:-1]) / 2
         scale_nbins = len(bin_centers)
 
@@ -1018,7 +1016,7 @@ class Emu(object):
 
         elif statistic == 'abs':
             return 10 ** pred_y - 10 ** y
-            #return np.mean(10 ** pred_y - 10 ** y, axis = 0)
+            # return np.mean(10 ** pred_y - 10 ** y, axis = 0)
         elif statistic == 'log_abs':
             return pred_y - y
             # return np.mean((pred_y - y), axis=0)
@@ -1159,11 +1157,11 @@ class OriginalRecipe(Emu):
         if self.method == 'gp':
             if gp_errs:
                 mu, cov = self._emulator.predict(self.y, t, mean_only=False)
-                return mu+self.y_hat, np.diag(cov)
+                return mu + self.y_hat, np.diag(cov)
             else:
-                return self._emulator.predict(self.y, t, mean_only=True)+self.y_hat
+                return self._emulator.predict(self.y, t, mean_only=True) + self.y_hat
         else:
-            return self._emulator.predict(t)+self.y_hat
+            return self._emulator.predict(t) + self.y_hat
 
     def train_metric(self, **kwargs):
         """
@@ -1270,7 +1268,7 @@ class ExtraCrispy(Emu):
         :return: None
         """
         super(ExtraCrispy, self).load_training_data(training_dir)
-        self.y+=self.y_hat #need to change this later
+        self.y += self.y_hat  # need to change this later
 
         # now, parition the data as specified by the user
         # note that ppe does not include overlap
@@ -1366,8 +1364,8 @@ class ExtraCrispy(Emu):
         self.x = _x
         self.y = _y
         self.yerr = _yerr
-        self.y_hat = self.y.mean(axis = 1)
-        self.y-=self.y_hat.reshape((-1, 1))
+        self.y_hat = self.y.mean(axis=1)
+        self.y -= self.y_hat.reshape((-1, 1))
 
     def _build_gp(self, hyperparams):
         """
@@ -1431,7 +1429,7 @@ class ExtraCrispy(Emu):
         mu = np.zeros((self.experts, t.shape[0]))  # experts down, t deep
         err = np.zeros_like(mu)
 
-        for i, (emulator, _y,_yhat) in enumerate(izip(self._emulators, self.y, self.y_hat)):
+        for i, (emulator, _y, _yhat) in enumerate(izip(self._emulators, self.y, self.y_hat)):
             if self.method == 'gp':
                 local_mu, local_cov = emulator.predict(_y, t, mean_only=False)
                 local_err = np.sqrt(np.diag(local_cov))
@@ -1439,7 +1437,7 @@ class ExtraCrispy(Emu):
                 local_mu = emulator.predict(t)
                 local_err = 1.0  # weight with this instead of the errors.
 
-            mu[i, :] = local_mu+_yhat
+            mu[i, :] = local_mu + _yhat
             err[i, :] = local_err
 
         # now, combine with weighted average
