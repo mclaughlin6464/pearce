@@ -434,7 +434,7 @@ class Emu(object):
                 if pname == 'r':
                     val = 10**val
 
-                assert np.all(plow <= val) and np.all(val <= phigh)
+                assert np.all(plow-val <= -1e-6) and np.all(val-phigh <= 1e-6)
             except AssertionError:
                 if type(val) is float:
                     warnings.warn("Emulator value for %s %.3f is outside the bounds (%.3f, %.3f) of the emulator." % (
@@ -659,7 +659,15 @@ class Emu(object):
                       'mean_occupation_centrals_assembias_slope1':179.90950523,
                       'mean_occupation_centrals_assembias_param1':80.75541473,
                       'mean_occupation_centrals_assembias_corr1':3.9659e6} )
-                     
+        elif self.obs == 'wt':
+            # TODO parameter name has changed, update
+            if independent_variable is None:
+                ig.update({'logMmin': 0.50604543531, 'f_c': 6.50148006111, 'logM0':45.5862423685,
+                    'sigma_logM':2.25950308654, 'alpha': 2.912095028, 'r': 0.306139450843,
+                    'logM1': 4.47113501396, 'amp': 31.8289259091, 'z': 1.0,
+                    'mean_occupation_satellites_assembias_param1':10.8685042271,
+                    'mean_occupation_centrals_assembias_param1':21.8441412417,})
+
         else:
             pass  # no other guesses saved yet.
 

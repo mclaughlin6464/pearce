@@ -1,9 +1,8 @@
 ###!/bin/bash
-#BSUB -q kipac-ibq 
-#BSUB -W 96:00
+#BSUB -q long 
+#BSUB -W 72:00
 #BSUB -J test_redmagic
 #BSUB -oo /u/ki/swmclau2/Git/pearce/bin/mcmc/test_redmagic_wt_mcmc.out    
-#BSUB -n 8 
-#BSUB -x
+#BSUB -n 16 
 
 python /u/ki/swmclau2/Git/pearce/bin/mcmc/test_redmagic_wt_mcmc.py 
