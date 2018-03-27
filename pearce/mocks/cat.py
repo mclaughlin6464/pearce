@@ -250,7 +250,7 @@ class Cat(object):
         else:
             return n_cores
 
-    def cache(self, scale_factors='all', overwrite=False, add_local_density=False, add_particles = False):
+    def cache(self, scale_factors='all', overwrite=False, add_local_density=False, add_particles = False,downsample_factor = 1e-3):
         '''
         Cache a halo catalog in the halotools format, for later use.
         :param scale_factors:
@@ -280,7 +280,7 @@ class Cat(object):
                                          overwrite=overwrite)
             reader.read_halocat(self.columns_to_convert)
             if add_local_density or add_particles:
-                particles = self._read_particles(snapdir) #TODO add downsample factor as an arg
+                particles = self._read_particles(snapdir, downsample_factor=downsample_factor)
                 if add_local_density:
                     self.add_local_density(reader, particles)  # TODO how to add radius?
 
@@ -288,9 +288,9 @@ class Cat(object):
             reader.update_cache_log()
 
             if add_particles:
-                self.cache_particles(particles, a)
+                self.cache_particles(particles, a, downsample_factor=downsample_factor)
 
-    def _read_particles(self, snapdir, downsample_factor = 1e-3):
+    def _read_particles(self, snapdir, downsample_factor):
         """
         Read in particles from a snapshot, and return them.
         :param snapdir:
@@ -319,7 +319,7 @@ class Cat(object):
 
         return all_particles
 
-    def cache_particles(self,particles, scale_factor ):
+    def cache_particles(self,particles, scale_factor, downsample_factor ):
         """
         Add the particle to the halocatalog, so loading it will load the corresponding particles.
         :param particles:
@@ -330,7 +330,7 @@ class Cat(object):
                                                x=particles[:, 0], y=particles[:, 1], z=particles[:, 2])
         ptcl_cache_loc = '/u/ki/swmclau2/des/halocats/ptcl_%.2f.list.%s_%s.hdf5'
         ptcl_cache_filename = ptcl_cache_loc % (scale_factor, self.simname, self.version_name)  # make sure we don't have redunancies.
-        ptcl_catalog.add_ptclcat_to_cache(ptcl_cache_filename, self.simname, self.version_name, '')#TODO would be nice to make a note of the downsampling without having to do some voodoo to get it.
+        ptcl_catalog.add_ptclcat_to_cache(ptcl_cache_filename, self.simname, self.version_name+'_particle_%.2f'%(-1*np.log10(downsample_factor)), str(downsample_factor))#TODO would be nice to make a note of the downsampling without having to do some voodoo to get it.
 
 
     def add_local_density(self, reader, all_particles, radius=[1, 5]):#[1,5,10]
@@ -380,7 +380,7 @@ class Cat(object):
         self.load_catalog(a, tol, check_sf=False)
         self.load_model(a, HOD, check_sf=False, hod_kwargs=hod_kwargs)
 
-    def load_catalog(self, scale_factor, tol=0.05, check_sf=True):
+    def load_catalog(self, scale_factor, tol=0.05, check_sf=True, particles = False, downsample_factor = 1e-3):
         '''
         Load only a specific catalog. Not reccomended to use separately from broader load function.
         Its possible for the redshift ni the model to be different fro the one from the catalog,
@@ -398,10 +398,16 @@ class Cat(object):
         else:
             a = scale_factor  # YOLO
         z = 1.0 / a - 1
-
-        self.halocat = CachedHaloCatalog(simname=self.simname, halo_finder=self.halo_finder,
+        if not particles:
+            self.halocat = CachedHaloCatalog(simname=self.simname, halo_finder=self.halo_finder,
+                                             version_name=self.version_name,
+                                            redshift=z, dz_tol=0.01)
+        else:
+            self._downsample_factor = downsample_factor
+            self.halocat = CachedHaloCatalog(simname=self.simname, halo_finder=self.halo_finder,
                                          version_name=self.version_name,
-                                         ptcl_version_name=self.version_name, redshift=z, dz_tol = 0.01)
+                                         ptcl_version_name=self.version_name+'_particle_%.2f'%(-1*np.log10(downsample_factor)),
+                                            redshift=z, dz_tol = 0.01)
         # refelct the current catalog
         self.z = z
         self.a = a
@@ -1012,3 +1018,17 @@ class Cat(object):
 
         return wt*W
 
+    @observable
+    def calc_ds(self,rp_bins, n_cores='all'):
+
+        n_cores = self._check_cores(n_cores)
+
+        x_g, y_g, z_g = [self.model.mock.galaxy_table[c] for c in ['x', 'y', 'z']]
+        pos_g = return_xyz_formatted_array(x_g, y_g, z_g, period=self.Lbox)
+
+        x_m, y_m, z_m = [self.halocat.ptcl_table[c] for c in ['x', 'y', 'z']]
+        pos_m = return_xyz_formatted_array(x_m, y_m, z_m, period=self.Lbox)
+
+        return delta_sigma(pos_g * self.h,pos_m*self.h, self.pmass*self.h,
+                           downsampling_factor = self.downsampling_factor, rp_bins = rp_bins,
+                           period=self.Lbox * self.h, num_threads=n_cores)[1]
