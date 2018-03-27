@@ -1020,7 +1020,20 @@ class Cat(object):
 
     @observable
     def calc_ds(self,rp_bins, n_cores='all'):
-
+        """
+        Calculate delta sigma, from a given galaxy and particle sample
+        :param rp_bins:
+            The projected radial binning in Mpc
+        :param n_cores:
+            Number of cores to use for the calculation, default is "all"
+        :return:
+            delta sigma, a numpy array of size (rp_bins.shape[0]-1,)
+        """
+        try:
+            assert hasattr(self, "downsampling_factor")
+        except AssertionError:
+            raise AssertionError("The catalog loaded doesn't have a downsampling factor."
+                                 "Make sure you load particles to calculate delta_sigma.")
         n_cores = self._check_cores(n_cores)
 
         x_g, y_g, z_g = [self.model.mock.galaxy_table[c] for c in ['x', 'y', 'z']]
