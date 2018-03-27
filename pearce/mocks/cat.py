@@ -364,8 +364,9 @@ class Cat(object):
                     densities[idx,r_idx] *= reader.particle_mass * len(particle_idxs)
 
             reader.halo_table['halo_local_density_%d'%(int(r))] = densities[:, r_idx]
-
-    def load(self, scale_factor, HOD='redMagic', tol=0.05, hod_kwargs = {}):
+    # adding **kwargs cuz some invalid things can be passed in, hopefully not a pain
+    # TODO some sort of spell check in the input file
+    def load(self, scale_factor, HOD='redMagic', tol=0.05,particles=False,downsample_factor=1e-3, hod_kwargs = {}, **kwargs):
         '''
         Load both a halocat and a model to prepare for population and calculation.
         :param scale_factor:
@@ -377,7 +378,7 @@ class Cat(object):
         a = self._return_nearest_sf(scale_factor, tol)
         if a is None:
             raise ValueError('Scale factor %.3f not within given tolerance.' % scale_factor)
-        self.load_catalog(a, tol, check_sf=False)
+        self.load_catalog(a, tol, check_sf=False, particles=particles, downsample_factor=downsample_factor)
         self.load_model(a, HOD, check_sf=False, hod_kwargs=hod_kwargs)
 
     def load_catalog(self, scale_factor, tol=0.05, check_sf=True, particles = False, downsample_factor = 1e-3):
@@ -1020,7 +1021,20 @@ class Cat(object):
 
     @observable
     def calc_ds(self,rp_bins, n_cores='all'):
-
+        """
+        Calculate delta sigma, from a given galaxy and particle sample
+        :param rp_bins:
+            The projected radial binning in Mpc
+        :param n_cores:
+            Number of cores to use for the calculation, default is "all"
+        :return:
+            delta sigma, a numpy array of size (rp_bins.shape[0]-1,)
+        """
+        try:
+            assert hasattr(self, "downsampling_factor")
+        except AssertionError:
+            raise AssertionError("The catalog loaded doesn't have a downsampling factor."
+                                 "Make sure you load particles to calculate delta_sigma.")
         n_cores = self._check_cores(n_cores)
 
         x_g, y_g, z_g = [self.model.mock.galaxy_table[c] for c in ['x', 'y', 'z']]
