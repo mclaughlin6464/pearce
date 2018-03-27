@@ -406,7 +406,7 @@ class Cat(object):
             self._downsample_factor = downsample_factor
             self.halocat = CachedHaloCatalog(simname=self.simname, halo_finder=self.halo_finder,
                                          version_name=self.version_name,
-                                         ptcl_version_name=self.version_name+'_particle_%.2f'%(-1*np.log10(downsample_factor)),
+                                         ptcl_version_name=self.version_name,#+'_particle_%.2f'%(-1*np.log10(downsample_factor)),
                                             redshift=z, dz_tol = 0.01)
         # refelct the current catalog
         self.z = z

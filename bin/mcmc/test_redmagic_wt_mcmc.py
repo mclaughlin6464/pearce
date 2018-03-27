@@ -21,7 +21,10 @@ emu = ExtraCrispy(training_dir,10, 2, split_method, method=em_method, fixed_para
 
 cosmo_params = {'simname':'chinchilla', 'Lbox':400.0, 'scale_factors':[a]}
 cat = cat_dict[cosmo_params['simname']](**cosmo_params)#construct the specified catalog!
-cat.load(a, HOD='hsabRedMagic')
+#cat.load(a, HOD='hsabRedMagic')
+cat.load_catalog(a, tol=0.01, check_sf=False, particles = True)
+cat.load_model(a, HOD='hsabRedMagic', check_sf=False)#, hod_kwargs=hod_kwargs)
+
 emulation_point = [('f_c', 0.15), ('logM0', 12.0), ('sigma_logM', 0.266), 
                     ('alpha', 0.9),('logM1', 13.7), ('logMmin', 13.733),
                     ('mean_occupation_satellites_assembias_param1', 0.0), 
@@ -53,6 +56,9 @@ for i in xrange(5):
 y = np.loadtxt('buzzard2_wt_11.npy')
 # TODO need a way to get a measurement cov for the shams
 cov = np.cov(np.array(wt_vals).T)#/np.sqrt(50)
+np.savetxt('wt_11_cov.npy', cov)
+from sys import exit
+exit(0)
 #obs_nd = np.mean(np.array(nds))
 obs_nd = np.loadtxt('buzzard2_nd_11.npy')
 obs_nd_err = np.std(np.array(nds))*1e4 #TODO delete me
