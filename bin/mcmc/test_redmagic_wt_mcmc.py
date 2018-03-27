@@ -4,7 +4,8 @@ from pearce.inference import run_mcmc_iterator
 import numpy as np
 from os import path
 
-training_dir = '/u/ki/swmclau2/des/PearceLHC_wt_z/'
+sherlock = True
+training_dir = '/home/swmclau2/scratch/PearceLHC_wt_z/'
 
 em_method = 'gp'
 split_method = 'random'
@@ -19,9 +20,9 @@ emu = ExtraCrispy(training_dir,10, 2, split_method, method=em_method, fixed_para
 #Remember if training data is an LHC can't load a fixed set, do that after
 #fixed_params = {'f_c':1.0}#,'logM1': 13.8 }# 'z':0.0}
 
-cosmo_params = {'simname':'chinchilla', 'Lbox':400.0, 'scale_factors':[a]}
-cat = cat_dict[cosmo_params['simname']](**cosmo_params)#construct the specified catalog!
-cat.load(a, HOD='hsabRedMagic')
+#cosmo_params = {'simname':'chinchilla', 'Lbox':400.0, 'scale_factors':[a],'system':'sherlock'}
+#cat = cat_dict[cosmo_params['simname']](**cosmo_params)#construct the specified catalog!
+#cat.load(a, HOD='hsabRedMagic')
 emulation_point = [('f_c', 0.15), ('logM0', 12.0), ('sigma_logM', 0.266), 
                     ('alpha', 0.9),('logM1', 13.7), ('logMmin', 13.733),
                     ('mean_occupation_satellites_assembias_param1', 0.0), 
@@ -45,17 +46,18 @@ rbins = np.array( [0.31622777, 0.44326829, 0.62134575, 0.87096359, 1.22086225, 1
 
 wt_vals = []
 nds = []
-for i in xrange(5):
-    cat.populate(em_params)
-    wt_vals.append(cat.calc_wt(theta_bins, rbins = rbins, W=W))
-    nds.append(cat.calc_number_density())
+#for i in xrange(5):
+#    cat.populate(em_params)
+#    wt_vals.append(cat.calc_wt(theta_bins, rbins = rbins, W=W))
+#    nds.append(cat.calc_number_density())
 #y = np.mean(np.log10(np.array(wp_vals)),axis = 0 )
 y = np.loadtxt('buzzard2_wt_11.npy')
 # TODO need a way to get a measurement cov for the shams
-cov = np.cov(np.array(wt_vals).T)#/np.sqrt(50)
+#cov = np.cov(np.array(wt_vals).T)#/np.sqrt(50)
+cov = np.loadtxt('wt_11_cov.npy')
 #obs_nd = np.mean(np.array(nds))
 obs_nd = np.loadtxt('buzzard2_nd_11.npy')
-obs_nd_err = np.std(np.array(nds))*1e4 #TODO delete me
+obs_nd_err = np.std(np.array(nds))
 
 #from sys import exit 
 #exit(0)
@@ -68,12 +70,12 @@ nburn = 0
 
 print 'Chain starting.'
 
-savedir = '/u/ki/swmclau2/des/PearceMCMC/'
+savedir = '/home/swmclau2/scratch/PearceMCMC/'
 chain_fname = path.join(savedir,'%d_walkers_%d_steps_chain_wt_redmagic_z%.2f.npy'%(nwalkers, nsteps, z)) 
 
 with open(chain_fname, 'w') as f:
     f.write('#' + '\t'.join(param_names)+'\n')
-print tpoints
+
 for pos in run_mcmc_iterator(emu, cat, param_names, y, cov, tpoints,obs_nd, obs_nd_err,'calc_analytic_nd', fixed_params = fixed_params,nwalkers = nwalkers, nsteps = nsteps, nburn = nburn):#,\
                         #resume_from_previous = '/u/ki/swmclau2/des/PearceMCMC/100_walkers_1000_steps_chain_shuffled_sham.npy')#, ncores = 1)
 
