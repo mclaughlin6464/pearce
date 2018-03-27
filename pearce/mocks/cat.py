@@ -1031,7 +1031,7 @@ class Cat(object):
             delta sigma, a numpy array of size (rp_bins.shape[0]-1,)
         """
         try:
-            assert hasattr(self, "downsampling_factor")
+            assert hasattr(self, "_downsampling_factor")
         except AssertionError:
             raise AssertionError("The catalog loaded doesn't have a downsampling factor."
                                  "Make sure you load particles to calculate delta_sigma.")
