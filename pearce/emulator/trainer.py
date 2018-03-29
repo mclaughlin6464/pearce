@@ -13,6 +13,7 @@ import pandas as pd
 
 from pearce.mocks import cat_dict
 
+
 class Trainer(object):
 
     def __init__(self, config_fname):
@@ -26,7 +27,7 @@ class Trainer(object):
         try:
             assert path.isfile(config_fname)
         except AssertionError:
-            raise AssertionError("%s is not a valid filename."%config_fname)
+            raise AssertionError("%s is not a valid filename." % config_fname)
 
         with open("config.yml", 'r') as ymlfile:
             cfg = yaml.load(ymlfile)
@@ -61,7 +62,7 @@ class Trainer(object):
         # if we have to load an ensemble of cats, do so. otherwise, just load up one.
         # it's also possible to load up one
         if 'boxno' in cosmo_cfg:
-            if ':' in cosmo_cfg['boxno']: #shorthand to do ranges, like 0:40
+            if ':' in cosmo_cfg['boxno']:  # shorthand to do ranges, like 0:40
                 splitstr = cosmo_cfg['boxno'].split(':')
                 boxnos = range(int(splitstr[0]), int(splitstr[1]))
             else:
@@ -71,9 +72,10 @@ class Trainer(object):
             self.cats = []
             # if there are multiple cosmos, they need to have a boxno kwarg
             for boxno in boxnos:
-                self.cats.append(cat_dict[cosmo_cfg['simname']](boxno = boxno, **cosmo_cfg)) # construct the specified catalog!
+                self.cats.append(
+                    cat_dict[cosmo_cfg['simname']](boxno=boxno, **cosmo_cfg))  # construct the specified catalog!
 
-        else: #fixed cosmology
+        else:  # fixed cosmology
             self.cats = [cat_dict[cosmo_cfg['simname']](**cosmo_cfg)]
 
         # TODO let the user specify redshifts instead? annoying.
@@ -94,7 +96,7 @@ class Trainer(object):
             Needs to specify the name of the HOD model to be loaded; available ones are in customHODModels or halotools.
             All other args will be passed in as kwargs.
         """
-        self.hod = hod_cfg['model'] #string defining which model
+        self.hod = hod_cfg['model']  # string defining which model
         # TODO confirm is valid?
         del hod_cfg['model']
         self._hod_kwargs = hod_cfg
@@ -137,7 +139,7 @@ class Trainer(object):
         # certain things, like xi and wp, are easier to emulate in log space
         # will define a tranform function for either case
         log_obs = bool(obs_cfg['log_obs']) if 'log_obs' in obs_cfg else True
-        self._transform_func = np.log10 if log_obs else lambda x:x
+        self._transform_func = np.log10 if log_obs else lambda x: x
 
         if 'log_obs' in obs_cfg:
             del obs_cfg['log_obs']
@@ -146,9 +148,10 @@ class Trainer(object):
         dummy_cat = self.cats[0]
         try:
             # get the function to calculate the observable
-            calc_observable = getattr(dummy_cat, 'calc_%s' %self.obs)
+            calc_observable = getattr(dummy_cat, 'calc_%s' % self.obs)
         except AttributeError:
-            raise AttributeError("Observable %s is not available. Please check if you specified correctly, only\n observables that are calc_<> cat functions are allowed."%obs)
+            raise AttributeError(
+                "Observable %s is not available. Please check if you specified correctly, only\n observables that are calc_<> cat functions are allowed." % obs)
 
         # check to see if there are kwargs for calc_observable
         args = calc_observable.args  # get function args
