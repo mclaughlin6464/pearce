@@ -5,6 +5,7 @@ Rather than firing off many jobs to do the training, will do everying with MPI i
 Will also write to an hdf5 file, to reduce the enormous clutter produced so far.
 """
 from os import path
+from time import time
 import warnings
 from ast import literal_eval
 import yaml
@@ -90,19 +91,67 @@ class Trainer(object):
         """
         Prepare HOD information we'll need.
         Stores  the HOD name and other kwargs.
-        Could conceivably do more, but this is mostly taken care of the cat object
+
+        Most importantly, loads or generates the HOD parameters. Can either accept a
+        'paramfile' which will be read as a pandas dataframe. The column names will be stored
+        as the parameter names, and the values as the HODs to use.
+
+        The alternative is to pass in an 'ordered_params' dictionary or ordered_dict, with
+        keys as param names and values with tuples defining the lower and upper bounds of the
+        parameter. Ex: ordered_params['logMmin'] = (12.5, 14.5). Also required is
+        'num_hods', the number of parameters to generate. A random, non-optimized
+        LHC will be generated.
         :param hod_cfg:
             A dictionary (loaded from the YAML file) of parameters relevant to HOD emulation.
             Needs to specify the name of the HOD model to be loaded; available ones are in customHODModels or halotools.
             All other args will be passed in as kwargs.
         """
+        # TODO possibly better error messaging
         self.hod = hod_cfg['model']  # string defining which model
         # TODO confirm is valid?
         del hod_cfg['model']
+        # A little unnerved by the assymetry between this and cosmology
+        # the cosmo params are attached to the objects
+        if 'paramfile' in hod_cfg:
+            # TODO check if is file
+            df = pd.read_csv(hod_cfg['paramfile'])
+            self._hod_param_names = df.columns
+            self._hod_param_vals = df.data
+
+            del hod_cfg['paramfile']
+        else:
+            assert 'ordered_params' in hod_cfg
+            assert 'num_hods' in hod_cfg #TODO better test here
+
+            # make a LHC from scratch
+            self._hod_param_names = hod_cfg['ordered_params'].keys()
+            self._hod_param_vals = self._make_LHC(hod_cfg['ordered_params'], hod_cfg['num_hods'])
+
+            del hod_cfg['ordered_params']
+            del hod_cfg['num_hods']
+
         self._hod_kwargs = hod_cfg
         # need scale factors too, but just use them from cosmology
 
-        # TODO need to either load or generate HOD params
+    def _make_LHC(self, ordered_params, N):
+        """Return a vector of points in parameter space that defines a latin hypercube.
+            :param ordered_params:
+                OrderedDict that defines the ordering, name, and ranges of parameters
+                used in the trianing data. Keys are the names, value of a tuple of (lower, higher) bounds
+            :param N:
+                Number of points per dimension in the hypercube. Default is 500.
+            :return
+                A latin hyper cube sample in HOD space in a numpy array.
+        """
+        np.random.seed(int(time()))
+
+        points = []
+        # by linspacing each parameter and shuffling, I ensure there is only one point in each row, in each dimension.
+        for plow, phigh in ordered_params.itervalues():
+            point = np.linspace(plow, phigh, num=N)
+            np.random.shuffle(point)  # makes the cube random.
+            points.append(point)
+        return np.stack(points).T
 
     def prep_observation(self, obs_cfg):
         """
@@ -144,14 +193,16 @@ class Trainer(object):
         if 'log_obs' in obs_cfg:
             del obs_cfg['log_obs']
 
-        # TODO make a check that this exists
+        # This goes through the motions of getting calc observable.
+        # Each cat will have to retrieve their own version though.
+
         dummy_cat = self.cats[0]
         try:
             # get the function to calculate the observable
             calc_observable = getattr(dummy_cat, 'calc_%s' % self.obs)
         except AttributeError:
             raise AttributeError(
-                "Observable %s is not available. Please check if you specified correctly, only\n observables that are calc_<> cat functions are allowed." % obs)
+                "Observable %s is not available. Please check if you specified correctly, only\n observables that are calc_<> cat functions are allowed." %self.obs)
 
         # check to see if there are kwargs for calc_observable
         args = calc_observable.args  # get function args
@@ -165,8 +216,33 @@ class Trainer(object):
                 if 'do_jackknife' in args:
                     kwargs['do_jackknife'] = False
 
-        if kwargs:  # if there are kwargs to pass in.
-            _calc_observable = calc_observable  # might not have to do this, but play it safe.
-            calc_observable = lambda bins: _calc_observable(bins, **kwargs)  # m
+        self._calc_observable_kwargs = kwargs
 
-        self.calc_observable = calc_observable
+    def _get_calc_observable(self, cat):
+        """
+        Get the calc_observable function for this cat. Ex, will retrieve a reference to calc_xi
+        if the observabel is xi. Additionally, if log_obs is true, will wrap in a log10 automatically.
+        :param cat:
+            The cat object to retrive calc_observabel for.
+        :return:
+            calc_observable, a function that calculates the observable for cat with no args
+        """
+        # TODO wanna make sure this works with no args
+        _calc_observable = getattr(cat, 'calc_%s' % self.obs)
+        if self._calc_observable_kwargs:
+            if self.scale_bins is not None:
+                return lambda : self._transform_func(_calc_observable(self.scale_bins, **self._calc_observable_kwargs))
+            else:
+                return lambda : self._transform_func(_calc_observable(**self._calc_observable_kwargs))
+        else:
+            if self.scale_bins is not None:
+                return lambda : self._transform_func(_calc_observable(self.scale_bins))
+            else:
+                return lambda : self._transform_func(_calc_observable)
+
+
+
+    def prep_computation(self, comp_cfg):
+
+        pass
+
