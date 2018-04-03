@@ -67,11 +67,11 @@ def calc_training_points(hod_params, bins,obs, cosmo_params,ordered_params, dirn
             #with open(val, 'r') as f:
             #   hod_kwargs[key] = pickle.load(f)
             hod_kwargs[key] = np.loadtxt(val)
-
-    if 'HOD' in cosmo_params:
-        cat.load(cosmo_params['scale_factor'], cosmo_params['HOD'], hod_kwargs=hod_kwargs)
-    else:
-        cat.load(cosmo_params['scale_factor'], hod_kwargs=hod_kwargs)
+    cat.load(**cosmo_params)
+#    if 'HOD' in cosmo_params:
+#        cat.load(cosmo_params['scale_factor'], cosmo_params['HOD'], hod_kwargs=hod_kwargs)
+#    else:
+#        cat.load(cosmo_params['scale_factor'], hod_kwargs=hod_kwargs)
 
     #Number of repopulations to do
     n_repops=1
