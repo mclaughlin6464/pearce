@@ -440,6 +440,10 @@ class Emu(object):
                     warnings.warn("Emulator value for %s %.3f is outside the bounds (%.3f, %.3f) of the emulator." % (
                     pname, val, plow, phigh))
                 else:
+                    if pname == 'r':
+                        print val
+                        print phigh, plow
+                        print '*'*20
                     warnings.warn("One value for %s is outside the bounds (%.3f, %.3f) of the emulator." % (
                     pname, plow, phigh))
 

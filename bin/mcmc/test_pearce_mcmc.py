@@ -94,6 +94,12 @@ obs_nd_err = np.std(np.array(nds))
 
 param_names = [k for k in em_params.iterkeys() if k not in fixed_params]
 
+print cat.calc_number_density(em_params)
+print cat.calc_analytic_nd(em_params)
+
+from sys import exit
+exit(0)
+
 nwalkers = 200 
 nsteps = 5000
 nburn = 0 

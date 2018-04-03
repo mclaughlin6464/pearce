@@ -325,7 +325,7 @@ class Cat(object):
         :param particles:
             A (N,3) shaped numpy array of all particle positions
         """
-        z = 1./scale_factor-1.0
+        z = 1.0/scale_factor-1.0
         ptcl_catalog = UserSuppliedPtclCatalog(redshift=z, Lbox=self.Lbox, particle_mass=self.pmass, \
                                                x=particles[:, 0], y=particles[:, 1], z=particles[:, 2])
         ptcl_cache_loc = '/u/ki/swmclau2/des/halocats/ptcl_%.2f.list.%s_%s.hdf5'

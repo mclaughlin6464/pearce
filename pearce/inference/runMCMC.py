@@ -303,6 +303,12 @@ def run_mcmc_iterator(emu, cat, param_names, y, cov, r_bin_centers, obs_nd, obs_
         pos0 = _resume_from_previous(resume_from_previous, nwalkers, num_params)
     else:
         pos0 = _random_initial_guess(param_names, nwalkers, num_params)
+    print 'hi'
+    print _emu.x.shape
+    print _emu.y.shape
+    print _emu.scale_bin_centers
+    print _emu._ordered_params
 
     for result in sampler.sample(pos0, iterations=nsteps, storechain=False):
+        print 'helllooooo'
         yield result[0]
