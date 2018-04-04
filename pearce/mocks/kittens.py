@@ -8,6 +8,7 @@ which particular files are cached/loaded/etc. '''
 
 from glob import glob
 from astropy import cosmology
+import pandas as pd
 from .cat import Cat
 
 __all__ = ['Bolshoi', 'Multidark', 'Emu', 'Fox', 'MDHR', 'Chinchilla', 'Aardvark', 'Guppy', 'cat_dict']
@@ -336,7 +337,17 @@ class MDHR(Cat):
 
 class TrainingBox(Cat):
 
+    # lazily loadin the params from disk
+    # may wanna hardcode them ot the object instead
+
+    cosmo_params = pd.DataFrame.from_csv('~jderose/desims/tinkers_emu/box_maker/LH_eigenspace_lnA_np7_n40_s556.dat',\
+                                         sep = ' ', index_col = None)
+
+
     def __init__(self, boxno, system='ki-ls', **kwargs):
+
+        assert 0 <= boxno < 40
+        assert int(boxno) == boxno #under 40, is an int
 
         simname = 'trainingbox'  # not sure if something with Emu would work better, but wanna separate from Emu..
         columns_to_keep = OUTLIST_COLS.copy()  # OUTLIST_BGC2_COLS
@@ -351,25 +362,24 @@ class TrainingBox(Cat):
         pmass = 3.83914e10 * cosmo.Om0 / self.cosmos[0].Om0
 
         self.prim_haloprop_key = 'halo_m200b'
-        locations = {'ki-ls': ['/u/ki/swmclau2/des/testbox_findparents/']}
-        #        locations = {'ki-ls': ['/nfs/slac/des/fs1/g/sims/beckermr/tinkers_emu/TestBox00%d-00%d/halos/m200b/',
-        #                               '/nfs/slac/g/ki/ki22/cosmo/beckermr/tinkers_emu/TestBox00%d-00%d/halos/m200b/',
-        #                               '/nfs/slac/g/ki/ki23/des/beckermr/tinkers_emu/TestBox00%d-00%d/halos/m200b/']}
+        #locations = {'ki-ls': ['/u/ki/swmclau2/des/testbox_findparents/']}
+        locations = {'ki-ls': ['/nfs/slac/g/ki/ki22/cosmo/beckermr/tinkers_emu/Box00%d/halos/m200b/',
+                               '/nfs/slac/g/ki/ki23/des/beckermr/tinkers_emu/Box00%d/halos/m200b/']}
         assert system in locations
-        loc = locations[system][0]
-        # loc_list = locations[system]
+        #loc = locations[system][0]
+        loc_list = locations[system]
 
-        #        if boxno < 2:
-        #            loc = loc_list[0]%(boxno, realization)
-        #        elif 2 <= boxno < 4:
-        #            loc = loc_list[1]%(boxno, realization)
-        #        else:
-        #            loc = loc_list[2]%(boxno, realization)
+        in_first_loc = set([0,1,2,3,4,10,11,12,13,14,15,16,17,18,19,25,30,31,32,33,34])
 
-        #        tmp_fnames = ['outbgc2_%d.list' % i for i in xrange(10)]
-        tmp_fnames = ['TestBox00%d-000_out_parents_5.list' % boxno]
-        #        tmp_scale_factors = [0.25, 0.333, 0.5, 0.540541, 0.588235, 0.645161, 0.714286, 0.8, 0.909091, 1.0]
-        tmp_scale_factors = [0.645161]
+        if boxno in in_first_loc:
+            loc = loc_list[0]%(boxno)
+        else:
+            loc = loc_list[1]%(boxno)
+
+        tmp_fnames = ['outbgc2_%d.list' % i for i in xrange(10)]
+        #tmp_fnames = ['TestBox00%d-000_out_parents_5.list' % boxno]
+        tmp_scale_factors = [0.25, 0.333, 0.5, 0.540541, 0.588235, 0.645161, 0.714286, 0.8, 0.909091, 1.0]
+        #tmp_scale_factors = [0.645161]
         self._update_lists(kwargs, tmp_fnames, tmp_scale_factors)
 
         new_kwargs = kwargs.copy()
@@ -377,8 +387,21 @@ class TrainingBox(Cat):
             if key in new_kwargs:
                 del new_kwargs[key]
 
-        super(TestBox, self).__init__(simname=simname, loc=loc, columns_to_keep=columns_to_keep, Lbox=Lbox,
+        super(TrainingBox, self).__init__(simname=simname, loc=loc, columns_to_keep=columns_to_keep, Lbox=Lbox,
                                       pmass=pmass, cosmo=cosmo, **new_kwargs)
+
+    def _get_cosmo(self, boxno):
+        """
+        Construct the cosmology object taht corresponds to this boxnumber
+        :param boxno:
+            The box number whose cosmology we want
+        :return:
+            Cosmology, the FlatwCDM astropy cosmology with the parameters of boxno
+        """
+        params = self.cosmo_params.iloc[boxno]
+        h = params['H0']/100.0
+        Om0 = (params['ombh2'] + params['ombch2'])/(h**2)
+        return cosmology.core.FlatwCDM(H0= params['H0'], Om0 = Om0, Neff=params['Neff'], Ob0=params['ombh2']/(h**2))
 
 
 class TestBox(Cat):
