@@ -412,6 +412,7 @@ class Cat(object):
         # refelct the current catalog
         self.z = z
         self.a = a
+        self.populated_once = False #no way this one's been populated!
 
     # TODO not sure if assembias should be boolean, or keep it as separate HODs?
     def load_model(self, scale_factor, HOD='redMagic', check_sf=True, hod_kwargs={}):

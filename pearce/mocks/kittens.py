@@ -339,7 +339,7 @@ class TrainingBox(Cat):
 
     # lazily loadin the params from disk
     # may wanna hardcode them ot the object instead
-
+    # also won't work for non-kils systems
     cosmo_params = pd.DataFrame.from_csv('~jderose/desims/tinkers_emu/box_maker/LH_eigenspace_lnA_np7_n40_s556.dat',\
                                          sep = ' ', index_col = None)
 

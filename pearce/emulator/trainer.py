@@ -8,9 +8,11 @@ from os import path
 from time import time
 import warnings
 from ast import literal_eval
+from itertools import product
 import yaml
 import numpy as np
 import pandas as pd
+import mpi4py
 
 from pearce.mocks import cat_dict
 
@@ -245,4 +247,75 @@ class Trainer(object):
     def prep_computation(self, comp_cfg):
 
         pass
+
+        # here i could export enviornment variables that ensure the cores per node is right?
+
+        # TODO output fname
+
+
+    def run(self, comm):
+
+        # a list of the indices ofo the cosmology, scale factor, and hod to be computed.
+        # will be scattered over all processes
+
+        rank = comm.Get_rank()
+
+        # TODO since these are numpy objects, could be communicated more efficiently
+        # since they're small and its only once, I don't think it matters much.
+        if rank == 0:
+            all_param_idxs = np.array(list(product(xrange(len(self.cats)), xrange(len(self._scale_factors)),
+                                        xrange(self._hod_param_vals.shape[0]))))
+        else:
+            all_param_idxs = None
+
+        all_param_idxs = comm.scatter(all_param_idxs, root=0)
+
+        if self.scale_bins is not None:
+            output = np.zeros((all_param_idxs.shape[0], self.scale_bins.shape[0]-1))
+            output_cov = np.zeros((all_param_idxs.shape[0], self.scale_bins.shape[0]-1,self.scale_bins.shape[0]-1))
+
+        else:
+            output = np.zeros((all_param_idxs.shape[0],))
+            output_cov = np.zeros((all_param_idxs.shape[0]))
+
+
+        last_cosmo_idx, last_scale_factor_idx = -1, -1
+        for output_idx, (cosmo_idx, scale_factor_idx, hod_idx) in enumerate(all_param_idxs):
+            if last_cosmo_idx != cosmo_idx or last_scale_factor_idx != scale_factor_idx:
+                cat = self.cats[cosmo_idx]
+
+                scale_factor = self._scale_factors[scale_factor_idx]
+
+                cat.load(scale_factor, HOD= self.hod, particles = self._particles,
+                         downsample_factor=self._downsample_factor, hod_kwargs= self._hod_kwargs  )
+
+                calc_observable = self._get_calc_observable(cat)
+
+            hod_params = dict(zip(self._hod_param_names, self._hod_param_vals[hod_idx, :]))
+
+            if self.n_repops == 1:
+                cat.populate(hod_params)
+                # TODO this will fail if you don't jackknife when n_repops is 1
+                obs_val, obs_cov = calc_observable()
+            else:  # do several repopulations
+                if self.scale_bins is not None:
+                    obs_repops = np.zeros((self._n_repops, self.scale_bins.shape[0] - 1))
+                else:
+                    obs_repops = np.zeros((self._n_repops,))
+
+                for repop in xrange(self._n_repops):
+                    cat.populate(hod_params)
+                    obs_repops[repop] = calc_observable()
+
+                obs_val = np.mean(obs_repops, axis=0)
+                obs_cov = np.cov(obs_repops, rowvar=False)
+
+            output[output_idx] = obs_val
+            output_cov[output_idx] = obs_cov
+
+
+
+
+
+
 
