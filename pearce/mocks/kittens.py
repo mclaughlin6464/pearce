@@ -349,6 +349,9 @@ class TrainingBox(Cat):
         assert 0 <= boxno < 40
         assert int(boxno) == boxno #under 40, is an int
 
+
+        self.boxno = boxno
+
         simname = 'trainingbox'  # not sure if something with Emu would work better, but wanna separate from Emu..
         columns_to_keep = OUTLIST_COLS.copy()  # OUTLIST_BGC2_COLS
         del columns_to_keep['halo_mvir']
@@ -358,7 +361,7 @@ class TrainingBox(Cat):
 
         Lbox = 1050.0  # Mpc
         # Need to make a way to combine all the params
-        cosmo = self._get_cosmo(boxno)
+        cosmo = self._get_cosmo()
         pmass = 3.83914e10 * cosmo.Om0 / self.cosmos[0].Om0
 
         self.prim_haloprop_key = 'halo_m200b'
@@ -390,7 +393,7 @@ class TrainingBox(Cat):
         super(TrainingBox, self).__init__(simname=simname, loc=loc, columns_to_keep=columns_to_keep, Lbox=Lbox,
                                       pmass=pmass, cosmo=cosmo, **new_kwargs)
 
-    def _get_cosmo(self, boxno):
+    def _get_cosmo(self):
         """
         Construct the cosmology object taht corresponds to this boxnumber
         :param boxno:
@@ -398,10 +401,16 @@ class TrainingBox(Cat):
         :return:
             Cosmology, the FlatwCDM astropy cosmology with the parameters of boxno
         """
-        params = self.cosmo_params.iloc[boxno]
+        params = self.cosmo_params.iloc[self.boxno]
         h = params['H0']/100.0
         Om0 = (params['ombh2'] + params['ombch2'])/(h**2)
         return cosmology.core.FlatwCDM(H0= params['H0'], Om0 = Om0, Neff=params['Neff'], Ob0=params['ombh2']/(h**2))
+
+    def _get_cosmo_param_names_vals(self):
+        # TODO docs
+        names = list(self.cosmo_params.columns.values)
+        vals = np.array(list(self.cosmo_params.iloc[self.boxno].values))
+        return names, vals
 
 
 class TestBox(Cat):
@@ -469,4 +478,4 @@ class TestBox(Cat):
 # TODO kitten_dict
 cat_dict = {'bolshoi': Bolshoi, 'multidark': Multidark, 'emu': Emu, 'fox': Fox, 'multidark_highres': MDHR,
             'chinchilla': Chinchilla,
-            'aardvark': Aardvark, 'guppy': Guppy, 'testbox': TestBox}
+            'aardvark': Aardvark, 'guppy': Guppy, 'trainingbox': TrainingBox, 'testbox': TestBox}

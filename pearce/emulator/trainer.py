@@ -13,6 +13,7 @@ import yaml
 import numpy as np
 import pandas as pd
 import mpi4py
+import h5py
 
 from pearce.mocks import cat_dict
 
@@ -81,6 +82,14 @@ class Trainer(object):
         else:  # fixed cosmology
             self.cats = [cat_dict[cosmo_cfg['simname']](**cosmo_cfg)]
 
+        self._cosmo_param_names,_ = self.cats[0]._get_cosmo_param_name_vals()
+        self._cosmo_param_vals = np.zeros((len(self._cosmo_param_names), len(self.cats)))
+
+        for idx, cat in enumerate(self.cats):
+            _, vals = cat._get_cosmo_param_name_vals() 
+
+            self._cosmo_param_vals[idx,:] = vals
+
         # TODO let the user specify redshifts instead? annoying.
         # In the future if there are more annoying params i'll turn this into a loop or something.
         scale_factors = literal_eval(cosmo_cfg['scale_factors'])
@@ -115,7 +124,7 @@ class Trainer(object):
         # A little unnerved by the assymetry between this and cosmology
         # the cosmo params are attached to the objects
         if 'paramfile' in hod_cfg:
-            # TODO check if is file
+            assert path.exists(hod_cfg['paramfile'])
             df = pd.read_csv(hod_cfg['paramfile'])
             self._hod_param_names = df.columns
             self._hod_param_vals = df.data
@@ -126,8 +135,9 @@ class Trainer(object):
             assert 'num_hods' in hod_cfg #TODO better test here
 
             # make a LHC from scratch
-            self._hod_param_names = hod_cfg['ordered_params'].keys()
-            self._hod_param_vals = self._make_LHC(hod_cfg['ordered_params'], hod_cfg['num_hods'])
+            ordered_params = literal_eval(hod_cfg['ordered_params'])
+            self._hod_param_names = ordered_params.keys()
+            self._hod_param_vals = self._make_LHC(ordered_params, hod_cfg['num_hods'])
 
             del hod_cfg['ordered_params']
             del hod_cfg['num_hods']
@@ -171,7 +181,7 @@ class Trainer(object):
         del obs_cfg['obs']
         # Would be nice to have a scheme to specify bins without listing them all
         if 'bins' in obs_cfg:
-            self.scale_bins = np.array(obs_cfg['bins'])
+            self.scale_bins = np.array(literal_eval(obs_cfg['bins']))
             del obs_cfg['bins']
         else:
             # For things like number density, don't need bins. this is temporary though.
@@ -245,16 +255,30 @@ class Trainer(object):
 
 
     def prep_computation(self, comp_cfg):
-
-        pass
+        """
+        #TODO
+        """
 
         # here i could export enviornment variables that ensure the cores per node is right?
+        self.output_fname = comp_cfg['filename']
+        overwrite = comp_cfg['overwrite'] if 'overwrite' in comp_cfg else False
+        if path.exists(self.output_fname) and not overwrite:
+            raise IOError("Overwrite is False or Not Specified, but the file exists. Please change the config.")
 
-        # TODO output fname
+
+    def _get_group_name(cosmo_idx, scale_factor_idx):
+        """
+        Helper function to return a standard group/dataset name based on the indicies
+        # TODO
+        """
+
+        return "cosmo_no_%d/a_%.3f"%(cosmo_idx, self._scale_factors[scale_factor_idx])
 
 
     def run(self, comm):
-
+        """
+        #TODO
+        """
         # a list of the indices ofo the cosmology, scale factor, and hod to be computed.
         # will be scattered over all processes
 
@@ -269,6 +293,7 @@ class Trainer(object):
             all_param_idxs = None
 
         all_param_idxs = comm.scatter(all_param_idxs, root=0)
+
 
         if self.scale_bins is not None:
             output = np.zeros((all_param_idxs.shape[0], self.scale_bins.shape[0]-1))
@@ -313,9 +338,60 @@ class Trainer(object):
             output[output_idx] = obs_val
             output_cov[output_idx] = obs_cov
 
+            last_cosmo_idx = cosmo_idx
+            last_scale_factor_idx = scale_factor_idx
 
 
+        all_cosmo_sf_pairs = np.array(list(product(xrange(len(self.cats)), xrange(len(self._scale_factors)))))
 
+        f = h5py.File(self.output_fname, 'w', driver='mpio', comm=comm)
+   
+        f.attrs['cosmo_param_names'] = self._cosmo_param_names 
+        f.attrs['cosmo_param_vals'] = self._cosmo_param_vals
+        f.attrs['scale_factors'] = self._scale_factors
+        f.attrs['hod_param_names'] = self._hod_param_names
+        f.attrs['hod_param_vals'] = self._hod_param_vals
 
+        # creation of groups and datasets must be done globally between all processes
+        for cosmo_sf_pair in all_cosmo_sf_pairs:
+            group_name = self._get_group_name(*cosmo_sf_pair)
+            grp = f.create_group(group_name) # could rename the above to the group name
+            if self.scale_bins is None:
+                grp.create_dataset("obs", data=np.zeros((len(self._hod_param_vals),)), chunks = True, compression = 'gzip')
+                grp.create_dataset("cov", data=np.zeros((len(self._hod_param_vals),)), chunks = True, compression = 'gzip')  
+            else:
+                nbins = len(self.scale_bins) # TODO should just define quantities for these, i use them a lot
+                grp.create_dataset("obs", data=np.zeros((len(self._hod_param_vals),nbins)), chunks = True, compression = 'gzip')
+                grp.create_dataset("cov", data=np.zeros((len(self._hod_param_vals),nbins, nbins)), chunks = True, compression = 'gzip')   
 
+        # get the pairs that this process did
+        cosmo_sf_pairs, first_appearence_idx = np.unique(all_param_idxs[:2,:], return_index = True, axis = 0)
 
+        for idx, cosmo_sf_pair in enumerate(cosmo_sf_pairs):
+            # assume that indices are in order, which SHOULD be true if i understand scatter right
+            group_name = self._get_group_name(*cosmo_sf_pair)
+            obs_dataset_name =  group_name + '/obs'
+            cov_dataset_name =  group_name + '/cov'
+
+            obs_dset = f[obs_dataset_name]
+            cov_dset = f[cov_dataset_name]
+
+            if idx != len(first_appearence_idx)-1:
+                hod_idxs = all_param_idxs[2, first_appearence_idx[idx]:first_appearence_idx[idx+1] ]
+                obs_dset[hod_idxs] = output[first_appearence_idx[idx]:first_appearence_idx[idx+1] ]
+                cov_dset[hod_idxs] = output_cov[first_appearence_idx[idx]:first_appearence_idx[idx+1] ]
+
+            else:
+                hod_idxs = all_param_idxs[2, first_appearence_idx[idx]:] 
+                obs_dset[hod_idxs] = output[first_appearence_idx[idx]:]
+                cov_dset[hod_idxs] = output_cov[first_appearence_idx[idx]:]
+
+        f.close()
+
+if __name__ == '__main__':
+    from sys import argv
+    config_fname = argv[1] # could implement full argparse if i want i guess
+    comm = MPI.COMM_WORLD
+
+    trainer = Trainer(config_fname)
+    trainer.run(comm)
