@@ -1018,7 +1018,8 @@ class Cat(object):
         #p.terminate()
 
         return wt*W
-
+    # TODO need to implement a particle check for some of these new functions
+    # TODO may want to enable central/satellite cuts, etc
     @observable
     def calc_ds(self,rp_bins, n_cores='all'):
         """
