@@ -1023,6 +1023,7 @@ class Cat(object):
     def calc_ds(self,rp_bins, n_cores='all'):
         """
         Calculate delta sigma, from a given galaxy and particle sample
+        Returns in units of h*M_sun/pc^2, so be wary! 
         :param rp_bins:
             The projected radial binning in Mpc
         :param n_cores:
@@ -1031,7 +1032,7 @@ class Cat(object):
             delta sigma, a numpy array of size (rp_bins.shape[0]-1,)
         """
         try:
-            assert hasattr(self, "_downsampling_factor")
+            assert hasattr(self, "_downsample_factor")
         except AssertionError:
             raise AssertionError("The catalog loaded doesn't have a downsampling factor."
                                  "Make sure you load particles to calculate delta_sigma.")
@@ -1043,6 +1044,9 @@ class Cat(object):
         x_m, y_m, z_m = [self.halocat.ptcl_table[c] for c in ['x', 'y', 'z']]
         pos_m = return_xyz_formatted_array(x_m, y_m, z_m, period=self.Lbox)
 
-        return delta_sigma(pos_g * self.h,pos_m*self.h, self.pmass*self.h,
-                           downsampling_factor = self.downsampling_factor, rp_bins = rp_bins,
-                           period=self.Lbox * self.h, num_threads=n_cores)[1]
+        #Halotools wnats downsampling factor defined oppositley
+        #TODO verify little h!
+        # TODO maybe split into a few lines for clarity
+        return self.h*delta_sigma(pos_g * self.h,pos_m*self.h, self.pmass*self.h,
+                           downsampling_factor = 1./self._downsample_factor, rp_bins = rp_bins,
+                           period=self.Lbox * self.h, num_threads=n_cores,cosmology = self.cosmology)[1]/(1e12)
