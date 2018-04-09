@@ -353,16 +353,16 @@ class TrainingBox(Cat):
         self.boxno = boxno
 
         simname = 'trainingbox'  # not sure if something with Emu would work better, but wanna separate from Emu..
-        columns_to_keep = OUTLIST_COLS.copy()  # OUTLIST_BGC2_COLS
-        del columns_to_keep['halo_mvir']
-        columns_to_keep['halo_m200b'] = (2, 'f4')
-        del columns_to_keep['halo_rvir']
-        columns_to_keep['halo_r200b'] = (5, 'f4')
+        columns_to_keep =  OUTLIST_BGC2_COLS.copy()
+        #del columns_to_keep['halo_mvir']
+        #columns_to_keep['halo_m200b'] = (2, 'f4')
+        #del columns_to_keep['halo_rvir']
+        #columns_to_keep['halo_r200b'] = (5, 'f4')
 
         Lbox = 1050.0  # Mpc
         # Need to make a way to combine all the params
         cosmo = self._get_cosmo()
-        pmass = 3.83914e10 * cosmo.Om0 / self.cosmos[0].Om0
+        pmass = 3.98769e10 * cosmo.Om0/(self.cosmo_params.iloc[0]['ombh2']*100*100/(self.cosmo_params.iloc[0]['H0']**2))
 
         self.prim_haloprop_key = 'halo_m200b'
         #locations = {'ki-ls': ['/u/ki/swmclau2/des/testbox_findparents/']}
@@ -403,7 +403,7 @@ class TrainingBox(Cat):
         """
         params = self.cosmo_params.iloc[self.boxno]
         h = params['H0']/100.0
-        Om0 = (params['ombh2'] + params['ombch2'])/(h**2)
+        Om0 = (params['ombh2'] + params['omch2'])/(h**2)
         return cosmology.core.FlatwCDM(H0= params['H0'], Om0 = Om0, Neff=params['Neff'], Ob0=params['ombh2']/(h**2))
 
     def _get_cosmo_param_names_vals(self):

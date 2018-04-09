@@ -12,7 +12,7 @@ from itertools import product
 import yaml
 import numpy as np
 import pandas as pd
-import mpi4py
+from mpi4py import MPI
 import h5py
 
 from pearce.mocks import cat_dict
