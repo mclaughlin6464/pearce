@@ -7,6 +7,7 @@ Each takes two kwargs: "filenames" and "scale_factors", both lists which allow t
 which particular files are cached/loaded/etc. '''
 
 from glob import glob
+import numpy as np
 from astropy import cosmology
 import pandas as pd
 from .cat import Cat
@@ -354,10 +355,12 @@ class TrainingBox(Cat):
 
         simname = 'trainingbox'  # not sure if something with Emu would work better, but wanna separate from Emu..
         columns_to_keep =  OUTLIST_BGC2_COLS.copy()
-        #del columns_to_keep['halo_mvir']
-        #columns_to_keep['halo_m200b'] = (2, 'f4')
-        #del columns_to_keep['halo_rvir']
-        #columns_to_keep['halo_r200b'] = (5, 'f4')
+        # Add duplicate columns for mvir if allowed
+        # TODO this sucks but halotools is tough here.
+        del columns_to_keep['halo_m200b']
+        columns_to_keep['halo_mvir'] = (2, 'f4')
+        del columns_to_keep['halo_r200b']
+        columns_to_keep['halo_rvir'] = (5, 'f4')
 
         Lbox = 1050.0  # Mpc
         # Need to make a way to combine all the params

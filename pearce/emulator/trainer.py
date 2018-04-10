@@ -7,7 +7,6 @@ Will also write to an hdf5 file, to reduce the enormous clutter produced so far.
 from os import path
 from time import time
 import warnings
-from ast import literal_eval
 from itertools import product
 import yaml
 import numpy as np
@@ -33,7 +32,7 @@ class Trainer(object):
         except AssertionError:
             raise AssertionError("%s is not a valid filename." % config_fname)
 
-        with open("config.yml", 'r') as ymlfile:
+        with open(config_fname, 'r') as ymlfile:
             cfg = yaml.load(ymlfile)
 
         # TODO could do more user babysitting here
@@ -58,20 +57,22 @@ class Trainer(object):
             Other optional args are 'particles' and 'downsampling_factor' which determine if and which particle catalog
             to load alongside the halo catalog. Certain observables require particles, so be wary!
         """
-        # TODO i believe a dictionary of emulator params will
-        # need to be attached to each emu box. This was
-        # unecessary in the non cosmo emu but needed now.
-        # We will combine these params into a csv for the emu.
 
         # if we have to load an ensemble of cats, do so. otherwise, just load up one.
         # it's also possible to load up one
+
+        # TODO let the user specify redshifts instead? annoying.
+        scale_factors = cosmo_cfg['scale_factors']
+        self._scale_factors = [scale_factors] if type(scale_factors) is float else scale_factors
+        cosmo_cfg['scale_factors'] = self._scale_factors #apply the same change
+
         if 'boxno' in cosmo_cfg:
             if ':' in cosmo_cfg['boxno']:  # shorthand to do ranges, like 0:40
                 splitstr = cosmo_cfg['boxno'].split(':')
                 boxnos = range(int(splitstr[0]), int(splitstr[1]))
             else:
-                boxnos = literal_eval(cosmo_cfg['boxno'])
-                boxnos = list(boxnos) if type(boxnos) is int else boxnos
+                boxnos = cosmo_cfg['boxno']
+                boxnos = [boxnos] if type(boxnos) is int else boxnos
             del cosmo_cfg['boxno']
             self.cats = []
             # if there are multiple cosmos, they need to have a boxno kwarg
@@ -82,18 +83,15 @@ class Trainer(object):
         else:  # fixed cosmology
             self.cats = [cat_dict[cosmo_cfg['simname']](**cosmo_cfg)]
 
-        self._cosmo_param_names,_ = self.cats[0]._get_cosmo_param_name_vals()
-        self._cosmo_param_vals = np.zeros((len(self._cosmo_param_names), len(self.cats)))
+        self._cosmo_param_names,_ = self.cats[0]._get_cosmo_param_names_vals()
+        self._cosmo_param_vals = np.zeros((len(self.cats), len(self._cosmo_param_names)))
 
         for idx, cat in enumerate(self.cats):
-            _, vals = cat._get_cosmo_param_name_vals() 
+            _, vals = cat._get_cosmo_param_names_vals() 
 
             self._cosmo_param_vals[idx,:] = vals
 
-        # TODO let the user specify redshifts instead? annoying.
         # In the future if there are more annoying params i'll turn this into a loop or something.
-        scale_factors = literal_eval(cosmo_cfg['scale_factors'])
-        self._scale_factors = list(scale_factors) if type(scale_factors) is float else scale_factors
         # TODO does yaml parse these to bools automatically?
         self._particles = bool(cosmo_cfg['particles']) if 'particles' in cosmo_cfg else False
         self._downsample_factor = float(cosmo_cfg['downsample_factor']) if 'downsample_facor' in cosmo_cfg else 1e-3
@@ -135,7 +133,7 @@ class Trainer(object):
             assert 'num_hods' in hod_cfg #TODO better test here
 
             # make a LHC from scratch
-            ordered_params = literal_eval(hod_cfg['ordered_params'])
+            ordered_params = hod_cfg['ordered_params']
             self._hod_param_names = ordered_params.keys()
             self._hod_param_vals = self._make_LHC(ordered_params, hod_cfg['num_hods'])
 
@@ -180,8 +178,9 @@ class Trainer(object):
         self.obs = obs_cfg['obs']
         del obs_cfg['obs']
         # Would be nice to have a scheme to specify bins without listing them all
+        # TODO warn if you chose an observable that requires bins
         if 'bins' in obs_cfg:
-            self.scale_bins = np.array(literal_eval(obs_cfg['bins']))
+            self.scale_bins = np.array((obs_cfg['bins']))
             del obs_cfg['bins']
         else:
             # For things like number density, don't need bins. this is temporary though.
@@ -243,14 +242,14 @@ class Trainer(object):
         _calc_observable = getattr(cat, 'calc_%s' % self.obs)
         if self._calc_observable_kwargs:
             if self.scale_bins is not None:
-                return lambda : self._transform_func(_calc_observable(self.scale_bins, **self._calc_observable_kwargs))
+                return lambda : _calc_observable(self.scale_bins, **self._calc_observable_kwargs)
             else:
-                return lambda : self._transform_func(_calc_observable(**self._calc_observable_kwargs))
+                return lambda : _calc_observable(**self._calc_observable_kwargs)
         else:
             if self.scale_bins is not None:
-                return lambda : self._transform_func(_calc_observable(self.scale_bins))
+                return lambda : _calc_observable(self.scale_bins)
             else:
-                return lambda : self._transform_func(_calc_observable)
+                return _calc_observable
 
 
 
@@ -283,17 +282,51 @@ class Trainer(object):
         # will be scattered over all processes
 
         rank = comm.Get_rank()
+        size = comm.Get_size()
 
         # TODO since these are numpy objects, could be communicated more efficiently
         # since they're small and its only once, I don't think it matters much.
+        sendbuf = None
+        all_param_idxs = np.array(list(product(xrange(len(self.cats)), xrange(len(self._scale_factors)),
+                                    xrange(self._hod_param_vals.shape[0]))))
+        n_combos = len(all_param_idxs)
+        n_per_node = n_combos/size
+        remainder = n_combos%size
+
+
         if rank == 0:
-            all_param_idxs = np.array(list(product(xrange(len(self.cats)), xrange(len(self._scale_factors)),
-                                        xrange(self._hod_param_vals.shape[0]))))
-        else:
-            all_param_idxs = None
 
-        all_param_idxs = comm.scatter(all_param_idxs, root=0)
+            zero_remainder = remainder == 0
+            if not zero_remainder:
+                n_per_node +=1
 
+            sendbuf = np.empty([size, n_per_node, 3], dtype = 'i')
+            
+            past_remainder_counter = 0
+            # This could be cleaned up to be more readable
+            for i in xrange(size):
+                if remainder == 0:
+                    if not zero_remainder: # initially, after we used it as a counter
+                        sendbuf[i, :-1, :] =  all_param_idxs[i*n_per_node - past_remainder_counter:(i+1)*n_per_node-past_remainder_counter-1, :]
+                        sendbuf[i,-1, :] = np.array([-1,-1,-1])
+                        past_remainder_counter+=1
+                    else: #no extra lines
+                        sendbuf[i, :, :] =  all_param_idxs[i*n_per_node:(i+1)*n_per_node, :]
+
+                else:
+                    sendbuf[i,:,:] = all_param_idxs[i*n_per_node:(i+1)*n_per_node, :]
+                    remainder-=1
+
+#        else:
+#            all_param_idxs = None
+
+        recvbuf = np.empty([n_per_node, 3], dtype = 'i')
+        #all_param_idxs = comm.scatter(all_param_idxs, root=0)
+        comm.Scatter(sendbuf, recvbuf, root = 0)
+
+        all_param_idxs = recvbuf
+
+        #print all_param_idxs
 
         if self.scale_bins is not None:
             output = np.zeros((all_param_idxs.shape[0], self.scale_bins.shape[0]-1))
@@ -306,6 +339,8 @@ class Trainer(object):
 
         last_cosmo_idx, last_scale_factor_idx = -1, -1
         for output_idx, (cosmo_idx, scale_factor_idx, hod_idx) in enumerate(all_param_idxs):
+            if any(idx == -1 for idx in [cosmo_idx, scale_factor_idx, hod_idx]):
+                continue # skip these placeholders
             if last_cosmo_idx != cosmo_idx or last_scale_factor_idx != scale_factor_idx:
                 cat = self.cats[cosmo_idx]
 
@@ -318,10 +353,10 @@ class Trainer(object):
 
             hod_params = dict(zip(self._hod_param_names, self._hod_param_vals[hod_idx, :]))
 
-            if self.n_repops == 1:
+            if self._n_repops == 1:
                 cat.populate(hod_params)
                 # TODO this will fail if you don't jackknife when n_repops is 1
-                obs_val, obs_cov = calc_observable()
+                obs_val, obs_cov = self._transform_func(calc_observable())
             else:  # do several repopulations
                 if self.scale_bins is not None:
                     obs_repops = np.zeros((self._n_repops, self.scale_bins.shape[0] - 1))
@@ -330,7 +365,7 @@ class Trainer(object):
 
                 for repop in xrange(self._n_repops):
                     cat.populate(hod_params)
-                    obs_repops[repop] = calc_observable()
+                    obs_repops[repop] = self._transform_func(calc_observable())
 
                 obs_val = np.mean(obs_repops, axis=0)
                 obs_cov = np.cov(obs_repops, rowvar=False)
@@ -351,6 +386,7 @@ class Trainer(object):
         f.attrs['scale_factors'] = self._scale_factors
         f.attrs['hod_param_names'] = self._hod_param_names
         f.attrs['hod_param_vals'] = self._hod_param_vals
+        f.attrs['scale_bins'] = self.scale_bins
 
         # creation of groups and datasets must be done globally between all processes
         for cosmo_sf_pair in all_cosmo_sf_pairs:
