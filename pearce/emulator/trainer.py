@@ -182,9 +182,11 @@ class Trainer(object):
         if 'bins' in obs_cfg:
             self.scale_bins = np.array((obs_cfg['bins']))
             del obs_cfg['bins']
+            self.n_bins = len(self.scale_bins)-1
         else:
             # For things like number density, don't need bins. this is temporary though.
             self.scale_bins = None
+            self.n_bins = 1
 
         # number of repopulations to average together for each cosmo/hod combination
         # default is 1
@@ -320,25 +322,24 @@ class Trainer(object):
 #        else:
 #            all_param_idxs = None
 
-        recvbuf = np.empty([n_per_node, 3], dtype = 'i')
+        param_idxs= np.empty([n_per_node, 3], dtype = 'i')
         #all_param_idxs = comm.scatter(all_param_idxs, root=0)
-        comm.Scatter(sendbuf, recvbuf, root = 0)
+        comm.Scatter(sendbuf, param_idxs, root = 0)
 
-        all_param_idxs = recvbuf
 
         #print all_param_idxs
 
-        if self.scale_bins is not None:
-            output = np.zeros((all_param_idxs.shape[0], self.scale_bins.shape[0]-1))
-            output_cov = np.zeros((all_param_idxs.shape[0], self.scale_bins.shape[0]-1,self.scale_bins.shape[0]-1))
+        if self.n_bins > 1 :
+            output = np.zeros((param_idxs.shape[0], self.n_bins))
+            output_cov = np.zeros((param_idxs.shape[0], self.n_bins, self.n_bins))
 
         else:
-            output = np.zeros((all_param_idxs.shape[0],))
-            output_cov = np.zeros((all_param_idxs.shape[0]))
+            output = np.zeros((param_idxs.shape[0],))
+            output_cov = np.zeros((param_idxs.shape[0]))
 
 
         last_cosmo_idx, last_scale_factor_idx = -1, -1
-        for output_idx, (cosmo_idx, scale_factor_idx, hod_idx) in enumerate(all_param_idxs):
+        for output_idx, (cosmo_idx, scale_factor_idx, hod_idx) in enumerate(param_idxs):
             if any(idx == -1 for idx in [cosmo_idx, scale_factor_idx, hod_idx]):
                 continue # skip these placeholders
             if last_cosmo_idx != cosmo_idx or last_scale_factor_idx != scale_factor_idx:
@@ -358,8 +359,8 @@ class Trainer(object):
                 # TODO this will fail if you don't jackknife when n_repops is 1
                 obs_val, obs_cov = self._transform_func(calc_observable())
             else:  # do several repopulations
-                if self.scale_bins is not None:
-                    obs_repops = np.zeros((self._n_repops, self.scale_bins.shape[0] - 1))
+                if self.n_bins > 1:
+                    obs_repops = np.zeros((self._n_repops, self.n_bins))
                 else:
                     obs_repops = np.zeros((self._n_repops,))
 
@@ -376,53 +377,52 @@ class Trainer(object):
             last_cosmo_idx = cosmo_idx
             last_scale_factor_idx = scale_factor_idx
 
+        # TODO, someday, glorious parallel hdf5.
+        # the "gather" should at max collect 16mb, so it may not be sooo bad.
+        #f = h5py.File(self.output_fname, 'w', driver='mpio', comm=comm)
 
-        all_cosmo_sf_pairs = np.array(list(product(xrange(len(self.cats)), xrange(len(self._scale_factors)))))
-
-        f = h5py.File(self.output_fname, 'w', driver='mpio', comm=comm)
-   
-        f.attrs['cosmo_param_names'] = self._cosmo_param_names 
-        f.attrs['cosmo_param_vals'] = self._cosmo_param_vals
-        f.attrs['scale_factors'] = self._scale_factors
-        f.attrs['hod_param_names'] = self._hod_param_names
-        f.attrs['hod_param_vals'] = self._hod_param_vals
-        f.attrs['scale_bins'] = self.scale_bins
-
-        # creation of groups and datasets must be done globally between all processes
-        for cosmo_sf_pair in all_cosmo_sf_pairs:
-            group_name = self._get_group_name(*cosmo_sf_pair)
-            grp = f.create_group(group_name) # could rename the above to the group name
-            if self.scale_bins is None:
-                grp.create_dataset("obs", data=np.zeros((len(self._hod_param_vals),)), chunks = True, compression = 'gzip')
-                grp.create_dataset("cov", data=np.zeros((len(self._hod_param_vals),)), chunks = True, compression = 'gzip')  
+        all_output = None
+        all_output_cov = None
+        if rank == 0:
+            if self.n_bins == 1:
+                all_output = np.empty([size, n_per_node], dtype='i')
+                all_output_cov = np.empty([size, n_per_node])
             else:
-                nbins = len(self.scale_bins) # TODO should just define quantities for these, i use them a lot
-                grp.create_dataset("obs", data=np.zeros((len(self._hod_param_vals),nbins)), chunks = True, compression = 'gzip')
-                grp.create_dataset("cov", data=np.zeros((len(self._hod_param_vals),nbins, nbins)), chunks = True, compression = 'gzip')   
+                all_output = np.empty([size, n_per_node, self.n_bins], dtype='i')
+                al_output_cov = np.empty([size, n_per_node, self.n_bins, self.n_bins])
+        comm.Gather(output, all_output, root=0)
+        comm.Gather(output_cov, all_output_cov)
 
-        # get the pairs that this process did
-        cosmo_sf_pairs, first_appearence_idx = np.unique(all_param_idxs[:2,:], return_index = True, axis = 0)
-
-        for idx, cosmo_sf_pair in enumerate(cosmo_sf_pairs):
-            # assume that indices are in order, which SHOULD be true if i understand scatter right
-            group_name = self._get_group_name(*cosmo_sf_pair)
-            obs_dataset_name =  group_name + '/obs'
-            cov_dataset_name =  group_name + '/cov'
-
-            obs_dset = f[obs_dataset_name]
-            cov_dset = f[cov_dataset_name]
-
-            if idx != len(first_appearence_idx)-1:
-                hod_idxs = all_param_idxs[2, first_appearence_idx[idx]:first_appearence_idx[idx+1] ]
-                obs_dset[hod_idxs] = output[first_appearence_idx[idx]:first_appearence_idx[idx+1] ]
-                cov_dset[hod_idxs] = output_cov[first_appearence_idx[idx]:first_appearence_idx[idx+1] ]
-
+        if rank == 0:
+            # wrap things up in the final process
+            if self.n_bins == 1:
+                all_output = all_output.reshape((-1,))
+                all_output_cov = all_output_cov.reshape((-1,))
             else:
-                hod_idxs = all_param_idxs[2, first_appearence_idx[idx]:] 
-                obs_dset[hod_idxs] = output[first_appearence_idx[idx]:]
-                cov_dset[hod_idxs] = output_cov[first_appearence_idx[idx]:]
+                all_output = all_output.reshape((-1,self.n_bins))
+                all_output_cov = all_output_cov.reshape((-1,self.n_bins, self.n_bins))
 
-        f.close()
+            all_cosmo_sf_pairs = np.array(list(product(xrange(len(self.cats)), xrange(len(self._scale_factors)))))
+
+            f = h5py.File(self.output_fname, 'w')
+            f.attrs['cosmo_param_names'] = self._cosmo_param_names
+            f.attrs['cosmo_param_vals'] = self._cosmo_param_vals
+            f.attrs['scale_factors'] = self._scale_factors
+            f.attrs['hod_param_names'] = self._hod_param_names
+            f.attrs['hod_param_vals'] = self._hod_param_vals
+            f.attrs['scale_bins'] = self.scale_bins
+
+            for cosmo_sf_pair in enumerate(all_cosmo_sf_pairs):
+                group_name = self._get_group_name(*cosmo_sf_pair)
+                grp = f.create_group(group_name) # could rename the above to the group name
+
+                # I could compute this, which would be faster, but this is easier to read.
+                hod_idxs = np.where(all_param_idxs[:, :2] == cosmo_sf_pair)[0]
+
+                grp.create_dataset("obs", data=all_output[hod_idxs], chunks = True, compression = 'gzip')
+                grp.create_dataset("cov", data=all_output_cov[hod_idxs], chunks = True, compression = 'gzip')
+
+            f.close()
 
 if __name__ == '__main__':
     from sys import argv
