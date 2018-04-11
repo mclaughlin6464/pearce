@@ -272,7 +272,7 @@ class Trainer(object):
         Helper function to return a standard group/dataset name based on the indicies
         # TODO
         """
-        return "cosmo_no_%d/a_%.3f"%(cosmo_idx, self._scale_factors[scale_factor])
+        return "cosmo_no_%02d/a_%.3f"%(cosmo_idx, self._scale_factors[scale_factor])
 
 
     def run(self, comm):
@@ -369,7 +369,6 @@ class Trainer(object):
 
                 obs_val = np.mean(obs_repops, axis=0)
                 obs_cov = np.cov(obs_repops, rowvar=False)
-
             output[output_idx] = obs_val
             output_cov[output_idx] = obs_cov
 
@@ -389,9 +388,10 @@ class Trainer(object):
             else:
                 all_output = np.empty([size, n_per_node, self.n_bins], dtype=output.dtype)
                 all_output_cov = np.empty([size, n_per_node, self.n_bins, self.n_bins], output_cov.dtype)
-
+        
         comm.Gather(output, all_output, root=0)
         comm.Gather(output_cov, all_output_cov, root = 0)
+
 
         if rank == 0:
             # wrap things up in the final process
@@ -405,6 +405,7 @@ class Trainer(object):
             all_cosmo_sf_pairs = np.array(list(product(xrange(len(self.cats)), xrange(len(self._scale_factors)))))
 
             f = h5py.File(self.output_fname, 'w')
+            f.attrs['obs'] = self.obs
             f.attrs['cosmo_param_names'] = self._cosmo_param_names
             f.attrs['cosmo_param_vals'] = self._cosmo_param_vals
             f.attrs['scale_factors'] = self._scale_factors
@@ -417,7 +418,7 @@ class Trainer(object):
                 grp = f.create_group(group_name) # could rename the above to the group name
 
                 # I could compute this, which would be faster, but this is easier to read.
-                hod_idxs = np.where(all_param_idxs[:, :2] == cosmo_sf_pair)[0]
+                hod_idxs = np.where(np.all(all_param_idxs[:, :2] == cosmo_sf_pair, axis = 1))[0]
 
                 grp.create_dataset("obs", data=all_output[hod_idxs], chunks = True, compression = 'gzip')
                 grp.create_dataset("cov", data=all_output_cov[hod_idxs], chunks = True, compression = 'gzip')
