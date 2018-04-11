@@ -192,7 +192,7 @@ class Emu(object):
 
                 for HOD_no, (_obs, _cov) in enumerate(izip(obs_dset, cov_dset)):
 
-                    if "HOD" in fixed_params and HOD_no != fixed_params['HOD']
+                    if "HOD" in fixed_params and HOD_no != fixed_params['HOD']:
                         continue
 
                     HOD = hod_param_vals[HOD_no, :]
