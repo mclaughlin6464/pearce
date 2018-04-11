@@ -122,7 +122,7 @@ class Emu(object):
             # this wil also fale if scb is None. but you can't fix when it's none anyway so.
             # may wanna have a friendlier error message htough.
             assert fixed_params['r'] in scale_bin_centers # may need to include a fudge factor here
-        r_idx = np.where(fixed_params['r'] == scale_bin_centers)[0][0]
+            r_idx = np.where(fixed_params['r'] == scale_bin_centers)[0][0]
 
         # construct ordered_params
         # ordered_params is an ordered dict whose keys are the parameters in the
@@ -185,6 +185,9 @@ class Emu(object):
 
                 obs_dset = sf_group['obs']
                 cov_dset = sf_group['cov']
+
+                print cosmo_no, z
+                print obs_dset[:]
 
                 if any(np.any(np.isnan(arr)) for arr in [obs_dset, cov_dset]):
                     # skip NaN points. May wanna change this behavior.
