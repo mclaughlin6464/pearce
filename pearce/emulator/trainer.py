@@ -267,13 +267,12 @@ class Trainer(object):
             raise IOError("Overwrite is False or Not Specified, but the file exists. Please change the config.")
 
 
-    def _get_group_name(cosmo_idx, scale_factor_idx):
+    def _get_group_name(self, cosmo_idx, scale_factor):
         """
         Helper function to return a standard group/dataset name based on the indicies
         # TODO
         """
-
-        return "cosmo_no_%d/a_%.3f"%(cosmo_idx, self._scale_factors[scale_factor_idx])
+        return "cosmo_no_%d/a_%.3f"%(cosmo_idx, self._scale_factors[scale_factor])
 
 
     def run(self, comm):
@@ -385,13 +384,14 @@ class Trainer(object):
         all_output_cov = None
         if rank == 0:
             if self.n_bins == 1:
-                all_output = np.empty([size, n_per_node], dtype='i')
-                all_output_cov = np.empty([size, n_per_node])
+                all_output = np.empty([size, n_per_node], dtype=output.dtype)
+                all_output_cov = np.empty([size, n_per_node], dtype = output_cov.dtype)
             else:
-                all_output = np.empty([size, n_per_node, self.n_bins], dtype='i')
-                al_output_cov = np.empty([size, n_per_node, self.n_bins, self.n_bins])
+                all_output = np.empty([size, n_per_node, self.n_bins], dtype=output.dtype)
+                all_output_cov = np.empty([size, n_per_node, self.n_bins, self.n_bins], output_cov.dtype)
+
         comm.Gather(output, all_output, root=0)
-        comm.Gather(output_cov, all_output_cov)
+        comm.Gather(output_cov, all_output_cov, root = 0)
 
         if rank == 0:
             # wrap things up in the final process
@@ -412,7 +412,7 @@ class Trainer(object):
             f.attrs['hod_param_vals'] = self._hod_param_vals
             f.attrs['scale_bins'] = self.scale_bins
 
-            for cosmo_sf_pair in enumerate(all_cosmo_sf_pairs):
+            for cosmo_sf_pair in all_cosmo_sf_pairs:
                 group_name = self._get_group_name(*cosmo_sf_pair)
                 grp = f.create_group(group_name) # could rename the above to the group name
 

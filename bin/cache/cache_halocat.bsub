@@ -1,7 +1,7 @@
 ###!/bin/bash
 #BSUB -q medium 
 #BSUB -W 4:00
-#BSUB -J testbox_cache
+#BSUB -J trainbox_cache
 #BSUB -oo /u/ki/swmclau2/Git/pearce/bin/cache/cache_halocat.out    
 #BSUB -n 4 
 
