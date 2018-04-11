@@ -38,6 +38,8 @@ class Trainer(object):
         # TODO could do more user babysitting here
 
         self.prep_cosmology(cfg['cosmology'])
+        # TODO one thing to consider is how to have HOD-independent emu
+        # quantities like xi_mm could require this.
         self.prep_hod(cfg['HOD'])
         self.prep_observation(cfg['observation'])
         self.prep_computation(cfg['computation'])
@@ -419,6 +421,7 @@ class Trainer(object):
 
                 # I could compute this, which would be faster, but this is easier to read.
                 hod_idxs = np.where(np.all(all_param_idxs[:, :2] == cosmo_sf_pair, axis = 1))[0]
+
 
                 grp.create_dataset("obs", data=all_output[hod_idxs], chunks = True, compression = 'gzip')
                 grp.create_dataset("cov", data=all_output_cov[hod_idxs], chunks = True, compression = 'gzip')
