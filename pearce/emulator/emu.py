@@ -74,6 +74,8 @@ class Emu(object):
         self.build_emulator(hyperparams)
 
     ###Data Loading and Manipulation####################################################################################
+    # This function is a little long, but I'm not certain there's a need to break it up
+    # it's shorter than it used to be, too.
     def get_data(self, filename, fixed_params, independent_variable, attach_params = False):
         """
         Read data in the format compatible with this object and return it.
@@ -87,13 +89,14 @@ class Emu(object):
             Cosmo and HOD can only be fixed to an integer number, representing the index of the cosmo/HOD to hold fixed
             across HODs/Cosmologies respectively. Multiple fixed params can be specified.
         :param independent_variable:
-            Independant variable to emulate. Options are xi, r2xi, and bias (eventually)..
+            Independant variable to emulate. Options are xi, r2xi
         :return: x, y, yerr, ycov, all numpy arrays.
                  x is (n_data_points, n_params)
                  y is (n_data_points, ), yerr is (n_data_points)
-                 and ycov (n_scale_bins, n_scale_bins), the average covariance matrix
+                 and ycov (n_data_points, n_scale_bins, n_scale_bins), a "list" of covaraince matrices,
+                 to do with what you will
         """
-        assert path.exists(filename)
+        assert path.isfile(filename)
         # fixed params can only fix an hod index, cosmo index, or z or r
         assert len(fixed_params) <= 4
         assert all(key in {'cosmo', 'HOD', 'z', 'r'} for key in fixed_params)
@@ -164,7 +167,7 @@ class Emu(object):
         y = []
         ycov = []
 
-        # book keeping obs.
+        # book keeping vars.
         # only want to warn the user once.
         warned = False
         # these can be useful for debugging
@@ -186,19 +189,20 @@ class Emu(object):
                 obs_dset = sf_group['obs']
                 cov_dset = sf_group['cov']
 
-                if any(np.any(np.isnan(arr)) for arr in [obs_dset, cov_dset]):
-                    # skip NaN points. May wanna change this behavior.
-                    if not warned:
-                        warnings.warn('WARNING: NaN detected. Skipping point in cosmo %d, z= %.2f' %(cosmo_no, z))
-                        warned = True
-                    num_skipped += 1
-                    continue
-
                 cosmo = cosmo_param_vals[cosmo_no, :]
-
+                # efficiency note. If I don't iterate over the datasets, just the indicies,
+                # I avoid loading them from disk in fixed HOD scenarios
+                # Those will be rare enough for now that I don't care.
                 for HOD_no, (_obs, _cov) in enumerate(izip(obs_dset, cov_dset)):
 
                     if "HOD" in fixed_params and HOD_no != fixed_params['HOD']:
+                        continue
+                    if any(np.any(np.isnan(arr)) for arr in [_obs, _cov]):
+                        # skip NaN points. May wanna change this behavior.
+                        if not warned:
+                            warnings.warn('WARNING: NaN detected. Skipping point %d in cosmo %d, z= %.2f' % (HOD_no, cosmo_no, z))
+                            warned = True
+                        num_skipped += 1
                         continue
 
                     HOD = hod_param_vals[HOD_no, :]
@@ -235,8 +239,7 @@ class Emu(object):
 
                     num_used += 1
 
-
-
+        f.close()
         return np.vstack(x), np.vstack(y), np.dstack(ycov)
 
 
