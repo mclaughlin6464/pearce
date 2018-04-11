@@ -3,13 +3,14 @@
 
 import warnings
 from glob import glob
-from itertools import izip
+from itertools import izip, product
 from collections import OrderedDict
 from os import path
 from time import time
 from abc import ABCMeta, abstractmethod
 
 import numpy as np
+import h5py
 import george
 from george.kernels import *
 import scipy.optimize as op
@@ -34,7 +35,7 @@ class Emu(object):
     skl_methods = {'gbdt': GradientBoostingRegressor, 'rf': RandomForestRegressor, \
                    'svr': SVR, 'krr': KernelRidge, 'linear': LinearRegression}
 
-    def __init__(self, training_dir, method='gp', hyperparams={}, fixed_params={}, independent_variable=None):
+    def __init__(self, training_data, method='gp', hyperparams={}, fixed_params={}, independent_variable=None):
         '''
         Initialize the Emu
         :param training_dir:
@@ -70,12 +71,12 @@ class Emu(object):
         self.fixed_params = fixed_params
         self.independent_variable = independent_variable
 
-        self.load_training_data(training_dir)
+        self.load_training_data(training_data)
         self.build_emulator(hyperparams)
 
     ###Data Loading and Manipulation####################################################################################
     # TODO this function automatically attaches ordered params. Maybe we don't want that?
-    def get_data(self, data_dir, em_params, fixed_params, independent_variable):
+    def get_data(self, training_data, fixed_params, independent_variable):
         """
         Read data in the format compatible with this object and return it.
 
@@ -84,11 +85,6 @@ class Emu(object):
 
         :param data_dir:
             Directory where data from trainingData is stored
-        :param em_params:
-            Parameters held fixed by the emulator. Slightly different than fixed_params, used for plotting.
-            NOTE Sort of different than em_params accepted by the emulator. If comparing emulator predictions to
-            truth on a plot, passing in em_params used for the emulator to this function will return data values
-            at em_params.
         :param fixed_params:
             Parameters to hold fixed. Only available if data in data_dir is a full hypercube, not a latin hypercube
         :param independent_variable:
@@ -98,187 +94,144 @@ class Emu(object):
                  y is (n_data_points, ), yerr is (n_data_points)
                  and ycov (n_scale_bins, n_scale_bins), the average covariance matrix
         """
+        assert path.exists(training_data)
+        # fixed params can only fix an hod index, cosmo index, or z or r
+        assert len(fixed_params) <= 4
+        assert all(key in {'cosmo', 'HOD', 'z', 'r'} for key in fixed_params)
 
-        input_params = {}
-        input_params.update(em_params)
-        # NOTEfixed_paramswill likely not be valid.
-        # TODO fixed_params will no longer work when all datasets are necessarily LHC.
-        # Changing fixed_params to represent a fixed HOD or cosmology, which is still possible.
-        # input_params.update(fixed_params)
+        for key in ['cosmo', 'HOD']:
+            if key in fixed_params:
+                assert type(fixed_params[key]) is int
 
-        # redshift is fixed.
-        self.redshift_bin_centers = np.array([0.0])
-        z = 0.0
+        f = h5py.File(training_data, 'r')
 
-        obs = 'wp'
-        self.obs = obs
+        # get global attributes from the file
+        cosmo_param_names = f.attrs['cosmo_param_names']
+        hod_param_names = f.attrs['hod_param_names']
 
-        # TODO it'd be nice if these had a standardized name so I don't have to glob them.
-        # TODO move this to a get orderd params func for this future versoin
-        cosmologies = np.loadtxt(glob(path.join(data_dir, 'cosmology*.dat'))[0])
-        HODs = np.loadtxt(glob(path.join(data_dir, 'HOD*.dat'))[0])
+        cosmo_param_vals = f.attrs['cosmo_param_vals']
+        hod_param_vals = f.attrs['hod_param_vals']
 
-        cosmo_names = ['Omega_m', 'Omega_b', 'sigma_8', 'h', 'n_s', 'N_eff', 'w_de']
-        HOD_names = ['Msat', 'alpha', 'Mcut', 'sigma_logM', 'vbias_cen', 'vbias_sats', 'conc', 'v_field_amp']
-        if 'HOD' in self.fixed_params:
-            if 'cosmo' in self.fixed_params:
+        scale_factors = f.attrs['scale_factors']
+        redshift_bin_centers = 1.0/scale_factors - 1 # emulator works in z, sims in a.
+        if 'z' in fixed_params:
+            assert fixed_params['z'] in redshift_bin_centers
+
+        scale_bins = f.attrs['scale_bins']
+        scale_bin_centers = (scale_bins[1:] + scale_bins[:-1])/2.0 if scale_bins is not None else None
+        if 'r' in fixed_params:
+            # this wil also fale if scb is None. but you can't fix when it's none anyway so.
+            # may wanna have a friendlier error message htough.
+            assert fixed_params['r'] in scale_bin_centers # may need to include a fudge factor here
+        r_idx = np.where(fixed_params['r'] == scale_bin_centers)[0][0]
+
+        obs = f.attrs['obs']
+
+        # construct ordered_params
+        # ordered_params is an ordered dict whose keys are the parameters in the
+        # order they are in in the data. The values are their bounds in the training data
+        if 'HOD' in fixed_params:
+            if 'cosmo' in fixed_params:
                 raise ValueError("Can't fix both HOD and cosmology!")
-            min_max_vals = zip(cosmologies.min(axis=0), cosmologies.max(axis=0))
-            ordered_params = OrderedDict(izip(cosmo_names, min_max_vals))
-        elif 'cosmo' in self.fixed_params:
-            min_max_vals = zip(HODs.min(axis=0), HODs.max(axis=0))
-            ordered_params = OrderedDict(izip(HOD_names, min_max_vals))
+            min_max_vals = zip(cosmo_param_vals.min(axis=0), cosmo_param_vals.max(axis=0))
+            ordered_params = OrderedDict(izip(cosmo_param_names, min_max_vals))
+        elif 'cosmo' in fixed_params:
+            min_max_vals = zip(hod_param_vals.min(axis=0), hod_param_vals.max(axis=0))
+            ordered_params = OrderedDict(izip(hod_param_names, min_max_vals))
         else:
-            op_names = HOD_names[:]
-            op_names.extend(cosmo_names)
-            min_max_vals = zip(np.r_[HODs.min(axis=0), cosmologies.min(axis=0)], \
-                               np.r_[HODs.max(axis=0), cosmologies.max(axis=0)])
+            op_names = hod_param_names[:]
+            op_names.extend(cosmo_param_names)
+            min_max_vals = zip(np.r_[hod_param_vals.min(axis=0), cosmo_param_vals.min(axis=0)], \
+                               np.r_[hod_param_vals.max(axis=0), cosmo_param_vals.max(axis=0)])
             ordered_params = OrderedDict(izip(op_names, min_max_vals))
 
-        for key, val in ordered_params.iteritems():
-            if key[0] == 'M':  # masses have to have the log taken
-                ordered_params[key] = (np.log10(val[0]), np.log10(val[1]))
+        # NOTE if its single_valued, may have to fudge this somehow?
+        if 'z' not in fixed_params:
+            ordered_params['z'] = (np.min(redshift_bin_centers), np.max(redshift_bin_centers))
 
-        if 'z' not in self.fixed_params:
-            ordered_params['z'] = (0, 1)
-        if 'r' not in self.fixed_params:
-            ordered_params['r'] = (0, 1)
+        if 'r' not in fixed_params:
+            ordered_params['r'] = (np.min(scale_bins), np.max(scale_bins))
 
-        self._ordered_params = ordered_params
 
-        for key in em_params:  # assert defined params are in ordered
-            assert key in self._ordered_params
+        # append files to a list, then concatenate at the end
+        x = []
+        y = []
+        ycov = []
 
-        obs_files = glob(path.join(data_dir, 'wp*.dat'))
-
-        # store the binning for the scale_bins
-        # assumes that it's the same for each box, which should be true.
-        # TODO
-        scale_nbins = 9  # hardcoding
-        npoints = len(obs_files) * scale_nbins  # each file contains NBINS points in r, and each file is a N-d point
-        ndim = len(self._ordered_params)
-        x = np.zeros((npoints, ndim))
-        y = np.zeros((npoints,))
-
+        # book keeping obs.
+        # only want to warn the user once.
         warned = False
+        # these can be useful for debugging
         num_skipped = 0
         num_used = 0
 
-        for idx, obs_file in enumerate(obs_files):
-            obs_and_rb = obs_file_reader(obs_file)
-            scale_bin_centers = obs_and_rb[:, 0]
-            obs = obs_and_rb[:, 1]
-
-            if hasattr(self, "scale_bin_centers"):
-                if scale_bin_centers.shape != self.scale_bin_centers.shape or \
-                        np.any(np.abs(scale_bin_centers - self.scale_bin_centers) > 0.1):
-                    warnings.warn(
-                        "The scale bin centers in %s are not the same as the ones alread attached to this object. This may lead to weird behavior!" % data_dir)
-
-            # skip NaNs
-            if np.any(np.isnan(obs)):
-                # only warn once.
-                if not warned:
-                    warnings.warn('WARNING: NaN detected. Skipping point in %s' % obs_file)
-                    warned = True
-                num_skipped += 1
-                continue
-
-            # TODO this structure allows you to hold an HOD or cosmology fixed, which I like.
-            split_obs_fname = path.basename(obs_file).split('_')
-            cosmo_no, HOD_no = int(split_obs_fname[3]), int(split_obs_fname[5])
-
-            cosmo = cosmologies[cosmo_no, :]
-            HOD = HODs[HOD_no, :]
-
-            if 'cosmo' in self.fixed_params:
-                if cosmo_no != self.fixed_params['cosmo']:
+        for cosmo_group_name, cosmo_group in f.iteritems():
+            # we're fixed to a particular cosmology #
+            cosmo_no = int(cosmo_group_name[-2:])
+            if 'cosmo' in fixed_params and cosmo_no != fixed_params['cosmo']:
                     continue
-                else:
-                    params = HOD[:]
-            elif 'HOD' in self.fixed_params:
-                if HOD_no != self.fixed_params['HOD']:
+            for sf_group_name, sf_group in cosmo_group.iteritems():
+                # likewise
+                z = 1.0/float(sf_group_name[-5:]) - 1.0
+                # TODO fudge factors?
+                if 'z' in fixed_params and z == fixed_params['z']:
                     continue
-                else:
-                    params = cosmo[:]
-            else:
-                params = np.r_[HOD, cosmo]
 
-            num_used += 1
+                obs_dset = sf_group['obs']
+                cov_dset = sf_group['cov']
 
-            # take the params from the file and put them in the right order and right place
-            file_params = []
-            for i, pname in enumerate(self._ordered_params):
-                # if pname not in fixed_params and pname not in {'z', 'r'}:  # may need to be input_params
-                if pname not in {'z', 'r'}:
-                    # note we have to repeat for each scale bin
-                    if pname[0] == 'M':  # take the log
-                        file_params.append(np.ones((scale_nbins,)) * np.log10(params[i]))
+                if any(np.any(np.isnan(arr)) for arr in [obs_dset, cov_dset]):
+                    # skip NaN points. May wanna change this behavior.
+                    if not warned:
+                        warnings.warn('WARNING: NaN detected. Skipping point in cosmo %d, z= %.2f' %(cosmo_no, z))
+                        warned = True
+                    num_skipped += 1
+                    continue
+
+                cosmo = cosmo_param_vals[cosmo_no, :]
+
+                for HOD_no, (_obs, _cov) in enumerate(izip(obs_dset, cov_dset)):
+
+                    if "HOD" in fixed_params and HOD_no != fixed_params['HOD']
+                        continue
+
+                    HOD = hod_param_vals[HOD_no, :]
+
+                    params = []
+                    # I wonder if this is annoyingly inefficient. Probably not a huge deal.
+                    if 'cosmo' not in fixed_params:
+                        params.extend(list(cosmo))
+                    if 'HOD' not in fixed_params:
+                        params.extend(list(HOD))
+                    if 'z' not in fixed_params:
+                        params.append(z)
+                    # handle fixed r differently than the others
+
+                    if 'r' in fixed_params:
+                        params = np.array(params)
+
+                        x.append(params)
+
+                        #we hve to transform the data (take a log, multiply, etc)
+                        # TODO this may not work with things like r2 anymore
+                        _o, _c = self._iv_transform(independent_variable, _obs, _cov)
+                        y.append(np.array([_o[r_idx]]))
+                        ycov.append(np.array(_c[r_idx, r_idx]))
+
                     else:
-                        file_params.append(np.ones((scale_nbins,)) * params[i])
+                        params = np.array(list(product(params, scale_bin_centers)))
 
-            # r and z will always be at the end.
-            if 'z' not in fixed_params:
-                file_params.append(np.ones((scale_nbins,)) * z)
-            if 'r' not in fixed_params:
-                file_params.append(np.log10(scale_bin_centers))
+                        x.append(params)
 
-            x[idx * scale_nbins:(idx + 1) * scale_nbins, :] = np.stack(file_params).T
+                        _o, _c = self._iv_transform(independent_variable, _obs, _cov)
+                        y.append(_o)
+                        ycov.append(_c)
 
-            y[idx * scale_nbins:(idx + 1) * scale_nbins] = self._iv_transform(independent_variable, obs)
-        self.scale_bin_centers = scale_bin_centers
+                    num_used += 1
 
-        if 'r' in self._ordered_params and self._ordered_params['r'] == (0, 1):
-            self._ordered_params['r'] = (np.min(self.scale_bin_centers), np.max(self.scale_bin_centers))
 
-        if 'z' in self._ordered_params and self._ordered_params['z'] == (0, 1):
-            self._ordered_params['z'] = (np.min(self.redshift_bin_centers), np.max(self.redshift_bin_centers))
+        return np.vstack(x), np.vstack(y), np.vstack(ycov)
 
-        # ok, now get the errors in their weird format.
-        # TODO is this how i want to handle f they don't exist?
-        try:
-            e1 = np.loadtxt(path.join(data_dir, 'Cosmo_err.dat'))
-            e2 = np.loadtxt(path.join(data_dir, 'Cosmo_pure_err.dat'))
-
-            yerr_1bin = e2 ** 2.0 + (e1 ** 2.0 - e2 ** 2.0) / scale_nbins
-            ycov_1bin = np.diag(yerr_1bin) / np.outer(np.mean(x.reshape((-1, scale_nbins)), axis=0) * np.log(10))
-        except IOError:
-            # a test dir, just create a dummy since it'll be thrown out.
-            ycov_1bin = np.eye(scale_nbins)
-
-        # TODO sort?
-
-        zeros_slice = np.where(np.any(x != 0.0, axis=1))[0]
-        return x[zeros_slice], y[zeros_slice], ycov_1bin
-
-    def get_plot_data(self, em_params, training_dir, independent_variable=None, fixed_params={},
-                      dependent_variable='r'):
-        """
-        Similar function to load_training_data. However, returns values for plotting comparisons to the emulator.
-        :param em_params:
-            Similar to fixed params. A dictionary of values held fixed in the emulator, as opposed to fixed_params
-            which are values held fixed in the training data.
-        :param training_dir:
-            Directory where training data from trainginData is stored.
-        :param independent_variable:
-            Independant variable to emulate. Options are xi, r2xi, and bias (eventually).
-        :param fixed_params:
-            Parameters to hold fixed. Only available if data in training_dir is a full hypercube, not a latin hypercube.
-        :param dependent_variable:
-            "x axis" variable. Default is 'r', but 'z' is also acceptable.
-        :return: log_r (or z), y, yerr for the independent variable at the points specified by fixed nad em params.
-        """
-
-        x, y, yerr, _ = self.get_data(training_dir, em_params, fixed_params, independent_variable)
-
-        sort_idxs = self._sort_params(x, argsort=True)
-
-        log_bin_centers = np.log10(self.scale_bin_centers) if dependent_variable == 'r' else self.redshift_bin_centers
-        # repeat for each row of y
-        log_bin_centers = np.tile(log_bin_centers, sort_idxs.shape[0] / len(log_bin_centers))
-
-        # TODO do I want to reshape to y.shape((-1, log_bin_centers.shape(1)) ?
-        return log_bin_centers, y[sort_idxs], yerr[sort_idxs]
 
     def load_training_data(self, training_dir):
         """
@@ -1211,7 +1164,7 @@ def get_leaves(kdtree):
         instance of KDTree to recover leaves of.
     :return: leaves, a list of  numpy arrays of shape (experts, points_per_expert), of leaves.
     """
-    points_per_expert = kdtree.leafsize
+    #points_per_expert = kdtree.leafsize
     leaves_list = []
     get_leaves_helper(kdtree.tree, leaves_list)
 

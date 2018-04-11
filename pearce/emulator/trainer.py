@@ -38,6 +38,8 @@ class Trainer(object):
         # TODO could do more user babysitting here
 
         self.prep_cosmology(cfg['cosmology'])
+        # TODO one thing to consider is how to have HOD-independent emu
+        # quantities like xi_mm could require this.
         self.prep_hod(cfg['HOD'])
         self.prep_observation(cfg['observation'])
         self.prep_computation(cfg['computation'])
@@ -272,7 +274,7 @@ class Trainer(object):
         Helper function to return a standard group/dataset name based on the indicies
         # TODO
         """
-        return "cosmo_no_%d/a_%.3f"%(cosmo_idx, self._scale_factors[scale_factor])
+        return "cosmo_no_%02d/a_%.3f"%(cosmo_idx, self._scale_factors[scale_factor])
 
 
     def run(self, comm):
@@ -405,6 +407,7 @@ class Trainer(object):
             all_cosmo_sf_pairs = np.array(list(product(xrange(len(self.cats)), xrange(len(self._scale_factors)))))
 
             f = h5py.File(self.output_fname, 'w')
+            f.attrs['obs'] = self.obs
             f.attrs['cosmo_param_names'] = self._cosmo_param_names
             f.attrs['cosmo_param_vals'] = self._cosmo_param_vals
             f.attrs['scale_factors'] = self._scale_factors
@@ -418,6 +421,7 @@ class Trainer(object):
 
                 # I could compute this, which would be faster, but this is easier to read.
                 hod_idxs = np.where(all_param_idxs[:, :2] == cosmo_sf_pair)[0]
+
 
                 grp.create_dataset("obs", data=all_output[hod_idxs], chunks = True, compression = 'gzip')
                 grp.create_dataset("cov", data=all_output_cov[hod_idxs], chunks = True, compression = 'gzip')
