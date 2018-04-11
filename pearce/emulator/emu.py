@@ -668,6 +668,15 @@ class Emu(object):
                     'mean_occupation_satellites_assembias_param1':10.8685042271,
                     'mean_occupation_centrals_assembias_param1':21.8441412417,})
 
+        elif self.obs == 'ds':
+            if independent_variable is None:
+                ig.update({'logMmin': 3.6176310032, 'f_c': 0.574766597478, 'logM0':45.5862423685,
+                    'sigma_logM': 1.3220351031, 'alpha': 2.31333123015, 'r': 0.17221523,
+                    'logM1': 2.16453187021, 'amp': 0.42810696, 'z': 1.0,
+                    'mean_occupation_satellites_assembias_param1': 6.65437027486,
+                    'mean_occupation_centrals_assembias_param1': 3.1539620393})
+
+
         else:
             pass  # no other guesses saved yet.
 
