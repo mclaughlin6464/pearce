@@ -4,10 +4,11 @@ from pearce.inference import run_mcmc_iterator
 import numpy as np
 from os import path
 
-from time import time
-t0 = time()
-
-training_dir = '/home/swmclau2/scratch/PearceLHC_wt_z/'
+sherlock = False 
+if sherlock:
+    training_dir = '/home/swmclau2/scratch/PearceLHC_wt_z/'
+else:
+    training_dir = '/u/ki/swmclau2/des/PearceLHC_wt_z/'
 
 em_method = 'gp'
 split_method = 'random'
@@ -59,8 +60,8 @@ rbins = np.array( [0.31622777, 0.44326829, 0.62134575, 0.87096359, 1.22086225, 1
 #y = np.mean(np.log10(np.array(wp_vals)),axis = 0 )
 y = np.loadtxt('buzzard2_wt_11.npy')
 # TODO need a way to get a measurement cov for the shams
-#cov = np.cov(np.array(wt_vals).T)#/np.sqrt(50)
-cov = np.loadtxt('wt_11_cov.npy')
+cov = np.cov(np.array(wt_vals).T)#/np.sqrt(50)
+#cov = np.loadtxt('wt_11_cov.npy')
 #cov = np.cov(np.array(wt_vals).T)#/np.sqrt(50)
 #np.savetxt('wt_11_cov.npy', cov)
 #from sys import exit
@@ -83,13 +84,14 @@ nburn = 0
 
 print 'Chain starting.'
 
-savedir = '/home/swmclau2/scratch/PearceMCMC/'
+if sherlock:
+    savedir = '/home/swmclau2/scratch/PearceMCMC/'
+else:
+    savedir = '/u/ki/swmclau2/des/PearceMCMC/'
 chain_fname = path.join(savedir,'%d_walkers_%d_steps_chain_wt_redmagic_z%.2f.npy'%(nwalkers, nsteps, z)) 
 
 with open(chain_fname, 'w') as f:
     f.write('#' + '\t'.join(param_names)+'\n')
-
-print time() - t0
 
 for pos in run_mcmc_iterator(emu, cat, param_names, y, cov, tpoints,obs_nd, obs_nd_err,'calc_analytic_nd', fixed_params = fixed_params,nwalkers = nwalkers, nsteps = nsteps, nburn = nburn, ncores=8):#,\
                         #resume_from_previous = '/u/ki/swmclau2/des/PearceMCMC/100_walkers_1000_steps_chain_shuffled_sham.npy')#, ncores = 1)
