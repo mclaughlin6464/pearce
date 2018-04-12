@@ -124,8 +124,8 @@ class Emu(object):
         if 'r' in fixed_params:
             # this wil also fale if scb is None. but you can't fix when it's none anyway so.
             # may wanna have a friendlier error message htough.
-            assert fixed_params['r'] in scale_bin_centers # may need to include a fudge factor here
-            r_idx = np.where(fixed_params['r'] == scale_bin_centers)[0][0]
+            assert np.any(np.abs(fixed_params['r'] - scale_bin_centers) < 1e-4) # may need to include a fudge factor here
+            r_idx = np.argmin(np.abs(fixed_params['r'] -  scale_bin_centers))
 
         # construct ordered_params
         # ordered_params is an ordered dict whose keys are the parameters in the
@@ -139,11 +139,12 @@ class Emu(object):
         elif 'cosmo' in fixed_params and 'HOD' not in fixed_params:
             min_max_vals = zip(hod_param_vals.min(axis=0), hod_param_vals.max(axis=0))
             ordered_params = OrderedDict(izip(hod_param_names, min_max_vals))
-        elif 'cosmo' in fixed_params and 'HOD' in fixed_params:
-            op_names = hod_param_names[:]
-            op_names.extend(cosmo_param_names)
-            min_max_vals = zip(np.r_[hod_param_vals.min(axis=0), cosmo_param_vals.min(axis=0)], \
-                               np.r_[hod_param_vals.max(axis=0), cosmo_param_vals.max(axis=0)])
+        elif 'cosmo' not in fixed_params and 'HOD' not in fixed_params:
+            op_names = list(cosmo_param_names[:])
+            op_names.extend(hod_param_names)
+
+            min_max_vals = zip(np.r_[cosmo_param_vals.min(axis=0), hod_param_vals.min(axis=0)], \
+                               np.r_[cosmo_param_vals.max(axis=0), hod_param_vals.max(axis=0)])
             ordered_params = OrderedDict(izip(op_names, min_max_vals))
         else:
             ordered_params = OrderedDict()
@@ -169,7 +170,7 @@ class Emu(object):
 
         # book keeping vars.
         # only want to warn the user once.
-        warned = False
+        give_warning = False
         # these can be useful for debugging
         num_skipped = 0
         num_used = 0
@@ -182,8 +183,9 @@ class Emu(object):
             for sf_group_name, sf_group in cosmo_group.iteritems():
                 # likewise
                 z = 1.0/float(sf_group_name[-5:]) - 1.0
+
                 # TODO fudge factors?
-                if 'z' in fixed_params and z == fixed_params['z']:
+                if 'z' in fixed_params and z != fixed_params['z']:
                     continue
 
                 obs_dset = sf_group['obs']
@@ -199,9 +201,7 @@ class Emu(object):
                         continue
                     if any(np.any(np.isnan(arr)) for arr in [_obs, _cov]):
                         # skip NaN points. May wanna change this behavior.
-                        if not warned:
-                            warnings.warn('WARNING: NaN detected. Skipping point %d in cosmo %d, z= %.2f' % (HOD_no, cosmo_no, z))
-                            warned = True
+                        give_warning = True
                         num_skipped += 1
                         continue
 
@@ -229,9 +229,10 @@ class Emu(object):
                         ycov.append(np.array(_c[r_idx, r_idx]))
 
                     else:
-                        params = np.array(list(product(params, scale_bin_centers)))
-
-                        x.append(params)
+                        _params = np.zeros((scale_bin_centers.shape[0], len(params) + 1))
+                        _params[:, :-1] = params
+                        _params[:, -1] = scale_bin_centers
+                        x.append(_params)
 
                         _o, _c = self._iv_transform(independent_variable, _obs, _cov)
                         y.append(_o)
@@ -239,8 +240,14 @@ class Emu(object):
 
                     num_used += 1
 
+        if give_warning:
+            warnings.warn('WARNING: NaN detected. Skipped %d points in training data.' % (num_skipped))
+
         f.close()
-        return np.vstack(x), np.vstack(y), np.dstack(ycov)
+        # stack so xs have shape (n points, n params)
+        # ys have shape (npoints)
+        # and ycov has shape (n_bins, n_bins, n_points/n_bins)
+        return np.vstack(x), np.hstack(y), np.dstack(ycov)
 
 
     def load_training_data(self, filename):
@@ -260,17 +267,14 @@ class Emu(object):
 
         # in general, the full cov matrix will be too big, and we won't need it. store the diagonal, and
         # an average
-        fullcov = block_diag(*[yc[:,:,0] for yc in np.dsplit(ycov, self.nbins)])
+        split_ycov = np.dsplit(ycov, ycov.shape[-1])
+        fullcov = block_diag(*[yc[:,:,0] for yc in split_ycov])
         yerr = np.sqrt(np.diag(fullcov))
         self.yerr = np.hstack([yerr for i in xrange(self.x.shape[0] / fullcov.shape[0])])
 
-        # compute the average covariance matrix
-        avgcov = np.zeros((self.n_bins, self.n_bins))
-        N = fullcov.shape[0] / self.n_bins
-        for i in xrange(N):
-            avgcov += fullcov[i * self.n_bins: (i + 1) * self.n_bins]
 
-        self.ycov = avgcov / N
+        #compute the average covaraince matrix
+        self.ycov = np.mean(split_ycov, axis = 2) 
 
         # subtract off the mean; this should lead to better performance for the GP
         self.y_hat = self.y.mean(axis=0)
@@ -585,6 +589,7 @@ class Emu(object):
                 #metric.append(1.0)
 
         metric = np.array(metric)
+        
 
         a = metric[0]
         # TODO other kernels?
@@ -660,6 +665,8 @@ class Emu(object):
             if type(z_bin_centers) is float:
                 z_bin_centers = np.array([z_bin_centers])
             del ep['z']
+        elif 'z' not in self.fixed_params:
+            raise ValueError("Please specify z in emulate_wrt_z")
         out = self.emulate_wrt_r_z(ep, r_bin_centers, z_bin_centers, gp_errs)
 
         # Extract depending on if there are errors
@@ -752,6 +759,8 @@ class Emu(object):
             _mu = out
 
         # account for weird binning isues.
+        print z_bin_centers.shape
+        print r_bin_centers.shape
         if not z_bin_centers.shape[0]:
             if not r_bin_centers.shape[0]:
                 mu = _mu.reshape((-1, 1, 1))
