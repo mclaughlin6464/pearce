@@ -25,8 +25,10 @@ from .ioHelpers import *
 
 
 class Emu(object):
+
     '''Main Emulator base class. Cannot itself be instatiated; can only be accessed via subclasses.
-       controls all loading, manipulation, and emulation of data.'''
+       controls all loading, manipulation, and emulation of data.
+    '''
 
     __metaclass__ = ABCMeta
     valid_methods = {'gp', 'svr', 'gbdt', 'rf', 'krr', 'linear'}  # could add more, coud even check if they exist in sklearn
@@ -434,16 +436,11 @@ class Emu(object):
                 if pname == 'r':
                     val = 10**val
 
-                assert np.all(plow-val <= -1e-6) and np.all(val-phigh <= 1e-6)
+                assert np.all(plow-val <= 1e-6) and np.all(val-phigh <= 1e-6)
             except AssertionError:
                 if type(val) is float:
-                    warnings.warn("Emulator value for %s %.3f is outside the bounds (%.3f, %.3f) of the emulator." % (
-                    pname, val, plow, phigh))
+                    warnings.warn("Emulator value for %s %.3f is outside the bounds (%.3f, %.3f) of the emulator." % (pname, val, plow, phigh))
                 else:
-                    if pname == 'r':
-                        print val
-                        print phigh, plow
-                        print '*'*20
                     warnings.warn("One value for %s is outside the bounds (%.3f, %.3f) of the emulator." % (
                     pname, plow, phigh))
 
@@ -666,11 +663,11 @@ class Emu(object):
         elif self.obs == 'wt':
             # TODO parameter name has changed, update
             if independent_variable is None:
-                ig.update({'logMmin': 0.50604543531, 'f_c': 6.50148006111, 'logM0':45.5862423685,
-                    'sigma_logM':2.25950308654, 'alpha': 2.912095028, 'r': 0.306139450843,
-                    'logM1': 4.47113501396, 'amp': 31.8289259091, 'z': 1.0,
-                    'mean_occupation_satellites_assembias_param1':10.8685042271,
-                    'mean_occupation_centrals_assembias_param1':21.8441412417,})
+                ig.update({'logMmin': 3.84345171761, 'f_c': 1.80188170556, 'logM0':14.11665461,
+                    'sigma_logM': 17.7239294539, 'alpha': 0.18960822912, 'r': 0.306139450843,
+                    'logM1': 1.0554692015, 'amp': 2.52461085754, 'z': 1.0,
+                    'mean_occupation_satellites_assembias_param1':2.45298658504,
+                    'mean_occupation_centrals_assembias_param1':27.2832783025})
 
         else:
             pass  # no other guesses saved yet.
