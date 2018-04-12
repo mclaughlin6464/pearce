@@ -759,8 +759,6 @@ class Emu(object):
             _mu = out
 
         # account for weird binning isues.
-        print z_bin_centers.shape
-        print r_bin_centers.shape
         if not z_bin_centers.shape[0]:
             if not r_bin_centers.shape[0]:
                 mu = _mu.reshape((-1, 1, 1))

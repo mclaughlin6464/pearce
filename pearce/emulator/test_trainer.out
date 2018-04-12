@@ -1,0 +1,124 @@
+Traceback (most recent call last):
+  File "trainer.py", line 394, in <module>
+    comm = MPI.COMM_WORLD
+NameError: name 'MPI' is not defined
+-------------------------------------------------------
+Primary job  terminated normally, but 1 process returned
+a non-zero exit code.. Per user-direction, the job has been aborted.
+-------------------------------------------------------
+--------------------------------------------------------------------------
+mpirun detected that one or more processes exited with non-zero status, thus causing
+the job to be terminated. The first process to do so was:
+
+  Process name: [[30320,1],3]
+  Exit code:    1
+--------------------------------------------------------------------------
+
+------------------------------------------------------------
+Sender: LSF System <lsf@bullet0120>
+Subject: Job 362599: <test_trainer> in cluster <slac> Exited
+
+Job <test_trainer> was submitted from host <ki-ls07> by user <swmclau2> in cluster <slac> at Fri Apr  6 14:45:52 2018.
+Job was executed on host(s) <1*bullet0120>, in queue <bulletmpi>, as user <swmclau2> in cluster <slac> at Sun Apr  8 09:59:41 2018.
+                            <1*bullet0117>
+                            <1*bullet0114>
+                            <1*bullet0297>
+                            <1*bullet0102>
+                            <1*bullet0272>
+                            <1*bullet0271>
+                            <1*bullet0266>
+                            <1*bullet0233>
+                            <1*bullet0225>
+                            <1*bullet0224>
+                            <1*bullet0218>
+                            <1*bullet0215>
+                            <1*bullet0214>
+                            <1*bullet0213>
+                            <1*bullet0212>
+                            <1*bullet0210>
+                            <1*bullet0206>
+                            <1*bullet0202>
+                            <1*bullet0200>
+                            <1*bullet0302>
+                            <1*bullet0300>
+                            <1*bullet0098>
+                            <1*bullet0097>
+                            <1*bullet0093>
+                            <1*bullet0091>
+                            <1*bullet0089>
+                            <1*bullet0087>
+                            <1*bullet0084>
+                            <1*bullet0082>
+                            <1*bullet0078>
+                            <1*bullet0070>
+                            <1*bullet0069>
+                            <1*bullet0064>
+                            <1*bullet0063>
+                            <1*bullet0062>
+                            <1*bullet0060>
+                            <1*bullet0054>
+                            <1*bullet0046>
+                            <1*bullet0041>
+                            <1*bullet0040>
+                            <1*bullet0039>
+                            <1*bullet0036>
+                            <1*bullet0025>
+                            <1*bullet0015>
+                            <1*bullet0014>
+                            <1*bullet0013>
+                            <1*bullet0197>
+                            <1*bullet0195>
+                            <1*bullet0194>
+                            <1*bullet0008>
+                            <1*bullet0005>
+                            <1*bullet0186>
+                            <1*bullet0183>
+                            <1*bullet0181>
+                            <1*bullet0180>
+                            <1*bullet0179>
+                            <1*bullet0174>
+                            <1*bullet0172>
+                            <1*bullet0164>
+                            <1*bullet0161>
+                            <1*bullet0156>
+                            <1*bullet0147>
+                            <1*bullet0144>
+</u/ki/swmclau2> was used as the home directory.
+</u/ki/swmclau2/Git/pearce/pearce/emulator> was used as the working directory.
+Started at Sun Apr  8 09:59:41 2018.
+Terminated at Sun Apr  8 10:00:21 2018.
+Results reported at Sun Apr  8 10:00:21 2018.
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+###!/bin/bash
+#BSUB -q bulletmpi
+#BSUB -W 1:00
+#BSUB -J test_trainer
+#BSUB -R span[ptile=1]
+#BSUB -oo /u/ki/swmclau2/Git/pearce/pearce/emulator/test_trainer.out    
+#BSUB -n 64 
+
+mpirun -np 4 python trainer.py test_trainer.yaml
+
+------------------------------------------------------------
+
+Exited with exit code 1.
+
+Resource usage summary:
+
+    CPU time :                                   14.81 sec.
+    Max Memory :                                 75 MB
+    Average Memory :                             41.50 MB
+    Total Requested Memory :                     -
+    Delta Memory :                               -
+    Max Swap :                                   -
+    Max Processes :                              5
+    Max Threads :                                15
+    Run time :                                   40 sec.
+    Turnaround time :                            155669 sec.
+
+The output (if any) is above this job summary.
+

@@ -1,0 +1,9 @@
+###!/bin/bash
+#BSUB -q bulletmpi
+#BSUB -W 1:00
+#BSUB -J test_trainer
+#BSUB -R span[ptile=1]
+#BSUB -oo /u/ki/swmclau2/Git/pearce/pearce/emulator/test_trainer.out    
+#BSUB -n 64 
+
+mpirun -np 4 python trainer.py test_trainer.yaml
