@@ -370,7 +370,10 @@ class TrainingBox(Cat):
         self.prim_haloprop_key = 'halo_m200b'
         #locations = {'ki-ls': ['/u/ki/swmclau2/des/testbox_findparents/']}
         locations = {'ki-ls': ['/nfs/slac/g/ki/ki22/cosmo/beckermr/tinkers_emu/Box0%02d/halos/m200b/',
-                               '/nfs/slac/g/ki/ki23/des/beckermr/tinkers_emu/Box0%02d/halos/m200b/']}
+                               '/nfs/slac/g/ki/ki23/des/beckermr/tinkers_emu/Box0%02d/halos/m200b/'],
+                     'sherlock': ['/home/swmclau2/scratch/TrainingBoxes/Box0%2d/halos/m200b/',
+                                  '/home/swmclau2/scratch/TrainingBoxes/Box0%2d/halos/m200b/']}
+                      #same place on sherlock
         assert system in locations
         #loc = locations[system][0]
         loc_list = locations[system]
