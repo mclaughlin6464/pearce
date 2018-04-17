@@ -1002,9 +1002,10 @@ class Cat(object):
 
                 r = np.sqrt((u**2+(x*t_med)**2))#*cat.h#not sure about the h
 
-                if r > units.Mpc/self.h*self.Lbox/10:
+                if r > (units.Mpc/self.h)*self.Lbox/10:
                     int_xi+=du*large_scale_model(r.value)
                 else:
+
                     int_xi+=du*(np.power(10, \
                                 xi_interp(np.log10(r.value))))
             wt[bin_no] = int_xi.to("Mpc").value/self.h
