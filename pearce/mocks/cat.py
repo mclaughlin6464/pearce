@@ -868,6 +868,7 @@ class Cat(object):
 
         # could move these last parts ot the decorator or a helper. Ah well.
         n_cores = self._check_cores(n_cores)
+        print 'N cores: %d'%n_cores
 
         if halo:
             x,y,z = [self.model.mock.halo_table[c] for c in ['halo_x', 'halo_y', 'halo_z']]

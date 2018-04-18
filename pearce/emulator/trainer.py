@@ -340,14 +340,27 @@ class Trainer(object):
 
 
         last_cosmo_idx, last_scale_factor_idx = -1, -1
+        t0 = time()
         for output_idx, (cosmo_idx, scale_factor_idx, hod_idx) in enumerate(param_idxs):
+            print 'Rank: %d, Cosmo: %d, Scale_Factor: %d, HOD: %d'%(rank, cosmo_idx, scale_factor_idx, hod_idx)
+            print 'Time: %.2f'%(time()- t0)
+            print '*'*30
+
             if any(idx == -1 for idx in [cosmo_idx, scale_factor_idx, hod_idx]):
                 continue # skip these placeholders
             if last_cosmo_idx != cosmo_idx or last_scale_factor_idx != scale_factor_idx:
+                if last_cosmo_idx != -1:
+                    # free some memory
+                    last_cat = self.cats[last_cosmo_idx]
+                    del last_cat.halocat
+                    del last_cat.model
+
+                print 'Get cat'
                 cat = self.cats[cosmo_idx]
 
                 scale_factor = self._scale_factors[scale_factor_idx]
 
+                print 'Load cat'
                 cat.load(scale_factor, HOD= self.hod, particles = self._particles,
                          downsample_factor=self._downsample_factor, hod_kwargs= self._hod_kwargs  )
 
