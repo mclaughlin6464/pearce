@@ -341,8 +341,8 @@ class TrainingBox(Cat):
     # lazily loadin the params from disk
     # may wanna hardcode them ot the object instead
     # also won't work for non-kils systems
-    cosmo_params = pd.DataFrame.from_csv('~swmclau2/des/LH_eigenspace_lnA_np7_n40_s556.dat',\
-                                         sep = ' ', index_col = None)
+    #cosmo_params = pd.DataFrame.from_csv('~swmclau2/des/LH_eigenspace_lnA_np7_n40_s556.dat',\
+    #                                     sep = ' ', index_col = None)
 
 
     def __init__(self, boxno, system='ki-ls', **kwargs):
@@ -362,8 +362,15 @@ class TrainingBox(Cat):
         del columns_to_keep['halo_r200b']
         columns_to_keep['halo_rvir'] = (5, 'f4')
 
-        Lbox = 1050.0  # Mpc
+        Lbox = 1050.0  # Mpc/h
         # Need to make a way to combine all the params
+        if system == 'ki-ls':
+            param_file = '~swmclau2/des/LH_eigenspace_lnA_np7_n40_s556.dat'
+        else: #sherlock
+            param_file = '~swmclau2/scratch/TrainingBoxes/LH_eigenspace_lnA_np7_n40_s556.dat'
+
+        self.cosmo_params = pd.DataFrame.from_csv(param_file, sep = ' ', index_col = None)
+
         cosmo = self._get_cosmo()
         pmass = 3.98769e10 * cosmo.Om0/(self.cosmo_params.iloc[0]['ombh2']*100*100/(self.cosmo_params.iloc[0]['H0']**2))
 
@@ -371,8 +378,8 @@ class TrainingBox(Cat):
         #locations = {'ki-ls': ['/u/ki/swmclau2/des/testbox_findparents/']}
         locations = {'ki-ls': ['/nfs/slac/g/ki/ki22/cosmo/beckermr/tinkers_emu/Box0%02d/halos/m200b/',
                                '/nfs/slac/g/ki/ki23/des/beckermr/tinkers_emu/Box0%02d/halos/m200b/'],
-                     'sherlock': ['/home/swmclau2/scratch/TrainingBoxes/Box0%2d/halos/m200b/',
-                                  '/home/swmclau2/scratch/TrainingBoxes/Box0%2d/halos/m200b/']}
+                     'sherlock': ['/home/swmclau2/scratch/TrainingBoxes/Box0%02d/halos/m200b/',
+                                  '/home/swmclau2/scratch/TrainingBoxes/Box0%02d/halos/m200b/']}
                       #same place on sherlock
         assert system in locations
         #loc = locations[system][0]
@@ -396,8 +403,17 @@ class TrainingBox(Cat):
             if key in new_kwargs:
                 del new_kwargs[key]
 
+        version_name = 'most_recent_%d'%boxno
+
         super(TrainingBox, self).__init__(simname=simname, loc=loc, columns_to_keep=columns_to_keep, Lbox=Lbox,
-                                      pmass=pmass, cosmo=cosmo, **new_kwargs)
+                                      pmass=pmass, version_name = version_name, cosmo=cosmo, **new_kwargs)
+
+        cache_locs = {'ki-ls': '/u/ki/swmclau2/des/halocats/hlist_%.2f.list.%s_%d.hdf5',
+                      'sherlock': '/scratch/users/swmclau2/halocats/hlist_%.2f.list.%s_%d.hdf5'}
+        cache_locs['long'] = cache_locs['ki-ls']
+        self.cache_filenames = [cache_locs[system] % (a, self.simname, boxno)
+                                for a in self.scale_factors]  # make sure we don't have redunancies.
+
 
     def _get_cosmo(self):
         """

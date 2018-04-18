@@ -10,6 +10,6 @@ from pearce.mocks.kittens import cat_dict
 
 for boxno in xrange(40):
     print boxno
-    cat = cat_dict['trainingbox'](boxno, scale_factors = [0.645161,0.8, 0.909091, 1.0], system = 'ki-ls')
+    cat = cat_dict['trainingbox'](boxno, scale_factors = [1.0], system = 'sherlock')
 
     cat.cache(overwrite = True, add_local_density=False)

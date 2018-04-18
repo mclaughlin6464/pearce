@@ -3,12 +3,12 @@ cosmology:
         simname: trainingbox
         scale_factors: 1.0
         particles: True
-        system: ki-ls
+        system: sherlock 
 HOD:
         model: redMagic
         num_hods: 10 
         ordered_params: {'logMmin': [11.5, 13.5], 'sigma_logM': [0.05, 0.6], 'logM0': [12.0, 16.0], 'logM1': [13.0, 15.0], 'alpha': [0.8, 1.2], 'f_c': [0.01, 0.5]}
-        system: ki-ls 
+        system: sherlock 
 
 observation:
         obs: wp
@@ -16,5 +16,5 @@ observation:
         n_repops: 2
         log_obs: True
 computation:
-        filename: /u/ki/swmclau2/des/PearceTrainerTest1.hdf5 
+        filename: ~swmclau2/scratch/PearceRedmagicCosmo.hdf5 
         overwrite: True
