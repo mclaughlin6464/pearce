@@ -325,7 +325,7 @@ class Cat(object):
         :param particles:
             A (N,3) shaped numpy array of all particle positions
         """
-        z = 1./scale_factor-1.0
+        z = 1.0/scale_factor-1.0
         ptcl_catalog = UserSuppliedPtclCatalog(redshift=z, Lbox=self.Lbox, particle_mass=self.pmass, \
                                                x=particles[:, 0], y=particles[:, 1], z=particles[:, 2])
         ptcl_cache_loc = '/u/ki/swmclau2/des/halocats/ptcl_%.2f.list.%s_%s.hdf5'
@@ -624,7 +624,7 @@ class Cat(object):
         """
         mf = self.calc_mf()
         hod = self.calc_hod(params)
-        return np.sum(mf*hod)/((self.Lbox*self.h)**3)
+        return np.sum(mf*hod)/((self.Lbox/self.h)**3)
 
     def calc_xi_mm(self, rbins, n_cores='all', use_corrfunc=False):
         """
@@ -650,15 +650,15 @@ class Cat(object):
         pos = return_xyz_formatted_array(x, y, z, period=self.Lbox)
 
         if use_corrfunc:
-            out = xi(self.Lbox * self.h, n_cores, rbins,
-                     x.astype('float32') * self.h, y.astype('float32') * self.h,
-                     z.astype('float32') * self.h)
+            out = xi(self.Lbox / self.h, n_cores, rbins,
+                     x.astype('float32') / self.h, y.astype('float32') / self.h,
+                     z.astype('float32') / self.h)
 
             xi_all = out[4]  # returns a lot of irrelevant info
             # TODO jackknife with corrfunc?
 
         else:
-            xi_all = tpcf(pos * self.h, rbins, period=self.Lbox * self.h, num_threads=n_cores,
+            xi_all = tpcf(pos / self.h, rbins, period=self.Lbox / self.h, num_threads=n_cores,
                           estimator='Landy-Szalay')
 
         #cache, so we don't ahve to repeat this calculation several times.
@@ -698,8 +698,7 @@ class Cat(object):
             Whether to calculate hte number density of halos instead of galaxies. Default is false.
         :return: Number density of a populated box.
         '''
-        # TODO I think i'm missing little h's here
-        return self.model.mock.number_density
+        return self.model.mock.number_density*self.h**3
 
     # TODO do_jackknife to cov?
     @observable
@@ -745,14 +744,14 @@ class Cat(object):
                     f.write('\t%f\t%f\n' % (low, high))
 
             # countpairs requires casting in order to work right.
-            xi_all = countpairs_xi(self.model.mock.Lbox * self.h, n_cores, path.join(bindir, './binfile'),
-                                   x.astype('float32') * self.h, y.astype('float32') * self.h,
-                                   z.astype('float32') * self.h)
+            xi_all = countpairs_xi(self.model.mock.Lbox / self.h, n_cores, path.join(bindir, './binfile'),
+                                   x.astype('float32') / self.h, y.astype('float32') / self.h,
+                                   z.astype('float32') / self.h)
             xi_all = np.array(xi_all, dtype='float64')[:, 3]
             '''
-            out = xi(self.model.mock.Lbox * self.h, n_cores, rbins,
-                     x.astype('float32') * self.h, y.astype('float32') * self.h,
-                     z.astype('float32') * self.h)
+            out = xi(self.model.mock.Lbox / self.h, n_cores, rbins,
+                     x.astype('float32') / self.h, y.astype('float32') / self.h,
+                     z.astype('float32') / self.h)
 
             xi_all = out[4]  # returns a lot of irrelevant info
             # TODO jackknife with corrfunc?
@@ -769,11 +768,11 @@ class Cat(object):
                     n_sub = jk_args['n_sub']
 
                 randoms = np.random.random((pos.shape[0] * n_rands,
-                                            3)) * self.Lbox * self.h  # Solution to NaNs: Just fuck me up with randoms
-                xi_all, xi_cov = tpcf_jackknife(pos * self.h, randoms, rbins, period=self.Lbox * self.h,
+                                            3)) * self.Lbox / self.h  # Solution to NaNs: Just fuck me up with randoms
+                xi_all, xi_cov = tpcf_jackknife(pos / self.h, randoms, rbins, period=self.Lbox / self.h,
                                                 num_threads=n_cores, Nsub=n_sub, estimator='Landy-Szalay')
             else:
-                xi_all = tpcf(pos * self.h, rbins, period=self.Lbox * self.h, num_threads=n_cores,
+                xi_all = tpcf(pos / self.h, rbins, period=self.Lbox / self.h, num_threads=n_cores,
                               estimator='Landy-Szalay')
 
         # TODO 1, 2 halo terms?
@@ -825,9 +824,9 @@ class Cat(object):
 
             rand_N2 = 3 * len(x_m)
 
-            rand_X2 = np.random.uniform(0, self.Lbox * self.h, rand_N2)
-            rand_Y2 = np.random.uniform(0, self.Lbox * self.h, rand_N2)
-            rand_Z2 = np.random.uniform(0, self.Lbox * self.h, rand_N2)
+            rand_X2 = np.random.uniform(0, self.Lbox / self.h, rand_N2)
+            rand_Y2 = np.random.uniform(0, self.Lbox / self.h, rand_N2)
+            rand_Z2 = np.random.uniform(0, self.Lbox / self.h, rand_N2)
 
             autocorr = False
             D1D2 = DD(autocorr, n_cores, rbins, x_g.astype('float32'),  y_g.astype('float32'),  z_g.astype('float32'),
@@ -842,7 +841,7 @@ class Cat(object):
             xi_all = convert_3d_counts_to_cf(len(x_g), len(x_m), rand_N1, rand_N2,
                                              D1D2, D1R2, D2R1, R1R2)
         else:
-            xi_all = tpcf(pos_g * self.h, rbins, sample2 = pos_m*self.h, period=self.Lbox * self.h, num_threads=n_cores,
+            xi_all = tpcf(pos_g / self.h, rbins, sample2 = pos_m*self.h, period=self.Lbox / self.h, num_threads=n_cores,
                           estimator='Landy-Szalay', do_auto=False)
 
         return xi_all
@@ -888,13 +887,13 @@ class Cat(object):
 
         # don't forget little h!!
         if use_corrfunc:
-            out = xi(self.model.mock.Lbox * self.h, pi_max * self.h, n_cores, rp_bins,
-                     x.astype('float32') * self.h, y.astype('float32') * self.h,
-                     z.astype('float32') * self.h)
+            out = xi(self.model.mock.Lbox / self.h, pi_max / self.h, n_cores, rp_bins,
+                     x.astype('float32') / self.h, y.astype('float32') / self.h,
+                     z.astype('float32') / self.h)
 
             wp_all = out[4]  # returns a lot of irrelevant info
         else:
-            wp_all = wp(pos * self.h, rp_bins, pi_max * self.h, period=self.Lbox * self.h, num_threads=n_cores)
+            wp_all = wp(pos / self.h, rp_bins, pi_max / self.h, period=self.Lbox / self.h, num_threads=n_cores)
         return wp_all
 
     @observable
@@ -923,14 +922,14 @@ class Cat(object):
             vels = np.vstack([self.model.mock.galaxy_table[c] for c in ['vx', 'vy', 'vz']]).T
 
         # TODO is the model cosmo same as the one attached to the cat?
-        ra, dec, z = mock_survey.ra_dec_z(pos * self.h, vels * self.h, cosmo=self.cosmology)
+        ra, dec, z = mock_survey.ra_dec_z(pos / self.h, vels / self.h, cosmo=self.cosmology)
         ang_pos = np.vstack((np.degrees(ra), np.degrees(dec))).T
 
         n_rands = 5
         rand_pos = np.random.random((pos.shape[0] * n_rands, 3)) * self.Lbox#*self.h
         rand_vels = np.zeros((pos.shape[0] * n_rands, 3))
 
-        rand_ra, rand_dec, rand_z = mock_survey.ra_dec_z(rand_pos * self.h, rand_vels * self.h, cosmo=self.cosmology)
+        rand_ra, rand_dec, rand_z = mock_survey.ra_dec_z(rand_pos / self.h, rand_vels / self.h, cosmo=self.cosmology)
         rand_ang_pos = np.vstack((np.degrees(rand_ra), np.degrees(rand_dec))).T
 
         # NOTE I can transform coordinates and not have to use randoms at all. Consider?
@@ -987,9 +986,9 @@ class Cat(object):
 
         tpoints = (theta_bins[1:] + theta_bins[:-1])/2.0
         wt = np.zeros_like(tpoints)
-        x = self.cosmology.comoving_distance(self.z)*self.a
+        x = self.cosmology.comoving_distance(self.z)*self.a/self.h
 
-        assert tpoints[0]*x.to("Mpc").value >= rbins[0]
+        assert tpoints[0]*x.to("Mpc").value/self.h >= rbins[0]
         #ubins = np.linspace(10**-6, 10**4.0, 1001)
         ubins = np.logspace(-6, 4.0, 1001)
         ubc = (ubins[1:]+ubins[:-1])/2.0
@@ -999,17 +998,18 @@ class Cat(object):
             t_med = np.radians(tpoints[bin_no])
             for ubin_no, _u in enumerate(ubc):
                 _du = ubins[ubin_no+1]-ubins[ubin_no]
-                u = _u*units.Mpc*self.a
-                du = _du*units.Mpc*self.a
+                u = _u*units.Mpc*self.a/self.h
+                du = _du*units.Mpc*self.a/self.h
 
                 r = np.sqrt((u**2+(x*t_med)**2))#*cat.h#not sure about the h
 
-                if r > units.Mpc*self.Lbox/10: 
+                if r > (units.Mpc/self.h)*self.Lbox/10:
                     int_xi+=du*large_scale_model(r.value)
                 else:
+
                     int_xi+=du*(np.power(10, \
                                 xi_interp(np.log10(r.value))))
-            wt[bin_no] = int_xi.to("Mpc").value
+            wt[bin_no] = int_xi.to("Mpc").value/self.h
 
         #Currently this doesn't work cuz you can't pickle the integrate_xi function.
         #I'll just ignore for now. This is why i'm making an emulator anyway
@@ -1025,6 +1025,7 @@ class Cat(object):
     def calc_ds(self,rp_bins, n_cores='all'):
         """
         Calculate delta sigma, from a given galaxy and particle sample
+        Returns in units of h*M_sun/pc^2, so be wary! 
         :param rp_bins:
             The projected radial binning in Mpc
         :param n_cores:
@@ -1033,7 +1034,7 @@ class Cat(object):
             delta sigma, a numpy array of size (rp_bins.shape[0]-1,)
         """
         try:
-            assert hasattr(self, "_downsampling_factor")
+            assert hasattr(self, "_downsample_factor")
         except AssertionError:
             raise AssertionError("The catalog loaded doesn't have a downsampling factor."
                                  "Make sure you load particles to calculate delta_sigma.")
@@ -1045,6 +1046,9 @@ class Cat(object):
         x_m, y_m, z_m = [self.halocat.ptcl_table[c] for c in ['x', 'y', 'z']]
         pos_m = return_xyz_formatted_array(x_m, y_m, z_m, period=self.Lbox)
 
-        return delta_sigma(pos_g * self.h,pos_m*self.h, self.pmass*self.h,
-                           downsampling_factor = self.downsampling_factor, rp_bins = rp_bins,
-                           period=self.Lbox * self.h, num_threads=n_cores)[1]
+        #Halotools wnats downsampling factor defined oppositley
+        #TODO verify little h!
+        # TODO maybe split into a few lines for clarity
+        return self.h*delta_sigma(pos_g / self.h,pos_m*self.h, self.pmass*self.h,
+                           downsampling_factor = 1./self._downsample_factor, rp_bins = rp_bins,
+                           period=self.Lbox / self.h, num_threads=n_cores,cosmology = self.cosmology)[1]/(1e12)
