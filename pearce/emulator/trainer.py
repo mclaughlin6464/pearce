@@ -355,19 +355,16 @@ class Trainer(object):
                     del last_cat.halocat
                     del last_cat.model
 
-                print 'Get cat'
                 cat = self.cats[cosmo_idx]
 
                 scale_factor = self._scale_factors[scale_factor_idx]
 
-                print 'Load cat'
                 cat.load(scale_factor, HOD= self.hod, particles = self._particles,
                          downsample_factor=self._downsample_factor, hod_kwargs= self._hod_kwargs  )
 
                 calc_observable = self._get_calc_observable(cat)
 
             hod_params = dict(zip(self._hod_param_names, self._hod_param_vals[hod_idx, :]))
-
             if self._n_repops == 1:
                 cat.populate(hod_params)
                 # TODO this will fail if you don't jackknife when n_repops is 1
