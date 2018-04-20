@@ -34,6 +34,14 @@ try:
 except ImportError:
     CORRFUNC_AVAILABLE = False
 
+try:
+    import pyccl as ccl
+
+    CCL_AVAILABLE = True
+except ImportError:
+    CCL_AVAILABLE = False
+
+
 VALID_HODS = {'redMagic', 'hsabRedMagic','abRedMagic','fsabRedMagic', 'fscabRedMagic','corrRedMagic',\
               'reddick14','hsabReddick14','abReddick14','fsabReddick14', 'fscabReddick14','corrReddick14','stepFunc',\
               'zheng07', 'leauthaud11', 'tinker13', 'hearin15', 'reddick14+redMagic', 'tabulated',\
@@ -959,9 +967,14 @@ class Cat(object):
         TODO docs
         """
         assert 'do_jackknife' not in xi_kwargs
+        try:
+            assert CCL_AVAILABLE
+        except AssertionError:
+            raise AssertionError("CCL is required for calc_wt. Please install, or choose another function.") 
 
         if type(rbins) is list:
             rbins = np.array(rbins)
+
         n_cores = self._check_cores(n_cores)
         xi = self.calc_xi(rbins,do_jackknife=False,n_cores=n_cores, halo=halo, **xi_kwargs)
         rpoints = (rbins[:-1]+rbins[1:])/2.0
@@ -971,17 +984,25 @@ class Cat(object):
             xi[xi<=0] = 1e-3
 
         xi_interp = interp1d(np.log10(rpoints), np.log10(xi))
+        names, vals = self._get_cosmo_param_names_vals()
+        param_dict = { n:v for n,v in zip(names, vals)}
 
-        xi_mm = self.calc_xi_mm(rbins,n_cores=n_cores) 
-        #if precomputed, will just load the cache
-
-        bias2 = np.mean(xi[-3:]/xi_mm[-3:]) #estimate the large scale bias from the box
-        #note i don't use the bias builtin cuz i've already computed xi_gg. 
+        if 'Omega_c' not in param_dict:
+            param_dict['Omega_c'] = param_dict['Omega_m'] - param_dict['Omega_b']
+            del param_dict['Omega_m']
         
-        #Assume xi_mm doesn't go below 0; will fail catastrophically if it does. but if it does we can't hack around it.
-        m,b,_,_,_ =linregress(np.log10(rpoints), np.log10(xi_mm))
+        cosmo = ccl.Cosmology(**param_dict)
 
-        large_scale_model = lambda r: bias2*(10**b)*(r**m) #should i use np.power?
+        big_rbins = np.logspace(1, 2.1, 21)
+        big_rbc = (big_rbins[1:] + big_rbins[:-1])/2.0
+        xi_mm = ccl.correlation_3d(cosmo, self.a, big_rbc)
+
+        #bias2 = np.mean(xi[-3:]/xi_mm[-3:]) #estimate the large scale bias from the box
+        #note i don't use the bias builtin cuz i've already computed xi_gg. 
+
+        xi_mm_interp = interp1d(np.log10(big_rbc), np.log10(xi_mm))
+
+        bias2 = np.power(10, xi_interp(1.2)-xi_mm_interp(1.2))
 
         tpoints = (theta_bins[1:] + theta_bins[:-1])/2.0
         wt = np.zeros_like(tpoints)
@@ -989,9 +1010,11 @@ class Cat(object):
 
         assert tpoints[0]*x.to("Mpc").value/self.h >= rbins[0]
         #ubins = np.linspace(10**-6, 10**4.0, 1001)
-        ubins = np.logspace(-6, 4.0, 1001)
+        ubins = np.logspace(-6, 2.0, 501)
         ubc = (ubins[1:]+ubins[:-1])/2.0
         
+        # TODO this is like this cause of a half-assed attempt at parraleization
+        # this is unesscary now, and could be discarded for a simpler for loop
         def integrate_xi(bin_no):#, w_theta, bin_no, ubc, ubins) 
             int_xi = 0
             t_med = np.radians(tpoints[bin_no])
@@ -1002,10 +1025,14 @@ class Cat(object):
 
                 r = np.sqrt((u**2+(x*t_med)**2))#*cat.h#not sure about the h
 
-                if r > (units.Mpc/self.h)*self.Lbox/10:
-                    int_xi+=du*large_scale_model(r.value)
+                if r > (units.Mpc)*self.Lbox/10:
+                    try:
+                        int_xi+=du*bias2*(np.power(10, \
+                                xi_mm_interp(np.log10(r.value))))
+                    except ValueError:
+                        #interpolation failed
+                        int_xi+=du*0
                 else:
-
                     int_xi+=du*(np.power(10, \
                                 xi_interp(np.log10(r.value))))
             wt[bin_no] = int_xi.to("Mpc").value/self.h
