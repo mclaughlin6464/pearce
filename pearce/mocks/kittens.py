@@ -367,19 +367,19 @@ class TrainingBox(Cat):
         if system == 'ki-ls':
             param_file = '~swmclau2/des/LH_eigenspace_lnA_np7_n40_s556.dat'
         else: #sherlock
-            param_file = '~swmclau2/scratch/TrainingBoxes/LH_eigenspace_lnA_np7_n40_s556.dat'
+            param_file = '/scratch/users/swmclau2/TrainingBoxes/LH_eigenspace_lnA_np7_n40_s556.dat'
 
-        self.cosmo_params = pd.DataFrame.from_csv(param_file, sep = ' ', index_col = None)
+        self.cosmo_params = pd.read_csv(param_file, sep = ' ', index_col = None)
 
         cosmo = self._get_cosmo()
         pmass = 3.98769e10 * cosmo.Om0/(self.cosmo_params.iloc[0]['ombh2']*100*100/(self.cosmo_params.iloc[0]['H0']**2))
 
         self.prim_haloprop_key = 'halo_m200b'
         #locations = {'ki-ls': ['/u/ki/swmclau2/des/testbox_findparents/']}
-        locations = {'ki-ls': ['/nfs/slac/g/ki/ki22/cosmo/beckermr/tinkers_emu/Box0%02d/halos/m200b/',
-                               '/nfs/slac/g/ki/ki23/des/beckermr/tinkers_emu/Box0%02d/halos/m200b/'],
-                     'sherlock': ['/home/swmclau2/scratch/TrainingBoxes/Box0%02d/halos/m200b/',
-                                  '/home/swmclau2/scratch/TrainingBoxes/Box0%02d/halos/m200b/']}
+        locations = {'ki-ls': ['/nfs/slac/g/ki/ki22/cosmo/beckermr/tinkers_emu/Box0%02d/',
+                               '/nfs/slac/g/ki/ki23/des/beckermr/tinkers_emu/Box0%02d/'],
+                     'sherlock': ['/home/swmclau2/scratch/TrainingBoxes/Box0%02d/',
+                                  '/home/swmclau2/scratch/TrainingBoxes/Box0%02d/']}
                       #same place on sherlock
         assert system in locations
         #loc = locations[system][0]
@@ -391,6 +391,9 @@ class TrainingBox(Cat):
             loc = loc_list[0]%(boxno)
         else:
             loc = loc_list[1]%(boxno)
+
+        gadget_loc = loc + 'output/'
+        loc += 'halos/m200b/'
 
         tmp_fnames = ['outbgc2_%d.list' % i for i in xrange(10)]
         #tmp_fnames = ['TestBox00%d-000_out_parents_5.list' % boxno]
@@ -406,7 +409,7 @@ class TrainingBox(Cat):
         version_name = 'most_recent_%d'%boxno
 
         super(TrainingBox, self).__init__(simname=simname, loc=loc, columns_to_keep=columns_to_keep, Lbox=Lbox,
-                                      pmass=pmass, version_name = version_name, cosmo=cosmo, **new_kwargs)
+                                      pmass=pmass, version_name = version_name, cosmo=cosmo,gadget_loc=gadget_loc, **new_kwargs)
 
         cache_locs = {'ki-ls': '/u/ki/swmclau2/des/halocats/hlist_%.2f.list.%s_%d.hdf5',
                       'sherlock': '/scratch/users/swmclau2/halocats/hlist_%.2f.list.%s_%d.hdf5'}

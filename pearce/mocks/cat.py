@@ -80,6 +80,7 @@ class Cat(object):
         # TODO need both loc and filenames?
         # TODO emply filenames does a glob?
         # TODO change 'loc' to dir?
+        # TODO soem of the defaults are bad, there's no point they should be that way (scale_factor, cache_loc) 
         '''
         The main object controlling manipulation and actions on catalogs.
 
@@ -333,7 +334,7 @@ class Cat(object):
         ptcl_catalog.add_ptclcat_to_cache(ptcl_cache_filename, self.simname, self.version_name+'_particle_%.2f'%(-1*np.log10(downsample_factor)), str(downsample_factor),overwrite=True)#TODO would be nice to make a note of the downsampling without having to do some voodoo to get it.
 
 
-    def add_local_density(self, reader, all_particles, radius=[1, 5]):#[1,5,10]
+    def add_local_density(self, reader, all_particles, radius=[1, 5, 10]):#[1,5,10]
         """
         Calculates the local density around each halo and adds it to the halo table, to be cached.
         :param reader:
@@ -868,7 +869,6 @@ class Cat(object):
 
         # could move these last parts ot the decorator or a helper. Ah well.
         n_cores = self._check_cores(n_cores)
-        print 'N cores: %d'%n_cores
 
         if halo:
             x,y,z = [self.model.mock.halo_table[c] for c in ['halo_x', 'halo_y', 'halo_z']]

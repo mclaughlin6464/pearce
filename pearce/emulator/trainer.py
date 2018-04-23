@@ -320,6 +320,9 @@ class Trainer(object):
                     sendbuf[i,:,:] = all_param_idxs[i*n_per_node:(i+1)*n_per_node, :]
                     remainder-=1
 
+            print size, n_per_node, sendbuf.shape, all_param_idxs.shape
+
+
 #        else:
 #            all_param_idxs = None
 
