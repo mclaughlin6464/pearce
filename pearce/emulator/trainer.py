@@ -307,6 +307,8 @@ class Trainer(object):
             
             past_remainder_counter = 0
             # This could be cleaned up to be more readable
+            # I believe this is still broken for weird node #'s
+            # current hack is to make sure hte number of nodes evenly divides the number of HODs*cosmos*sfs
             for i in xrange(size):
                 if remainder == 0:
                     if not zero_remainder: # initially, after we used it as a counter
@@ -320,7 +322,6 @@ class Trainer(object):
                     sendbuf[i,:,:] = all_param_idxs[i*n_per_node:(i+1)*n_per_node, :]
                     remainder-=1
 
-            print size, n_per_node, sendbuf.shape, all_param_idxs.shape
 
 
 #        else:
@@ -329,6 +330,7 @@ class Trainer(object):
         param_idxs= np.empty([n_per_node, 3], dtype = 'i')
         #all_param_idxs = comm.scatter(all_param_idxs, root=0)
         comm.Scatter(sendbuf, param_idxs, root = 0)
+
 
 
         #print all_param_idxs
