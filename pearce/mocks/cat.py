@@ -1006,7 +1006,7 @@ class Cat(object):
 
         tpoints = (theta_bins[1:] + theta_bins[:-1])/2.0
         wt = np.zeros_like(tpoints)
-        x = self.cosmology.comoving_distance(self.z)*self.a/self.h
+        x = self.cosmology.comoving_distance(self.z)/self.h
 
         assert tpoints[0]*x.to("Mpc").value/self.h >= rbins[0]
         #ubins = np.linspace(10**-6, 10**4.0, 1001)
@@ -1020,8 +1020,8 @@ class Cat(object):
             t_med = np.radians(tpoints[bin_no])
             for ubin_no, _u in enumerate(ubc):
                 _du = ubins[ubin_no+1]-ubins[ubin_no]
-                u = _u*units.Mpc*self.a/self.h
-                du = _du*units.Mpc*self.a/self.h
+                u = _u*units.Mpc/self.h
+                du = _du*units.Mpc/self.h
 
                 r = np.sqrt((u**2+(x*t_med)**2))#*cat.h#not sure about the h
 
