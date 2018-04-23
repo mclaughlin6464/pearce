@@ -283,7 +283,7 @@ class Cat(object):
             if add_local_density or add_particles:
                 particles = self._read_particles(snapdir, downsample_factor=downsample_factor)
                 if add_local_density:
-                    self.add_local_density(reader, particles)  # TODO how to add radius?
+                    self.add_local_density(reader, particles, downsample_factor)  # TODO how to add radius?
 
             reader.write_to_disk()  # do these after so we have a halo table to work off of
             reader.update_cache_log()
@@ -334,7 +334,7 @@ class Cat(object):
         ptcl_catalog.add_ptclcat_to_cache(ptcl_cache_filename, self.simname, self.version_name+'_particle_%.2f'%(-1*np.log10(downsample_factor)), str(downsample_factor),overwrite=True)#TODO would be nice to make a note of the downsampling without having to do some voodoo to get it.
 
 
-    def add_local_density(self, reader, all_particles, radius=[1, 5, 10]):#[1,5,10]
+    def add_local_density(self, reader, all_particles,downsample_factor = 1e-3, radius=[1, 5, 10]):#[1,5,10]
         """
         Calculates the local density around each halo and adds it to the halo table, to be cached.
         :param reader:
@@ -358,7 +358,7 @@ class Cat(object):
 
         with fast3tree(all_particles) as tree:
             for r_idx, r in enumerate(radius):
-                densities[:, r_idx] = densities[:, r_idx]/ (p * 4 * np.pi / 3 * r ** 3)
+                densities[:, r_idx] = densities[:, r_idx]/ (downsample_factor * 4 * np.pi / 3 * r ** 3)
                 for idx, halo_pos in enumerate(
                         izip(reader.halo_table['halo_x'], reader.halo_table['halo_y'], reader.halo_table['halo_z'])):
                     particle_idxs = tree.query_radius(halo_pos, r, periodic=True)
