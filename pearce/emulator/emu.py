@@ -1111,10 +1111,10 @@ class OriginalRecipe(Emu):
         """
         if self.method == 'gp':
             if gp_errs:
-                mu, cov = self._emulator.predict(self.y, t, mean_only=False)
+                mu, cov = self._emulator.predict(self.y, t)
                 return mu+self.y_hat, np.diag(cov)
             else:
-                return self._emulator.predict(self.y, t, mean_only=True)+self.y_hat
+                return self._emulator.predict(self.y, t, return_cov=False)+self.y_hat
         else:
             return self._emulator.predict(t)+self.y_hat
 
@@ -1336,7 +1336,8 @@ class ExtraCrispy(Emu):
         for _x, _yerr in izip(self.x, self.yerr):
             emulator = george.GP(kernel)
 
-            emulator.compute(_x, _yerr,sort=False,**hyperparams)  # NOTE I'm using a modified version of george!
+            emulator.compute(_x, _yerr,**hyperparams)  # NOTE I'm using a modified version of george!
+
             self._emulators.append(emulator)
 
     def _build_skl(self, hyperparams):
@@ -1381,7 +1382,7 @@ class ExtraCrispy(Emu):
 
         for i, (emulator, _y,_yhat) in enumerate(izip(self._emulators, self.y, self.y_hat)):
             if self.method == 'gp':
-                local_mu, local_cov = emulator.predict(_y, t, mean_only=False)
+                local_mu, local_cov = emulator.predict(_y, t, return_cov=True)
                 local_err = np.sqrt(np.diag(local_cov))
             else:
                 local_mu = emulator.predict(t)
