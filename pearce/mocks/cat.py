@@ -281,6 +281,7 @@ class Cat(object):
 
         for a, z, fname, cache_fnames, snapdir in izip(self.scale_factors, self.redshifts, self.filenames, self.cache_filenames, snapdirs):
             # TODO get right reader for each halofinder.
+            print a,z
             if scale_factors != 'all' and a not in scale_factors:
                 continue
             reader = RockstarHlistReader(fname, self.columns_to_keep, cache_fnames, self.simname,
@@ -310,6 +311,7 @@ class Cat(object):
         from .readGadgetSnapshot import readGadgetSnapshot
         assert 0<= downsample_factor <=1
         np.random.seed(0)
+        print 'howdy'
         all_particles = np.array([], dtype='float32')
         # TODO should fail gracefully if memory is exceeded or if p is too small.
         for file in glob(path.join(snapdir, 'snapshot*')):
@@ -356,6 +358,7 @@ class Cat(object):
         #Possible this will be slow
 
         from fast3tree import fast3tree
+        print 'hi'
 
         if type(radius) == float:
             radius = np.array([radius])
@@ -365,6 +368,7 @@ class Cat(object):
 
         with fast3tree(all_particles) as tree:
             for r_idx, r in enumerate(radius):
+                print r_idx, r
                 densities[:, r_idx] = densities[:, r_idx]/ (p * 4 * np.pi / 3 * r ** 3)
                 for idx, halo_pos in enumerate(
                         izip(reader.halo_table['halo_x'], reader.halo_table['halo_y'], reader.halo_table['halo_z'])):
