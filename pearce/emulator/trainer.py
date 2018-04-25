@@ -309,6 +309,7 @@ class Trainer(object):
             # This could be cleaned up to be more readable
             # I believe this is still broken for weird node #'s
             # current hack is to make sure hte number of nodes evenly divides the number of HODs*cosmos*sfs
+            #print size, n_per_node, remainder, n_combos 
             for i in xrange(size):
                 if remainder == 0:
                     if not zero_remainder: # initially, after we used it as a counter
@@ -321,7 +322,8 @@ class Trainer(object):
                 else:
                     sendbuf[i,:,:] = all_param_idxs[i*n_per_node:(i+1)*n_per_node, :]
                     remainder-=1
-
+            
+                #print sendbuf[i]
 
 
 #        else:
@@ -331,7 +333,9 @@ class Trainer(object):
         #all_param_idxs = comm.scatter(all_param_idxs, root=0)
         comm.Scatter(sendbuf, param_idxs, root = 0)
 
-
+        #print '*'*50
+        #print rank, param_idxs
+        #print '-'*50
 
         #print all_param_idxs
 
@@ -347,10 +351,11 @@ class Trainer(object):
         last_cosmo_idx, last_scale_factor_idx = -1, -1
         t0 = time()
         for output_idx, (cosmo_idx, scale_factor_idx, hod_idx) in enumerate(param_idxs):
+            #pass
             print 'Rank: %d, Cosmo: %d, Scale_Factor: %d, HOD: %d'%(rank, cosmo_idx, scale_factor_idx, hod_idx)
             print 'Time: %.2f'%(time()- t0)
             print '*'*30
-
+            #continue
             if any(idx == -1 for idx in [cosmo_idx, scale_factor_idx, hod_idx]):
                 continue # skip these placeholders
             if last_cosmo_idx != cosmo_idx or last_scale_factor_idx != scale_factor_idx:
@@ -370,6 +375,7 @@ class Trainer(object):
                 calc_observable = self._get_calc_observable(cat)
 
             hod_params = dict(zip(self._hod_param_names, self._hod_param_vals[hod_idx, :]))
+            #continue
             if self._n_repops == 1:
                 cat.populate(hod_params)
                 # TODO this will fail if you don't jackknife when n_repops is 1
@@ -391,7 +397,9 @@ class Trainer(object):
 
             last_cosmo_idx = cosmo_idx
             last_scale_factor_idx = scale_factor_idx
-
+        #print '#'*30
+        #print rank, output
+        #print '%'*30
         # TODO, someday, glorious parallel hdf5.
         # the "gather" should at max collect 16mb, so it may not be sooo bad.
         #f = h5py.File(self.output_fname, 'w', driver='mpio', comm=comm)
@@ -411,6 +419,7 @@ class Trainer(object):
 
 
         if rank == 0:
+        #    print rank, all_output
             # wrap things up in the final process
             if self.n_bins == 1:
                 all_output = all_output.reshape((-1,))

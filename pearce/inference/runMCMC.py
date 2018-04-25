@@ -74,7 +74,7 @@ def lnlike(theta, param_names, fixed_params, r_bin_centers, y, combined_inv_cov,
 
     chi2 = -0.5 * np.dot(delta, np.dot(combined_inv_cov, delta))
 
-    return chi2 - 0.5 * ((obs_nd - getattr(_cat, nd_func_name)(param_dict)) / obs_nd_err) ** 2
+    return chi2# - 0.5 * ((obs_nd - getattr(_cat, nd_func_name)(param_dict)) / obs_nd_err) ** 2
 
 
 def lnprob(theta, *args):
