@@ -65,7 +65,8 @@ def lnlike(theta, param_names, fixed_params, r_bin_centers, y, combined_inv_cov,
     y_bar = _emu.emulate_wrt_r(param_dict, r_bin_centers)[0]
     # should chi2 be calculated in log or linear?
     # answer: the user is responsible for taking the log before it comes here.
-    delta = y_bar - y
+    #delta = y_bar - y
+    delta = np.log10(y_bar) - np.log10(y)
     #print y_bar
     #print y
     #print getattr(_cat, nd_func_name)(param_dict)
@@ -74,7 +75,7 @@ def lnlike(theta, param_names, fixed_params, r_bin_centers, y, combined_inv_cov,
 
     chi2 = -0.5 * np.dot(delta, np.dot(combined_inv_cov, delta))
 
-    return chi2 - 0.5 * ((obs_nd - getattr(_cat, nd_func_name)(param_dict)) / obs_nd_err) ** 2
+    return chi2# - 0.5 * ((obs_nd - getattr(_cat, nd_func_name)(param_dict)) / obs_nd_err) ** 2
 
 
 def lnprob(theta, *args):
@@ -287,6 +288,7 @@ def run_mcmc_iterator(emu, cat, param_names, y, cov, r_bin_centers, obs_nd, obs_
     num_params = len(param_names)
 
     combined_inv_cov = inv(np.diag(_emu.ycov) + cov)
+
     #combined_inv_cov = inv(cov)
 
 
