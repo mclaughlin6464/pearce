@@ -289,27 +289,35 @@ class Trainer(object):
 
         # TODO since these are numpy objects, could be communicated more efficiently
         # since they're small and its only once, I don't think it matters much.
-        sendbuf = None
-        all_param_idxs = np.array(list(product(xrange(len(self.cats)), xrange(len(self._scale_factors)),
-                                    xrange(self._hod_param_vals.shape[0]))))
-        n_combos = len(all_param_idxs)
-        n_per_node = n_combos/size
-        remainder = n_combos%size
+        #sendbuf = None
+        #all_param_idxs = np.array(list(product(xrange(len(self.cats)), xrange(len(self._scale_factors)),
+        #                            xrange(self._hod_param_vals.shape[0]))))
+        #n_combos = len(all_param_idxs)
+        #n_per_node = n_combos/size
+        #remainder = n_combos%size
 
 
         if rank == 0:
+            all_param_idxs = np.array(list(product(xrange(len(self.cats)), xrange(len(self._scale_factors)),
+                                    xrange(self._hod_param_vals.shape[0]))))
+
+            n_combos = len(all_param_idxs)
+            n_per_node = n_combos/size
+            remainder = n_combos%size
+
 
             zero_remainder = remainder == 0
             if not zero_remainder:
                 n_per_node +=1
 
-            sendbuf = np.empty([size, n_per_node, 3], dtype = 'i')
+            sendbuf = np.zeros([size, n_per_node, 3], dtype = 'i')
             
             past_remainder_counter = 0
             # This could be cleaned up to be more readable
             # I believe this is still broken for weird node #'s
             # current hack is to make sure hte number of nodes evenly divides the number of HODs*cosmos*sfs
             #print size, n_per_node, remainder, n_combos 
+
             for i in xrange(size):
                 if remainder == 0:
                     if not zero_remainder: # initially, after we used it as a counter
@@ -325,17 +333,17 @@ class Trainer(object):
             
                 #print sendbuf[i]
 
+            all_param_idxs_send = sendbuf
 
-#        else:
-#            all_param_idxs = None
+        else:
+            all_param_idxs_send = None
 
-        param_idxs= np.empty([n_per_node, 3], dtype = 'i')
-        #all_param_idxs = comm.scatter(all_param_idxs, root=0)
-        comm.Scatter(sendbuf, param_idxs, root = 0)
+        #param_idxs= np.empty([n_per_node, 3], dtype = 'i')
+        #comm.barrier()
+        param_idxs = comm.scatter(all_param_idxs_send, root=0)
+        #param_idxs = all_param_idxs_send[rank]
+        #comm.Scatter(sendbuf, param_idxs, root = 0)
 
-        #print '*'*50
-        #print rank, param_idxs
-        #print '-'*50
 
         #print all_param_idxs
 
@@ -459,3 +467,5 @@ if __name__ == '__main__':
 
     trainer = Trainer(config_fname)
     trainer.run(comm)
+
+
