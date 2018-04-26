@@ -65,7 +65,9 @@ def lnlike(theta, param_names, fixed_params, r_bin_centers, y, combined_inv_cov,
     y_bar = _emu.emulate_wrt_r(param_dict, r_bin_centers)[0]
     # should chi2 be calculated in log or linear?
     # answer: the user is responsible for taking the log before it comes here.
-    delta = y_bar - y
+    print y_bar
+    print y
+    delta = np.log10(y_bar) - np.log10(y)
     #print y_bar
     #print y
     #print getattr(_cat, nd_func_name)(param_dict)
