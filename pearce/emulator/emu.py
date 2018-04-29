@@ -268,9 +268,9 @@ class Emu(object):
         # in general, the full cov matrix will be too big, and we won't need it. store the diagonal, and
         # an average
         split_ycov = np.dsplit(ycov, ycov.shape[-1])
-        fullcov = block_diag(*[yc[:,:,0] for yc in split_ycov])
-        yerr = np.sqrt(np.diag(fullcov))
-        self.yerr = np.hstack([yerr for i in xrange(self.x.shape[0] / fullcov.shape[0])])
+        #fullcov = block_diag(*[yc[:,:,0] for yc in split_ycov])
+        self.yerr = np.sqrt(np.hstack(np.diag(syc[:,:,0]) for syc in split_ycov))
+        #self.yerr = np.hstack([yerr for i in xrange(self.x.shape[0] / fullcov.shape[0])])
 
 
         #compute the average covaraince matrix
@@ -789,6 +789,66 @@ class Emu(object):
 
         return np.diag(rms_err ** 2)
 
+    def hyperparam_random_grid_search(self, N, param_dist=None):
+        """
+        """
+        # TODO docs
+        if self.method == 'gp':
+            return self._kernel_random_grid_search(N, param_dist)
+        else:
+            #return self._skl_random_grid_search(N, param_dist)
+            raise NotImplementedError
+
+    def _kernel_random_grid_search(self,N, param_dist):
+        """
+        """
+        # TODO docs
+        param_names = self.get_param_names()
+        param_names.append('amp') #dont forget!
+        if param_dist is None: #default, do every parameter over a large range
+            param_ranges = [(-6, 6) for p in param_names]
+            param_dist = OrderedDict(zip(param_names, param_ranges))
+            fixed_param_names = []
+        else:
+            # not all the parameters, hold some fixed? ugh. 
+            if type(param_dist) is not OrderedDict:
+                param_dist = OrderedDict(param_dist)
+            param_names = param_dist.keys()
+            assert all(up in set(param_names) for up in user_param_names)
+            fixed_param_names = list(set(param_names) - set(user_param_names))
+
+
+        np.random.seed(int(time()))
+
+        points = []
+                                                                                                                                            # by linspacing each parameter and shuffling, I ensure there is only one point in each row, in each dimension.
+        # TODO  min max LHC?
+        for plow, phigh in param_dist.itervalues():
+            point = np.logspace(plow, phigh, num=N)
+            np.random.shuffle(point)  # makes the cube random.
+            points.append(point)
+
+        LHC = np.stack(points).T
+
+        ig = self._get_initial_guess(self.independent_variable)
+
+        likelihoods = np.zeros
+        for i, point in enumerate(LHC):
+            metric = dict(zip(param_names,point)) 
+
+            for fixed_param in fixed_param_names:
+                metric[fixed_param] = ig[fixed_param]
+
+            self._build_gp({'metric': metric})
+            ll, _ = self._emulator_lnlikelihood()
+            likelihoods[i] = ll
+
+        self._build_gp() #rebuild the default
+
+        sorted_idxs = np.argsort(likelihoods)[::-1]
+        return likelihoods[sorted_idxs], LHC[sorted_idxs] 
+
+
     # only predicts wrt r. don't know if that's an ihmssue.
     def goodness_of_fit(self, truth_dir, N=None, statistic='r2'):
         """
@@ -862,7 +922,11 @@ class Emu(object):
             return (10 ** pred_y - 10 ** y) / (10 ** y)
 
     @abstractmethod
-    def train_metric(self, **kwargs):
+    def _emulator_lnlikelihood(self):
+        pass
+
+    @abstractmethod
+    def train_metric(self,p0, **kwargs):
         pass
 
     # TODO this feature is not super useful anymore, and also is poorly defined w.r.t non gp methods.
@@ -998,7 +1062,20 @@ class OriginalRecipe(Emu):
         else:
             return self._emulator.predict(t) + self.y_hat
 
-    def train_metric(self, **kwargs):
+    def _emulator_lnlikelihood(self):
+        """
+        """
+        # TODO docs
+        assert self.method == 'gp'
+
+        ll = self._emulator.lnlikelihood(self.y, quiet=True)
+        
+        ll = ll if np.isfinite(ll) else -1e25
+
+        return ll, -self._emulator.grad_lnlikelihood(self.y, quiet=True)
+
+
+    def train_metric(self,p0=None, **kwargs):
         """
         Train the metric parameters of the GP. Has a spotty record of working.
         Best used as used in lowDimTraining.
@@ -1027,7 +1104,9 @@ class OriginalRecipe(Emu):
             self._emulator.kernel[:] = p
             return -self._emulator.grad_lnlikelihood(self.y, quiet=True)
 
-        p0 = self._emulator.kernel.vector
+        if p0 is None:
+            p0 = self._emulator.kernel.vector
+
         results = op.minimize(nll, p0, jac=grad_nll, **kwargs)
         # results = op.minimize(nll, p0, jac=grad_nll, method='TNC', bounds =\
         #   [(np.log(0.01), np.log(10)) for i in xrange(ndim+1)],options={'maxiter':50})
@@ -1036,7 +1115,7 @@ class OriginalRecipe(Emu):
         self._emulator.recompute()
         # self.metric = np.exp(results.x)
 
-        return results.success
+        return results
 
 
 def get_leaves(kdtree):
@@ -1284,8 +1363,28 @@ class ExtraCrispy(Emu):
             return combined_mu
         return combined_mu, np.sqrt(combined_var)
 
+    def _emulator_lnlikelihood(self):
+        """
+        """
+        assert self.method == 'gp'
+
+        ll = 0
+        for emulator, _y in izip(self._emulators, self.y):
+            ll += emulator.lnlikelihood(_y, quiet=True)
+
+            # The scipy optimizer doesn't play well with infinities.
+        ll = ll if np.isfinite(ll) else -1e25
+
+        # Update the kernel parameters and compute the likelihood.
+        gll = 0
+        for emulator, _y in izip(self._emulators, self.y):
+            gll += emulator.grad_lnlikelihood(_y, quiet=True)
+
+        return ll, gll
+
+
     # TODO could make this learn the metric for other kernel based emulators...
-    def train_metric(self, **kwargs):
+    def train_metric(self, p0=None,  **kwargs):
         """
         Train the emulator. Has a spotty record of working. Better luck may be had with the NAMEME code.
         :param kwargs:
@@ -1318,7 +1417,9 @@ class ExtraCrispy(Emu):
                 gll += emulator.grad_lnlikelihood(_y, quiet=True)
             return -gll
 
-        p0 = self._emulators[0].kernel.vector
+        if p0 is None:
+            p0 = self._emulators[0].kernel.vector
+
         results = op.minimize(nll, p0, jac=grad_nll, **kwargs)
         # results = op.minimize(nll, p0, jac=grad_nll, method='TNC', bounds =\
         #   [(np.log(0.01), np.log(10)) for i in xrange(ndim+1)],options={'maxiter':50})
@@ -1327,4 +1428,4 @@ class ExtraCrispy(Emu):
             emulator.kernel[:] = results.x
             emulator.recompute()
 
-        return results.success
+        return results

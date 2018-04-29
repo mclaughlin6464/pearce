@@ -177,6 +177,7 @@ class Chinchilla(Cat):
             tmp_scale_factors = [float(fname[6:-5]) for fname in tmp_fnames]  # pull out scale factors
 
         # if the user passed in stuff, have to check a bunch of things
+        self.npart = npart
         self._update_lists(kwargs, tmp_fnames, tmp_scale_factors)
 
         new_kwargs = kwargs.copy()
@@ -363,6 +364,7 @@ class TrainingBox(Cat):
         columns_to_keep['halo_rvir'] = (5, 'f4')
 
         Lbox = 1050.0  # Mpc/h
+        self.npart = 1400
         # Need to make a way to combine all the params
         if system == 'ki-ls':
             param_file = '~swmclau2/des/LH_eigenspace_lnA_np7_n40_s556.dat'

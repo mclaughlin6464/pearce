@@ -273,8 +273,8 @@ class Cat(object):
             snapdirs = ['' for i in self.scale_factors]
 
         for a, z, fname, cache_fnames, snapdir in izip(self.scale_factors, self.redshifts, self.filenames, self.cache_filenames, snapdirs):
+            print a,z
             # TODO get right reader for each halofinder.
-            print self.boxno, a
             if scale_factors != 'all' and a not in scale_factors:
                 continue
             reader = RockstarHlistReader(fname, self.columns_to_keep, cache_fnames, self.simname,
@@ -303,7 +303,8 @@ class Cat(object):
         """
         from .readGadgetSnapshot import readGadgetSnapshot
         assert 0<= downsample_factor <=1
-        np.random.seed(0)
+        from time import time
+        np.random.seed(int(time())) # TODO pass in seed?
         all_particles = np.array([], dtype='float32')
         # TODO should fail gracefully if memory is exceeded or if p is too small.
         for file in glob(path.join(snapdir, 'snapshot*')):
@@ -335,7 +336,7 @@ class Cat(object):
         ptcl_catalog.add_ptclcat_to_cache(ptcl_cache_filename, self.simname, self.version_name+'_particle_%.2f'%(-1*np.log10(downsample_factor)), str(downsample_factor),overwrite=True)#TODO would be nice to make a note of the downsampling without having to do some voodoo to get it.
 
 
-    def add_local_density(self, reader, all_particles,downsample_factor = 1e-3, radius=[1, 5, 10]):#[1,5,10]
+    def add_local_density(self, reader, all_particles, downsample_factor = 1e-3, radius=[1, 5, 10]):#[1,5,10]
         """
         Calculates the local density around each halo and adds it to the halo table, to be cached.
         :param reader:
@@ -348,25 +349,28 @@ class Cat(object):
         """
         #doing imports here since these are both files i've stolen from Yao
         #Possible this will be slow
-
         from fast3tree import fast3tree
 
         if type(radius) == float:
             radius = np.array([radius])
         elif type(radius) == list:
             radius = np.array(radius)
-        densities = np.ones((reader.halo_table['halo_x'].shape[0], radius.shape[0]))
+        densities = np.zeros((reader.halo_table['halo_x'].shape[0], radius.shape[0]))
+
+        mean_particle_density = downsample_factor*(self.npart/self.Lbox)**3
 
         with fast3tree(all_particles) as tree:
             for r_idx, r in enumerate(radius):
-                print r_idx, r
-                densities[:, r_idx] = densities[:, r_idx]/ (downsample_factor * 4 * np.pi / 3 * r ** 3)
+                print  'Calculating Densities for radius %d'%r
+                #densities[:, r_idx] = densities[:, r_idx]/ (downsample_factor * 4 * np.pi / 3 * r ** 3)
                 for idx, halo_pos in enumerate(
                         izip(reader.halo_table['halo_x'], reader.halo_table['halo_y'], reader.halo_table['halo_z'])):
+                    #print idx
                     particle_idxs = tree.query_radius(halo_pos, r, periodic=True)
-                    densities[idx,r_idx] *= reader.particle_mass * len(particle_idxs)
+                    densities[idx,r_idx] += len(particle_idxs)
 
-            reader.halo_table['halo_local_density_%d'%(int(r))] = densities[:, r_idx]
+                volume = (4 *np.pi/3 * r**3)
+                reader.halo_table['halo_local_density_%d'%(int(r))] = densities[:, r_idx]/(volume*mean_particle_density)
     # adding **kwargs cuz some invalid things can be passed in, hopefully not a pain
     # TODO some sort of spell check in the input file
     def load(self, scale_factor, HOD='redMagic', tol=0.05,particles=False,downsample_factor=1e-3, hod_kwargs = {}, **kwargs):
@@ -405,13 +409,13 @@ class Cat(object):
         if not particles:
             self.halocat = CachedHaloCatalog(simname=self.simname, halo_finder=self.halo_finder,
                                              version_name=self.version_name,
-                                            redshift=z, dz_tol=0.1)
+                                            redshift=z, dz_tol=tol)
         else:
             self._downsample_factor = downsample_factor
             self.halocat = CachedHaloCatalog(simname=self.simname, halo_finder=self.halo_finder,
                                          version_name=self.version_name,
                                          ptcl_version_name=self.version_name+'_particle_%.2f'%(-1*np.log10(downsample_factor)),
-                                            redshift=z, dz_tol = 0.1)
+                                            redshift=z, dz_tol = tol)
         # refelct the current catalog
         self.z = z
         self.a = a

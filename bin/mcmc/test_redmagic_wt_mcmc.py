@@ -18,12 +18,12 @@ a = 0.81120
 z = 1.0/a-1.0
 load_fixed_params = {'z':z}
 
-emu = ExtraCrispy(training_dir,10, 2, split_method, method=em_method, fixed_params=load_fixed_params)
+#emu = ExtraCrispy(training_dir,10, 2, split_method, method=em_method, fixed_params=load_fixed_params)
 
 #Remember if training data is an LHC can't load a fixed set, do that after
 #fixed_params = {'f_c':1.0}#,'logM1': 13.8 }# 'z':0.0}
 
-cosmo_params = {'simname':'chinchilla', 'Lbox':400.0, 'scale_factors':[a],'system':'sherlock'}
+cosmo_params = {'simname':'chinchilla', 'Lbox':400.0, 'scale_factors':[a],'system':'ki-ls'}
 cat = cat_dict[cosmo_params['simname']](**cosmo_params)#construct the specified catalog!
 #cat.load(a, HOD='hsabRedMagic')
 cat.load_catalog(a, tol=0.01, check_sf=False, particles = False)
@@ -45,36 +45,42 @@ fixed_params = {}
 #em_params.update(fixed_params)
 #del em_params['z']
 theta_bins = np.logspace(np.log10(2.5), np.log10(250), 21)/60
-#tpoints = (theta_bins[1:]+theta_bins[:-1])/2
-tpoints = emu.scale_bin_centers
+tpoints = (theta_bins[1:]+theta_bins[:-1])/2
+#tpoints = emu.scale_bin_centers
 
 W = 0.00275848072207
 rbins = np.array( [0.31622777, 0.44326829, 0.62134575, 0.87096359, 1.22086225, 1.7113283, 2.39883292, 3.36253386, 4.71338954, 6.60693448, 9.26118728,  12.98175275, 18.19700859,  25.50742784,  35.75471605,  50.11872336])
 
-#wt_vals = []
-#nds = []
-#for i in xrange(5):
-#    cat.populate(em_params)
-#    wt_vals.append(cat.calc_wt(theta_bins, rbins = rbins, W=W))
-#    nds.append(cat.calc_number_density())
+wt_vals = []
+nds = []
+for i in xrange(25):
+    cat.populate(em_params)
+    wt_vals.append(cat.calc_wt(theta_bins, rbins = rbins, W=W))
+    nds.append(cat.calc_number_density())
 #y = np.mean(np.log10(np.array(wp_vals)),axis = 0 )
 y = np.loadtxt('buzzard2_wt_11.npy')
 # TODO need a way to get a measurement cov for the shams
 cov = np.cov(np.array(wt_vals).T)#/np.sqrt(50)
 #cov = np.loadtxt('wt_11_cov.npy')
-#cov = np.cov(np.array(wt_vals).T)#/np.sqrt(50)
-#np.savetxt('wt_11_cov.npy', cov)
+cov = np.cov(np.array(wt_vals).T)#/np.sqrt(50)
+np.savetxt('wt_11_cov.npy', cov)
+
+log_cov = np.cov(np.array(np.log10(wt_vals)).T)#/np.sqrt(50)
+np.savetxt('wt_11_log_cov.npy', log_cov)
+
 #from sys import exit
 #exit(0)
 #obs_nd = np.mean(np.array(nds))
 obs_nd = np.loadtxt('buzzard2_nd_11.npy')
-#obs_nd_err = np.std(np.array(nds))
-obs_nd_err = 1e-3
+obs_nd_err = np.std(np.array(nds))
+
+np.savetxt('nd_11_cov.npy', np.array(obs_nd_err))
+#obs_nd_err = 1e-3
 
 #print cat.calc_analytic_nd(em_params)
 #print cat.calc_number_density(em_params)
-#from sys import exit 
-#exit(0)
+from sys import exit 
+exit(0)
 
 param_names = [k for k in em_params.iterkeys() if k not in fixed_params]
 
