@@ -803,6 +803,7 @@ class Emu(object):
         """
         """
         # TODO docs
+        from sys import stdout
         param_names = self.get_param_names()
         param_names.append('amp') #dont forget!
         if param_dist is None: #default, do every parameter over a large range
@@ -832,18 +833,21 @@ class Emu(object):
 
         ig = self._get_initial_guess(self.independent_variable)
 
-        likelihoods = np.zeros
+        likelihoods = np.zeros((LHC.shape[0],))
+        t0 = time()
         for i, point in enumerate(LHC):
+            print i,point
             metric = dict(zip(param_names,point)) 
 
             for fixed_param in fixed_param_names:
                 metric[fixed_param] = ig[fixed_param]
-
             self._build_gp({'metric': metric})
             ll, _ = self._emulator_lnlikelihood()
+            print time()-t0
+            stdout.flush()
             likelihoods[i] = ll
 
-        self._build_gp() #rebuild the default
+        self._build_gp({}) #rebuild the default
 
         sorted_idxs = np.argsort(likelihoods)[::-1]
         return likelihoods[sorted_idxs], LHC[sorted_idxs] 
@@ -1369,16 +1373,15 @@ class ExtraCrispy(Emu):
         assert self.method == 'gp'
 
         ll = 0
-        for emulator, _y in izip(self._emulators, self.y):
+        gll = 0
+        for idx, (emulator, _y) in enumerate(izip(self._emulators, self.y)):
             ll += emulator.lnlikelihood(_y, quiet=True)
+            gll += emulator.grad_lnlikelihood(_y, quiet=True)
 
-            # The scipy optimizer doesn't play well with infinities.
+        # The scipy optimizer doesn't play well with infinities.
+
         ll = ll if np.isfinite(ll) else -1e25
 
-        # Update the kernel parameters and compute the likelihood.
-        gll = 0
-        for emulator, _y in izip(self._emulators, self.y):
-            gll += emulator.grad_lnlikelihood(_y, quiet=True)
 
         return ll, gll
 

@@ -6,7 +6,7 @@ from pearce.mocks.kittens import cat_dict
 #0.8112
 cat = cat_dict['chinchilla'](400.0, scale_factors = [0.81120,1.0], system = 'ki-ls')
 
-cat.cache(overwrite = True, add_local_density=False, add_particles=False)
+cat.cache(overwrite = True, add_local_density=False, add_particles=True)
 
 from sys import exit
 exit()
