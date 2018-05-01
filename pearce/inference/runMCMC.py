@@ -63,19 +63,18 @@ def lnlike(theta, param_names, fixed_params, r_bin_centers, y, combined_inv_cov,
     #return - 0.5 * ((obs_nd - getattr(_cat, nd_func_name)(param_dict)) / obs_nd_err) ** 2
 
     y_bar = _emu.emulate_wrt_r(param_dict, r_bin_centers)[0]
+    #y_bar = np.log10(y_bar)
     # should chi2 be calculated in log or linear?
     # answer: the user is responsible for taking the log before it comes here.
-    #delta = y_bar - y
-    delta = np.log10(y_bar) - np.log10(y)
-    #print y_bar
-    #print y
+    delta = y_bar - y
+    #delta = np.log10(y_bar) - np.log10(y)
     #print getattr(_cat, nd_func_name)(param_dict)
     #print obs_nd
     #print '*'*10
 
     chi2 = -0.5 * np.dot(delta, np.dot(combined_inv_cov, delta))
 
-    return chi2# - 0.5 * ((obs_nd - getattr(_cat, nd_func_name)(param_dict)) / obs_nd_err) ** 2
+    return chi2 - 0.5 * ((obs_nd - getattr(_cat, nd_func_name)(param_dict)) / obs_nd_err) ** 2
 
 
 def lnprob(theta, *args):
@@ -218,6 +217,7 @@ def run_mcmc(emu, cat, param_names, y, cov, r_bin_centers, obs_nd, obs_nd_err, n
     num_params = len(param_names)
     combined_inv_cov = inv(_emu.ycov + cov)
 
+    
     sampler = mc.EnsembleSampler(nwalkers, num_params, lnprob,
                                  threads=ncores, args=(param_names, fixed_params, r_bin_centers, y, combined_inv_cov, \
                                                        obs_nd, obs_nd_err, nd_func_name))
@@ -287,10 +287,9 @@ def run_mcmc_iterator(emu, cat, param_names, y, cov, r_bin_centers, obs_nd, obs_
     ncores = _run_tests(y, cov, r_bin_centers, param_names, fixed_params, ncores, nd_func_name)
     num_params = len(param_names)
 
-    combined_inv_cov = inv(np.diag(_emu.ycov) + cov)
+    combined_inv_cov = inv(_emu.ycov + cov)
 
     #combined_inv_cov = inv(cov)
-
 
     sampler = mc.EnsembleSampler(nwalkers, num_params, lnprob,
                                  threads=ncores, args=(param_names, fixed_params, r_bin_centers, y, combined_inv_cov, \

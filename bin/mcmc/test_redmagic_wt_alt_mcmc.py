@@ -23,7 +23,7 @@ emu = ExtraCrispy(training_dir,10, 2, split_method, method=em_method, fixed_para
 cosmo_params = {'simname':'chinchilla', 'Lbox':400.0, 'scale_factors':[a],'system':'sherlock'}
 cat = cat_dict[cosmo_params['simname']](**cosmo_params)#construct the specified catalog!
 
-cat.load_catalog(a, tol=0.01, check_sf=False, particles = False)
+cat.load_catalog(a, tol=0.01, check_sf=False)#, particles = True, downsample_factor = 1e-2)
 cat.load_model(a, HOD='hsabRedMagic', check_sf=False)#, hod_kwargs=hod_kwargs)
 
 emulation_point = [('f_c', 0.15), ('logM0', 12.0), ('sigma_logM', 0.266), 
@@ -44,9 +44,9 @@ rbins = np.array( [0.31622777, 0.44326829, 0.62134575, 0.87096359, 1.22086225, 1
 
 #wt_vals = []
 #nds = []
-#for i in xrange(5):
+#for i in xrange(25):
 #    cat.populate(em_params)
-#    wt_vals.append(cat.calc_wt(theta_bins, rbins = rbins, W=W))
+    #wt_vals.append(cat.calc_wt(theta_bins, rbins = rbins, W=W))
 #    nds.append(cat.calc_number_density())
 #y = np.mean(np.log10(np.array(wp_vals)),axis = 0 )
 y = np.loadtxt('buzzard2_wt_11.npy')
@@ -59,19 +59,20 @@ cov = np.loadtxt('wt_11_cov.npy')
 #exit(0)
 #obs_nd = np.mean(np.array(nds))
 obs_nd = np.loadtxt('buzzard2_nd_11.npy')
-#obs_nd_err = np.std(np.array(nds))
-obs_nd_err = 1e-5 
+obs_nd_err = 4.45192206877e-07# np.loadtxt('nd_11_cov.npy')#[0]
+#obs_nd_err = 1e-2
+
 
 param_names = [k for k in em_params.iterkeys() if k not in fixed_params]
 
-nwalkers = 200
+nwalkers = 500
 nsteps = 5000
 nburn = 0 
 
 print 'Chain starting.'
 
 savedir = '/home/users/swmclau2/scratch/PearceMCMC/'
-chain_fname = path.join(savedir,'%d_walkers_%d_steps_chain_wt_alt_fixed_h_redmagic_z%.2f.npy'%(nwalkers, nsteps, z)) 
+chain_fname = path.join(savedir,'%d_walkers_%d_steps_chain_wt_alt_redmagic_z%.2f.npy'%(nwalkers, nsteps, z)) 
 
 with open(chain_fname, 'w') as f:
     f.write('#' + '\t'.join(param_names)+'\n')

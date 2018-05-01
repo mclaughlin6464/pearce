@@ -8,5 +8,5 @@ setup(name='pearce',
         author='Sean McLaughlin',
         author_email='swmclau2@stanford.edu',
         url='https://github.com/mclaughlin6464/pearce',
-        scripts=scripts,
+        #scripts=scripts,
         packages=['pearce', 'pearce.emulator', 'pearce.mocks','pearce.inference'])
