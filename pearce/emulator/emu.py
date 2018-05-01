@@ -544,12 +544,13 @@ class Emu(object):
         elif self.obs == 'wp':
             # TODO parameter name has changed, update
             if independent_variable is None:
-                ig.update({'ombh2': 37.926902, 'omch2': 0.001438, 'w0': 162.377674,
-                            'ns': 8.858668, 'ln10As': 0.000078, 'H0': 0.006158,
-                            'Neff': 0.026367, 'logM1': 0.006158, 'logMmin': 162.377674,
-                            'f_c': 54555.947812 ,'logM0': 8.858668, 'sigma_logM': 2.069138,
-                            'alpha': 695.192796,'r': 0.000078,
-                           'logM1': 1.66509412286, 'amp': 2.06913808111479, 'z': 1.0,
+
+                ig.update({'ombh2': 7.41265e-5, 'omch2': 5.04824e1, 'w0': 1.301436e-2,
+                            'ns': 3.89150886e-4, 'ln10As': 9.83101864, 'H0': 1.5611286e5,
+                            'Neff': 9.71398614e2, 'logM1': 1.148312e-2, 'logMmin': 1.6566059e1,
+                            'f_c': 1.4426e1 ,'logM0': 6.2487e1, 'sigma_logM': 2.32469,
+                            'alpha': 4.5149677,'r': 1.94217e-2,
+                           'amp': 2.9004304, 'z': 1.0,
                            'mean_occupation_satellites_assembias_split1': 21.02835102,
                            'mean_occupation_satellites_assembias_slope1': 225.64738711,
                            'mean_occupation_satellites_assembias_param1': 89.17850468,
