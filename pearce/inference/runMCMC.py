@@ -217,7 +217,6 @@ def run_mcmc(emu, cat, param_names, y, cov, r_bin_centers, obs_nd, obs_nd_err, n
     num_params = len(param_names)
     combined_inv_cov = inv(_emu.ycov + cov)
 
-    
     sampler = mc.EnsembleSampler(nwalkers, num_params, lnprob,
                                  threads=ncores, args=(param_names, fixed_params, r_bin_centers, y, combined_inv_cov, \
                                                        obs_nd, obs_nd_err, nd_func_name))

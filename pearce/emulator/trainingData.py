@@ -157,7 +157,7 @@ def make_sherlock_command(jobname, max_time, outputdir, queue=None):
 
     return 'sbatch %s' % (path.join(outputdir, 'tmp.sbatch'))
 
-
+# TODO replace with a yaml config file, with a better defined schema/docs
 def training_config_reader(filename):
     '''
     Reads specific details of the config file for this usage.
@@ -168,6 +168,8 @@ def training_config_reader(filename):
         Config parameters defined explicitly elsewhere.
     '''
     #TODO need a check that the HOD and params are all kosher
+    # i.e. if hsabRedMagic is the HOD, are all params in that in ordered_params
+    # TODO change these names.
     config = config_reader(filename)
     # I could make some of these have defaults with get()
     # I'm not sure I want to do that.
@@ -194,7 +196,7 @@ def training_config_reader(filename):
         # check simname and scale_factor (the 100% required ones) are in there!
         # if fails, will throw a KeyError
         #TODO turn into a assert
-        cosmo_params['simname']
+        assert 'simname' in cosmo_params
         # TODO change to scale factors?
         cosmo_params['scale_factor'] =literal_eval(cosmo_params['scale_factor'])# [float(a.strip()) for a in sf_str.strip('[ ]').split(',')]
 
@@ -212,6 +214,7 @@ def training_config_reader(filename):
     return method, obs,log_obs, n_points, system, n_jobs, max_time, outputdir, bins, cosmo_params
 
 
+# TODO should parralelize this with mpi, here.
 def make_training_data(config_filename, ordered_params=None):
     '''
     "Main" function. Take a config file as input and send off jobs to compute an observable
@@ -233,6 +236,8 @@ def make_training_data(config_filename, ordered_params=None):
     scale_factors = cosmo_params['scale_factor']
 
     # load one up to test that these scale factors maek sense.
+    # TODO is this necessary? kinda sloppy
+    # may not matter for the future
     cat = cat_dict[cosmo_params['simname']](**cosmo_params)
 
     if scale_factors[0] == 'all':
@@ -260,7 +265,7 @@ def make_training_data(config_filename, ordered_params=None):
         points = makeFHC(ordered_params, n_points)
     else:
         raise ValueError('Invalid method for making training data: %s' % method)
-
+    # TODO won't be necessary in an mpi setting.
     if system == 'ki-ls':
         make_command = make_kils_command
     elif system == 'long':
@@ -318,3 +323,5 @@ def make_training_data(config_filename, ordered_params=None):
         with open(path.join(outputdir, TRAINING_FILE_LOC_FILENAME), 'w') as f:
             pickle.dump(training_file_loc, f)
 
+
+# TODO should have an if __name__ == '__main__' block for when i send this to the cluster

@@ -1,6 +1,6 @@
 from distutils.core import setup
 from glob import glob
-scripts = glob('bin/*/*')
+#scripts = glob('bin/*/*')
 
 setup(name='pearce',
         version='0.1',

@@ -73,7 +73,19 @@ def training_file_loc_reader(dirname, fname=TRAINING_FILE_LOC_FILENAME):
     return training_file_loc
 
 
-def obs_file_reader(corr_file, cov_file=None):
+def obs_file_reader(obs_file):
+    '''
+    Loads data from an individual observation
+    :param obs_file:
+        File with one column that is rp and another that is teh observable (probably wp)
+    :return:
+        obs, an array of shape (nbins, 2) with rbins in the first column and the observable in the second.
+    '''
+    assert path.exists(obs_file)
+    obs = np.loadtxt(obs_file)
+    return obs
+
+def old_obs_file_reader(corr_file, cov_file=None,):
     '''
     A helper function to parse the training data files.
     :param corr_file:
@@ -99,6 +111,7 @@ def obs_file_reader(corr_file, cov_file=None):
         cov = np.loadtxt(cov_file)
 
         return params, obs, cov
+
     return params, obs
 
 

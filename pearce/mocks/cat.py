@@ -88,6 +88,7 @@ class Cat(object):
         # TODO need both loc and filenames?
         # TODO emply filenames does a glob?
         # TODO change 'loc' to dir?
+        # TODO soem of the defaults are bad, there's no point they should be that way (scale_factor, cache_loc)
         '''
         The main object controlling manipulation and actions on catalogs.
 
@@ -214,7 +215,14 @@ class Cat(object):
 
         self.sf_idxs = np.array(sf_idxs)
 
-
+    def _get_cosmo_param_names_vals(self):
+        """
+        Return the names and values of the cosmology parameters
+        :return:
+            names, vals. A list of strings and a list of float values of the parameters
+        """
+        names = ['h', 'Om0', 'Ode0'] # TODO more
+        return names, [self.cosmology.h, self.cosmology.Om0, self.cosmology.Ode0]
 
     def _return_nearest_sf(self, a, tol=0.05):
         '''
@@ -291,7 +299,7 @@ class Cat(object):
             if add_local_density or add_particles:
                 particles = self._read_particles(snapdir, downsample_factor=downsample_factor)
                 if add_local_density:
-                    self.add_local_density(reader, particles)  # TODO how to add radius?
+                    self.add_local_density(reader, particles, downsample_factor)  # TODO how to add radius?
 
             reader.write_to_disk()  # do these after so we have a halo table to work off of
             reader.update_cache_log()
@@ -310,8 +318,7 @@ class Cat(object):
         """
         from .readGadgetSnapshot import readGadgetSnapshot
         assert 0<= downsample_factor <=1
-        np.random.seed(0)
-        print 'howdy'
+        np.random.seed(int(time())) # TODO pass in seed?
         all_particles = np.array([], dtype='float32')
         # TODO should fail gracefully if memory is exceeded or if p is too small.
         for file in glob(path.join(snapdir, 'snapshot*')):
@@ -343,7 +350,7 @@ class Cat(object):
         ptcl_catalog.add_ptclcat_to_cache(ptcl_cache_filename, self.simname, self.version_name+'_particle_%.2f'%(-1*np.log10(downsample_factor)), str(downsample_factor),overwrite=True)#TODO would be nice to make a note of the downsampling without having to do some voodoo to get it.
 
 
-    def add_local_density(self, reader, all_particles, radius=[1, 5]):#[1,5,10]
+    def add_local_density(self, reader, all_particles, downsample_factor = 1e-3, radius=[1, 5, 10]):#[1,5,10]
         """
         Calculates the local density around each halo and adds it to the halo table, to be cached.
         :param reader:
@@ -356,26 +363,28 @@ class Cat(object):
         """
         #doing imports here since these are both files i've stolen from Yao
         #Possible this will be slow
-
         from fast3tree import fast3tree
-        print 'hi'
 
         if type(radius) == float:
             radius = np.array([radius])
         elif type(radius) == list:
             radius = np.array(radius)
-        densities = np.ones((reader.halo_table['halo_x'].shape[0], radius.shape[0]))
+        densities = np.zeros((reader.halo_table['halo_x'].shape[0], radius.shape[0]))
+
+        mean_particle_density = downsample_factor*(self.npart/self.Lbox)**3
 
         with fast3tree(all_particles) as tree:
             for r_idx, r in enumerate(radius):
-                print r_idx, r
-                densities[:, r_idx] = densities[:, r_idx]/ (p * 4 * np.pi / 3 * r ** 3)
+                print  'Calculating Densities for radius %d'%r
+                #densities[:, r_idx] = densities[:, r_idx]/ (downsample_factor * 4 * np.pi / 3 * r ** 3)
                 for idx, halo_pos in enumerate(
                         izip(reader.halo_table['halo_x'], reader.halo_table['halo_y'], reader.halo_table['halo_z'])):
+                    #print idx
                     particle_idxs = tree.query_radius(halo_pos, r, periodic=True)
-                    densities[idx,r_idx] *= reader.particle_mass * len(particle_idxs)
+                    densities[idx,r_idx] += len(particle_idxs)
 
-            reader.halo_table['halo_local_density_%d'%(int(r))] = densities[:, r_idx]
+                volume = (4 *np.pi/3 * r**3)
+                reader.halo_table['halo_local_density_%d'%(int(r))] = densities[:, r_idx]/(volume*mean_particle_density)
     # adding **kwargs cuz some invalid things can be passed in, hopefully not a pain
     # TODO some sort of spell check in the input file
     def load(self, scale_factor, HOD='redMagic', tol=0.05,particles=False,downsample_factor=1e-3, hod_kwargs = {}, **kwargs):
@@ -414,16 +423,17 @@ class Cat(object):
         if not particles:
             self.halocat = CachedHaloCatalog(simname=self.simname, halo_finder=self.halo_finder,
                                              version_name=self.version_name,
-                                            redshift=z, dz_tol=0.01)
+                                            redshift=z, dz_tol=tol)
         else:
             self._downsample_factor = downsample_factor
             self.halocat = CachedHaloCatalog(simname=self.simname, halo_finder=self.halo_finder,
                                          version_name=self.version_name,
                                          ptcl_version_name=self.version_name+'_particle_%.2f'%(-1*np.log10(downsample_factor)),
-                                            redshift=z, dz_tol = 0.01)
+                                            redshift=z, dz_tol = tol)
         # refelct the current catalog
         self.z = z
         self.a = a
+        self.populated_once = False #no way this one's been populated!
 
     # TODO not sure if assembias should be boolean, or keep it as separate HODs?
     def load_model(self, scale_factor, HOD='redMagic', check_sf=True, hod_kwargs={}):
@@ -974,7 +984,7 @@ class Cat(object):
         try:
             assert CCL_AVAILABLE
         except AssertionError:
-            raise AssertionError("CCL is required for calc_wt. Please install, or choose another function.") 
+            raise AssertionError("CCL is required for calc_wt. Please install, or choose another function.")
 
         if type(rbins) is list:
             rbins = np.array(rbins)
@@ -994,7 +1004,7 @@ class Cat(object):
         if 'Omega_c' not in param_dict:
             param_dict['Omega_c'] = param_dict['Omega_m'] - param_dict['Omega_b']
             del param_dict['Omega_m']
-        
+
         cosmo = ccl.Cosmology(**param_dict)
 
         big_rbins = np.logspace(1, 2.1, 21)
@@ -1019,7 +1029,7 @@ class Cat(object):
         
         # TODO this is like this cause of a half-assed attempt at parraleization
         # this is unesscary now, and could be discarded for a simpler for loop
-        def integrate_xi(bin_no):#, w_theta, bin_no, ubc, ubins) 
+        def integrate_xi(bin_no):#, w_theta, bin_no, ubc, ubins)
             int_xi = 0
             t_med = np.radians(tpoints[bin_no])
             for ubin_no, _u in enumerate(ubc):
