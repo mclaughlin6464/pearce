@@ -207,7 +207,14 @@ class Cat(object):
 
         self.sf_idxs = np.array(sf_idxs)
 
-
+    def _get_cosmo_param_names_vals(self):
+        """
+        Return the names and values of the cosmology parameters
+        :return:
+            names, vals. A list of strings and a list of float values of the parameters
+        """
+        names = ['h', 'Om0', 'Ode0'] # TODO more
+        return names, [self.cosmology.h, self.cosmology.Om0, self.cosmology.Ode0]
 
     def _return_nearest_sf(self, a, tol=0.05):
         '''
