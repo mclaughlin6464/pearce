@@ -1,6 +1,6 @@
 ###!/bin/bash
-#BSUB -q long 
-#BSUB -W 72:00
+#BSUB -q medium 
+#BSUB -W 12:00
 #BSUB -J test_redmagic
 #BSUB -oo /u/ki/swmclau2/Git/pearce/bin/mcmc/test_redmagic_wt_mcmc.out    
 #BSUB -n 16 
