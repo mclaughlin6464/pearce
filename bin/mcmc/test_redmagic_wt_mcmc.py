@@ -73,7 +73,7 @@ np.savetxt('wt_11_log_cov.npy', log_cov)
 #obs_nd = np.mean(np.array(nds))
 obs_nd = np.loadtxt('buzzard2_nd_11.npy')
 obs_nd_err = np.std(np.array(nds))
-
+print obs_nd_err
 np.savetxt('nd_11_cov.npy', np.array(obs_nd_err))
 #obs_nd_err = 1e-3
 

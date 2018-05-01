@@ -154,7 +154,7 @@ class Emu(object):
             ordered_params['z'] = (np.min(redshift_bin_centers), np.max(redshift_bin_centers))
 
         if 'r' not in fixed_params:
-            ordered_params['r'] = (np.min(scale_bins), np.max(scale_bins))
+            ordered_params['r'] = (np.log10(np.min(scale_bins)), np.log10(np.max(scale_bins)))
 
         if attach_params: #attach certain parameters to the object
             self.obs = f.attrs['obs']
@@ -225,13 +225,13 @@ class Emu(object):
                         #we hve to transform the data (take a log, multiply, etc)
                         # TODO this may not work with things like r2 anymore
                         _o, _c = self._iv_transform(independent_variable, _obs, _cov)
-                        y.append(np.array([_o[r_idx]]))
+                        y.append(np.log10(np.array([_o[r_idx]])))
                         ycov.append(np.array(_c[r_idx, r_idx]))
 
                     else:
                         _params = np.zeros((scale_bin_centers.shape[0], len(params) + 1))
                         _params[:, :-1] = params
-                        _params[:, -1] = scale_bin_centers
+                        _params[:, -1] = np.log10(scale_bin_centers)
                         x.append(_params)
 
                         _o, _c = self._iv_transform(independent_variable, _obs, _cov)
@@ -543,9 +543,12 @@ class Emu(object):
         elif self.obs == 'wp':
             # TODO parameter name has changed, update
             if independent_variable is None:
-                ig.update({'logMmin': 1.7348042925, 'f_c': 0.327508062386, 'logM0': 15.8416094906,
-                           'sigma_logM': 5.36288382789, 'alpha': 3.63498762588, 'r': 0.306139450843,
-                           'logM1': 1.66509412286, 'amp': 1.18212664544, 'z': 1.0,
+                ig.update({'ombh2': 37.926902, 'omch2': 0.001438, 'w0': 162.377674,
+                            'ns': 8.858668, 'ln10As': 0.000078, 'H0': 0.006158,
+                            'Neff': 0.026367, 'logM1': 0.006158, 'logMmin': 162.377674,
+                            'f_c': 54555.947812 ,'logM0': 8.858668, 'sigma_logM': 2.069138,
+                            'alpha': 695.192796,'r': 0.000078, 
+                           'logM1': 1.66509412286, 'amp': 2.06913808111479, 'z': 1.0,
                            'mean_occupation_satellites_assembias_split1': 21.02835102,
                            'mean_occupation_satellites_assembias_slope1': 225.64738711,
                            'mean_occupation_satellites_assembias_param1': 89.17850468,
@@ -803,6 +806,7 @@ class Emu(object):
         """
         """
         # TODO docs
+        from sys import stdout
         param_names = self.get_param_names()
         param_names.append('amp') #dont forget!
         if param_dist is None: #default, do every parameter over a large range
@@ -832,18 +836,21 @@ class Emu(object):
 
         ig = self._get_initial_guess(self.independent_variable)
 
-        likelihoods = np.zeros
+        likelihoods = np.zeros((LHC.shape[0],))
+        t0 = time()
         for i, point in enumerate(LHC):
+            print i,point
             metric = dict(zip(param_names,point)) 
 
             for fixed_param in fixed_param_names:
                 metric[fixed_param] = ig[fixed_param]
-
             self._build_gp({'metric': metric})
             ll, _ = self._emulator_lnlikelihood()
+            print time()-t0
+            stdout.flush()
             likelihoods[i] = ll
 
-        self._build_gp() #rebuild the default
+        self._build_gp({}) #rebuild the default
 
         sorted_idxs = np.argsort(likelihoods)[::-1]
         return likelihoods[sorted_idxs], LHC[sorted_idxs] 
@@ -1369,16 +1376,15 @@ class ExtraCrispy(Emu):
         assert self.method == 'gp'
 
         ll = 0
-        for emulator, _y in izip(self._emulators, self.y):
+        gll = 0
+        for idx, (emulator, _y) in enumerate(izip(self._emulators, self.y)):
             ll += emulator.lnlikelihood(_y, quiet=True)
+            gll += emulator.grad_lnlikelihood(_y, quiet=True)
 
-            # The scipy optimizer doesn't play well with infinities.
+        # The scipy optimizer doesn't play well with infinities.
+
         ll = ll if np.isfinite(ll) else -1e25
 
-        # Update the kernel parameters and compute the likelihood.
-        gll = 0
-        for emulator, _y in izip(self._emulators, self.y):
-            gll += emulator.grad_lnlikelihood(_y, quiet=True)
 
         return ll, gll
 
