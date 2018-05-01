@@ -20,7 +20,7 @@ emu = ExtraCrispy(training_dir,10, 2, split_method, method=em_method, fixed_para
 #Remember if training data is an LHC can't load a fixed set, do that after
 #fixed_params = {'f_c':1.0}#,'logM1': 13.8 }# 'z':0.0}
 
-cosmo_params = {'simname':'chinchilla', 'Lbox':400.0, 'scale_factors':[a],'system':'sherlock'}
+cosmo_params = {'simname':'chinchilla', 'Lbox':400.0, 'scale_factors':[a]}#,'system':'sherlock'}
 cat = cat_dict[cosmo_params['simname']](**cosmo_params)#construct the specified catalog!
 
 cat.load_catalog(a, tol=0.01, check_sf=False)#, particles = True, downsample_factor = 1e-2)
@@ -77,7 +77,7 @@ chain_fname = path.join(savedir,'%d_walkers_%d_steps_chain_wt_alt_redmagic_z%.2f
 with open(chain_fname, 'w') as f:
     f.write('#' + '\t'.join(param_names)+'\n')
 
-for pos in run_mcmc_iterator(emu, cat, param_names, y, cov, tpoints,obs_nd, obs_nd_err,'calc_analytic_nd', fixed_params = fixed_params,nwalkers = nwalkers, nsteps = nsteps, nburn = nburn, ncores=4):#,\
+for pos in run_mcmc_iterator(emu, cat, param_names, y, cov, tpoints,obs_nd, obs_nd_err,'calc_analytic_nd', fixed_params = fixed_params,nwalkers = nwalkers, nsteps = nsteps, nburn = nburn, ncores=2):#,\
                         #resume_from_previous = '/u/ki/swmclau2/des/PearceMCMC/100_walkers_1000_steps_chain_shuffled_sham.npy')#, ncores = 1)
 
     with open(chain_fname, 'a') as f:

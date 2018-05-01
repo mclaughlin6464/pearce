@@ -189,6 +189,11 @@ class Chinchilla(Cat):
         cache_locs['long'] = cache_locs['ki-ls']
         self.cache_filenames = [cache_locs[system] % (a, self.simname, self.version_name)
                            for a in self.scale_factors]  # make sure we don't have redunancies.
+    def _get_cosmo_param_names_vals(self):
+        # TODO docs
+        names = ['Omega_m', 'Omega_b','h', 'sigma8', 'n_s'] 
+        vals = [0.286, 0.047,self.h, 0.82, 0.96]
+        return names, vals
 
 # TODO consider a name change, as there could be a conflict with the emulator object
 class Emu(Cat):
