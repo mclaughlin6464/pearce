@@ -154,7 +154,7 @@ class Emu(object):
             ordered_params['z'] = (np.min(redshift_bin_centers), np.max(redshift_bin_centers))
 
         if 'r' not in fixed_params:
-            ordered_params['r'] = (np.min(scale_bins), np.max(scale_bins))
+            ordered_params['r'] = (np.log10(np.min(scale_bins)), np.log10(np.max(scale_bins)))
 
         if attach_params: #attach certain parameters to the object
             self.obs = f.attrs['obs']
@@ -225,13 +225,13 @@ class Emu(object):
                         #we hve to transform the data (take a log, multiply, etc)
                         # TODO this may not work with things like r2 anymore
                         _o, _c = self._iv_transform(independent_variable, _obs, _cov)
-                        y.append(np.array([_o[r_idx]]))
+                        y.append(np.log10(np.array([_o[r_idx]])))
                         ycov.append(np.array(_c[r_idx, r_idx]))
 
                     else:
                         _params = np.zeros((scale_bin_centers.shape[0], len(params) + 1))
                         _params[:, :-1] = params
-                        _params[:, -1] = scale_bin_centers
+                        _params[:, -1] = np.log10(scale_bin_centers)
                         x.append(_params)
 
                         _o, _c = self._iv_transform(independent_variable, _obs, _cov)
