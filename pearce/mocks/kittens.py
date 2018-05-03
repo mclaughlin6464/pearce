@@ -379,7 +379,8 @@ class TrainingBox(Cat):
         self.cosmo_params = pd.read_csv(param_file, sep = ' ', index_col = None)
 
         cosmo = self._get_cosmo()
-        pmass = 3.98769e10 * cosmo.Om0/(self.cosmo_params.iloc[0]['ombh2']*100*100/(self.cosmo_params.iloc[0]['H0']**2))
+        pmass = 3.98769e10 * cosmo.Om0/\
+                ((self.cosmo_params.iloc[0]['omch2']+self.cosmo_params.iloc[0]['ombh2'])*100*100/(self.cosmo_params.iloc[0]['H0']**2))
 
         self.prim_haloprop_key = 'halo_m200b'
         #locations = {'ki-ls': ['/u/ki/swmclau2/des/testbox_findparents/']}
@@ -446,23 +447,16 @@ class TrainingBox(Cat):
 
 
 class TestBox(Cat):
-    cosmos = [cosmology.core.FlatwCDM(H0=100 * 0.632317, Om0=0.327876, w0=-0.726513),
-              cosmology.core.FlatwCDM(H0=100 * 0.657317, Om0=0.313825, w0=-0.861513),
-              cosmology.core.FlatwCDM(H0=100 * 0.682317, Om0=0.300915, w0=-0.996513),
-              cosmology.core.FlatwCDM(H0=100 * 0.707317, Om0=0.289014, w0=-1.13151),
-              cosmology.core.FlatwCDM(H0=100 * 0.732317, Om0=0.278009, w0=-1.26651),
-              cosmology.core.FlatwCDM(H0=100 * 0.697317, Om0=0.281939, w0=-1.08911),
-              cosmology.core.FlatwCDM(H0=100 * 0.667317, Om0=0.321332, w0=-0.90392)]
 
     def __init__(self, boxno, realization, system='ki-ls', **kwargs):
 
         #       I'm writing a hack to work for the CMASS catalogs I'm making. I have to do something better in the future.
         # The hack is due to the bgc2 cats not having concetrations, and not being possible to match againts the outlists.
         # I ran findparents on 3 of the catalogs. ALl other catalogs will be in accessible for now
-        assert realization == 0
-        assert 0 <= boxno <= 2
-        #        assert 0<=boxno<=6
-        #        assert 0<=realization<=4
+        #assert realization == 0
+        #assert 0 <= boxno <= 2
+        assert 0<=boxno<=6
+        assert 0<=realization<=4
 
         simname = 'testbox'  # not sure if something with Emu would work better, but wanna separate from Emu..
         columns_to_keep = OUTLIST_COLS.copy()  # OUTLIST_BGC2_COLS
@@ -471,30 +465,40 @@ class TestBox(Cat):
         del columns_to_keep['halo_rvir']
         columns_to_keep['halo_r200b'] = (5, 'f4')
 
-        Lbox = 1050.0  # Mpc
-        cosmo = self.cosmos[boxno]
-        pmass = 3.83914e10 * cosmo.Om0 / self.cosmos[0].Om0
+        Lbox = 1050.0  # Mpc/h
+        self.npart = 1400
+        # Need to make a way to combine all the params
+        if system == 'ki-ls':
+            param_file = '~swmclau2/des/hypercube_test_points_np7.dat'
+        else:  # sherlock
+            param_file = '~swmclau2/scratch/TestBoxes/hypercube_test_points_np7.dat'
+
+        self.cosmo_params = pd.read_csv(param_file, sep=' ', index_col=None)
+
+        cosmo = self._get_cosmo()
+        pmass =  3.83914e10* cosmo.Om0/\
+                ((self.cosmo_params.iloc[0]['omch2']+self.cosmo_params.iloc[0]['ombh2'])*100*100/(self.cosmo_params.iloc[0]['H0']**2))
 
         self.prim_haloprop_key = 'halo_m200b'
-        locations = {'ki-ls': ['/u/ki/swmclau2/des/testbox_findparents/']}
-        #        locations = {'ki-ls': ['/nfs/slac/des/fs1/g/sims/beckermr/tinkers_emu/TestBox00%d-00%d/halos/m200b/',
-        #                               '/nfs/slac/g/ki/ki22/cosmo/beckermr/tinkers_emu/TestBox00%d-00%d/halos/m200b/',
-        #                               '/nfs/slac/g/ki/ki23/des/beckermr/tinkers_emu/TestBox00%d-00%d/halos/m200b/']}
+        #locations = {'ki-ls': ['/u/ki/swmclau2/des/testbox_findparents/']}
+        locations = {'ki-ls': ['/nfs/slac/des/fs1/g/sims/beckermr/tinkers_emu/TestBox00%d-00%d/halos/m200b/',
+                                       '/nfs/slac/g/ki/ki22/cosmo/beckermr/tinkers_emu/TestBox00%d-00%d/halos/m200b/',
+                                       '/nfs/slac/g/ki/ki23/des/beckermr/tinkers_emu/TestBox00%d-00%d/halos/m200b/']}
         assert system in locations
-        loc = locations[system][0]
-        # loc_list = locations[system]
+        #loc = locations[system][0]
+        loc_list = locations[system]
 
-        #        if boxno < 2:
-        #            loc = loc_list[0]%(boxno, realization)
-        #        elif 2 <= boxno < 4:
-        #            loc = loc_list[1]%(boxno, realization)
-        #        else:
-        #            loc = loc_list[2]%(boxno, realization)
+        if boxno < 2:
+            loc = loc_list[0]%(boxno, realization)
+        elif 2 <= boxno < 4:
+            loc = loc_list[1]%(boxno, realization)
+        else:
+            loc = loc_list[2]%(boxno, realization)
 
-        #        tmp_fnames = ['outbgc2_%d.list' % i for i in xrange(10)]
-        tmp_fnames = ['TestBox00%d-000_out_parents_5.list' % boxno]
-        #        tmp_scale_factors = [0.25, 0.333, 0.5, 0.540541, 0.588235, 0.645161, 0.714286, 0.8, 0.909091, 1.0]
-        tmp_scale_factors = [0.645161]
+        tmp_fnames = ['outbgc2_%d.list' % i for i in xrange(10)]
+        #tmp_fnames = ['TestBox00%d-000_out_parents_5.list' % boxno]
+        tmp_scale_factors = [0.25, 0.333, 0.5, 0.540541, 0.588235, 0.645161, 0.714286, 0.8, 0.909091, 1.0]
+        #tmp_scale_factors = [0.645161]
         self._update_lists(kwargs, tmp_fnames, tmp_scale_factors)
 
         new_kwargs = kwargs.copy()
@@ -504,6 +508,32 @@ class TestBox(Cat):
 
         super(TestBox, self).__init__(simname=simname, loc=loc, columns_to_keep=columns_to_keep, Lbox=Lbox,
                                       pmass=pmass, cosmo=cosmo, **new_kwargs)
+
+        cache_locs = {'ki-ls': '/u/ki/swmclau2/des/halocats/hlist_%.2f.list.%s_%d.hdf5',
+                      'sherlock': '/scratch/users/swmclau2/halocats/hlist_%.2f.list.%s_%d.hdf5'}
+        cache_locs['long'] = cache_locs['ki-ls']
+        self.cache_filenames = [cache_locs[system] % (a, self.simname, boxno)
+                                for a in self.scale_factors]  # make sure we don't have redunancies.
+
+    def _get_cosmo(self):
+        """
+        Construct the cosmology object taht corresponds to this boxnumber
+        :param boxno:
+            The box number whose cosmology we want
+        :return:
+            Cosmology, the FlatwCDM astropy cosmology with the parameters of boxno
+        """
+        params = self.cosmo_params.iloc[self.boxno]
+        h = params['H0'] / 100.0
+        Om0 = (params['ombh2'] + params['omch2']) / (h ** 2)
+        return cosmology.core.FlatwCDM(H0=params['H0'], Om0=Om0, Neff=params['Neff'],
+                                       Ob0=params['ombh2'] / (h ** 2))
+
+    def _get_cosmo_param_names_vals(self):
+        # TODO docs
+        names = list(self.cosmo_params.columns.values)
+        vals = np.array(list(self.cosmo_params.iloc[self.boxno].values))
+        return names, vals
 
 
 # a dict that maps the default simnames to objects, which makes construction easier.

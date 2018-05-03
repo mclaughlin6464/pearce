@@ -410,7 +410,7 @@ class Emu(object):
                 # TODO wish i didn't have to hardcode this
                 # NOTE insert from merge, not sure if bad
                 if pname == 'r':
-                    val = 10 ** val
+                    val = np.log10(val)
 
                 assert np.all(plow <= val) and np.all(val <= phigh)
             except AssertionError:
