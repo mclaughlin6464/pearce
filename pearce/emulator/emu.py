@@ -1117,7 +1117,7 @@ class OriginalRecipe(Emu):
         def nll(p):
             # Update the kernel parameters and compute the likelihood.
             # params are log(a) and log(m)
-            self._emulator.kernel[:] = p
+            self._emulator.set_parameter_vector(p)
             ll = self._emulator.lnlikelihood(self.y, quiet=True)
 
             # The scipy optimizer doesn't play well with infinities.
@@ -1126,11 +1126,11 @@ class OriginalRecipe(Emu):
         # And the gradient of the objective function.
         def grad_nll(p):
             # Update the kernel parameters and compute the likelihood.
-            self._emulator.kernel[:] = p
+            self._emulator.set_parameter_vector(p)
             return -self._emulator.grad_lnlikelihood(self.y, quiet=True)
 
         if p0 is None:
-            p0 = self._emulator.kernel.vector
+            p0 = self._emulator.get_parameter_vector()
 
         results = op.minimize(nll, p0, jac=grad_nll, **kwargs)
         # results = op.minimize(nll, p0, jac=grad_nll, method='TNC', bounds =\
@@ -1428,7 +1428,7 @@ class ExtraCrispy(Emu):
             # params are log(a) and log(m)
             ll = 0
             for emulator, _y in izip(self._emulators, self.y):
-                emulator.kernel[:] = p
+                emulator.set_parameter_vector(p)
                 ll += emulator.lnlikelihood(_y, quiet=True)
 
             # The scipy optimizer doesn't play well with infinities.
@@ -1439,12 +1439,12 @@ class ExtraCrispy(Emu):
             # Update the kernel parameters and compute the likelihood.
             gll = 0
             for emulator, _y in izip(self._emulators, self.y):
-                emulator.kernel[:] = p
+                emulator.set_parameter_vector(p)
                 gll += emulator.grad_lnlikelihood(_y, quiet=True)
             return -gll
 
         if p0 is None:
-            p0 = self._emulators[0].kernel.vector
+            p0 = self._emulators[0].get_parameter_vector()
 
         results = op.minimize(nll, p0, jac=grad_nll, **kwargs)
         # results = op.minimize(nll, p0, jac=grad_nll, method='TNC', bounds =\
