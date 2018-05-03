@@ -160,7 +160,7 @@ class Cat(object):
         self.halocat = None  # halotools halocat that we wrap
         self.model = None  # same as above, but for the model
         self.populated_once = False
-
+    # TODO lol why tf did I write this?/
     def __len__(self):
         '''Number of separate catalogs contained in one object. '''
         return len(self.scale_factors)
