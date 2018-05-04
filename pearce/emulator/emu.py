@@ -21,7 +21,8 @@ from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 from sklearn.kernel_ridge import KernelRidge
 from sklearn.svm import SVR
 from sklearn.linear_model import LinearRegression
-
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn.pipeline import make_pipeline
 
 class Emu(object):
     '''Main Emulator base class. Cannot itself be instatiated; can only be accessed via subclasses.
@@ -282,6 +283,7 @@ class Emu(object):
         self.y = (y - self._y_mean)/(self._y_std + 1e-5) # TODO could make getters that do this work for you when you want these.
 
         self.mean_function = self._make_custom_mean_function(custom_mean_function)
+        self.y-=self.mean_function(self.x)
 
         # in general, the full cov matrix will be too big, and we won't need it. store the diagonal, and
         # an average
@@ -306,11 +308,18 @@ class Emu(object):
         if custom_mean_function is None:
             return lambda x: 0
 
-        elif custom_mean_function == 'linear':
+        elif custom_mean_function == 'linear' or custom_mean_function == 1:
             self._mean_func = LinearRegression() #TODO hyperparams
             self._mean_func.fit(self.x, self.y)
 
             return self._mean_func.predict
+
+        elif type(custom_mean_function) is int and custom_mean_function > 0: # TODO would like to take a dict here maybe, for kwargs
+            self._mean_func = make_pipeline(PolynomialFeatures(custom_mean_function), LinearRegression())
+            self._mean_func.fit(self.x, self.y)
+
+            return self._mean_func.predict
+
         else:
             raise NotImplementedError #TODO add something better! 
 
@@ -1077,7 +1086,7 @@ class OriginalRecipe(Emu):
         self._emulator = george.GP(kernel)
         # gp = george.GP(kernel, solver=george.HODLRSolver, nleaf=x.shape[0]+1,tol=1e-18)
 
-        self._emulator.compute(self.x, self.yerr, sort=False)  # NOTE I'm using a modified version of george!
+        self._emulator.compute(self.x, self.yerr)  # NOTE I'm using a modified version of george!
 
     def _build_skl(self, hyperparams):
         """
@@ -1403,6 +1412,8 @@ class ExtraCrispy(Emu):
         mu = np.zeros((self.experts, t.shape[0]))  # experts down, t deep
         err = np.zeros_like(mu)
 
+        mean_func_at_params = self.mean_function(t)
+
         for i, (emulator, _y) in enumerate(izip(self._emulators, self.y)):
             if self.method == 'gp':
                 local_mu, local_cov = emulator.predict(_y, t, return_cov=True)
@@ -1411,7 +1422,7 @@ class ExtraCrispy(Emu):
                 local_mu = emulator.predict(t)
                 local_err = 1.0  # weight with this instead of the errors.
 
-            mu[i, :] = self._y_std*local_mu + self._y_mean
+            mu[i, :] = self._y_std*(local_mu + mean_func_at_params) + self._y_mean
             err[i, :] = local_err*self._y_std
 
         # now, combine with weighted average
