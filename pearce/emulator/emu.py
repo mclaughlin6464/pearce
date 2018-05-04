@@ -34,7 +34,7 @@ class Emu(object):
     skl_methods = {'gbdt': GradientBoostingRegressor, 'rf': RandomForestRegressor, \
                    'svr': SVR, 'krr': KernelRidge, 'linear': LinearRegression}
 
-    def __init__(self, filename, method='gp', hyperparams={}, fixed_params={}, independent_variable=None):
+    def __init__(self, filename, method='gp', hyperparams={}, fixed_params={}, independent_variable=None, custom_mean_function = None):
         '''
         Initialize the Emu
         :param filename:
@@ -69,7 +69,7 @@ class Emu(object):
         self.fixed_params = fixed_params
         self.independent_variable = independent_variable
 
-        self.load_training_data(filename)
+        self.load_training_data(filename, custom_mean_function)
         self.build_emulator(hyperparams)
 
     ###Data Loading and Manipulation####################################################################################
@@ -260,7 +260,7 @@ class Emu(object):
             return np.vstack(x), np.hstack(y), np.dstack(ycov), info
 
 
-    def load_training_data(self, filename):
+    def load_training_data(self, filename, custom_mean_function = None):
         """
         Read the training data for the emulator and attach it to the object.
 
@@ -281,6 +281,8 @@ class Emu(object):
         self.x = (x - self._x_mean)/(self._x_std + 1e-5)
         self.y = (y - self._y_mean)/(self._y_std + 1e-5) # TODO could make getters that do this work for you when you want these.
 
+        self.mean_function = self._make_custom_mean_function(custom_mean_function)
+
         # in general, the full cov matrix will be too big, and we won't need it. store the diagonal, and
         # an average
         split_ycov = np.dsplit(ycov, ycov.shape[-1])
@@ -294,6 +296,24 @@ class Emu(object):
 
         ndim = self.x.shape[1]
         self.emulator_ndim = ndim  # The number of params for the emulator is different than those in sampling.
+
+    def _make_custom_mean_function(self, custom_mean_function =None):
+        """
+        Generate a custom mean function to make training better behaved (in theory)
+        """
+        # TODO docs
+
+        if custom_mean_function is None:
+            return lambda x: 0
+
+        elif custom_mean_function == 'linear':
+            self._mean_func = LinearRegression() #TODO hyperparams
+            self._mean_func.fit(self.x, self.y)
+
+            return self._mean_func.predict
+        else:
+            raise NotImplementedError #TODO add something better! 
+
 
     def get_param_names(self):
         """
@@ -422,8 +442,8 @@ class Emu(object):
                 val = params[pname]
                 # TODO wish i didn't have to hardcode this
                 # NOTE insert from merge, not sure if bad
-                if pname == 'r':
-                    val = np.log10(val)
+                #if pname == 'r':
+                #    val = np.log10(val)
 
                 assert np.all(plow <= val) and np.all(val <= phigh)
             except AssertionError:
@@ -1092,14 +1112,16 @@ class OriginalRecipe(Emu):
             mu, err (if gp_errs True). Predicted value for dependetn variable t.
             mu and err both have shape (t.shape[0])
         """
+
+        mean_func_at_params = self.mean_function(t)
         if self.method == 'gp':
             if gp_errs:
                 mu, cov = self._emulator.predict(self.y, t)
-                return self._y_std*mu+self._y_mean, np.diag(cov)*self._y_std**2
+                return self._y_std*(mu+mean_func_at_params)+self._y_mean, np.diag(cov)*self._y_std**2
             else:
-                return self._y_std*self._emulator.predict(self.y, t, return_cov=False)+self._y_mean
+                return self._y_std*(self._emulator.predict(self.y, t, return_cov=False)+mean_func_at_params)+self._y_mean
         else:
-            return self._y_std*self._emulator.predict(t) + self._y_mean
+            return self._y_std*(self._emulator.predict(t)+mean_func_at_params) + self._y_mean
 
     def _emulator_lnlikelihood(self):
         """
@@ -1211,7 +1233,7 @@ class ExtraCrispy(Emu):
 
         super(ExtraCrispy, self).__init__(training_dir, **kwargs)
 
-    def load_training_data(self, training_dir):
+    def load_training_data(self, training_dir, custom_mean_function = None):
         """
         Read the training data for the emulator and attach it to the object.
         :param training_dir:
@@ -1220,7 +1242,7 @@ class ExtraCrispy(Emu):
             Parameters to hold fixed. Only available if data in training_dir is a full hypercube, not a latin hypercube.
         :return: None
         """
-        super(ExtraCrispy, self).load_training_data(training_dir)
+        super(ExtraCrispy, self).load_training_data(training_dir, custom_mean_function)
 
         # now, parition the data as specified by the user
         # note that ppe does not include overlap
