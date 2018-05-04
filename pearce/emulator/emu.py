@@ -1462,7 +1462,7 @@ class ExtraCrispy(Emu):
         #   [(np.log(0.01), np.log(10)) for i in xrange(ndim+1)],options={'maxiter':50})
 
         for emulator in self._emulators:
-            emulator.kernel[:] = results.x
+            emulator.set_parameter_vector(results.x)
             emulator.recompute()
 
-        return results.success
+        return results

@@ -458,6 +458,9 @@ class TestBox(Cat):
         assert 0<=boxno<=6
         assert 0<=realization<=4
 
+        self.boxno = boxno
+        self.realization = realization
+
         simname = 'testbox'  # not sure if something with Emu would work better, but wanna separate from Emu..
         columns_to_keep = OUTLIST_COLS.copy()  # OUTLIST_BGC2_COLS
         del columns_to_keep['halo_mvir']
