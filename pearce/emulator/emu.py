@@ -161,6 +161,14 @@ class Emu(object):
             self.scale_bin_centers = scale_bin_centers
             self.n_bins = len(scale_bin_centers) if scale_bin_centers is not None else 1
             self._ordered_params = ordered_params
+        else:
+            # return them
+            info = {'obs': f.attrs['obs'],
+                    'rbc': redshift_bin_centers,
+                    'sbc': scale_bin_centers,
+                    'n_bins': len(scale_bin_centers) if scale_bin_centers is not None else 1,
+                    'ordered_params': ordered_params
+                    }
 
         # append files to a list, then concatenate at the end
         x = []
@@ -246,7 +254,10 @@ class Emu(object):
         # stack so xs have shape (n points, n params)
         # ys have shape (npoints)
         # and ycov has shape (n_bins, n_bins, n_points/n_bins)
-        return np.vstack(x), np.hstack(y), np.dstack(ycov)
+        if attach_params:
+            return np.vstack(x), np.hstack(y), np.dstack(ycov)
+        else:
+            return np.vstack(x), np.hstack(y), np.dstack(ycov), info
 
 
     def load_training_data(self, filename):
@@ -261,8 +272,14 @@ class Emu(object):
         # make sure we attach metadata to the object
         x, y, ycov = self.get_data(filename, self.fixed_params, self.independent_variable, attach_params=True)
 
-        self.x = x
-        self.y = y
+        # whiten the training data
+        self._x_mean, self._x_std = x.mean(axis = 0), x.std(axis = 0)
+        self._y_mean, self._y_std = y.mean(axis = 0), y.std(axis = 0)
+
+        ycov/=(np.outer(self._y_std, self._y_std) + 1e-5)
+
+        self.x = (x - self._x_mean)/(self._x_std + 1e-5)
+        self.y = (y - self._y_mean)/(self._y_std + 1e-5) # TODO could make getters that do this work for you when you want these.
 
         # in general, the full cov matrix will be too big, and we won't need it. store the diagonal, and
         # an average
@@ -274,10 +291,6 @@ class Emu(object):
 
         #compute the average covaraince matrix
         self.ycov = np.mean(split_ycov, axis = 2)
-
-        # subtract off the mean; this should lead to better performance for the GP
-        self.y_hat = self.y.mean(axis=0)
-        self.y -= self.y_hat
 
         ndim = self.x.shape[1]
         self.emulator_ndim = ndim  # The number of params for the emulator is different than those in sampling.
@@ -655,6 +668,10 @@ class Emu(object):
         if len(t.shape) == 1:
             t = np.array([t])
 
+        # whiten
+        t-=self._x_mean
+        t/=(self._x_std + 1e-5)
+
         return self._emulate_helper(t, gp_errs)
 
     @abstractmethod
@@ -875,7 +892,7 @@ class Emu(object):
 
 
     # only predicts wrt r. don't know if that's an ihmssue.
-    def goodness_of_fit(self, truth_dir, N=None, statistic='r2'):
+    def goodness_of_fit(self, truth_file, N=None, statistic='r2'):
         """
         Calculate the goodness of fit of an emulator as compared to some validation data.
         :param truth_dir:
@@ -891,13 +908,10 @@ class Emu(object):
         if N is not None:
             assert N > 0 and int(N) == N
 
-        sub_dirs, _ = self._get_z_subdirs(truth_dir, fixed_zs=self.fixed_params.get('z', None))
+        x, y, _, info = self.get_data(truth_file, self.fixed_params, self.independent_variable)
 
-        x, y, _, _ = self.get_data(truth_dir, {}, self.fixed_params, self.independent_variable)
-
-        bins, _, _, _, _ = global_file_reader(sub_dirs[0])
-        bin_centers = (bins[1:] + bins[:-1]) / 2
-        scale_nbins = len(bin_centers)
+        scale_bin_centers = info['sbc']
+        scale_nbins = len(scale_bin_centers)
 
         y = y.reshape((-1, scale_nbins))
 
@@ -911,8 +925,8 @@ class Emu(object):
         pred_y = pred_y.reshape((-1, scale_nbins))
 
         # TODO untested
-        if np.any(bin_centers != self.scale_bin_centers):
-            bin_centers = bin_centers[self.scale_bin_centers[0] <= bin_centers <= self.scale_bin_centers[-1]]
+        if np.any(scale_bin_centers != self.scale_bin_centers):
+            bin_centers = scale_bin_centers[self.scale_bin_centers[0] <= scale_bin_centers <= self.scale_bin_centers[-1]]
             new_mu = []
             for mean in pred_y:
                 xi_interpolator = interp1d(self.scale_bin_centers, mean, kind='slinear')
@@ -1081,11 +1095,11 @@ class OriginalRecipe(Emu):
         if self.method == 'gp':
             if gp_errs:
                 mu, cov = self._emulator.predict(self.y, t)
-                return mu+self.y_hat, np.diag(cov)
+                return self._y_std*mu+self._y_mean, np.diag(cov)*self._y_std**2
             else:
-                return self._emulator.predict(self.y, t, return_cov=False)+self.y_hat
+                return self._y_std*self._emulator.predict(self.y, t, return_cov=False)+self._y_mean
         else:
-            return self._emulator.predict(t) + self.y_hat
+            return self._y_std*self._emulator.predict(t) + self._y_mean
 
     def _emulator_lnlikelihood(self):
         """
@@ -1207,7 +1221,6 @@ class ExtraCrispy(Emu):
         :return: None
         """
         super(ExtraCrispy, self).load_training_data(training_dir)
-        self.y += self.y_hat  # need to change this later
 
         # now, parition the data as specified by the user
         # note that ppe does not include overlap
@@ -1303,8 +1316,6 @@ class ExtraCrispy(Emu):
         self.x = _x
         self.y = _y
         self.yerr = _yerr
-        self.y_hat = self.y.mean(axis=1)
-        self.y -= self.y_hat.reshape((-1, 1))
 
     def _build_gp(self, hyperparams):
         """
@@ -1370,7 +1381,7 @@ class ExtraCrispy(Emu):
         mu = np.zeros((self.experts, t.shape[0]))  # experts down, t deep
         err = np.zeros_like(mu)
 
-        for i, (emulator, _y, _yhat) in enumerate(izip(self._emulators, self.y, self.y_hat)):
+        for i, (emulator, _y) in enumerate(izip(self._emulators, self.y)):
             if self.method == 'gp':
                 local_mu, local_cov = emulator.predict(_y, t, return_cov=True)
                 local_err = np.sqrt(np.diag(local_cov))
@@ -1378,8 +1389,8 @@ class ExtraCrispy(Emu):
                 local_mu = emulator.predict(t)
                 local_err = 1.0  # weight with this instead of the errors.
 
-            mu[i, :] = local_mu + _yhat
-            err[i, :] = local_err
+            mu[i, :] = self._y_std*local_mu + self._y_mean
+            err[i, :] = local_err*self._y_std
 
         # now, combine with weighted average
         combined_var = np.reciprocal(np.sum(np.reciprocal(err ** 2), axis=0))
