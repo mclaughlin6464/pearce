@@ -462,11 +462,11 @@ class TestBox(Cat):
         self.realization = realization
 
         simname = 'testbox'  # not sure if something with Emu would work better, but wanna separate from Emu..
-        columns_to_keep =  OUTLIST_BGC2_COLS
-        #del columns_to_keep['halo_mvir']
-        #columns_to_keep['halo_m200b'] = (2, 'f4')
-        #del columns_to_keep['halo_rvir']
-        #columns_to_keep['halo_r200b'] = (5, 'f4')
+        columns_to_keep =  OUTLIST_BGC2_COLS.copy()
+        del columns_to_keep['halo_m200b']
+        columns_to_keep['halo_mvir'] = (2, 'f4')
+        del columns_to_keep['halo_r200b']
+        columns_to_keep['halo_rvir'] = (5, 'f4')
 
         Lbox = 1050.0  # Mpc/h
         self.npart = 1400
@@ -512,7 +512,7 @@ class TestBox(Cat):
             if key in new_kwargs:
                 del new_kwargs[key]
 
-        version_name = 'most_recent_%d'%boxno
+        version_name = 'most_recent_%d_%d'%(boxno,realization)
 
         super(TestBox, self).__init__(simname=simname, loc=loc, columns_to_keep=columns_to_keep, Lbox=Lbox,
                                       pmass=pmass, cosmo=cosmo, version_name = version_name, **new_kwargs)
