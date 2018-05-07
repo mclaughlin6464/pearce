@@ -582,16 +582,16 @@ class Emu(object):
                 # could have other guesses for this case, but don't have any now
                 # leave this structure in case I make more later
                 pass
+        # TODO  change with mean_function
         elif self.obs == 'wp':
-            # TODO parameter name has changed, update
             if independent_variable is None:
 
-                ig.update({'ombh2': 7.41265e-5, 'omch2': 5.04824e1, 'w0': 1.301436e-2,
-                            'ns': 3.89150886e-4, 'ln10As': 9.83101864, 'H0': 1.5611286e5,
-                            'Neff': 9.71398614e2, 'logM1': 1.148312e-2, 'logMmin': 1.6566059e1,
-                            'f_c': 1.4426e1 ,'logM0': 6.2487e1, 'sigma_logM': 2.32469,
-                            'alpha': 4.5149677,'r': 1.94217e-2,
-                           'amp': 2.9004304, 'z': 1.0,
+                ig.update({'ombh2': 1.0328e5, 'omch2': 1.638433e1, 'w0': 2.0636e-1,
+                            'ns': 1.02807e0, 'ln10As': 1.3876e1, 'H0': 5.69e-5,
+                            'Neff': 1.14847e0, 'logM1': 1.15911e-2, 'logMmin': 6.21709e-6,
+                            'f_c': 4.43909e1 ,'logM0': 7.44292233e-3, 'sigma_logM': 1.1431842e-5,
+                            'alpha': 1.439e5,'r': 1.84728e-1,
+                           'amp': 1.18617e-1, 'z': 1.0,
                            'mean_occupation_satellites_assembias_split1': 21.02835102,
                            'mean_occupation_satellites_assembias_slope1': 225.64738711,
                            'mean_occupation_satellites_assembias_param1': 89.17850468,
