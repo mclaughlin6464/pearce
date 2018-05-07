@@ -282,6 +282,7 @@ class Emu(object):
         self.x = (x - self._x_mean)/(self._x_std + 1e-5)
         self.y = (y - self._y_mean)/(self._y_std + 1e-5) # TODO could make getters that do this work for you when you want these.
 
+        # TODO differnet hyperparams depending on what this is.
         self.mean_function = self._make_custom_mean_function(custom_mean_function)
         self.y-=self.mean_function(self.x)
 
