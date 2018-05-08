@@ -551,11 +551,11 @@ class ResolutionTestBox(Cat):
         cosmo = cosmology.core.LambdaCDM(H0=100 * 0.7, Om0=0.286, Ode0=0.714)
 
         simname = 'resolution'  # not sure if something with Emu would work better, but wanna separate from Emu..
-        columns_to_keep = OUTLIST_COLS.copy()  # OUTLIST_BGC2_COLS
-        del columns_to_keep['halo_mvir']
-        columns_to_keep['halo_m200b'] = (2, 'f4')
-        del columns_to_keep['halo_rvir']
-        columns_to_keep['halo_r200b'] = (5, 'f4')
+        columns_to_keep = OUTLIST_BGC2_COLS.copy()
+        del columns_to_keep['halo_200b']
+        columns_to_keep['halo_mvir'] = (2, 'f4')
+        del columns_to_keep['halo_r200b']
+        columns_to_keep['halo_rvir'] = (5, 'f4')
 
         npart_dict = {0: 535,
                       4: 1071,
