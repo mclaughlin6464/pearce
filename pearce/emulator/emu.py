@@ -586,12 +586,8 @@ class Emu(object):
         elif self.obs == 'wp':
             if independent_variable is None:
 
-                ig.update({'ombh2': 1.0328e5, 'omch2': 1.638433e1, 'w0': 2.0636e-1,
-                            'ns': 1.02807e0, 'ln10As': 1.3876e1, 'H0': 5.69e-5,
-                            'Neff': 1.14847e0, 'logM1': 1.15911e-2, 'logMmin': 6.21709e-6,
-                            'f_c': 4.43909e1 ,'logM0': 7.44292233e-3, 'sigma_logM': 1.1431842e-5,
-                            'alpha': 1.439e5,'r': 1.84728e-1,
-                           'amp': 1.18617e-1, 'z': 1.0,
+                ig.update({'logMmin': 1.943466926536022e-06, 'Neff': 19614.858085794294, 'amp': 1.0280732238308647, 'f_c': 87474.96301554433, 'logM0': 0.00021511234301821672, 'logM1': 6480.719826311958, 'H0': 13312.159025043049, 'w0': 9.682153059967076e-06, 'sigma_logM': 0.0017639772753140453, 'r': 0.004521792417370702, 'omch2': 0.015288635880587296, 'ln10As': 344.4087275973823, 'alpha': 0.002459130425468044, 'ns': 17558.563314144707, 'ombh2': 0.0020827506301905143,
+                        'z': 1.0,
                            'mean_occupation_satellites_assembias_split1': 21.02835102,
                            'mean_occupation_satellites_assembias_slope1': 225.64738711,
                            'mean_occupation_satellites_assembias_param1': 89.17850468,
@@ -943,14 +939,16 @@ class Emu(object):
         scale_bin_centers = info['sbc']
         scale_nbins = len(scale_bin_centers)
 
-        y = y.reshape((-1, scale_nbins))
-
         np.random.seed(int(time()))
 
+        # TODO this is busted
         if N is not None:  # make a random choice
-            idxs = np.random.choice(x.shape[0], N, replace=False)
+            idxs = np.random.choice(y.shape[0], N*scale_nbins, replace=False)
 
             x, y = x[idxs], y[idxs]
+        
+        y = y.reshape((-1, scale_nbins))
+
         pred_y = self._emulate_helper(x, False)
         pred_y = pred_y.reshape((-1, scale_nbins))
 
@@ -1423,12 +1421,24 @@ class ExtraCrispy(Emu):
                 local_mu = emulator.predict(t)
                 local_err = 1.0  # weight with this instead of the errors.
 
+            #print i
+            #print local_mu
+            #print local_err
+            #print mean_func_at_params
+            #print self._y_mean, self._y_std
+            #print '*'*30
+
             mu[i, :] = self._y_std*(local_mu + mean_func_at_params) + self._y_mean
             err[i, :] = local_err*self._y_std
 
+        #print 'Endgame'
+        #print mu
+        #print err
         # now, combine with weighted average
         combined_var = np.reciprocal(np.sum(np.reciprocal(err ** 2), axis=0))
         combined_mu = combined_var * np.sum(np.reciprocal(err ** 2) * mu, axis=0)
+        #print combined_mu
+        #print combined_var
 
         # Reshape to be consistent with my other implementation
         if not gp_errs:

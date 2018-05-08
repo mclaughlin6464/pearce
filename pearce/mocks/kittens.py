@@ -572,7 +572,7 @@ class ResolutionTestBox(Cat):
         pmass = 3.29908e10 * (self.npart/535.0)**3
 
         self.prim_haloprop_key = 'halo_m200b'
-        locations = {'ki-ls': '/u/ki/jderose/ki18/jderose/tinkers_emu/Box0%02d/halos/m200b'}
+        locations = {'ki-ls': '/u/ki/jderose/ki18/jderose/tinkers_emu/Box0%02d/halos/m200b/'}
         assert system in locations
         loc = locations[system]%boxno
 
