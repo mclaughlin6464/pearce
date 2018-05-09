@@ -292,6 +292,7 @@ class Cat(object):
             print a,z
             if scale_factors != 'all' and a not in scale_factors:
                 continue
+            print self.pmass
             reader = RockstarHlistReader(fname, self.columns_to_keep, cache_fnames, self.simname,
                                          self.halo_finder, z, self.version_name, self.Lbox, self.pmass,
                                          overwrite=overwrite)

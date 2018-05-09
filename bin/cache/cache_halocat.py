@@ -12,6 +12,6 @@ for boxno in [0, 4,5,6,7,8,9,10]:
     print boxno
     #cat = cat_dict['resolution'](boxno, scale_factors = [0.25, 0.333, 0.5, 0.540541, 0.588235, 0.645161, 0.714286, 0.8, 0.909091, 1.0], system = 'ki-ls')
     #cat = cat_dict['trainingbox'](boxno, scale_factors = [0.645161, 0.714286, 0.8, 0.909091, 1.0], system = 'ki-ls')
-    cat = cat_dict['resolution'](boxno, scale_factors = [1.0], system = 'ki-ls')
+    cat = cat_dict['resolution'](boxno, scale_factors = [0.8, 1.0], system = 'ki-ls')
 
     cat.cache(overwrite = True)#, add_local_density=False, add_particles = True, downsample_factor = 1e-2)

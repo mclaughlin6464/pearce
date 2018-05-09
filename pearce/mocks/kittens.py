@@ -359,7 +359,7 @@ class TrainingBox(Cat):
 
         self.boxno = boxno
 
-        simname = 'trainingbox'  # not sure if something with Emu would work better, but wanna separate from Emu..
+        simname = 'trainingbox'# not sure if something with Emu would work better, but wanna separate from Emu..
         columns_to_keep =  OUTLIST_BGC2_COLS.copy()
         # Add duplicate columns for mvir if allowed
         # TODO this sucks but halotools is tough here.
@@ -414,7 +414,7 @@ class TrainingBox(Cat):
             if key in new_kwargs:
                 del new_kwargs[key]
 
-        version_name = 'most_recent_%d'%boxno
+        version_name = 'most_recent_%02d'%boxno
 
         super(TrainingBox, self).__init__(simname=simname, loc=loc, columns_to_keep=columns_to_keep, Lbox=Lbox,
                                       pmass=pmass, version_name = version_name, cosmo=cosmo,gadget_loc=gadget_loc, **new_kwargs)
@@ -461,7 +461,7 @@ class TestBox(Cat):
         self.boxno = boxno
         self.realization = realization
 
-        simname = 'testbox'  # not sure if something with Emu would work better, but wanna separate from Emu..
+        simname = 'testbox'# not sure if something with Emu would work better, but wanna separate from Emu..
         columns_to_keep = OUTLIST_COLS.copy()  # OUTLIST_BGC2_COLS
         del columns_to_keep['halo_mvir']
         columns_to_keep['halo_m200b'] = (2, 'f4')
@@ -550,9 +550,9 @@ class ResolutionTestBox(Cat):
         assert boxno in set([0, 4,5,6,7,8,9,10])
         cosmo = cosmology.core.LambdaCDM(H0=100 * 0.7, Om0=0.286, Ode0=0.714)
 
-        simname = 'resolution'  # not sure if something with Emu would work better, but wanna separate from Emu..
+        simname = 'resolution'# not sure if something with Emu would work better, but wanna separate from Emu..
         columns_to_keep = OUTLIST_BGC2_COLS.copy()
-        del columns_to_keep['halo_200b']
+        del columns_to_keep['halo_m200b']
         columns_to_keep['halo_mvir'] = (2, 'f4')
         del columns_to_keep['halo_r200b']
         columns_to_keep['halo_rvir'] = (5, 'f4')
@@ -569,7 +569,7 @@ class ResolutionTestBox(Cat):
         self.npart = npart_dict[boxno]
         # Need to make a way to combine all the params
 
-        pmass = 3.29908e10 * (self.npart/535.0)**3
+        pmass = 3.29908e10 * (535.0/self.npart)**3
 
         self.prim_haloprop_key = 'halo_m200b'
         locations = {'ki-ls': '/u/ki/jderose/ki18/jderose/tinkers_emu/Box0%02d/halos/m200b/'}
@@ -587,9 +587,15 @@ class ResolutionTestBox(Cat):
             if key in new_kwargs:
                 del new_kwargs[key]
 
+
         super(ResolutionTestBox, self).__init__(simname=simname, loc=loc, columns_to_keep=columns_to_keep, Lbox=Lbox,
                                       pmass=pmass, cosmo=cosmo, **new_kwargs)
 
+        cache_locs = {'ki-ls': '/u/ki/swmclau2/des/halocats/hlist_%.2f.list.%s_%d.hdf5',
+                      'sherlock': '/scratch/users/swmclau2/halocats/hlist_%.2f.list.%s_%d.hdf5'}
+        cache_locs['long'] = cache_locs['ki-ls']
+        self.cache_filenames = [cache_locs[system] % (a, self.simname, boxno)
+                                for a in self.scale_factors]  # make sure we don't have redunancies.
 
     def _get_cosmo_param_names_vals(self):
         # TODO docs
