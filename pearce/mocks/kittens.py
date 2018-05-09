@@ -419,8 +419,8 @@ class TrainingBox(Cat):
         super(TrainingBox, self).__init__(simname=simname, loc=loc, columns_to_keep=columns_to_keep, Lbox=Lbox,
                                       pmass=pmass, version_name = version_name, cosmo=cosmo,gadget_loc=gadget_loc, **new_kwargs)
 
-        cache_locs = {'ki-ls': '/u/ki/swmclau2/des/halocats/hlist_%.2f.list.%s_%d.hdf5',
-                      'sherlock': '/scratch/users/swmclau2/halocats/hlist_%.2f.list.%s_%d.hdf5'}
+        cache_locs = {'ki-ls': '/u/ki/swmclau2/des/halocats/hlist_%.2f.list.%s_%02d.hdf5',
+                      'sherlock': '/scratch/users/swmclau2/halocats/hlist_%.2f.list.%s_%02d.hdf5'}
         cache_locs['long'] = cache_locs['ki-ls']
         self.cache_filenames = [cache_locs[system] % (a, self.simname, boxno)
                                 for a in self.scale_factors]  # make sure we don't have redunancies.
@@ -487,9 +487,9 @@ class TestBox(Cat):
         locations = {'ki-ls': ['/nfs/slac/des/fs1/g/sims/beckermr/tinkers_emu/TestBox00%d-00%d/halos/m200b/',
                                        '/nfs/slac/g/ki/ki22/cosmo/beckermr/tinkers_emu/TestBox00%d-00%d/halos/m200b/',
                                        '/nfs/slac/g/ki/ki23/des/beckermr/tinkers_emu/TestBox00%d-00%d/halos/m200b/'],
-                     'sherlock': ['/home/swmclau2/scratch/TestBoxes/Box0%02d/',
-                                  '/home/swmclau2/scratch/TestBoxes/Box0%02d/',
-                                  '/home/swmclau2/scratch/TestBoxes/Box0%02d/']} #all the same for Sherlock
+                     'sherlock': ['/home/swmclau2/scratch/TestBoxes/TestBox0%02d-00%d/',
+                                  '/home/swmclau2/scratch/TestBoxes/TestBox0%02d-00%d/',
+                                  '/home/swmclau2/scratch/TestBoxes/TestBox0%02d-00%d/']} #all the same for Sherlock
         assert system in locations
         #loc = locations[system][0]
         loc_list = locations[system]
@@ -512,11 +512,13 @@ class TestBox(Cat):
             if key in new_kwargs:
                 del new_kwargs[key]
 
-        super(TestBox, self).__init__(simname=simname, loc=loc, columns_to_keep=columns_to_keep, Lbox=Lbox,
-                                      pmass=pmass, cosmo=cosmo, **new_kwargs)
+        version_name = 'most_recent_%d_%d'%(boxno, realization)
 
-        cache_locs = {'ki-ls': '/u/ki/swmclau2/des/halocats/hlist_%.2f.list.%s_%d.hdf5',
-                      'sherlock': '/scratch/users/swmclau2/halocats/hlist_%.2f.list.%s_%d.hdf5'}
+        super(TestBox, self).__init__(simname=simname, loc=loc, columns_to_keep=columns_to_keep, Lbox=Lbox,
+                                      pmass=pmass, cosmo=cosmo, version_name = version_name, **new_kwargs)
+
+        cache_locs = {'ki-ls': '/u/ki/swmclau2/des/halocats/hlist_%.2f.list.%s_%02d.hdf5',
+                      'sherlock': '/scratch/users/swmclau2/halocats/hlist_%.2f.list.%s_%02d.hdf5'}
         cache_locs['long'] = cache_locs['ki-ls']
         self.cache_filenames = [cache_locs[system] % (a, self.simname, boxno)
                                 for a in self.scale_factors]  # make sure we don't have redunancies.
@@ -591,8 +593,8 @@ class ResolutionTestBox(Cat):
         super(ResolutionTestBox, self).__init__(simname=simname, loc=loc, columns_to_keep=columns_to_keep, Lbox=Lbox,
                                       pmass=pmass, cosmo=cosmo, **new_kwargs)
 
-        cache_locs = {'ki-ls': '/u/ki/swmclau2/des/halocats/hlist_%.2f.list.%s_%d.hdf5',
-                      'sherlock': '/scratch/users/swmclau2/halocats/hlist_%.2f.list.%s_%d.hdf5'}
+        cache_locs = {'ki-ls': '/u/ki/swmclau2/des/halocats/hlist_%.2f.list.%s_%02d.hdf5',
+                      'sherlock': '/scratch/users/swmclau2/halocats/hlist_%.2f.list.%s_%02d.hdf5'}
         cache_locs['long'] = cache_locs['ki-ls']
         self.cache_filenames = [cache_locs[system] % (a, self.simname, boxno)
                                 for a in self.scale_factors]  # make sure we don't have redunancies.
