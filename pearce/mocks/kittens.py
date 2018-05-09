@@ -543,9 +543,64 @@ class TestBox(Cat):
         vals = np.array(list(self.cosmo_params.iloc[self.boxno].values))
         return names, vals
 
+class ResolutionTestBox(Cat):
+
+    def __init__(self, boxno, system='ki-ls', **kwargs):
+
+        #assert realization == 0
+        #assert 0 <= boxno <= 2
+        assert boxno in set([0, 4,5,6,7,8,9,10])
+        cosmo = cosmology.core.LambdaCDM(H0=100 * 0.7, Om0=0.286, Ode0=0.714)
+
+        simname = 'resolution'  # not sure if something with Emu would work better, but wanna separate from Emu..
+        columns_to_keep = OUTLIST_BGC2_COLS.copy()
+        del columns_to_keep['halo_200b']
+        columns_to_keep['halo_mvir'] = (2, 'f4')
+        del columns_to_keep['halo_r200b']
+        columns_to_keep['halo_rvir'] = (5, 'f4')
+
+        npart_dict = {0: 535,
+                      4: 1071,
+                      5: 535,
+                      6: 1071,
+                      7: 535,
+                      8: 1071,
+                      9: 535,
+                      10: 1071}
+        Lbox =  400.0 # Mpc/h
+        self.npart = npart_dict[boxno]
+        # Need to make a way to combine all the params
+
+        pmass = 3.29908e10 * (self.npart/535.0)**3
+
+        self.prim_haloprop_key = 'halo_m200b'
+        locations = {'ki-ls': '/u/ki/jderose/ki18/jderose/tinkers_emu/Box0%02d/halos/m200b'}
+        assert system in locations
+        loc = locations[system]%boxno
+
+        tmp_fnames = ['outbgc2_%d.list' % i for i in xrange(10)]
+        #tmp_fnames = ['TestBox00%d-000_out_parents_5.list' % boxno]
+        tmp_scale_factors = [0.25, 0.333, 0.5, 0.540541, 0.588235, 0.645161, 0.714286, 0.8, 0.909091, 1.0]
+        #tmp_scale_factors = [0.645161]
+        self._update_lists(kwargs, tmp_fnames, tmp_scale_factors)
+
+        new_kwargs = kwargs.copy()
+        for key in ['simname', 'loc', 'columns_to_keep', 'Lbox', 'pmass', 'cosmo']:
+            if key in new_kwargs:
+                del new_kwargs[key]
+
+        super(ResolutionTestBox, self).__init__(simname=simname, loc=loc, columns_to_keep=columns_to_keep, Lbox=Lbox,
+                                      pmass=pmass, cosmo=cosmo, **new_kwargs)
+
+
+    def _get_cosmo_param_names_vals(self):
+        # TODO docs
+        names = ['Omega_m', 'Omega_b','h', 'sigma8', 'n_s']
+        vals = [0.286, 0.047,self.h, 0.82, 0.96]
+        return names, vals
 
 # a dict that maps the default simnames to objects, which makes construction easier.
 # TODO kitten_dict
 cat_dict = {'bolshoi': Bolshoi, 'multidark': Multidark, 'emu': Emu, 'fox': Fox, 'multidark_highres': MDHR,
-            'chinchilla': Chinchilla,
-            'aardvark': Aardvark, 'guppy': Guppy, 'trainingbox': TrainingBox, 'testbox': TestBox}
+            'chinchilla': Chinchilla, 'aardvark': Aardvark, 'guppy': Guppy,
+            'trainingbox': TrainingBox, 'testbox': TestBox, 'resolution': ResolutionTestBox}
