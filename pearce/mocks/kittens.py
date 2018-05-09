@@ -359,7 +359,7 @@ class TrainingBox(Cat):
 
         self.boxno = boxno
 
-        simname = 'trainingbox'  # not sure if something with Emu would work better, but wanna separate from Emu..
+        simname = 'trainingbox_%d'%boxno  # not sure if something with Emu would work better, but wanna separate from Emu..
         columns_to_keep =  OUTLIST_BGC2_COLS.copy()
         # Add duplicate columns for mvir if allowed
         # TODO this sucks but halotools is tough here.
@@ -414,13 +414,11 @@ class TrainingBox(Cat):
             if key in new_kwargs:
                 del new_kwargs[key]
 
-        version_name = 'most_recent_%d'%boxno
-
         super(TrainingBox, self).__init__(simname=simname, loc=loc, columns_to_keep=columns_to_keep, Lbox=Lbox,
                                       pmass=pmass, version_name = version_name, cosmo=cosmo,gadget_loc=gadget_loc, **new_kwargs)
 
-        cache_locs = {'ki-ls': '/u/ki/swmclau2/des/halocats/hlist_%.2f.list.%s_%d.hdf5',
-                      'sherlock': '/scratch/users/swmclau2/halocats/hlist_%.2f.list.%s_%d.hdf5'}
+        cache_locs = {'ki-ls': '/u/ki/swmclau2/des/halocats/hlist_%.2f.list.%s_%02d.hdf5',
+                      'sherlock': '/scratch/users/swmclau2/halocats/hlist_%.2f.list.%s_%02d.hdf5'}
         cache_locs['long'] = cache_locs['ki-ls']
         self.cache_filenames = [cache_locs[system] % (a, self.simname, boxno)
                                 for a in self.scale_factors]  # make sure we don't have redunancies.
@@ -517,8 +515,8 @@ class TestBox(Cat):
         super(TestBox, self).__init__(simname=simname, loc=loc, columns_to_keep=columns_to_keep, Lbox=Lbox,
                                       pmass=pmass, cosmo=cosmo, version_name = version_name, **new_kwargs)
 
-        cache_locs = {'ki-ls': '/u/ki/swmclau2/des/halocats/hlist_%.2f.list.%s_%d.hdf5',
-                      'sherlock': '/scratch/users/swmclau2/halocats/hlist_%.2f.list.%s_%d.hdf5'}
+        cache_locs = {'ki-ls': '/u/ki/swmclau2/des/halocats/hlist_%.2f.list.%s_%02d.hdf5',
+                      'sherlock': '/scratch/users/swmclau2/halocats/hlist_%.2f.list.%s_%02d.hdf5'}
         cache_locs['long'] = cache_locs['ki-ls']
         self.cache_filenames = [cache_locs[system] % (a, self.simname, boxno)
                                 for a in self.scale_factors]  # make sure we don't have redunancies.
@@ -592,6 +590,11 @@ class ResolutionTestBox(Cat):
         super(ResolutionTestBox, self).__init__(simname=simname, loc=loc, columns_to_keep=columns_to_keep, Lbox=Lbox,
                                       pmass=pmass, cosmo=cosmo, **new_kwargs)
 
+        cache_locs = {'ki-ls': '/u/ki/swmclau2/des/halocats/hlist_%.2f.list.%s_%02d.hdf5',
+                      'sherlock': '/scratch/users/swmclau2/halocats/hlist_%.2f.list.%s_%02d.hdf5'}
+        cache_locs['long'] = cache_locs['ki-ls']
+        self.cache_filenames = [cache_locs[system] % (a, self.simname, boxno)
+                                for a in self.scale_factors]  # make sure we don't have redunancies.
 
     def _get_cosmo_param_names_vals(self):
         # TODO docs
