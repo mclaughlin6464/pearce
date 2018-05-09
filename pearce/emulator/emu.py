@@ -211,6 +211,7 @@ class Emu(object):
                         # skip NaN points. May wanna change this behavior.
                         give_warning = True
                         num_skipped += 1
+                        print _obs
                         continue
 
                     HOD = hod_param_vals[HOD_no, :]
@@ -585,9 +586,7 @@ class Emu(object):
         # TODO  change with mean_function
         elif self.obs == 'wp':
             if independent_variable is None:
-
-                {'Neff': 8.767158480098395, 'H0': 279.72348771683846, 'w0': 0.4969056392641753, 'r': 0.2274611016147588, 'omch2': 5.3139138378707, 'ln10As': 10.251330035668598, 'amp': 0.8005677074551913, 'ns': 31708.08570546147, 'ombh2': 535.7652967077171}
-                ig.update({'logMmin': 1.943466926536022e-06, 'Neff': 8.767158, 'amp': 0.050649375, 'f_c': 87474.96301554433, 'logM0': 0.00021511234301821672, 'logM1': 6480.719826311958, 'H0': 279.72348, 'w0': 0.496905639, 'sigma_logM': 0.0017639772753140453, 'r': 0.227461101, 'omch2': 5.313913, 'ln10As': 10.251330035, 'alpha': 0.002459130425468044, 'ns': 31708.0857, 'ombh2': 535.765296,
+                ig.update({'logMmin': 4.635891111, 'Neff': 8.767158, 'amp': 0.050649375, 'f_c': 3.535979, 'logM0': 0.33752477, 'logM1': 0.81730183, 'H0': 279.72348, 'w0': 0.496905639, 'sigma_logM': 3700.95379, 'r': 0.227461101, 'omch2': 5.313913, 'ln10As': 10.251330035, 'alpha': 1651.3668747, 'ns': 31708.0857, 'ombh2': 535.765296,
                         'z': 1.0,
                            'mean_occupation_satellites_assembias_split1': 21.02835102,
                            'mean_occupation_satellites_assembias_slope1': 225.64738711,

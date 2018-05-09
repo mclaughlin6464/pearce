@@ -512,7 +512,7 @@ class TestBox(Cat):
             if key in new_kwargs:
                 del new_kwargs[key]
 
-        version_name = 'most_recent_%d_%d'%(boxno, realization)
+        version_name = 'most_recent_%02d_%d'%(boxno, realization)
 
         super(TestBox, self).__init__(simname=simname, loc=loc, columns_to_keep=columns_to_keep, Lbox=Lbox,
                                       pmass=pmass, cosmo=cosmo, version_name = version_name, **new_kwargs)
@@ -588,7 +588,8 @@ class ResolutionTestBox(Cat):
         for key in ['simname', 'loc', 'columns_to_keep', 'Lbox', 'pmass', 'cosmo']:
             if key in new_kwargs:
                 del new_kwargs[key]
-
+        
+        version_name = 'most_recent_%02d'
 
         super(ResolutionTestBox, self).__init__(simname=simname, loc=loc, columns_to_keep=columns_to_keep, Lbox=Lbox,
                                       pmass=pmass, cosmo=cosmo, **new_kwargs)
