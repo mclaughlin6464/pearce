@@ -2,8 +2,7 @@
 """The Emu object esentially wraps the George gaussian process code. It handles building, training, and predicting."""
 
 import warnings
-from glob import glob
-from itertools import izip, product
+from itertools import izip
 from collections import OrderedDict
 from os import path
 from time import time
@@ -15,7 +14,6 @@ import george
 from george.kernels import *
 import scipy.optimize as op
 from scipy.interpolate import interp1d
-from scipy.linalg import inv, block_diag
 from scipy.spatial import KDTree
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 from sklearn.kernel_ridge import KernelRidge
@@ -35,7 +33,8 @@ class Emu(object):
     skl_methods = {'gbdt': GradientBoostingRegressor, 'rf': RandomForestRegressor, \
                    'svr': SVR, 'krr': KernelRidge, 'linear': LinearRegression}
 
-    def __init__(self, filename, method='gp', hyperparams={}, fixed_params={}, independent_variable=None, custom_mean_function = None):
+    def __init__(self, filename, method='gp', hyperparams={}, fixed_params={},\
+                        downsample_factor = 1.0, independent_variable=None, custom_mean_function = None):
         '''
         Initialize the Emu
         :param filename:
@@ -69,6 +68,7 @@ class Emu(object):
 
         self.fixed_params = fixed_params
         self.independent_variable = independent_variable
+        self._downsample_factor = downsample_factor
 
         self.load_training_data(filename, custom_mean_function)
         self.build_emulator(hyperparams)
@@ -214,6 +214,11 @@ class Emu(object):
                         print _obs
                         continue
 
+                    #downsample, if requested.
+                    if downsample_factor != 1.0:
+                        if np.random.rand() < downsample_factor:
+                            continue
+
                     HOD = hod_param_vals[HOD_no, :]
 
                     params = []
@@ -273,6 +278,9 @@ class Emu(object):
 
         # make sure we attach metadata to the object
         x, y, ycov = self.get_data(filename, self.fixed_params, self.independent_variable, attach_params=True)
+
+        # store the data loading args, if we wanna reload later
+        # useful ofr sampling the training data
 
         # whiten the training data
         self._x_mean, self._x_std = x.mean(axis = 0), x.std(axis = 0)
@@ -548,10 +556,18 @@ class Emu(object):
         :return: None
         """
 
+        assert 0 < self.downsample_factor <= 1.0
+        if self.downsample_factor < 1.0:
+            self._downsample_data()
+
         if self.method == 'gp':
             self._build_gp(hyperparams)
         else:  # an sklearn method
             self._build_skl(hyperparams)
+
+    @abstractmethod
+    def _downsample_data(self):
+        pass
 
     @abstractmethod
     def _build_gp(self, hyperparams):
@@ -878,7 +894,7 @@ class Emu(object):
             # not all the parameters, hold some fixed? ugh.
             if type(param_dist) is not OrderedDict:
                 param_dist = OrderedDict(param_dist)
-            param_names = param_dist.keys()
+            user_param_names = param_dist.keys()
             assert all(up in set(param_names) for up in user_param_names)
             fixed_param_names = list(set(param_names) - set(user_param_names))
 
@@ -905,6 +921,10 @@ class Emu(object):
 
             for fixed_param in fixed_param_names:
                 metric[fixed_param] = ig[fixed_param]
+
+            if self._downsample_factor != 1.0:
+                self._downsample_data()
+
             self._build_gp({'metric': metric})
             ll, _ = self._emulator_lnlikelihood()
             print time()-t0
@@ -1071,6 +1091,21 @@ class Emu(object):
 class OriginalRecipe(Emu):
     """Emulator that emulates with only one learner that is trained on all training data. The "naive" approach. """
 
+    def _downsample_data(self):
+
+        N_points = self.x.shape[0]/self.n_bins #sample full HOD/cosmo points,
+        downsample_N_points = int(self._downsample_factor*N_points)
+        self.downsample_x = np.zeros((downsample_N_points*self.n_bins, self.x.shape[1]))
+        self.downsample_y = np.zeros((downsample_N_points*self.n_bins))
+        self.downsample_yerr = np.zeros((downsample_N_points*self.n_bins))
+
+        downsampled_points = np.random.choice(N_points, downsample_N_points, replace = False)
+
+        for i, dp in enumerate(downsampled_points):
+            self.downsample_x[i*self.n_bins:(i+1)*self.n_bins] = self.x[dp*self.n_bins: (dp+1)*self.n_bins]
+            self.downsample_y[i*self.n_bins:(i+1)*self.n_bins] = self.y[dp*self.n_bins: (dp+1)*self.n_bins]
+            self.downsample_yerr[i*self.n_bins:(i+1)*self.n_bins] = self.yerr[dp*self.n_bins: (dp+1)*self.n_bins]
+
     def _build_gp(self, hyperparams):
         """
         Initialize the GP emulator.
@@ -1084,8 +1119,12 @@ class OriginalRecipe(Emu):
 
         self._emulator = george.GP(kernel)
         # gp = george.GP(kernel, solver=george.HODLRSolver, nleaf=x.shape[0]+1,tol=1e-18)
+        if self._downsample_factor == 1.0:
+            x, yerr = self.x, self.yerr
+        else:
+            x, yerr = self.downsample_x, self.downsample_yerr
 
-        self._emulator.compute(self.x, self.yerr)  # NOTE I'm using a modified version of george!
+        self._emulator.compute(x, yerr)  # NOTE I'm using a modified version of george!
 
     def _build_skl(self, hyperparams):
         """
@@ -1107,7 +1146,13 @@ class OriginalRecipe(Emu):
                 hyperparams['kernel'] = lambda x1, x2: kernel.value(np.array([x1]), np.array([x2]))
 
         self._emulator = self.skl_methods[self.method](**hyperparams)
-        self._emulator.fit(self.x, self.y)
+
+        if self._downsample_factor == 1.0:
+            x, y = self.x, self.y
+        else:
+            x, y = self.downsample_x, self.downsample_y
+
+        self._emulator.fit(x, y)
 
     def _emulate_helper(self, t, gp_errs):
         """
@@ -1122,12 +1167,18 @@ class OriginalRecipe(Emu):
         """
 
         mean_func_at_params = self.mean_function(t)
+
+        if self._downsample_factor == 1.0:
+            y = self.y
+        else:
+            y = self.downsample_y
+
         if self.method == 'gp':
             if gp_errs:
-                mu, cov = self._emulator.predict(self.y, t)
+                mu, cov = self._emulator.predict(y, t)
                 return self._y_std*(mu+mean_func_at_params)+self._y_mean, np.diag(cov)*self._y_std**2
             else:
-                return self._y_std*(self._emulator.predict(self.y, t, return_cov=False)+mean_func_at_params)+self._y_mean
+                return self._y_std*(self._emulator.predict(y, t, return_cov=False)+mean_func_at_params)+self._y_mean
         else:
             return self._y_std*(self._emulator.predict(t)+mean_func_at_params) + self._y_mean
 
@@ -1137,11 +1188,16 @@ class OriginalRecipe(Emu):
         # TODO docs
         assert self.method == 'gp'
 
-        ll = self._emulator.lnlikelihood(self.y, quiet=True)
+        if self._downsample_factor == 1.0:
+            y = self.y
+        else:
+            y = self.downsample_y
+
+        ll = self._emulator.lnlikelihood(y, quiet=True)
 
         ll = ll if np.isfinite(ll) else -1e25
 
-        return ll, -self._emulator.grad_lnlikelihood(self.y, quiet=True)
+        return ll, -self._emulator.grad_lnlikelihood(y, quiet=True)
 
 
     def train_metric(self,p0=None, **kwargs):
@@ -1158,11 +1214,18 @@ class OriginalRecipe(Emu):
         assert self.method == 'gp'
 
         # move these outside? hm.
+        if self._downsample_factor == 1.0:
+            y = self.y
+        else:
+            y = self.downsample_y
+
+        # TODO downsample sampling?
         def nll(p):
             # Update the kernel parameters and compute the likelihood.
             # params are log(a) and log(m)
             self._emulator.set_parameter_vector(p)
-            ll = self._emulator.lnlikelihood(self.y, quiet=True)
+
+            ll = self._emulator.lnlikelihood(y, quiet=True)
 
             # The scipy optimizer doesn't play well with infinities.
             return -ll if np.isfinite(ll) else 1e25
@@ -1171,7 +1234,7 @@ class OriginalRecipe(Emu):
         def grad_nll(p):
             # Update the kernel parameters and compute the likelihood.
             self._emulator.set_parameter_vector(p)
-            return -self._emulator.grad_lnlikelihood(self.y, quiet=True)
+            return -self._emulator.grad_lnlikelihood(y, quiet=True)
 
         if p0 is None:
             p0 = self._emulator.get_parameter_vector()
@@ -1347,6 +1410,23 @@ class ExtraCrispy(Emu):
         self.y = _y
         self.yerr = _yerr
 
+    def _downsample_data(self):
+
+        N_points = self.x.shape[1]  # don't sample full HOD/cosmo points. Already broken up in experts
+        downsample_N_points = int(self._downsample_factor * N_points)
+        self.downsample_x = np.zeros((self.x.shape[0], downsample_N_points, self.x.shape[2]))
+        self.downsample_y = np.zeros((self.y.shape[0], downsample_N_points))
+        self.downsample_yerr = np.zeros((self.y.shape[0], downsample_N_points))
+
+        for e in xrange(self.experts):
+
+            downsampled_points = np.random.choice(N_points, downsample_N_points, replace=False)
+
+            for i, dp in enumerate(downsampled_points):
+                self.downsample_x[e,i :(i + 1)] = self.x[e,dp : (dp + 1)]
+                self.downsample_y[e,i :(i + 1) ] = self.y[e,dp: (dp + 1)]
+                self.downsample_yerr[e,i:(i + 1)] = self.yerr[e,dp: (dp + 1)]
+
     def _build_gp(self, hyperparams):
         """
         Initialize the GP emulator using an MOE model.
@@ -1364,7 +1444,14 @@ class ExtraCrispy(Emu):
         # now, make a list of emulators
         self._emulators = []
 
-        for _x, _yerr in izip(self.x, self.yerr):
+        if self._downsample_factor == 1.0:
+            x = self.x
+            yerr = self.yerr
+        else:
+            x = self.downsample_x
+            x = self.downsample_yerr
+
+        for _x, _yerr in izip(x, yerr):
             emulator = george.GP(kernel)
 
             emulator.compute(_x, _yerr,**hyperparams)  # NOTE I'm using a modified version of george!
@@ -1394,7 +1481,13 @@ class ExtraCrispy(Emu):
 
         self._emulators = [self.skl_methods[self.method](**hyperparams) for i in xrange(self.experts)]
 
-        for i, (emulator, _x, _y) in enumerate(izip(self._emulators, self.x, self.y)):
+        if self._downsample_factor == 1.0:
+            x = self.x
+            y = self.y
+        else:
+            x = self.downsample_x
+            y = self.downsample_y
+        for i, (emulator, _x, _y) in enumerate(izip(self._emulators, x, y)):
             emulator.fit(_x, _y)
 
     def _emulate_helper(self, t, gp_errs=False):
@@ -1413,7 +1506,12 @@ class ExtraCrispy(Emu):
 
         mean_func_at_params = self.mean_function(t)
 
-        for i, (emulator, _y) in enumerate(izip(self._emulators, self.y)):
+        if self._downsample_factor == 1.0:
+            y = self.y
+        else:
+            y = self.downsample_y
+
+        for i, (emulator, _y) in enumerate(izip(self._emulators, y)):
             if self.method == 'gp':
                 local_mu, local_cov = emulator.predict(_y, t, return_cov=True)
                 local_err = np.sqrt(np.diag(local_cov))
@@ -1452,7 +1550,12 @@ class ExtraCrispy(Emu):
 
         ll = 0
         gll = 0
-        for idx, (emulator, _y) in enumerate(izip(self._emulators, self.y)):
+        if self._downsample_factor == 1.0:
+            y = self.y
+        else:
+            y = self.downsample_y
+
+        for idx, (emulator, _y) in enumerate(izip(self._emulators, y)):
             ll += emulator.lnlikelihood(_y, quiet=True)
             gll += emulator.grad_lnlikelihood(_y, quiet=True)
 
@@ -1476,13 +1579,17 @@ class ExtraCrispy(Emu):
         assert self.method == 'gp'
 
         # emulators is a list containing refernces to the same object. this should still work!
+        if self._downsample_factor == 1.0:
+            y = self.y
+        else:
+            y = self.downsample_y
 
         # move these outside? hm.
         def nll(p):
             # Update the kernel parameters and compute the likelihood.
             # params are log(a) and log(m)
             ll = 0
-            for emulator, _y in izip(self._emulators, self.y):
+            for emulator, _y in izip(self._emulators, y):
                 emulator.set_parameter_vector(p)
                 ll += emulator.lnlikelihood(_y, quiet=True)
 
@@ -1493,7 +1600,7 @@ class ExtraCrispy(Emu):
         def grad_nll(p):
             # Update the kernel parameters and compute the likelihood.
             gll = 0
-            for emulator, _y in izip(self._emulators, self.y):
+            for emulator, _y in izip(self._emulators, y):
                 emulator.set_parameter_vector(p)
                 gll += emulator.grad_lnlikelihood(_y, quiet=True)
             return -gll
