@@ -1244,7 +1244,7 @@ class OriginalRecipe(Emu):
         # results = op.minimize(nll, p0, jac=grad_nll, method='TNC', bounds =\
         #   [(np.log(0.01), np.log(10)) for i in xrange(ndim+1)],options={'maxiter':50})
 
-        self._emulator.kernel[:] = results.x
+        self._emulator.kernel.set_parameter_vector(results.x)
         self._emulator.recompute()
         # self.metric = np.exp(results.x)
 
