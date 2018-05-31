@@ -211,13 +211,8 @@ class Emu(object):
                         # skip NaN points. May wanna change this behavior.
                         give_warning = True
                         num_skipped += 1
-                        print _obs
+                        #print _obs
                         continue
-
-                    #downsample, if requested.
-                    if downsample_factor != 1.0:
-                        if np.random.rand() < downsample_factor:
-                            continue
 
                     HOD = hod_param_vals[HOD_no, :]
 
@@ -556,8 +551,8 @@ class Emu(object):
         :return: None
         """
 
-        assert 0 < self.downsample_factor <= 1.0
-        if self.downsample_factor < 1.0:
+        assert 0 < self._downsample_factor <= 1.0
+        if self._downsample_factor < 1.0:
             self._downsample_data()
 
         if self.method == 'gp':
@@ -953,7 +948,8 @@ class Emu(object):
         assert statistic in {'r2', 'rms', 'rmsfd', 'abs', 'log_abs', 'frac', 'log_frac'}
         if N is not None:
             assert N > 0 and int(N) == N
-
+        
+        print 'A'
         x, y, _, info = self.get_data(truth_file, self.fixed_params, self.independent_variable)
 
         scale_bin_centers = info['sbc']
@@ -967,12 +963,15 @@ class Emu(object):
 
             x, y = x[idxs], y[idxs]
         
+        print 'B'
         y = y.reshape((-1, scale_nbins))
 
         pred_y = self._emulate_helper(x, False)
+        print 'C'
         pred_y = pred_y.reshape((-1, scale_nbins))
 
         # TODO untested
+
         if np.any(scale_bin_centers != self.scale_bin_centers):
             bin_centers = scale_bin_centers[self.scale_bin_centers[0] <= scale_bin_centers <= self.scale_bin_centers[-1]]
             new_mu = []
@@ -983,6 +982,7 @@ class Emu(object):
             pred_y = np.array(new_mu)
             y = y[:, self.scale_bin_centers[0] <= bin_centers <= self.scale_bin_centers[-1]]
 
+        print 'D'
         if statistic == 'rmsfd':
             return np.sqrt(np.mean((((pred_y - y) ** 2) / (y ** 2)), axis=0))
 
@@ -1174,6 +1174,7 @@ class OriginalRecipe(Emu):
             y = self.downsample_y
 
         if self.method == 'gp':
+            print y.shape, t.shape, self._emulator._x.shape, gp_errs
             if gp_errs:
                 mu, cov = self._emulator.predict(y, t)
                 return self._y_std*(mu+mean_func_at_params)+self._y_mean, np.diag(cov)*self._y_std**2
@@ -1449,7 +1450,7 @@ class ExtraCrispy(Emu):
             yerr = self.yerr
         else:
             x = self.downsample_x
-            x = self.downsample_yerr
+            yerr = self.downsample_yerr
 
         for _x, _yerr in izip(x, yerr):
             emulator = george.GP(kernel)
@@ -1513,8 +1514,9 @@ class ExtraCrispy(Emu):
 
         for i, (emulator, _y) in enumerate(izip(self._emulators, y)):
             if self.method == 'gp':
-                local_mu, local_cov = emulator.predict(_y, t, return_cov=True)
-                local_err = np.sqrt(np.diag(local_cov))
+                local_mu, local_err = emulator.predict(_y, t, return_cov = False,return_var=True)
+                #local_mu = emulator.predict(_y, t, return_cov = False,return_var=False)
+                #local_err = 1.0
             else:
                 local_mu = emulator.predict(t)
                 local_err = 1.0  # weight with this instead of the errors.
@@ -1529,11 +1531,13 @@ class ExtraCrispy(Emu):
             mu[i, :] = self._y_std*(local_mu + mean_func_at_params) + self._y_mean
             err[i, :] = local_err*self._y_std
 
+
         #print 'Endgame'
         #print mu
         #print err
         # now, combine with weighted average
         combined_var = np.reciprocal(np.sum(np.reciprocal(err ** 2), axis=0))
+        #print np.std(combined_var), np.max(combined_var), np.min(combined_var)
         combined_mu = combined_var * np.sum(np.reciprocal(err ** 2) * mu, axis=0)
         #print combined_mu
         #print combined_var
@@ -1541,6 +1545,7 @@ class ExtraCrispy(Emu):
         # Reshape to be consistent with my other implementation
         if not gp_errs:
             return combined_mu
+
         return combined_mu, np.sqrt(combined_var)
 
     def _emulator_lnlikelihood(self):
