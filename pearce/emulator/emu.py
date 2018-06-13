@@ -597,7 +597,7 @@ class Emu(object):
         # TODO  change with mean_function
         elif self.obs == 'wp':
             if independent_variable is None:
-                ig.update({'logMmin': 4.635891111, 'Neff': 8.767158, 'amp': 0.050649375, 'f_c': 3.535979, 'logM0': 0.33752477, 'logM1': 0.81730183, 'H0': 279.72348, 'w0': 0.496905639, 'sigma_logM': 3700.95379, 'r': 0.227461101, 'omch2': 5.313913, 'ln10As': 10.251330035, 'alpha': 1651.3668747, 'ns': 31708.0857, 'ombh2': 535.765296,
+                ig.update({'logMmin': 2.84216e1, 'Neff': 5.6002e10, 'amp': 3.4007e-2, 'f_c': 1.4535e1, 'logM0': 0.33952477, 'logM1': 2.17317, 'H0': 1.943e1, 'w0': 8.15016e19, 'sigma_logM': 1.678e1, 'r': 0.26096, 'omch2': 3.368e1, 'ln10As': 4.672e1, 'alpha': 2.8585e1, 'ns': 9.7638e10, 'ombh2': 5.339e-1,
                         'z': 1.0,
                            'mean_occupation_satellites_assembias_split1': 21.02835102,
                            'mean_occupation_satellites_assembias_slope1': 225.64738711,
