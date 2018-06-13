@@ -386,8 +386,8 @@ class TrainingBox(Cat):
         #locations = {'ki-ls': ['/u/ki/swmclau2/des/testbox_findparents/']}
         locations = {'ki-ls': ['/nfs/slac/g/ki/ki22/cosmo/beckermr/tinkers_emu/Box0%02d/',
                                '/nfs/slac/g/ki/ki23/des/beckermr/tinkers_emu/Box0%02d/'],
-                     'sherlock': ['/home/users/swmclau2/scratch/TrainingBoxes/Box0%02d/',
-                                  '/home/users/swmclau2/scratch/TrainingBoxes/Box0%02d/']}
+                     'sherlock': ['/home/users/swmclau2/scratch/NewTrainingBoxes/Box0%02d/',
+                                  '/home/users/swmclau2/scratch/NewTrainingBoxes/Box0%02d/']}
                       #same place on sherlock
         assert system in locations
         #loc = locations[system][0]
