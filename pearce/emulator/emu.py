@@ -62,6 +62,8 @@ class Emu(object):
         '''
 
         assert method in self.valid_methods
+        if method == 'nn':
+            assert type(self) is SpicyBuffalo #only one to do nn
 
         assert independent_variable in {None, 'r2'}  # no bias for now.
 
@@ -1299,7 +1301,7 @@ def get_leaves_helper(node, leaves):
 class ExtraCrispy(Emu):
     """Emulator that emulates with a mixture of expert learners rather than a single one."""
 
-    def __init__(self, training_dir, experts, overlap=1, partition_scheme='random', **kwargs):
+    def __init__(self, filename, experts, overlap=1, partition_scheme='random', **kwargs):
         """
         Similar initialization as the superclass with one additional parameter: Em_param
         :param training_dir:
@@ -1323,9 +1325,9 @@ class ExtraCrispy(Emu):
         self.overlap = int(overlap)
         self.partition_scheme = partition_scheme
 
-        super(ExtraCrispy, self).__init__(training_dir, **kwargs)
+        super(ExtraCrispy, self).__init__(filename, **kwargs)
 
-    def load_training_data(self, training_dir, custom_mean_function = None):
+    def load_training_data(self, filename, custom_mean_function = None):
         """
         Read the training data for the emulator and attach it to the object.
         :param training_dir:
@@ -1334,7 +1336,7 @@ class ExtraCrispy(Emu):
             Parameters to hold fixed. Only available if data in training_dir is a full hypercube, not a latin hypercube.
         :return: None
         """
-        super(ExtraCrispy, self).load_training_data(training_dir, custom_mean_function)
+        super(ExtraCrispy, self).load_training_data(filename, custom_mean_function)
 
         # now, parition the data as specified by the user
         # note that ppe does not include overlap
@@ -1642,3 +1644,27 @@ class ExtraCrispy(Emu):
             emulator.recompute()
 
         return results
+
+class SpicyBuffalo(Emu):
+    def __init__(self, filename, nn_init_func, cost_func, optimizer_init_func, train_dict, **kwargs):
+        self._nn_init_func = nn_init_func
+        super(SpicyBuffalo, self).__init__(filename, method = 'nn', **kwargs)
+        self.train_nn(self, cost_func, optimizer_init_func, train_dict)
+
+    # TODO this could be in Emu since it is copied from OR
+    def _downsample_data(self):
+
+        N_points = self.x.shape[0]/self.n_bins #sample full HOD/cosmo points,
+        downsample_N_points = int(self._downsample_factor*N_points)
+        self.downsample_x = np.zeros((downsample_N_points*self.n_bins, self.x.shape[1]))
+        self.downsample_y = np.zeros((downsample_N_points*self.n_bins))
+        self.downsample_yerr = np.zeros((downsample_N_points*self.n_bins))
+
+        downsampled_points = np.random.choice(N_points, downsample_N_points, replace = False)
+
+        for i, dp in enumerate(downsampled_points):
+            self.downsample_x[i*self.n_bins:(i+1)*self.n_bins] = self.x[dp*self.n_bins: (dp+1)*self.n_bins]
+            self.downsample_y[i*self.n_bins:(i+1)*self.n_bins] = self.y[dp*self.n_bins: (dp+1)*self.n_bins]
+            self.downsample_yerr[i*self.n_bins:(i+1)*self.n_bins] = self.yerr[dp*self.n_bins: (dp+1)*self.n_bins]
+
+    def _build_nn(self, hyperparams):
