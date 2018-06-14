@@ -19,6 +19,7 @@ from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 from sklearn.kernel_ridge import KernelRidge
 from sklearn.svm import SVR
 from sklearn.linear_model import LinearRegression
+from sklearn.neural_network import MLPRegressor
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.pipeline import make_pipeline
 
@@ -29,9 +30,9 @@ class Emu(object):
 
     __metaclass__ = ABCMeta
     valid_methods = {'gp', 'svr', 'gbdt', 'rf', 'krr',
-                     'linear'}  # could add more, coud even check if they exist in sklearn
+                     'linear', 'nn'}  # could add more, coud even check if they exist in sklearn
     skl_methods = {'gbdt': GradientBoostingRegressor, 'rf': RandomForestRegressor, \
-                   'svr': SVR, 'krr': KernelRidge, 'linear': LinearRegression}
+            'svr': SVR, 'krr': KernelRidge, 'linear': LinearRegression, 'nn': MLPRegressor}
 
     def __init__(self, filename, method='gp', hyperparams={}, fixed_params={},\
                         downsample_factor = 1.0, independent_variable=None, custom_mean_function = None):
