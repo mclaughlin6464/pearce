@@ -664,7 +664,7 @@ class Emu(object):
 
         a = metric[0]
         # TODO other kernels?
-        return a * ExpSquaredKernel(metric[1:], ndim=self.emulator_ndim)
+        return a * ExpSquaredKernel(metric[1:], ndim=self.emulator_ndim)*Matern32Kernel(metric[1:], ndim=self.emulator_ndim)
         # return a * Matern32Kernel(metric[1:], ndim=self.emulator_ndim)
 
     ###Emulation and methods that Utilize it############################################################################
