@@ -143,6 +143,12 @@ class Trainer(object):
             del hod_cfg['ordered_params']
             del hod_cfg['num_hods']
 
+        if 'min_ptcl' in hod_cfg:
+            self._min_ptcl = hod_cfg['min_ptcl']
+            del hod_cfg['min_ptcl']
+        else:
+            self._min_ptcl = 200 #default
+
         self._hod_kwargs = hod_cfg
         # need scale factors too, but just use them from cosmology
 
@@ -386,7 +392,7 @@ class Trainer(object):
             hod_params = dict(zip(self._hod_param_names, self._hod_param_vals[hod_idx, :]))
             #continue
             if self._n_repops == 1:
-                cat.populate(hod_params)
+                cat.populate(hod_params, min_ptcl = self._min_ptcl)
                 # TODO this will fail if you don't jackknife when n_repops is 1
                 obs_val, obs_cov = self._transform_func(calc_observable())
             else:  # do several repopulations
@@ -396,7 +402,7 @@ class Trainer(object):
                     obs_repops = np.zeros((self._n_repops,))
 
                 for repop in xrange(self._n_repops):
-                    cat.populate(hod_params)
+                    cat.populate(hod_params, min_ptcl= self._min_ptcl)
                     obs_repops[repop] = self._transform_func(calc_observable())
 
                 obs_val = np.mean(obs_repops, axis=0)
@@ -441,6 +447,7 @@ class Trainer(object):
 
             f = h5py.File(self.output_fname, 'w')
             f.attrs['obs'] = self.obs
+            f.attrs['min_ptcl'] = self._min_ptcl
             f.attrs['cosmo_param_names'] = self._cosmo_param_names
             f.attrs['cosmo_param_vals'] = self._cosmo_param_vals
             f.attrs['scale_factors'] = self._scale_factors
