@@ -234,7 +234,7 @@ class Emu(object):
                         #we hve to transform the data (take a log, multiply, etc)
                         # TODO this may not work with things like r2 anymore
                         _o, _c = self._iv_transform(independent_variable, _obs, _cov)
-                        y.append(np.log10(np.array([_o[r_idx]])))
+                        y.append(np.array([_o[r_idx]]))
                         ycov.append(np.array(_c[r_idx, r_idx]))
 
                     else:
