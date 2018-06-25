@@ -235,7 +235,7 @@ class Emu(object):
                         #we hve to transform the data (take a log, multiply, etc)
                         # TODO this may not work with things like r2 anymore
                         _o, _c = self._iv_transform(independent_variable, _obs, _cov)
-                        y.append(np.log10(np.array([_o[r_idx]])))
+                        y.append(np.array([_o[r_idx]]))
                         ycov.append(np.array(_c[r_idx, r_idx]))
 
                     else:
@@ -280,7 +280,7 @@ class Emu(object):
 
         # whiten the training data
         self._x_mean, self._x_std = x.mean(axis = 0), x.std(axis = 0)
-        self._y_mean, self._y_std = y.mean(axis = 0), y.std(axis = 0)
+        self._y_mean, self._y_std = 0, 1#y.mean(axis = 0), y.std(axis = 0)
 
         ycov/=(np.outer(self._y_std, self._y_std) + 1e-5)
 
@@ -953,6 +953,9 @@ class Emu(object):
         print 'A'
         x, y, _, info = self.get_data(truth_file, self.fixed_params, self.independent_variable)
 
+        x = (x - self._x_mean)/(self._x_std + 1e-5)
+        #y = (y - self._y_mean)/(self._y_std + 1e-5)
+
         scale_bin_centers = info['sbc']
         scale_nbins = len(scale_bin_centers)
 
@@ -970,6 +973,9 @@ class Emu(object):
         pred_y = self._emulate_helper(x, False)
         print 'C'
         pred_y = pred_y.reshape((-1, scale_nbins))
+
+        print y[0,:]
+        print pred_y[0, :]
 
         # TODO untested
 
