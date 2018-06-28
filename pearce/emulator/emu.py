@@ -19,6 +19,7 @@ from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 from sklearn.kernel_ridge import KernelRidge
 from sklearn.svm import SVR
 from sklearn.linear_model import LinearRegression
+from sklearn.neural_network import MLPRegressor
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.pipeline import make_pipeline
 
@@ -29,9 +30,9 @@ class Emu(object):
 
     __metaclass__ = ABCMeta
     valid_methods = {'gp', 'svr', 'gbdt', 'rf', 'krr',
-                     'linear'}  # could add more, coud even check if they exist in sklearn
+                     'linear', 'nn'}  # could add more, coud even check if they exist in sklearn
     skl_methods = {'gbdt': GradientBoostingRegressor, 'rf': RandomForestRegressor, \
-                   'svr': SVR, 'krr': KernelRidge, 'linear': LinearRegression}
+            'svr': SVR, 'krr': KernelRidge, 'linear': LinearRegression, 'nn': MLPRegressor}
 
     def __init__(self, filename, method='gp', hyperparams={}, fixed_params={},\
                         downsample_factor = 1.0, independent_variable=None, custom_mean_function = None):
@@ -160,14 +161,14 @@ class Emu(object):
             self.obs = f.attrs['obs']
             self.redshift_bin_centers = redshift_bin_centers
             self.scale_bin_centers = scale_bin_centers
-            self.n_bins = len(scale_bin_centers) if scale_bin_centers is not None else 1
+            self.n_bins = len(scale_bin_centers) if (scale_bin_centers is not None) and ('r' not in fixed_params) else 1
             self._ordered_params = ordered_params
         else:
             # return them
             info = {'obs': f.attrs['obs'],
                     'rbc': redshift_bin_centers,
                     'sbc': scale_bin_centers,
-                    'n_bins': len(scale_bin_centers) if scale_bin_centers is not None else 1,
+                    'n_bins': len(scale_bin_centers) if (scale_bin_centers is not None) and ('r' not in fixed_params) else 1,
                     'ordered_params': ordered_params
                     }
 
@@ -664,7 +665,7 @@ class Emu(object):
 
         a = metric[0]
         # TODO other kernels?
-        return a * ExpSquaredKernel(metric[1:], ndim=self.emulator_ndim)*Matern32Kernel(metric[1:], ndim=self.emulator_ndim)
+        return a * ExpSquaredKernel(metric[1:], ndim=self.emulator_ndim)+a*Matern32Kernel(metric[1:], ndim=self.emulator_ndim)+a
         # return a * Matern32Kernel(metric[1:], ndim=self.emulator_ndim)
 
     ###Emulation and methods that Utilize it############################################################################
@@ -949,11 +950,13 @@ class Emu(object):
         if N is not None:
             assert N > 0 and int(N) == N
         
-        print 'A'
         x, y, _, info = self.get_data(truth_file, self.fixed_params, self.independent_variable)
 
+        x = (x - self._x_mean)/(self._x_std + 1e-5)
+        #y = (_y - self._y_mean)/(self._y_std + 1e-5)
+
         scale_bin_centers = info['sbc']
-        scale_nbins = len(scale_bin_centers)
+        scale_nbins = len(scale_bin_centers) if 'r' not in self.fixed_params else 1 
 
         np.random.seed(int(time()))
 
@@ -963,12 +966,12 @@ class Emu(object):
 
             x, y = x[idxs], y[idxs]
         
-        print 'B'
-        y = y.reshape((-1, scale_nbins))
-
+       
         pred_y = self._emulate_helper(x, False)
-        print 'C'
-        pred_y = pred_y.reshape((-1, scale_nbins))
+
+        if scale_nbins > 1:
+            y = y.reshape((-1, scale_nbins))
+            pred_y = pred_y.reshape((-1, scale_nbins))
 
         # TODO untested
 
@@ -982,7 +985,6 @@ class Emu(object):
             pred_y = np.array(new_mu)
             y = y[:, self.scale_bin_centers[0] <= bin_centers <= self.scale_bin_centers[-1]]
 
-        print 'D'
         if statistic == 'rmsfd':
             return np.sqrt(np.mean((((pred_y - y) ** 2) / (y ** 2)), axis=0))
 
@@ -1003,10 +1005,10 @@ class Emu(object):
             return pred_y - y
             # return np.mean((pred_y - y), axis=0)
         elif statistic == 'log_frac':  # 'rel'
-            return (pred_y - y) / y
+            return np.abs(pred_y - y) / np.abs(y)
             # return np.mean((pred_y - y) / y, axis=0)
         else:  # 'frac'
-            return (10 ** pred_y - 10 ** y) / (10 ** y)
+            return np.abs(10 ** pred_y - 10 ** y) / np.abs(10 ** y)
 
     @abstractmethod
     def _emulator_lnlikelihood(self):
@@ -1174,7 +1176,6 @@ class OriginalRecipe(Emu):
             y = self.downsample_y
 
         if self.method == 'gp':
-            print y.shape, t.shape, self._emulator._x.shape, gp_errs
             if gp_errs:
                 mu, cov = self._emulator.predict(y, t)
                 return self._y_std*(mu+mean_func_at_params)+self._y_mean, np.diag(cov)*self._y_std**2
