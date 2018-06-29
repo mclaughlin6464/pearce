@@ -589,10 +589,10 @@ class ResolutionTestBox(Cat):
             if key in new_kwargs:
                 del new_kwargs[key]
         
-        version_name = 'most_recent_%02d'
+        version_name = 'most_recent_%02d'%boxno
 
         super(ResolutionTestBox, self).__init__(simname=simname, loc=loc, columns_to_keep=columns_to_keep, Lbox=Lbox,
-                                      pmass=pmass, cosmo=cosmo, **new_kwargs)
+                                      pmass=pmass, cosmo=cosmo,version_name = version_name, **new_kwargs)
 
         cache_locs = {'ki-ls': '/u/ki/swmclau2/des/halocats/hlist_%.2f.list.%s_%02d.hdf5',
                       'sherlock': '/scratch/users/swmclau2/halocats/hlist_%.2f.list.%s_%02d.hdf5'}

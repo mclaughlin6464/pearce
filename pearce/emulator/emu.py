@@ -111,9 +111,15 @@ class Emu(object):
         # get global attributes from the file
         cosmo_param_names = f.attrs['cosmo_param_names']
         hod_param_names = f.attrs['hod_param_names']
-
-        cosmo_param_vals = f.attrs['cosmo_param_vals']
-        hod_param_vals = f.attrs['hod_param_vals']
+        try:
+            cosmo_param_vals = f.attrs['cosmo_param_vals']
+            hod_param_vals = f.attrs['hod_param_vals']
+        except KeyError:
+            cosmo_param_vals = np.array(f['attrs/cosmo_param_vals'])
+            hod_param_vals = np.array(f['attrs/hod_param_vals'])
+        
+        fixed_cosmo = 'cosmo' in fixed_params or cosmo_param_vals.shape[0] == 1
+        fixed_hod = 'HOD' in fixed_params or hod_param_vals.shape[0] == 1
 
         scale_factors = f.attrs['scale_factors']
         redshift_bin_centers = 1.0/scale_factors - 1 # emulator works in z, sims in a.
@@ -131,16 +137,16 @@ class Emu(object):
         # construct ordered_params
         # ordered_params is an ordered dict whose keys are the parameters in the
         # order they are in in the data. The values are their bounds in the training data
-        if 'HOD' in fixed_params and 'cosmo' not in fixed_params:
+        if fixed_hod and not fixed_cosmo:
             # Why not?
             #if 'cosmo' in fixed_params:
             #    raise ValueError("Can't fix both HOD and cosmology!")
             min_max_vals = zip(cosmo_param_vals.min(axis=0), cosmo_param_vals.max(axis=0))
             ordered_params = OrderedDict(izip(cosmo_param_names, min_max_vals))
-        elif 'cosmo' in fixed_params and 'HOD' not in fixed_params:
+        elif fixed_cosmo and not fixed_hod:
             min_max_vals = zip(hod_param_vals.min(axis=0), hod_param_vals.max(axis=0))
             ordered_params = OrderedDict(izip(hod_param_names, min_max_vals))
-        elif 'cosmo' not in fixed_params and 'HOD' not in fixed_params:
+        elif not fixed_hod and not fixed_cosmo: 
             op_names = list(cosmo_param_names[:])
             op_names.extend(hod_param_names)
 
@@ -184,13 +190,15 @@ class Emu(object):
         num_skipped = 0
         num_used = 0
 
+
         for cosmo_group_name, cosmo_group in f.iteritems():
             # we're fixed to a particular cosmology #
+            if cosmo_group_name == 'attrs':
+                continue
             cosmo_no = int(cosmo_group_name[-2:])
             if 'cosmo' in fixed_params and cosmo_no != fixed_params['cosmo']:
                     continue
             for sf_group_name, sf_group in cosmo_group.iteritems():
-                # likewise
                 z = 1.0/float(sf_group_name[-5:]) - 1.0
 
                 # TODO fudge factors?
@@ -199,6 +207,7 @@ class Emu(object):
 
                 obs_dset = sf_group['obs']
                 cov_dset = sf_group['cov']
+
 
                 cosmo = cosmo_param_vals[cosmo_no, :]
                 # efficiency note. If I don't iterate over the datasets, just the indicies,
@@ -219,9 +228,9 @@ class Emu(object):
 
                     params = []
                     # I wonder if this is annoyingly inefficient. Probably not a huge deal.
-                    if 'cosmo' not in fixed_params:
+                    if not fixed_cosmo: 
                         params.extend(list(cosmo))
-                    if 'HOD' not in fixed_params:
+                    if not fixed_hod: 
                         params.extend(list(HOD))
                     if 'z' not in fixed_params:
                         params.append(z)
@@ -249,6 +258,8 @@ class Emu(object):
                         ycov.append(_c)
 
                     num_used += 1
+
+
 
         if give_warning:
             warnings.warn('WARNING: NaN detected. Skipped %d points in training data.' % (num_skipped))
@@ -666,6 +677,7 @@ class Emu(object):
         a = metric[0]
         # TODO other kernels?
         return a * ExpSquaredKernel(metric[1:], ndim=self.emulator_ndim)+a*Matern32Kernel(metric[1:], ndim=self.emulator_ndim)+a
+        #return a * ExpSquaredKernel(metric[1:], ndim=self.emulator_ndim)*Matern32Kernel(metric[1:], ndim=self.emulator_ndim)
         # return a * Matern32Kernel(metric[1:], ndim=self.emulator_ndim)
 
     ###Emulation and methods that Utilize it############################################################################
