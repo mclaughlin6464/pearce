@@ -724,7 +724,7 @@ class Cat(object):
 
     # TODO do_jackknife to cov?
     @observable
-    def calc_xi(self, rbins, n_cores='all', do_jackknife=True, use_corrfunc=False, jk_args={}, halo=False):
+    def calc_xi(self, rbins, n_cores='all', do_jackknife=False, use_corrfunc=False, jk_args={}, halo=False):
         '''
         Calculate a 3-D correlation function on a populated catalog.
         :param rbins:

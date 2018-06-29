@@ -462,11 +462,13 @@ class TestBox(Cat):
         self.realization = realization
 
         simname = 'testbox'# not sure if something with Emu would work better, but wanna separate from Emu..
-        columns_to_keep = OUTLIST_COLS.copy()  # OUTLIST_BGC2_COLS
-        del columns_to_keep['halo_mvir']
-        columns_to_keep['halo_m200b'] = (2, 'f4')
-        del columns_to_keep['halo_rvir']
-        columns_to_keep['halo_r200b'] = (5, 'f4')
+        columns_to_keep =  OUTLIST_BGC2_COLS.copy()
+        # Add duplicate columns for mvir if allowed
+        # TODO this sucks but halotools is tough here.
+        del columns_to_keep['halo_m200b']
+        columns_to_keep['halo_mvir'] = (2, 'f4')
+        del columns_to_keep['halo_r200b']
+        columns_to_keep['halo_rvir'] = (5, 'f4')
 
         Lbox = 1050.0  # Mpc/h
         self.npart = 1400
@@ -487,9 +489,9 @@ class TestBox(Cat):
         locations = {'ki-ls': ['/nfs/slac/des/fs1/g/sims/beckermr/tinkers_emu/TestBox00%d-00%d/halos/m200b/',
                                        '/nfs/slac/g/ki/ki22/cosmo/beckermr/tinkers_emu/TestBox00%d-00%d/halos/m200b/',
                                        '/nfs/slac/g/ki/ki23/des/beckermr/tinkers_emu/TestBox00%d-00%d/halos/m200b/'],
-                     'sherlock': ['/home/swmclau2/scratch/TestBoxes/TestBox0%02d-00%d/',
-                                  '/home/swmclau2/scratch/TestBoxes/TestBox0%02d-00%d/',
-                                  '/home/swmclau2/scratch/TestBoxes/TestBox0%02d-00%d/']} #all the same for Sherlock
+                     'sherlock': ['/home/users/swmclau2/scratch/TestBoxes/TestBox0%02d-00%d/halos/m200b/',
+                                  '/home/users/swmclau2/scratch/TestBoxes/TestBox0%02d-00%d/halos/m200b/',
+                                  '/home/users/swmclau2/scratch/TestBoxes/TestBox0%02d-00%d/halos/m200b/']} #all the same for Sherlock
         assert system in locations
         #loc = locations[system][0]
         loc_list = locations[system]
