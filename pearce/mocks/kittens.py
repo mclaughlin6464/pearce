@@ -489,9 +489,9 @@ class TestBox(Cat):
         locations = {'ki-ls': ['/nfs/slac/des/fs1/g/sims/beckermr/tinkers_emu/TestBox00%d-00%d/halos/m200b/',
                                        '/nfs/slac/g/ki/ki22/cosmo/beckermr/tinkers_emu/TestBox00%d-00%d/halos/m200b/',
                                        '/nfs/slac/g/ki/ki23/des/beckermr/tinkers_emu/TestBox00%d-00%d/halos/m200b/'],
-                     'sherlock': ['/home/users/swmclau2/scratch/TestBoxes/TestBox0%02d-00%d/halos/m200b/',
-                                  '/home/users/swmclau2/scratch/TestBoxes/TestBox0%02d-00%d/halos/m200b/',
-                                  '/home/users/swmclau2/scratch/TestBoxes/TestBox0%02d-00%d/halos/m200b/']} #all the same for Sherlock
+                     'sherlock': ['/home/users/swmclau2/scratch/NewTrainingBoxes/TestBox0%02d-00%d/',
+                                  '/home/users/swmclau2/scratch/NewTrainingBoxes/TestBox0%02d-00%d/',
+                                  '/home/users/swmclau2/scratch/NewTrainingBoxes/TestBox0%02d-00%d/']} #all the same for Sherlock
         assert system in locations
         #loc = locations[system][0]
         loc_list = locations[system]
@@ -502,6 +502,9 @@ class TestBox(Cat):
             loc = loc_list[1]%(boxno, realization)
         else:
             loc = loc_list[2]%(boxno, realization)
+
+        gadget_loc = loc + 'output/'
+        loc += 'halos/m200b/'
 
         tmp_fnames = ['outbgc2_%d.list' % i for i in xrange(10)]
         #tmp_fnames = ['TestBox00%d-000_out_parents_5.list' % boxno]
@@ -517,7 +520,7 @@ class TestBox(Cat):
         version_name = 'most_recent_%02d_%d'%(boxno, realization)
 
         super(TestBox, self).__init__(simname=simname, loc=loc, columns_to_keep=columns_to_keep, Lbox=Lbox,
-                                      pmass=pmass, cosmo=cosmo, version_name = version_name, **new_kwargs)
+                                      pmass=pmass, cosmo=cosmo, version_name = version_name, gadget_loc=gadget_loc,**new_kwargs)
 
         cache_locs = {'ki-ls': '/u/ki/swmclau2/des/halocats/hlist_%.2f.list.%s_%02d.hdf5',
                       'sherlock': '/scratch/users/swmclau2/halocats/hlist_%.2f.list.%s_%02d.hdf5'}
