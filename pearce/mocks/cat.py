@@ -323,6 +323,7 @@ class Cat(object):
         all_particles = np.array([], dtype='float32')
         # TODO should fail gracefully if memory is exceeded or if p is too small.
         for file in glob(path.join(snapdir, 'snapshot*')):
+            print 'Reading %s'%file
             # TODO should find out which is "fast" axis and use that.
             # Numpy uses fortran ordering.
             particles = readGadgetSnapshot(file, read_pos=True)[1]  # Think this returns some type of tuple; should check
@@ -1086,6 +1087,8 @@ class Cat(object):
 
         x_m, y_m, z_m = [self.halocat.ptcl_table[c] for c in ['x', 'y', 'z']]
         pos_m = return_xyz_formatted_array(x_m, y_m, z_m, period=self.Lbox)
+
+
 
         #Halotools wnats downsampling factor defined oppositley
         #TODO verify little h!
