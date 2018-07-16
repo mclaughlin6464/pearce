@@ -290,8 +290,8 @@ class Emu(object):
         # useful ofr sampling the training data
 
         # whiten the training data
-        self._x_mean, self._x_std = x.mean(axis = 0), x.std(axis = 0)
-        self._y_mean, self._y_std = y.mean(axis = 0), y.std(axis = 0)
+        self._x_mean, self._x_std = 0.0, 1.0#x.mean(axis = 0), x.std(axis = 0)
+        self._y_mean, self._y_std = 0.0, 1.0#y.mean(axis = 0), y.std(axis = 0)
 
         ycov/=(np.outer(self._y_std, self._y_std) + 1e-5)
 
@@ -687,9 +687,9 @@ class Emu(object):
 
         a = metric[0]
         # TODO other kernels?
-        #return a * ExpSquaredKernel(metric[1:], ndim=self.emulator_ndim)+a*Matern32Kernel(metric[1:], ndim=self.emulator_ndim)+a
+        return a * ExpSquaredKernel(metric[1:], ndim=self.emulator_ndim)+a*Matern32Kernel(metric[1:], ndim=self.emulator_ndim)+a
         #return a * ExpSquaredKernel(metric[1:], ndim=self.emulator_ndim)*Matern32Kernel(metric[1:], ndim=self.emulator_ndim)
-        return a * Matern32Kernel(metric[1:], ndim=self.emulator_ndim) + a
+        #return a * Matern32Kernel(metric[1:], ndim=self.emulator_ndim) + a
 
     ###Emulation and methods that Utilize it############################################################################
     def emulate(self, em_params, gp_errs=False):

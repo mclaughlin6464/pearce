@@ -167,10 +167,10 @@ class Chinchilla(Cat):
             # add a subdirectory
             loc += 'c%d-%d/' % (int(Lbox), int(npart))
 
-            if system == 'ki-ls' or system == 'long':  # differences in how the files are stored
-                gadget_loc = loc
-                loc += '/rockstar/hlists/'
-                gadget_loc += '/output/'
+            #if system == 'ki-ls' or system == 'long':  # differences in how the files are stored
+            gadget_loc = loc
+            loc += '/rockstar/hlists/'
+            gadget_loc += '/output/'
 
             tmp_fnames = sorted(glob(loc + 'hlist_*.list'))  # snag all the hlists
             tmp_fnames = [fname[len(loc):] for fname in tmp_fnames]  # just want the names in the dir
