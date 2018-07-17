@@ -840,9 +840,9 @@ class Cat(object):
             #corrfunc doesn't have built in cross correlations
             rand_N1 = 3 * len(x_g)
 
-            rand_X1 = np.random.uniform(0, self.Lbox*self.h, rand_N1)
-            rand_Y1 = np.random.uniform(0, self.Lbox*self.h, rand_N1)
-            rand_Z1 = np.random.uniform(0, self.Lbox*self.h, rand_N1)
+            rand_X1 = np.random.uniform(0, self.Lbox/self.h, rand_N1)
+            rand_Y1 = np.random.uniform(0, self.Lbox/self.h, rand_N1)
+            rand_Z1 = np.random.uniform(0, self.Lbox/self.h, rand_N1)
 
             rand_N2 = 3 * len(x_m)
 
@@ -851,11 +851,11 @@ class Cat(object):
             rand_Z2 = np.random.uniform(0, self.Lbox / self.h, rand_N2)
 
             autocorr = False
-            D1D2 = DD(autocorr, n_cores, rbins, x_g.astype('float32'),  y_g.astype('float32'),  z_g.astype('float32'),
-                      X2= x_m.astype('float32'), Y2 = y_m.astype('float32'), Z2 = z_m.astype('float32'))
-            D1R2 = DD(autocorr, n_cores, rbins, x_g.astype('float32'), y_g.astype('float32'), z_g.astype('float32'),
+            D1D2 = DD(autocorr, n_cores, rbins, x_g.astype('float32')/self.h,  y_g.astype('float32')/self.h,  z_g.astype('float32')/self.h,
+                      X2= x_m.astype('float32')/self.h, Y2 = y_m.astype('float32')/self.h, Z2 = z_m.astype('float32')/self.h)
+            D1R2 = DD(autocorr, n_cores, rbins, x_g.astype('float32')/self.h, y_g.astype('float32')/self.h, z_g.astype('float32')/self.h,
                       X2=rand_X2.astype('float32'), Y2=rand_Y2.astype('float32'), Z2=rand_Z2.astype('float32'))
-            D2R1 = DD(autocorr, n_cores, rbins, x_m.astype('float32'), y_m.astype('float32'), z_m.astype('float32'),
+            D2R1 = DD(autocorr, n_cores, rbins, x_m.astype('float32')/self.h, y_m.astype('float32')/self.h, z_m.astype('float32')/self.h,
                       X2=rand_X1.astype('float32'), Y2=rand_Y1.astype('float32'), Z2=rand_Z1.astype('float32'))
             R1R2 = DD(autocorr, n_cores, rbins,rand_X1.astype('float32'),rand_Y1.astype('float32'), rand_Z1.astype('float32'),
                       X2=rand_X2.astype('float32'), Y2=rand_Y2.astype('float32'), Z2=rand_Z2.astype('float32'))
@@ -863,7 +863,7 @@ class Cat(object):
             xi_all = convert_3d_counts_to_cf(len(x_g), len(x_m), rand_N1, rand_N2,
                                              D1D2, D1R2, D2R1, R1R2)
         else:
-            xi_all = tpcf(pos_g / self.h, rbins, sample2 = pos_m*self.h, period=self.Lbox / self.h, num_threads=n_cores,
+            xi_all = tpcf(pos_g / self.h, rbins, sample2 = pos_m/self.h, period=self.Lbox / self.h, num_threads=n_cores,
                           estimator='Landy-Szalay', do_auto=False)
 
         return xi_all
@@ -1090,6 +1090,6 @@ class Cat(object):
         #Halotools wnats downsampling factor defined oppositley
         #TODO verify little h!
         # TODO maybe split into a few lines for clarity
-        return self.h*delta_sigma(pos_g / self.h,pos_m*self.h, self.pmass*self.h,
+        return self.h*delta_sigma(pos_g / self.h,pos_m/self.h, self.pmass/self.h,
                            downsampling_factor = 1./self._downsample_factor, rp_bins = rp_bins,
                            period=self.Lbox / self.h, num_threads=n_cores,cosmology = self.cosmology)[1]/(1e12)
