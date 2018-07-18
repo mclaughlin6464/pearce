@@ -958,7 +958,7 @@ class Cat(object):
         wt_all = angular_tpcf(ang_pos, theta_bins, randoms=rand_ang_pos, num_threads=n_cores)
         return wt_all
 
-    def compute_wt_prefactor(self, zbins, dNdz):
+    def compute_wt_prefactor(self, zbins, dNdzs):
         """
         Helper function to compute the w(theta) prefactor W from the dNdz distribution. 
         param zbins: the edges of the redshift bins in which dNdz is computed
@@ -967,7 +967,7 @@ class Cat(object):
         return: W, the result of 2/c*\int_0^{\infty} dz H(z) (dN/dz)^2, in units of inverse Mpc
         """
         W = 0 
-        for idx, dN in enumerate(dNdz):
+        for idx, dN in enumerate(dNdzs):
             dz = zbins[idx+1] - zbins[idx]
             dNdz = dN/dz
             H = self.cosmology.H((zbins[idx+1] + zbins[idx])/2.0)
@@ -1093,3 +1093,52 @@ class Cat(object):
         return self.h*delta_sigma(pos_g / self.h,pos_m/self.h, self.pmass/self.h,
                            downsampling_factor = 1./self._downsample_factor, rp_bins = rp_bins,
                            period=self.Lbox / self.h, num_threads=n_cores,cosmology = self.cosmology)[1]/(1e12)
+
+    def calc_sigma_crit_inv(self, zbins, dNdzs):
+        """
+
+        :param zbins:
+        :param dNdz:
+        :return:
+        """
+        Scrit = 0
+        Dl = self.cosmology.angular_diameter_distance(self.z)
+        Dl_t = self.cosmology.angular_diameter_distance(self.z)
+        for idx, dN in enumerate(dNdzs):
+            dz = zbins[idx+1] - zbins[idx]
+            zs = zbins[idx]
+            Dls =  1/(1+zs)*(self.cosmology.comoving_distance(zs) - Dl_t) # from  arXiv:9905116 (David Hogg distance paper)
+            Scrit+= dN*dz*Dls/self.cosmology.angular_diameter_distance(zs)
+
+        return (Scrit*Dl*4*np.pi*const.G/(const.c**2)).to("(Mpc^2)/Msun").value
+
+    @observable
+    def calc_gt(self, theta_bins, rp_bins,sigma_crit_inv, n_cores='all', ds_kwargs = {}):
+        """
+
+        :param theta_bins:
+        :param rbins:
+        :param n_cores:
+        :param ds_kwargs:
+        :return:
+        """
+        n_cores = self._check_cores(n_cores)
+        # TODO analytic delta sigma?
+        ds = self.calc_ds(rp_bins,n_cores =n_cores, **ds_kwargs)
+        rpbc = (rp_bins[1:]+rp_bins[:-1])/2.0
+        gamma_r = sigma_crit_inv*ds
+
+        gamma_r_interp = interp1d(np.log10(rpbc), np.log10(gamma_r))
+
+        Da = self.cosmology.angular_diameter_distance(self.z)
+
+        tbc = (theta_bins[1:]+theta_bins[:-1])/2.0
+        gamma_t = np.zeros_like(tbc)
+
+        for i, t in enumerate(np.radians(tbc)):
+            gamma_t[i] = 10**gamma_r_interp(np.log10(t*Da))
+
+        return gamma_t
+
+
+
