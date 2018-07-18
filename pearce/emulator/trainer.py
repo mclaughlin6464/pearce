@@ -446,14 +446,27 @@ class Trainer(object):
             all_cosmo_sf_pairs = np.array(list(product(xrange(len(self.cats)), xrange(len(self._scale_factors)))))
 
             f = h5py.File(self.output_fname, 'w')
-            f.attrs['obs'] = self.obs
-            f.attrs['min_ptcl'] = self._min_ptcl
-            f.attrs['cosmo_param_names'] = self._cosmo_param_names
-            f.attrs['cosmo_param_vals'] = self._cosmo_param_vals
-            f.attrs['scale_factors'] = self._scale_factors
-            f.attrs['hod_param_names'] = self._hod_param_names
-            f.attrs['hod_param_vals'] = self._hod_param_vals
-            f.attrs['scale_bins'] = self.scale_bins
+            try:
+                f.attrs['obs'] = self.obs
+                f.attrs['min_ptcl'] = self._min_ptcl
+                f.attrs['cosmo_param_names'] = self._cosmo_param_names
+                f.attrs['cosmo_param_vals'] = self._cosmo_param_vals
+                f.attrs['scale_factors'] = self._scale_factors
+                f.attrs['hod_param_names'] = self._hod_param_names
+                f.attrs['hod_param_vals'] = self._hod_param_vals
+                f.attrs['scale_bins'] = self.scale_bins
+            except RuntimeError: #data too large
+                attrs = f.create_group('attrs')
+
+                f.attrs['obs'] = self.obs
+                f.attrs['min_ptcl'] = self._min_ptcl
+                f.attrs['cosmo_param_names'] = self._cosmo_param_names
+                f.attrs['scale_factors'] = self._scale_factors
+                f.attrs['hod_param_names'] = self._hod_param_names
+                f.attrs['scale_bins'] = self.scale_bins
+
+                attrs.create_dataset('cosmo_param_vals', data= self._cosmo_param_vals)
+                attrs.create_dataset('hod_param_vals', data= self._hod_param_vals)
 
             for cosmo_sf_pair in all_cosmo_sf_pairs:
                 group_name = self._get_group_name(*cosmo_sf_pair)

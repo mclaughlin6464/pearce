@@ -596,12 +596,23 @@ class Emu(object):
         # default
         ig = {'amp': 1}
         ig.update({pname: 0.1 for pname in self._ordered_params})
-
         if self.obs == 'xi':
             if independent_variable is None:
-                ig.update({'amp': 0.481, 'logMmin': 0.1349, 'sigma_logM': 0.089,
-                           'logM0': 2.0, 'logM1': 0.204, 'alpha': 0.039,
-                           'f_c': 0.041, 'r': 0.040, 'z': 1.0})
+                ig.update({'H0': 0.12537079874409196,
+                 'Neff': 9.682153059967076e-06,
+                  'alpha': 0.5004939102700954,
+                   'amp': 1.2829697978941474,
+                    'ln10As': 0.00031695820887261153,
+                     'logM0': 2.3482346005542763e-05,
+                      'logM1': 1.208270935044776e-05,
+                       'logMmin': 0.00028373036165162114,
+                        'ns': 4398.317466650228,
+                         'ombh2': 895166.4721378284,
+                          'omch2': 78304.65404301183,
+                           'sigma_logM': 10092.715146305698,
+                            'w0': 5.3884384426082236e-05,
+                            'r': 0.40,
+                            'z':1.0})
             else:
                 # could have other guesses for this case, but don't have any now
                 # leave this structure in case I make more later
