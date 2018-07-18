@@ -15,6 +15,7 @@ from multiprocessing import Pool
 import numpy as np
 from scipy.interpolate import interp1d
 from scipy.stats import linregress
+from scipy.integrate import quad
 
 from astropy import cosmology
 from astropy import constants as const, units as units
@@ -977,7 +978,7 @@ class Cat(object):
 
 
     @observable
-    def calc_wt(self, theta_bins, rbins, W, n_cores='all', halo = False, xi_kwargs = {}):
+    def calc_wt(self, theta_bins, W, n_cores='all', halo = False, xi_kwargs = {}):
         """
         TODO docs
         """
@@ -987,18 +988,22 @@ class Cat(object):
         except AssertionError:
             raise AssertionError("CCL is required for calc_wt. Please install, or choose another function.")
 
-        if type(rbins) is list:
-            rbins = np.array(rbins)
-
         n_cores = self._check_cores(n_cores)
+        # calculate xi_gg first
+        rbins = np.logspace(-1.1, 1.6, 17) #make my own bins
         xi = self.calc_xi(rbins,do_jackknife=False,n_cores=n_cores, halo=halo, **xi_kwargs)
-        rpoints = (rbins[:-1]+rbins[1:])/2.0
-        
+
         if np.any(xi<=0):
             warnings.warn("Some values of xi are less than 0. Setting to a small nonzero value. This may have unexpected behavior, check your HOD")
             xi[xi<=0] = 1e-3
+        #TODO I should be able to just specify my own rbins
+        rpoints = (rbins[:-1]+rbins[1:])/2.0
+        xi_rmin, xi_rmax = rpoints[0], rpoints[-1]
 
+        # make an interpolator for integrating
         xi_interp = interp1d(np.log10(rpoints), np.log10(xi))
+
+        # get the theotertical matter xi, for large scale estimates
         names, vals = self._get_cosmo_param_names_vals()
         param_dict = { n:v for n,v in zip(names, vals)}
 
@@ -1009,57 +1014,44 @@ class Cat(object):
         cosmo = ccl.Cosmology(**param_dict)
 
         big_rbins = np.logspace(1, 2.1, 21)
-        big_rbc = (big_rbins[1:] + big_rbins[:-1])/2.0
-        xi_mm = ccl.correlation_3d(cosmo, self.a, big_rbc)
+        big_rpoints = (big_rbins[1:] + big_rbins[:-1])/2.0
+        big_xi_rmax = big_rpoints[-1]
+        xi_mm = ccl.correlation_3d(cosmo, self.a, big_rpoints)
 
-        #bias2 = np.mean(xi[-3:]/xi_mm[-3:]) #estimate the large scale bias from the box
-        #note i don't use the bias builtin cuz i've already computed xi_gg. 
+        xi_mm_interp = interp1d(np.log10(big_rpoints), np.log10(xi_mm))
 
-        xi_mm_interp = interp1d(np.log10(big_rbc), np.log10(xi_mm))
-
+        #correction factor
         bias2 = np.power(10, xi_interp(1.2)-xi_mm_interp(1.2))
 
         tpoints = (theta_bins[1:] + theta_bins[:-1])/2.0
         wt = np.zeros_like(tpoints)
+        # need this distance for computation
         x = self.cosmology.comoving_distance(self.z)/self.h
 
-        assert tpoints[0]*x.to("Mpc").value/self.h >= rbins[0]
-        #ubins = np.linspace(10**-6, 10**4.0, 1001)
-        ubins = np.logspace(-6, 2.0, 501)
-        ubc = (ubins[1:]+ubins[:-1])/2.0
-        
-        # TODO this is like this cause of a half-assed attempt at parraleization
-        # this is unesscary now, and could be discarded for a simpler for loop
-        def integrate_xi(bin_no):#, w_theta, bin_no, ubc, ubins)
-            int_xi = 0
-            t_med = np.radians(tpoints[bin_no])
-            for ubin_no, _u in enumerate(ubc):
-                _du = ubins[ubin_no+1]-ubins[ubin_no]
-                u = _u*units.Mpc/self.h
-                du = _du*units.Mpc/self.h
+        assert tpoints[0]*x.to("Mpc").value/self.h >= xi_rmin #TODO explain this check
 
-                r = np.sqrt((u**2+(x*t_med)**2))#*cat.h#not sure about the h
+        def small_scales_integrand(log_u, x, t, xi_interp):
+            r2 = np.power(10, 2*log_u) + (x*t)**2
+            return np.power(10, xi_interp(0.5*np.log10(r2)))
 
-                if r > (units.Mpc)*self.Lbox/10:
-                    try:
-                        int_xi+=du*bias2*(np.power(10, \
-                                xi_mm_interp(np.log10(r.value))))
-                    except ValueError:
-                        #interpolation failed
-                        int_xi+=du*0
-                else:
-                    int_xi+=du*(np.power(10, \
-                                xi_interp(np.log10(r.value))))
-            wt[bin_no] = int_xi.to("Mpc").value/self.h
+        def large_scales_integrand(log_u, x, t, bias2, xi_mm_interp):
+            r2 = np.power(10, 2*log_u) + (x*t)**2
+            try:
+                return bias2*np.power(10, xi_mm_interp(0.5*np.log10(r2)))
+            except ValueError: #usually out of bounds interpolation
+                return 0.0
 
-        #Currently this doesn't work cuz you can't pickle the integrate_xi function.
-        #I'll just ignore for now. This is why i'm making an emulator anyway
-        #p = Pool(n_cores)  
-        map(integrate_xi, range(tpoints.shape[0]))
-        #p.map(integrate_xi, range(tpoints.shape[0]))
-        #p.terminate()
+        for bin_no, t_med in enumerate(tpoints):
+            log_u_ss_max = np.log10(xi_rmax**2 - (t_med*x)**2)/2.0 #max we can integrate to on small scales
+            log_u_ls_max = np.log10(big_xi_rmax**2 - (t_med*x)**2)/2.0 #max we can integrate to on small scales
+            small_scales_contribution = quad(small_scales_integrand, -10, log_u_ss_max, args = (x.value, t_med, xi_interp))[0]
+            large_scales_contribution = quad(large_scales_integrand, log_u_ss_max, log_u_ls_max,\
+                                             args = (x.value, t_med, bias2, xi_mm_interp))[0]
+
+            wt[bin_no] = (small_scales_contribution + large_scales_contribution)/self.h #TODO check little h's
 
         return wt*W
+
     # TODO need to implement a particle check for some of these new functions
     # TODO may want to enable central/satellite cuts, etc
     @observable
@@ -1094,6 +1086,90 @@ class Cat(object):
                            downsampling_factor = 1./self._downsample_factor, rp_bins = rp_bins,
                            period=self.Lbox / self.h, num_threads=n_cores,cosmology = self.cosmology)[1]/(1e12)
 
+    @observable
+    def calc_ds_analytic(self, rp_bins, n_cores = 'all', ds_kwargs = {}):
+
+        # NOTE this is compied stright from
+        assert 'do_jackknife' not in ds_kwargs
+        try:
+            assert CCL_AVAILABLE
+        except AssertionError:
+            raise AssertionError("CCL is required for calc_wt. Please install, or choose another function.")
+
+        n_cores = self._check_cores(n_cores)
+        # calculate xi_gg first
+        rbins = np.logspace(-1.1, 1.6, 17)
+        xi = self.calc_xi_gm(rbins,do_jackknife=False,n_cores=n_cores, **ds_kwargs)
+
+        if np.any(xi<=0):
+            warnings.warn("Some values of xi are less than 0. Setting to a small nonzero value. This may have unexpected behavior, check your HOD")
+            xi[xi<=0] = 1e-3
+
+        rpoints = (rbins[:-1]+rbins[1:])/2.0
+        xi_rmin, xi_rmax = rpoints[0], rpoints[-1]
+
+        # make an interpolator for integrating
+        xi_interp = interp1d(np.log10(rpoints), np.log10(xi))
+
+        # get the theotertical matter xi, for large scale estimates
+        names, vals = self._get_cosmo_param_names_vals()
+        param_dict = { n:v for n,v in zip(names, vals)}
+
+        if 'Omega_c' not in param_dict:
+            param_dict['Omega_c'] = param_dict['Omega_m'] - param_dict['Omega_b']
+            del param_dict['Omega_m']
+
+        cosmo = ccl.Cosmology(**param_dict)
+
+        big_rbins = np.logspace(1, 2.1, 21)
+        big_rpoints = (big_rbins[1:] + big_rbins[:-1])/2.0
+        big_xi_rmax = big_rpoints[-1]
+        xi_mm = ccl.correlation_3d(cosmo, self.a, big_rpoints)
+
+        xi_mm_interp = interp1d(np.log10(big_rpoints), np.log10(xi_mm))
+
+        #correction factor
+        bias = np.power(10, xi_interp(1.2)-xi_mm_interp(1.2))
+        rhocrit = self.cosmology.critical_density(0).to('Msun/(Mpc^3)').value
+        rhom = self.cosmology.Om(0) * rhocrit * 1e-12  # SM h^2/pc^2/Mpc; integral is over Mpc/h
+
+        def sigma_integrand_medium_scales(lRz, Rp, xi_interp):
+            Rz = np.power(10, lRz)
+            return Rz * 10 ** xi_interp(np.log10(Rz * Rz + Rp * Rp) * 0.5)
+
+        def sigma_integrand_large_scales(lRz, Rp, bias, xi_mm_interp):
+            Rz = np.power(10, lRz)
+            return Rz*bias*10 ** xi_mm_interp(np.log10(Rz * Rz + Rp * Rp) * 0.5)
+
+        ### calculate sigma first###
+
+        sigma_rpoints = np.logspace(-1.1, 2.1, 20)
+        sigma = np.zeros_like(sigma_rpoints)
+        for i, rp in enumerate(sigma_rpoints):
+            log_u_ss_max = np.log10(xi_rmax**2 - rp**2)/2.0  # Max distance to integrate to
+            log_u_ls_max = np.log10(big_xi_rmax**2 - rp**2)/2.0 # Max distance to integrate to
+
+            small_scales_contribution = quad(sigma_integrand_medium_scales, -10, log_u_ss_max, args=(rp, xi_interp))[0]
+            large_scales_contribution = quad(sigma_integrand_large_scales, log_u_ss_max,log_u_ls_max,\
+                                             args=(rp, bias, xi_mm_interp))[0]
+            sigma[i] = (small_scales_contribution+large_scales_contribution)*rhom*2;
+
+        ### calculate delta sigma ###
+
+        def DS_integrand_medium_scales(lR, sigma_interp):
+            return np.power(10, 2*lR)*sigma_interp(lR)
+
+        rp_points = (rp_bins[1:] + rp_bins[:-1])
+        lrmin = np.log10(rp_points[0])
+        ds = np.zeros_like(rp_points)
+        sigma_interp = interp1d(np.log10(rp_points), sigma)
+
+        for i, rp in enumerate(rp_points):
+            result = quad(DS_integrand_medium_scales, lrmin, np.log10(rp), args=(sigma_interp,))[0]
+            ds[i] = result * 2 / (rp ** 2) - sigma_interp(np.log10(rp))
+
+        return self.h * ds
+
     def calc_sigma_crit_inv(self, zbins, dNdzs):
         """
 
@@ -1113,7 +1189,7 @@ class Cat(object):
         return (Scrit*Dl*4*np.pi*const.G/(const.c**2)).to("(Mpc^2)/Msun").value
 
     @observable
-    def calc_gt(self, theta_bins, rp_bins,sigma_crit_inv, n_cores='all', ds_kwargs = {}):
+    def calc_gt(self, theta_bins, rp_bins, sigma_crit_inv, n_cores='all', ds_kwargs = {}):
         """
 
         :param theta_bins:
@@ -1122,10 +1198,25 @@ class Cat(object):
         :param ds_kwargs:
         :return:
         """
+
+        # TODO no rp_bins; figured out what they are from theta
         n_cores = self._check_cores(n_cores)
-        # TODO analytic delta sigma?
-        ds = self.calc_ds(rp_bins,n_cores =n_cores, **ds_kwargs)
+        if type(rp_bins) is list:
+            rp_bins = np.array(rp_bins)
+
+        # TODO my own rp_bins
         rpbc = (rp_bins[1:]+rp_bins[:-1])/2.0
+
+        ds = np.zeros_like(rpbc)
+        small_scales = rp_bins < 1.5 #smaller then an MPC, compute with ht
+        # compute the small scales using halotools, but integrate xi_mm to larger scales.
+        if np.sum(small_scales) >0:
+            ds_ss = self.calc_ds(rp_bins[small_scales],n_cores =n_cores, **ds_kwargs)
+            ds[:np.sum(small_scales)-1] = ds_ss
+        if np.sum(~small_scales) > 0:
+            ds_ls = self.calc_ds_analytic(rp_bins[~small_scales], n_cores=n_cores, **ds_kwargs)
+            ds[-np.sum(~small_scales):] = ds_ls
+
         gamma_r = sigma_crit_inv*ds
 
         gamma_r_interp = interp1d(np.log10(rpbc), np.log10(gamma_r))
