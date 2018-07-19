@@ -1099,7 +1099,7 @@ class Cat(object):
         n_cores = self._check_cores(n_cores)
         # calculate xi_gg first
         rbins = np.logspace(-1.1, 1.6, 17)
-        xi = self.calc_xi_gm(rbins,do_jackknife=False,n_cores=n_cores, **ds_kwargs)
+        xi = self.calc_xi_gm(rbins,n_cores=n_cores, **ds_kwargs)
 
         if np.any(xi<=0):
             warnings.warn("Some values of xi are less than 0. Setting to a small nonzero value. This may have unexpected behavior, check your HOD")
@@ -1143,7 +1143,7 @@ class Cat(object):
 
         ### calculate sigma first###
 
-        sigma_rpoints = np.logspace(-1.1, 2.1, 20)
+        sigma_rpoints = np.logspace(-0.5, 2.1, 16)
         sigma = np.zeros_like(sigma_rpoints)
         for i, rp in enumerate(sigma_rpoints):
             log_u_ss_max = np.log10(xi_rmax**2 - rp**2)/2.0  # Max distance to integrate to
@@ -1154,6 +1154,8 @@ class Cat(object):
                                              args=(rp, bias, xi_mm_interp))[0]
             sigma[i] = (small_scales_contribution+large_scales_contribution)*rhom*2;
 
+
+        sigma_interp = interp1d(np.log10(sigma_rpoints), sigma)
         ### calculate delta sigma ###
 
         def DS_integrand_medium_scales(lR, sigma_interp):
@@ -1162,7 +1164,6 @@ class Cat(object):
         rp_points = (rp_bins[1:] + rp_bins[:-1])
         lrmin = np.log10(rp_points[0])
         ds = np.zeros_like(rp_points)
-        sigma_interp = interp1d(np.log10(rp_points), sigma)
 
         for i, rp in enumerate(rp_points):
             result = quad(DS_integrand_medium_scales, lrmin, np.log10(rp), args=(sigma_interp,))[0]
@@ -1179,12 +1180,17 @@ class Cat(object):
         """
         Scrit = 0
         Dl = self.cosmology.angular_diameter_distance(self.z)
-        Dl_t = self.cosmology.angular_diameter_distance(self.z)
+        Dl_t = self.cosmology.comoving_distance(self.z)
         for idx, dN in enumerate(dNdzs):
-            dz = zbins[idx+1] - zbins[idx]
             zs = zbins[idx]
+            if dN ==0 or zs == 0:
+                continue
+            dz = zbins[idx+1] - zbins[idx]
             Dls =  1/(1+zs)*(self.cosmology.comoving_distance(zs) - Dl_t) # from  arXiv:9905116 (David Hogg distance paper)
+
+            print dN, dz, Dls, self.cosmology.angular_diameter_distance(zs)
             Scrit+= dN*dz*Dls/self.cosmology.angular_diameter_distance(zs)
+
 
         return (Scrit*Dl*4*np.pi*const.G/(const.c**2)).to("(Mpc^2)/Msun").value
 
@@ -1215,19 +1221,25 @@ class Cat(object):
             ds[:np.sum(small_scales)-1] = ds_ss
         if np.sum(~small_scales) > 0:
             ds_ls = self.calc_ds_analytic(rp_bins[~small_scales], n_cores=n_cores, **ds_kwargs)
-            ds[-np.sum(~small_scales):] = ds_ls
+            ds[-np.sum(~small_scales)+1:] = ds_ls
 
         gamma_r = sigma_crit_inv*ds
 
+        print gamma_r
+
         gamma_r_interp = interp1d(np.log10(rpbc), np.log10(gamma_r))
 
-        Da = self.cosmology.angular_diameter_distance(self.z)
+        Da = self.cosmology.angular_diameter_distance(self.z).value
 
         tbc = (theta_bins[1:]+theta_bins[:-1])/2.0
         gamma_t = np.zeros_like(tbc)
 
         for i, t in enumerate(np.radians(tbc)):
-            gamma_t[i] = 10**gamma_r_interp(np.log10(t*Da))
+            print t*Da, rpbc[-1]
+            try:
+                gamma_t[i] = 10**gamma_r_interp(np.log10(t*Da))
+            except ValueError: # TODO fix?
+                gamma_t[i] = 0.0
 
         return gamma_t
 
