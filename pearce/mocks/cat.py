@@ -1098,7 +1098,7 @@ class Cat(object):
 
         n_cores = self._check_cores(n_cores)
         # calculate xi_gg first
-        rbins = np.logspace(-1.1, 1.6, 17)
+        rbins = np.logspace(-1.3, 1.6, 16)
         xi = self.calc_xi_gm(rbins,n_cores=n_cores, **ds_kwargs)
 
         if np.any(xi<=0):
@@ -1134,39 +1134,48 @@ class Cat(object):
         rhom = self.cosmology.Om(0) * rhocrit * 1e-12  # SM h^2/pc^2/Mpc; integral is over Mpc/h
 
         def sigma_integrand_medium_scales(lRz, Rp, xi_interp):
-            Rz = np.power(10, lRz)
+            Rz = np.exp(lRz)
             return Rz * 10 ** xi_interp(np.log10(Rz * Rz + Rp * Rp) * 0.5)
 
         def sigma_integrand_large_scales(lRz, Rp, bias, xi_mm_interp):
-            Rz = np.power(10, lRz)
+            Rz = np.exp(lRz)
             return Rz*bias*10 ** xi_mm_interp(np.log10(Rz * Rz + Rp * Rp) * 0.5)
 
         ### calculate sigma first###
 
-        sigma_rpoints = np.logspace(-0.5, 2.1, 16)
+        sigma_rpoints = np.logspace(-1.1, 2.0, 15)
+
         sigma = np.zeros_like(sigma_rpoints)
         for i, rp in enumerate(sigma_rpoints):
-            log_u_ss_max = np.log10(xi_rmax**2 - rp**2)/2.0  # Max distance to integrate to
-            log_u_ls_max = np.log10(big_xi_rmax**2 - rp**2)/2.0 # Max distance to integrate to
+            log_u_ss_max = np.log(xi_rmax**2 - rp**2)/2.0  # Max distance to integrate to
+            log_u_ls_max = np.log(big_xi_rmax**2 - rp**2)/2.0 # Max distance to integrate to
 
-            small_scales_contribution = quad(sigma_integrand_medium_scales, -10, log_u_ss_max, args=(rp, xi_interp))[0]
-            large_scales_contribution = quad(sigma_integrand_large_scales, log_u_ss_max,log_u_ls_max,\
+            if not np.isnan(log_u_ss_max): # rp > xi_rmax
+                small_scales_contribution = quad(sigma_integrand_medium_scales, -10, log_u_ss_max, args=(rp, xi_interp))[0]
+                large_scales_contribution = quad(sigma_integrand_large_scales, log_u_ss_max,log_u_ls_max,\
                                              args=(rp, bias, xi_mm_interp))[0]
+            elif not np.isnan(log_u_ls_max):
+                small_scales_contribution = 0
+                large_scales_contribution = quad(sigma_integrand_large_scales, np.log(xi_rmax),log_u_ls_max,\
+                                             args=(rp, bias, xi_mm_interp))[0]
+            else:
+                small_scales_contribution = large_scales_contribution = 0.0
+
             sigma[i] = (small_scales_contribution+large_scales_contribution)*rhom*2;
-
-
+        
         sigma_interp = interp1d(np.log10(sigma_rpoints), sigma)
         ### calculate delta sigma ###
 
         def DS_integrand_medium_scales(lR, sigma_interp):
-            return np.power(10, 2*lR)*sigma_interp(lR)
+            return np.exp(2*lR)*sigma_interp(np.log10(np.exp(lR)))
 
-        rp_points = (rp_bins[1:] + rp_bins[:-1])
-        lrmin = np.log10(rp_points[0])
+        rp_points = (rp_bins[1:] + rp_bins[:-1])/2.0
+        lrmin = np.log(rp_points[0])
         ds = np.zeros_like(rp_points)
 
         for i, rp in enumerate(rp_points):
-            result = quad(DS_integrand_medium_scales, lrmin, np.log10(rp), args=(sigma_interp,))[0]
+            result = quad(DS_integrand_medium_scales, lrmin, np.log(rp), args=(sigma_interp,))[0]
+            #print result, rp, sigma_interp(np.log10(rp))
             ds[i] = result * 2 / (rp ** 2) - sigma_interp(np.log10(rp))
 
         return self.h * ds
@@ -1183,16 +1192,15 @@ class Cat(object):
         Dl_t = self.cosmology.comoving_distance(self.z)
         for idx, dN in enumerate(dNdzs):
             zs = zbins[idx]
-            if dN ==0 or zs == 0:
+            if dN ==0 or zs < self.z:
                 continue
-            dz = zbins[idx+1] - zbins[idx]
+            #dz = zbins[idx+1] - zbins[idx]
             Dls =  1/(1+zs)*(self.cosmology.comoving_distance(zs) - Dl_t) # from  arXiv:9905116 (David Hogg distance paper)
 
-            print dN, dz, Dls, self.cosmology.angular_diameter_distance(zs)
-            Scrit+= dN*dz*Dls/self.cosmology.angular_diameter_distance(zs)
+            Scrit+= dN*Dls/self.cosmology.angular_diameter_distance(zs)
 
 
-        return (Scrit*Dl*4*np.pi*const.G/(const.c**2)).to("(Mpc^2)/Msun").value
+        return (Scrit*Dl*4*np.pi*const.G/(const.c**2)).to("(pc^2)/Msun").value
 
     @observable
     def calc_gt(self, theta_bins, rp_bins, sigma_crit_inv, n_cores='all', ds_kwargs = {}):
@@ -1216,18 +1224,21 @@ class Cat(object):
         ds = np.zeros_like(rpbc)
         small_scales = rp_bins < 1.5 #smaller then an MPC, compute with ht
         # compute the small scales using halotools, but integrate xi_mm to larger scales.
+        start_idx = np.sum(small_scales)
         if np.sum(small_scales) >0:
-            ds_ss = self.calc_ds(rp_bins[small_scales],n_cores =n_cores, **ds_kwargs)
-            ds[:np.sum(small_scales)-1] = ds_ss
+            ds_ss = self.calc_ds(rp_bins,n_cores =n_cores, **ds_kwargs)
+            ds[:start_idx-1] = ds_ss[:start_idx-1]
+
         if np.sum(~small_scales) > 0:
-            ds_ls = self.calc_ds_analytic(rp_bins[~small_scales], n_cores=n_cores, **ds_kwargs)
-            ds[-np.sum(~small_scales)+1:] = ds_ls
+            ds_ls = self.calc_ds_analytic(rp_bins, n_cores=n_cores, **ds_kwargs)
+            ds[start_idx-1:] = ds_ls[start_idx-1:]
 
-        gamma_r = sigma_crit_inv*ds
-
+        print ds
+        gamma_r = sigma_crit_inv*ds #hope user has converter ds to pc from Mpc
         print gamma_r
 
-        gamma_r_interp = interp1d(np.log10(rpbc), np.log10(gamma_r))
+
+        gamma_r_interp = interp1d(np.log10(rpbc), np.log10(gamma_r) )
 
         Da = self.cosmology.angular_diameter_distance(self.z).value
 
@@ -1235,7 +1246,6 @@ class Cat(object):
         gamma_t = np.zeros_like(tbc)
 
         for i, t in enumerate(np.radians(tbc)):
-            print t*Da, rpbc[-1]
             try:
                 gamma_t[i] = 10**gamma_r_interp(np.log10(t*Da))
             except ValueError: # TODO fix?
