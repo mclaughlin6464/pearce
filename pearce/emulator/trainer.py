@@ -158,7 +158,7 @@ class Trainer(object):
             self._min_ptcl = 200 #default
 
         try:
-            self._fixed_nd = hod_cfg['fixed_nd']
+            self._fixed_nd = float(hod_cfg['fixed_nd'])
             del hod_cfg['fixed_nd']
         except KeyError:
             self._fixed_nd = None
@@ -309,8 +309,11 @@ class Trainer(object):
         """
         hod_params['logMmin'] = 13.0 #initial guess
         #cat.populate(hod_params) #may be overkill, but will ensure params are written everywhere
-        func = lambda logMmin: hod_params.update({'logMmin':logMmin});(cat.calc_analytic_nd(hod_params) - self._fixed_nd)**2
-        res = minimize_scalar(func, bounds = self._logMmin_bounds, options = {'maxiter':100})
+        def func(logMmin, hod_params):
+            hod_params.update({'logMmin':logMmin}) 
+            return (cat.calc_analytic_nd(hod_params) - self._fixed_nd)**2
+
+        res = minimize_scalar(func, bounds = self._logMmin_bounds, args = (hod_params,), options = {'maxiter':100})
 
         # assuming this doens't fail
         hod_params['logMmin'] = res.x
@@ -422,7 +425,7 @@ class Trainer(object):
 
             hod_params = dict(zip(self._hod_param_names, self._hod_param_vals[hod_idx, :]))
             if self._fixed_nd is not None:
-                self.add_logMmin(hod_params, cat)
+                self._add_logMmin(hod_params, cat)
             #continue
             if self._n_repops == 1:
                 cat.populate(hod_params, min_ptcl = self._min_ptcl)
