@@ -19,6 +19,7 @@ from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 from sklearn.kernel_ridge import KernelRidge
 from sklearn.svm import SVR
 from sklearn.linear_model import LinearRegression
+from sklearn.neural_network import MLPRegressor
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.pipeline import make_pipeline
 
@@ -29,9 +30,9 @@ class Emu(object):
 
     __metaclass__ = ABCMeta
     valid_methods = {'gp', 'svr', 'gbdt', 'rf', 'krr',
-                     'linear'}  # could add more, coud even check if they exist in sklearn
+                     'linear', 'nn'}  # could add more, coud even check if they exist in sklearn
     skl_methods = {'gbdt': GradientBoostingRegressor, 'rf': RandomForestRegressor, \
-                   'svr': SVR, 'krr': KernelRidge, 'linear': LinearRegression}
+            'svr': SVR, 'krr': KernelRidge, 'linear': LinearRegression, 'nn': MLPRegressor}
 
     def __init__(self, filename, method='gp', hyperparams={}, fixed_params={},\
                         downsample_factor = 1.0, independent_variable=None, custom_mean_function = None):
@@ -234,7 +235,7 @@ class Emu(object):
                         #we hve to transform the data (take a log, multiply, etc)
                         # TODO this may not work with things like r2 anymore
                         _o, _c = self._iv_transform(independent_variable, _obs, _cov)
-                        y.append(np.log10(np.array([_o[r_idx]])))
+                        y.append(np.array([_o[r_idx]]))
                         ycov.append(np.array(_c[r_idx, r_idx]))
 
                     else:
@@ -279,7 +280,7 @@ class Emu(object):
 
         # whiten the training data
         self._x_mean, self._x_std = x.mean(axis = 0), x.std(axis = 0)
-        self._y_mean, self._y_std = y.mean(axis = 0), y.std(axis = 0)
+        self._y_mean, self._y_std = 0, 1#y.mean(axis = 0), y.std(axis = 0)
 
         ycov/=(np.outer(self._y_std, self._y_std) + 1e-5)
 
@@ -597,7 +598,7 @@ class Emu(object):
         # TODO  change with mean_function
         elif self.obs == 'wp':
             if independent_variable is None:
-                ig.update({'logMmin': 4.635891111, 'Neff': 8.767158, 'amp': 0.050649375, 'f_c': 3.535979, 'logM0': 0.33752477, 'logM1': 0.81730183, 'H0': 279.72348, 'w0': 0.496905639, 'sigma_logM': 3700.95379, 'r': 0.227461101, 'omch2': 5.313913, 'ln10As': 10.251330035, 'alpha': 1651.3668747, 'ns': 31708.0857, 'ombh2': 535.765296,
+                ig.update({'logMmin': 2.84216e1, 'Neff': 5.6002e10, 'amp': 3.4007e-2, 'f_c': 1.4535e1, 'logM0': 0.33952477, 'logM1': 2.17317, 'H0': 1.943e1, 'w0': 8.15016e19, 'sigma_logM': 1.678e1, 'r': 0.26096, 'omch2': 3.368e1, 'ln10As': 4.672e1, 'alpha': 2.8585e1, 'ns': 9.7638e10, 'ombh2': 5.339e-1,
                         'z': 1.0,
                            'mean_occupation_satellites_assembias_split1': 21.02835102,
                            'mean_occupation_satellites_assembias_slope1': 225.64738711,
@@ -952,6 +953,9 @@ class Emu(object):
         print 'A'
         x, y, _, info = self.get_data(truth_file, self.fixed_params, self.independent_variable)
 
+        x = (x - self._x_mean)/(self._x_std + 1e-5)
+        #y = (y - self._y_mean)/(self._y_std + 1e-5)
+
         scale_bin_centers = info['sbc']
         scale_nbins = len(scale_bin_centers)
 
@@ -969,6 +973,9 @@ class Emu(object):
         pred_y = self._emulate_helper(x, False)
         print 'C'
         pred_y = pred_y.reshape((-1, scale_nbins))
+
+        print y[0,:]
+        print pred_y[0, :]
 
         # TODO untested
 
