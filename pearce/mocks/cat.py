@@ -50,44 +50,44 @@ VALID_HODS = {'redMagic', 'hsabRedMagic','abRedMagic','fsabRedMagic', 'fscabRedM
 DEFAULT_HODS = {'zheng07', 'leauthaud11', 'tinker13', 'hearin15'}
 
 
-def observable(func, particles = False):
+def observable(particles = False):
     '''
     Decorator for observable methods. Checks that the catalog is properly loaded and calcualted.
-    :param func:
-        Function that calculates an observable on a populated catalog.
     :param particles:
         Boolean. Determines if particle catalogs need ot be checked as well.
     :return: func
     '''
+    def actual_decorator(func):
+        @wraps(func)
+        def _func(self, *args, **kwargs):
 
-    @wraps(func)
-    def _func(self, *args, **kwargs):
+            if 'use_corrfunc' in kwargs and (kwargs['use_corrfunc'] and not CORRFUNC_AVAILABLE):
+                # NOTE just switch to halotools in this case? Or fail?
+                raise ImportError("Corrfunc is not available on this machine!")
 
-        if 'use_corrfunc' in kwargs and (kwargs['use_corrfunc'] and not CORRFUNC_AVAILABLE):
-            # NOTE just switch to halotools in this case? Or fail?
-            raise ImportError("Corrfunc is not available on this machine!")
-
-        try:
-            assert self.halocat is not None
-            assert self.model is not None
-            assert self.populated_once
-        except AssertionError:
-            raise AssertionError("The cat must have a loaded model and catalog and be populated before calculating an\
-             observable.")
-
-        if particles:
             try:
-                assert self.halocat.ptcl_table is not None
+                assert self.halocat is not None
+                assert self.model is not None
+                assert self.populated_once
             except AssertionError:
-                raise AssertionError("The function you called requires the loading of particles, but the catalog loaded\
-                 doesn't have a particle table. Please try a different catalog")
-        return func(self, *args, **kwargs)
+                raise AssertionError("The cat must have a loaded model and catalog and be populated before calculating an\
+                 observable.")
 
-    # store the arguments, as the decorator destroys the spec
-    _func.args = inspect.getargspec(func)[0]
-    #_func.__doc__ = func.__doc__
+            if particles:
+                try:
+                    assert self.halocat.ptcl_table is not None
+                except AssertionError:
+                    raise AssertionError("The function you called requires the loading of particles, but the catalog loaded\
+                     doesn't have a particle table. Please try a different catalog")
+            return func(self, *args, **kwargs)
 
-    return _func
+        # store the arguments, as the decorator destroys the spec
+        _func.args = inspect.getargspec(func)[0]
+        #_func.__doc__ = func.__doc__
+
+        return _func
+
+    return actual_decorator
 
 
 class Cat(object):
