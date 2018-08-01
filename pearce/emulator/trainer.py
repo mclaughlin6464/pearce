@@ -10,6 +10,7 @@ import warnings
 from itertools import product
 import yaml
 import numpy as np
+from scipy.optimize import minimize_scalar
 import pandas as pd
 from mpi4py import MPI
 import h5py
@@ -137,6 +138,13 @@ class Trainer(object):
 
             # make a LHC from scratch
             ordered_params = hod_cfg['ordered_params']
+
+            if 'fixed_nd' in hod_cfg and 'logMmin' in ordered_params:
+                self._logMmin_bounds = ordered_params['logMmin']
+                del ordered_params['logMmin'] # do I want to keep this for any reason?
+            else:
+                self._logMmin_bounds = None
+
             self._hod_param_names = ordered_params.keys()
             self._hod_param_vals = self._make_LHC(ordered_params, hod_cfg['num_hods'])
 
@@ -148,6 +156,12 @@ class Trainer(object):
             del hod_cfg['min_ptcl']
         else:
             self._min_ptcl = 200 #default
+
+        try:
+            self._fixed_nd = hod_cfg['fixed_nd']
+            del hod_cfg['fixed_nd']
+        except KeyError:
+            self._fixed_nd = None
 
         self._hod_kwargs = hod_cfg
         # need scale factors too, but just use them from cosmology
@@ -283,6 +297,23 @@ class Trainer(object):
         """
         return "cosmo_no_%02d/a_%.3f"%(cosmo_idx, self._scale_factors[scale_factor])
 
+    def _add_logMmin(self, hod_params, cat):
+        """
+        In the fixed number density case, find the logMmin value that will match the nd given hod_params
+        :param: hod_params:
+            The other parameters besides logMmin
+        :param cat:
+            the catalog in question
+        :return:
+            None. hod_params will have logMmin added to it.
+        """
+        hod_params['logMmin'] = 13.0 #initial guess
+        #cat.populate(hod_params) #may be overkill, but will ensure params are written everywhere
+        func = lambda logMmin: hod_params.update({'logMmin':logMmin});(cat.calc_analytic_nd(hod_params) - self._fixed_nd)**2
+        res = minimize_scalar(func, bounds = self._logMmin_bounds, options = {'maxiter':100})
+
+        # assuming this doens't fail
+        hod_params['logMmin'] = res.x
 
     def run(self, comm):
         """
@@ -390,6 +421,8 @@ class Trainer(object):
                 calc_observable = self._get_calc_observable(cat)
 
             hod_params = dict(zip(self._hod_param_names, self._hod_param_vals[hod_idx, :]))
+            if self._fixed_nd is not None:
+                self.add_logMmin(hod_params, cat)
             #continue
             if self._n_repops == 1:
                 cat.populate(hod_params, min_ptcl = self._min_ptcl)
