@@ -98,7 +98,8 @@ class Trainer(object):
         # In the future if there are more annoying params i'll turn this into a loop or something.
         # TODO does yaml parse these to bools automatically?
         self._particles = bool(cosmo_cfg['particles']) if 'particles' in cosmo_cfg else False
-        self._downsample_factor = float(cosmo_cfg['downsample_factor']) if 'downsample_facor' in cosmo_cfg else 1e-3
+        print cosmo_cfg.keys()
+        self._downsample_factor = float(cosmo_cfg['downsample_factor']) if 'downsample_factor' in cosmo_cfg else 1e-3
 
     def prep_hod(self, hod_cfg):
         """
@@ -158,7 +159,7 @@ class Trainer(object):
             self._min_ptcl = 200 #default
 
         try:
-            self._fixed_nd = hod_cfg['fixed_nd']
+            self._fixed_nd = float(hod_cfg['fixed_nd'])
             del hod_cfg['fixed_nd']
         except KeyError:
             self._fixed_nd = None
@@ -309,8 +310,11 @@ class Trainer(object):
         """
         hod_params['logMmin'] = 13.0 #initial guess
         #cat.populate(hod_params) #may be overkill, but will ensure params are written everywhere
-        func = lambda logMmin: hod_params.update({'logMmin':logMmin});(cat.calc_analytic_nd(hod_params) - self._fixed_nd)**2
-        res = minimize_scalar(func, bounds = self._logMmin_bounds, options = {'maxiter':100})
+        def func(logMmin, hod_params):
+            hod_params.update({'logMmin':logMmin}) 
+            return (cat.calc_analytic_nd(hod_params) - self._fixed_nd)**2
+
+        res = minimize_scalar(func, bounds = self._logMmin_bounds, args = (hod_params,), options = {'maxiter':100})
 
         # assuming this doens't fail
         hod_params['logMmin'] = res.x
@@ -376,14 +380,14 @@ class Trainer(object):
         else:
             all_param_idxs_send = None
 
+        print rank, size
         #param_idxs= np.empty([n_per_node, 3], dtype = 'i')
         #comm.barrier()
         param_idxs = comm.scatter(all_param_idxs_send, root=0)
         #param_idxs = all_param_idxs_send[rank]
         #comm.Scatter(sendbuf, param_idxs, root = 0)
 
-
-        #print all_param_idxs
+        print param_idxs
 
         if self.n_bins > 1 :
             output = np.zeros((param_idxs.shape[0], self.n_bins))
@@ -420,9 +424,10 @@ class Trainer(object):
 
                 calc_observable = self._get_calc_observable(cat)
 
+            print 'hi'
             hod_params = dict(zip(self._hod_param_names, self._hod_param_vals[hod_idx, :]))
             if self._fixed_nd is not None:
-                self.add_logMmin(hod_params, cat)
+                self._add_logMmin(hod_params, cat)
             #continue
             if self._n_repops == 1:
                 cat.populate(hod_params, min_ptcl = self._min_ptcl)
@@ -435,6 +440,7 @@ class Trainer(object):
                     obs_repops = np.zeros((self._n_repops,))
 
                 for repop in xrange(self._n_repops):
+                    print repop
                     cat.populate(hod_params, min_ptcl= self._min_ptcl)
                     obs_repops[repop] = self._transform_func(calc_observable())
 

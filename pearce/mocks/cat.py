@@ -158,6 +158,8 @@ class Cat(object):
         self.cache_filenames = [path.join(cache_loc, 'hlist_%.2f.list.%s.hdf5' % (a, self.simname)) \
                                 for a in self.scale_factors]
 
+        self.cache_loc = cache_loc
+
         self.halocat = None  # halotools halocat that we wrap
         self.model = None  # same as above, but for the model
         self.populated_once = False
@@ -283,7 +285,7 @@ class Cat(object):
             raise AssertionError('Particle location not specified; please specify gadget location for %s' % self.simname)
 
         if add_local_density or add_particles:
-            all_snapdirs = glob(path.join(self.gadget_loc, 'snapdir*'))
+            all_snapdirs = sorted(glob(path.join(self.gadget_loc, 'snapdir*')))
             snapdirs = [all_snapdirs[idx] for idx in self.sf_idxs]#only the snapdirs for the scale factors were interested in .
         else:
             snapdirs = ['' for i in self.scale_factors]
@@ -293,7 +295,6 @@ class Cat(object):
             print a,z
             if scale_factors != 'all' and a not in scale_factors:
                 continue
-            print self.pmass
             reader = RockstarHlistReader(fname, self.columns_to_keep, cache_fnames, self.simname,
                                          self.halo_finder, z, self.version_name, self.Lbox, self.pmass,
                                          overwrite=overwrite)
@@ -348,8 +349,10 @@ class Cat(object):
         z = 1.0/scale_factor-1.0
         ptcl_catalog = UserSuppliedPtclCatalog(redshift=z, Lbox=self.Lbox, particle_mass=self.pmass, \
                                                x=particles[:, 0], y=particles[:, 1], z=particles[:, 2])
-        ptcl_cache_loc = '/u/ki/swmclau2/des/halocats/ptcl_%.2f.list.%s_%s.hdf5'
-        ptcl_cache_filename = ptcl_cache_loc % (scale_factor, self.simname, self.version_name)  # make sure we don't have redunancies.
+        ptcl_cache_loc = self.cache_loc 
+        ptcl_cache_filename = 'ptcl_%.2f.list.%s_%s.hdf5'% (scale_factor, self.simname, self.version_name)  # make sure we don't have redunancies.
+        ptcl_cache_filename = path.join(ptcl_cache_loc, ptcl_cache_filename)
+        print ptcl_cache_filename
         ptcl_catalog.add_ptclcat_to_cache(ptcl_cache_filename, self.simname, self.version_name+'_particle_%.2f'%(-1*np.log10(downsample_factor)), str(downsample_factor),overwrite=True)#TODO would be nice to make a note of the downsampling without having to do some voodoo to get it.
 
 
