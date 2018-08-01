@@ -117,7 +117,7 @@ class Emu(object):
         except KeyError:
             cosmo_param_vals = np.array(f['attrs/cosmo_param_vals'])
             hod_param_vals = np.array(f['attrs/hod_param_vals'])
-        
+
         fixed_cosmo = 'cosmo' in fixed_params or cosmo_param_vals.shape[0] == 1
         fixed_hod = 'HOD' in fixed_params or hod_param_vals.shape[0] == 1
 
@@ -146,7 +146,7 @@ class Emu(object):
         elif fixed_cosmo and not fixed_hod:
             min_max_vals = zip(hod_param_vals.min(axis=0), hod_param_vals.max(axis=0))
             ordered_params = OrderedDict(izip(hod_param_names, min_max_vals))
-        elif not fixed_hod and not fixed_cosmo: 
+        elif not fixed_hod and not fixed_cosmo:
             op_names = list(cosmo_param_names[:])
             op_names.extend(hod_param_names)
 
@@ -190,7 +190,6 @@ class Emu(object):
         num_skipped = 0
         num_used = 0
 
-
         for cosmo_group_name, cosmo_group in f.iteritems():
             # we're fixed to a particular cosmology #
             if cosmo_group_name == 'attrs':
@@ -207,7 +206,6 @@ class Emu(object):
 
                 obs_dset = sf_group['obs']
                 cov_dset = sf_group['cov']
-
 
                 cosmo = cosmo_param_vals[cosmo_no, :]
                 # efficiency note. If I don't iterate over the datasets, just the indicies,
@@ -228,9 +226,9 @@ class Emu(object):
 
                     params = []
                     # I wonder if this is annoyingly inefficient. Probably not a huge deal.
-                    if not fixed_cosmo: 
+                    if not fixed_cosmo:
                         params.extend(list(cosmo))
-                    if not fixed_hod: 
+                    if not fixed_hod:
                         params.extend(list(HOD))
                     if 'z' not in fixed_params:
                         params.append(z)
@@ -258,8 +256,6 @@ class Emu(object):
                         ycov.append(_c)
 
                     num_used += 1
-
-
 
         if give_warning:
             warnings.warn('WARNING: NaN detected. Skipped %d points in training data.' % (num_skipped))
@@ -290,7 +286,7 @@ class Emu(object):
         # useful ofr sampling the training data
 
         # whiten the training data
-        self._x_mean, self._x_std = 0.0, 1.0#x.mean(axis = 0), x.std(axis = 0)
+        self._x_mean, self._x_std = x.mean(axis = 0), x.std(axis = 0)
         self._y_mean, self._y_std = 0.0, 1.0#y.mean(axis = 0), y.std(axis = 0)
 
         ycov/=(np.outer(self._y_std, self._y_std) + 1e-5)
@@ -620,7 +616,7 @@ class Emu(object):
         # TODO  change with mean_function
         elif self.obs == 'wp':
             if independent_variable is None:
-                ig.update({'logMmin': 4.635891111, 'Neff': 8.767158, 'amp': 0.050649375, 'f_c': 3.535979, 'logM0': 0.33752477, 'logM1': 0.81730183, 'H0': 279.72348, 'w0': 0.496905639, 'sigma_logM': 3700.95379, 'r': 0.227461101, 'omch2': 5.313913, 'ln10As': 10.251330035, 'alpha': 1651.3668747, 'ns': 31708.0857, 'ombh2': 535.765296,
+                ig.update({'logMmin': 2.84216e1, 'Neff': 5.6002e10, 'amp': 3.4007e-2, 'f_c': 1.4535e1, 'logM0': 0.33952477, 'logM1': 2.17317, 'H0': 1.943e1, 'w0': 8.15016e19, 'sigma_logM': 1.678e1, 'r': 0.26096, 'omch2': 3.368e1, 'ln10As': 4.672e1, 'alpha': 2.8585e1, 'ns': 9.7638e10, 'ombh2': 5.339e-1,
                         'z': 1.0,
                            'mean_occupation_satellites_assembias_split1': 21.02835102,
                            'mean_occupation_satellites_assembias_slope1': 225.64738711,
@@ -972,14 +968,14 @@ class Emu(object):
         assert statistic in {'r2', 'rms', 'rmsfd', 'abs', 'log_abs', 'frac', 'log_frac'}
         if N is not None:
             assert N > 0 and int(N) == N
-        
+
         x, y, _, info = self.get_data(truth_file, self.fixed_params, self.independent_variable)
 
         x = (x - self._x_mean)/(self._x_std + 1e-5)
-        #y = (_y - self._y_mean)/(self._y_std + 1e-5)
+        #y = (y - self._y_mean)/(self._y_std + 1e-5)
 
         scale_bin_centers = info['sbc']
-        scale_nbins = len(scale_bin_centers) if 'r' not in self.fixed_params else 1 
+        scale_nbins = len(scale_bin_centers) if 'r' not in self.fixed_params else 1
 
         np.random.seed(int(time()))
 
@@ -989,7 +985,7 @@ class Emu(object):
 
             x, y = x[idxs], y[idxs]
         
-       
+
         pred_y = self._emulate_helper(x, False)
 
         if scale_nbins > 1:

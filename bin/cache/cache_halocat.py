@@ -16,3 +16,4 @@ for boxno in xrange(5,7):
         #cat = cat_dict['resolution'](boxno, scale_factors = [0.8, 1.0], system = 'ki-ls')
 
         cat.cache(overwrite = True, add_local_density=True, add_particles = False, downsample_factor = 1e-2)
+
