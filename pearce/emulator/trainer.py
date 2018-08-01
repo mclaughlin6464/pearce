@@ -5,6 +5,8 @@ Rather than firing off many jobs to do the training, will do everying with MPI i
 Will also write to an hdf5 file, to reduce the enormous clutter produced so far.
 """
 from os import path
+from shutil import copyfile
+from subprocess import call
 from time import time
 import warnings
 from itertools import product
@@ -277,8 +279,6 @@ class Trainer(object):
             else:
                 return _calc_observable
 
-
-
     def prep_computation(self, comp_cfg):
         """
         #TODO
@@ -289,6 +289,19 @@ class Trainer(object):
         overwrite = comp_cfg['overwrite'] if 'overwrite' in comp_cfg else False
         if path.exists(self.output_fname) and not overwrite:
             raise IOError("Overwrite is False or Not Specified, but the file exists. Please change the config.")
+
+
+        self.system = comp_cfg.get("system", None)
+        self.n_jobs = comp_cfg.get("n_jobs", -1)
+        self.max_time = comp_cfg.get("max_time", -1)
+
+        if 'queue_skipper' in comp_cfg and comp_cfg['queue_skipper']:
+            self._skip_queue = True
+            assert self.system is not None, "Please specify the system when using the queue skipper."
+            assert self.n_jobs > 0, "Please specify the number of jobs for the queue skipper"
+            assert self.max_time > 0, "Please specify a maximum time for the queue skipper."
+        else:
+            self._skip_queue = False
 
 
     def _get_group_name(self, cosmo_idx, scale_factor):
@@ -319,75 +332,49 @@ class Trainer(object):
         # assuming this doens't fail
         hod_params['logMmin'] = res.x
 
-    def run(self, comm):
+    def _divide_tasks(self, size):
         """
-        #TODO
+        divide each unique HOD, Scale Factor, and cosmology task between
+        every jobs
+        :param size:
+            Number of MPI jobs/ submission scripts to divide amongst.
+        :return:
+            sendbuf, a numpy array of shape (size, ceil(n_tasks/size), 3)
+            Each index of the size dimension contains the HOD, SF, and cosmology index of the task
         """
-        # a list of the indices ofo the cosmology, scale factor, and hod to be computed.
-        # will be scattered over all processes
+        all_param_idxs = np.array(list(product(xrange(len(self.cats)), xrange(len(self._scale_factors)),
+                                xrange(self._hod_param_vals.shape[0]))))
 
-        rank = comm.Get_rank()
-        size = comm.Get_size()
+        n_combos = len(all_param_idxs)
+        n_per_node = np.ceil(float(n_combos)/size)
+        remainder = n_combos%size
+        zero_remainder = remainder == 0
 
-        # TODO since these are numpy objects, could be communicated more efficiently
-        # since they're small and its only once, I don't think it matters much.
-        #sendbuf = None
-        #all_param_idxs = np.array(list(product(xrange(len(self.cats)), xrange(len(self._scale_factors)),
-        #                            xrange(self._hod_param_vals.shape[0]))))
-        #n_combos = len(all_param_idxs)
-        #n_per_node = n_combos/size
-        #remainder = n_combos%size
+        sendbuf = np.zeros([size, n_per_node, 3], dtype = 'i')
 
+        past_remainder_counter = 0
+        # This could be cleaned up to be more readable
+        # I believe this is still broken for weird node #'s
+        # current hack is to make sure hte number of nodes evenly divides the number of HODs*cosmos*sfs
+        #print size, n_per_node, remainder, n_combos
 
-        if rank == 0:
-            all_param_idxs = np.array(list(product(xrange(len(self.cats)), xrange(len(self._scale_factors)),
-                                    xrange(self._hod_param_vals.shape[0]))))
+        for i in xrange(size):
+            if remainder == 0:
+                if not zero_remainder: # initially, after we used it as a counter
+                    sendbuf[i, :-1, :] =  all_param_idxs[i*n_per_node - past_remainder_counter:(i+1)*n_per_node-past_remainder_counter-1, :]
+                    sendbuf[i,-1, :] = np.array([-1,-1,-1])
+                    past_remainder_counter+=1
+                else: #no extra lines
+                    sendbuf[i, :, :] =  all_param_idxs[i*n_per_node:(i+1)*n_per_node, :]
 
-            n_combos = len(all_param_idxs)
-            n_per_node = n_combos/size
-            remainder = n_combos%size
+            else:
+                sendbuf[i,:,:] = all_param_idxs[i*n_per_node:(i+1)*n_per_node, :]
+                remainder-=1
 
+            #print sendbuf[i]
+        return sendbuf
 
-            zero_remainder = remainder == 0
-            if not zero_remainder:
-                n_per_node +=1
-
-            sendbuf = np.zeros([size, n_per_node, 3], dtype = 'i')
-            
-            past_remainder_counter = 0
-            # This could be cleaned up to be more readable
-            # I believe this is still broken for weird node #'s
-            # current hack is to make sure hte number of nodes evenly divides the number of HODs*cosmos*sfs
-            #print size, n_per_node, remainder, n_combos 
-
-            for i in xrange(size):
-                if remainder == 0:
-                    if not zero_remainder: # initially, after we used it as a counter
-                        sendbuf[i, :-1, :] =  all_param_idxs[i*n_per_node - past_remainder_counter:(i+1)*n_per_node-past_remainder_counter-1, :]
-                        sendbuf[i,-1, :] = np.array([-1,-1,-1])
-                        past_remainder_counter+=1
-                    else: #no extra lines
-                        sendbuf[i, :, :] =  all_param_idxs[i*n_per_node:(i+1)*n_per_node, :]
-
-                else:
-                    sendbuf[i,:,:] = all_param_idxs[i*n_per_node:(i+1)*n_per_node, :]
-                    remainder-=1
-            
-                #print sendbuf[i]
-
-            all_param_idxs_send = sendbuf
-
-        else:
-            all_param_idxs_send = None
-
-        print rank, size
-        #param_idxs= np.empty([n_per_node, 3], dtype = 'i')
-        #comm.barrier()
-        param_idxs = comm.scatter(all_param_idxs_send, root=0)
-        #param_idxs = all_param_idxs_send[rank]
-        #comm.Scatter(sendbuf, param_idxs, root = 0)
-
-        print param_idxs
+    def compute_measurement(self, param_idxs, rank = None):
 
         if self.n_bins > 1 :
             output = np.zeros((param_idxs.shape[0], self.n_bins))
@@ -397,15 +384,17 @@ class Trainer(object):
             output = np.zeros((param_idxs.shape[0],))
             output_cov = np.zeros((param_idxs.shape[0]))
 
-
         last_cosmo_idx, last_scale_factor_idx = -1, -1
         t0 = time()
         for output_idx, (cosmo_idx, scale_factor_idx, hod_idx) in enumerate(param_idxs):
-            #pass
-            print 'Rank: %d, Cosmo: %d, Scale_Factor: %d, HOD: %d'%(rank, cosmo_idx, scale_factor_idx, hod_idx)
+            if rank is not None:
+                print 'Rank: %d, Cosmo: %d, Scale_Factor: %d, HOD: %d'%(rank, cosmo_idx, scale_factor_idx, hod_idx)
+            else:
+                print 'Cosmo: %d, Scale_Factor: %d, HOD: %d'%(cosmo_idx, scale_factor_idx, hod_idx)
+
             print 'Time: %.2f'%(time()- t0)
             print '*'*30
-            #continue
+
             if any(idx == -1 for idx in [cosmo_idx, scale_factor_idx, hod_idx]):
                 continue # skip these placeholders
             if last_cosmo_idx != cosmo_idx or last_scale_factor_idx != scale_factor_idx:
@@ -424,7 +413,6 @@ class Trainer(object):
 
                 calc_observable = self._get_calc_observable(cat)
 
-            print 'hi'
             hod_params = dict(zip(self._hod_param_names, self._hod_param_vals[hod_idx, :]))
             if self._fixed_nd is not None:
                 self._add_logMmin(hod_params, cat)
@@ -451,9 +439,78 @@ class Trainer(object):
 
             last_cosmo_idx = cosmo_idx
             last_scale_factor_idx = scale_factor_idx
-        #print '#'*30
-        #print rank, output
-        #print '%'*30
+
+        return output, output_cov
+
+    def write_hdf5_file(self, output, output_cov):
+
+        all_param_idxs = np.array(list(product(xrange(len(self.cats)), xrange(len(self._scale_factors)),
+                                xrange(self._hod_param_vals.shape[0]))))
+
+        if self.n_bins == 1:
+            output = output.reshape((-1,))
+            output_cov = output_cov.reshape((-1,))
+        else:
+            output = output.reshape((-1, self.n_bins))
+            output_cov = output_cov.reshape((-1, self.n_bins, self.n_bins))
+
+        all_cosmo_sf_pairs = np.array(list(product(xrange(len(self.cats)), xrange(len(self._scale_factors)))))
+
+        f = h5py.File(self.output_fname, 'w')
+        try:
+            f.attrs['obs'] = self.obs
+            f.attrs['min_ptcl'] = self._min_ptcl
+            f.attrs['cosmo_param_names'] = self._cosmo_param_names
+            f.attrs['cosmo_param_vals'] = self._cosmo_param_vals
+            f.attrs['scale_factors'] = self._scale_factors
+            f.attrs['hod_param_names'] = self._hod_param_names
+            f.attrs['hod_param_vals'] = self._hod_param_vals
+            f.attrs['scale_bins'] = self.scale_bins
+        except RuntimeError:  # data too large
+            attrs = f.create_group('attrs')
+
+            f.attrs['obs'] = self.obs
+            f.attrs['min_ptcl'] = self._min_ptcl
+            f.attrs['cosmo_param_names'] = self._cosmo_param_names
+            f.attrs['scale_factors'] = self._scale_factors
+            f.attrs['hod_param_names'] = self._hod_param_names
+            f.attrs['scale_bins'] = self.scale_bins
+
+            attrs.create_dataset('cosmo_param_vals', data=self._cosmo_param_vals)
+            attrs.create_dataset('hod_param_vals', data=self._hod_param_vals)
+
+        for cosmo_sf_pair in all_cosmo_sf_pairs:
+            group_name = self._get_group_name(*cosmo_sf_pair)
+            grp = f.create_group(group_name)  # could rename the above to the group name
+
+            # I could compute this, which would be faster, but this is easier to read.
+            hod_idxs = np.where(np.all(all_param_idxs[:, :2] == cosmo_sf_pair, axis=1))[0]
+
+            grp.create_dataset("obs", data=output[hod_idxs], chunks=True, compression='gzip')
+            grp.create_dataset("cov", data=output_cov[hod_idxs], chunks=True, compression='gzip')
+
+        f.close()
+
+    def run(self, comm):
+        """
+        #TODO
+        """
+
+        rank = comm.Get_rank()
+        size = comm.Get_size()
+
+        n_combos = len(self.cats)*len(self._scale_factors)*len(self._hod_param_vals)
+        n_per_node = np.ceil(float(n_combos) / size)
+
+        if rank == 0:
+            all_param_idxs_send = self._divide_tasks(size)
+        else:
+            all_param_idxs_send = None
+
+        param_idxs = comm.scatter(all_param_idxs_send, root=0)
+
+        output, output_cov = self.compute_measurement(param_idxs, rank)
+
         # TODO, someday, glorious parallel hdf5.
         # the "gather" should at max collect 16mb, so it may not be sooo bad.
         #f = h5py.File(self.output_fname, 'w', driver='mpio', comm=comm)
@@ -473,52 +530,121 @@ class Trainer(object):
 
 
         if rank == 0:
-        #    print rank, all_output
-            # wrap things up in the final process
-            if self.n_bins == 1:
-                all_output = all_output.reshape((-1,))
-                all_output_cov = all_output_cov.reshape((-1,))
-            else:
-                all_output = all_output.reshape((-1,self.n_bins))
-                all_output_cov = all_output_cov.reshape((-1,self.n_bins, self.n_bins))
+            self.write_hdf5_file(all_output, all_output_cov)
 
-            all_cosmo_sf_pairs = np.array(list(product(xrange(len(self.cats)), xrange(len(self._scale_factors)))))
+    def queue_skipper(self, make_command, config_fname):
+        """
+        A dark twisted thing. The standard run command does the "right" thing, creating a large MPI job
+        that does all the training in parallel. However, this can frequently get stuck in the queue of clusters.
+        This function creates a series of small jobs that run indepently, which is usually much faster to run,
+        though less ethically.
+        :param make_command:
+            A function that takes a jobname, a maximum time (in hours) and an output directory,
+            and returns a tring that executes a submission command. This will be called
+            to send jobs to the queue.
+        :param config_fname:
+            The filename of the config file for the trainer.
+        :return:
+        """
 
-            f = h5py.File(self.output_fname, 'w')
-            try:
-                f.attrs['obs'] = self.obs
-                f.attrs['min_ptcl'] = self._min_ptcl
-                f.attrs['cosmo_param_names'] = self._cosmo_param_names
-                f.attrs['cosmo_param_vals'] = self._cosmo_param_vals
-                f.attrs['scale_factors'] = self._scale_factors
-                f.attrs['hod_param_names'] = self._hod_param_names
-                f.attrs['hod_param_vals'] = self._hod_param_vals
-                f.attrs['scale_bins'] = self.scale_bins
-            except RuntimeError: #data too large
-                attrs = f.create_group('attrs')
+        output_directory = path.dirname(self.output_fname)
+        # Only have to write HOD info. Rest is uniquely specified by the config.
+        np.savetxt(path.join(output_directory, HOD_FNAME), self._hod_param_vals, header = '\t'.join(self._hod_param_names))
+        copyfile(config_fname, path.join(output_directory, CONFIG_FNAME))
 
-                f.attrs['obs'] = self.obs
-                f.attrs['min_ptcl'] = self._min_ptcl
-                f.attrs['cosmo_param_names'] = self._cosmo_param_names
-                f.attrs['scale_factors'] = self._scale_factors
-                f.attrs['hod_param_names'] = self._hod_param_names
-                f.attrs['scale_bins'] = self.scale_bins
+        #split into a unique job per scale factor and cosmology
+        all_param_idxs = self._divide_tasks(self.n_jobs)
 
-                attrs.create_dataset('cosmo_param_vals', data= self._cosmo_param_vals)
-                attrs.create_dataset('hod_param_vals', data= self._hod_param_vals)
+        for idx, param_idxs in enumerate(all_param_idxs):
 
-            for cosmo_sf_pair in all_cosmo_sf_pairs:
-                group_name = self._get_group_name(*cosmo_sf_pair)
-                grp = f.create_group(group_name) # could rename the above to the group name
+            # slice out a portion of the poitns
+            jobname = 'trainer_%03d' %idx
+            param_filename = path.join(output_directory, jobname + '.npy')
+            np.savetxt(param_filename, param_idxs)
 
-                # I could compute this, which would be faster, but this is easier to read.
-                hod_idxs = np.where(np.all(all_param_idxs[:, :2] == cosmo_sf_pair, axis = 1))[0]
+            # TODO allow queue changing
+            command = make_command(jobname, self.max_time, output_directory)
+            # the odd shell call is to deal with minute differences in the systems.
+            # TODO make this more general
+            call(command, shell=self.system == 'sherlock')
 
 
-                grp.create_dataset("obs", data=all_output[hod_idxs], chunks = True, compression = 'gzip')
-                grp.create_dataset("cov", data=all_output_cov[hod_idxs], chunks = True, compression = 'gzip')
+def make_kils_command(jobname, max_time, outputdir, queue='kipac-ibq'):  # 'bulletmpi'):
+    '''
+    Return a list of strings that comprise a bash command to call trainingHelper.py on the cluster.
+    Designed to work on ki-ls's batch system
+    :param jobname:
+        Name of the job. Will also be used to make the parameter file and log file.
+    :param max_time:
+        Time for the job to run, in hours.
+    :param outputdir:
+        Directory to store output and param files.
+    :param queue:
+        Optional. Which queue to submit the job to.
+    :return:
+        Command, a list of strings that can be ' '.join'd to form a bash command.
+    '''
+    log_file = jobname + '.out'
+    param_file = jobname + '.npy'
+    command = ['bsub',
+               '-q', queue,
+               '-n', str(16),
+               '-J', jobname,
+               '-oo', path.join(outputdir, log_file),
+               '-W', '%d:00' % max_time,
+               'python', path.join(path.dirname(__file__), 'trainingHelper.py'),
+               path.join(outputdir, param_file)]
 
-            f.close()
+    return command
+
+
+def make_sherlock_command(jobname, max_time, outputdir, queue=None):
+    '''
+    Return a list of strings that comprise a bash command to call trainingHelper.py on the cluster.
+    Designed to work on sherlock's sbatch system. Differnet from the above in that it must write a file
+    to disk in order to work. Still returns a callable script.
+    :param jobname:
+        Name of the job. Will also be used to make the parameter file and log file.
+    :param max_time:
+        Time for the job to run, in hours.
+    :param outputdir:
+        Directory to store output and param files.
+    :param queue:
+        Optional. Which queue to submit the job to.
+    :return:
+        Command, a string to call to submit the job.
+    '''
+    log_file = jobname + '.out'
+    err_file = jobname + '.err'
+    param_file = jobname + '.npy'
+    sbatch_header = ['#!/bin/bash',
+                     '--job-name=%s' % jobname,
+                     '-p iric',  # KIPAC queue
+                     '--output=%s' % path.join(outputdir, log_file),
+                     '--error=%s' % path.join(outputdir, err_file),
+                     '--time=%d:00' % (max_time * 60),  # max_time is in minutes
+                     '--qos=normal',
+                     '--nodes=%d' % 1,
+                     # '--exclusive',
+                     '--mem-per-cpu=32000',
+                     '--ntasks-per-node=%d' % 1,
+                     '--cpus-per-task=%d' % 16]
+
+    sbatch_header = '\n#SBATCH '.join(sbatch_header)
+
+    call_str = ['python', path.join(path.dirname(__file__), 'trainingHelper.py'),
+                path.join(outputdir, param_file)]
+
+    call_str = ' '.join(call_str)
+    # have to write to file in order to work.
+    with open(path.join(outputdir, 'tmp.sbatch'), 'w') as f:
+        f.write(sbatch_header + '\n' + call_str)
+
+    return 'sbatch %s' % (path.join(outputdir, 'tmp.sbatch'))
+
+HOD_FNAME = 'HOD_params.npy'
+CONFIG_FNAME = 'config.yaml'
+
 
 if __name__ == '__main__':
     from sys import argv
@@ -526,6 +652,17 @@ if __name__ == '__main__':
     comm = MPI.COMM_WORLD
 
     trainer = Trainer(config_fname)
-    trainer.run(comm)
+    if trainer._skip_queue:
+        # unclear if having this here or elsewhere is better.
+        # My thinking currently is that this functionality enables other systems more transparently.
+        if trainer.system == 'sherlock':
+            make_command = make_sherlock_command
+        else:
+            make_command = make_kils_command
+
+        trainer.queue_skipper(make_command, config_fname)
+    else:
+        comm = MPI.COMM_WORLD
+        trainer.run(comm)
 
 
