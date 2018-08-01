@@ -14,8 +14,6 @@ from glob import glob
 from multiprocessing import Pool
 
 import numpy as np
-from scipy.interpolate import interp1d
-from scipy.stats import linregress
 from scipy.integrate import quad
 
 from astropy import cosmology
@@ -175,10 +173,6 @@ class Cat(object):
         self.halocat = None  # halotools halocat that we wrap
         self.model = None  # same as above, but for the model
         self.populated_once = False
-    # TODO lol why tf did I write this?/
-    def __len__(self):
-        '''Number of separate catalogs contained in one object. '''
-        return len(self.scale_factors)
 
     def __str__(self):
         '''Return an informative output string.'''
@@ -198,9 +192,20 @@ class Cat(object):
 
         return '\n'.join(output)
 
+    def __repr__(self):
+        return str(self)
+
     def _update_lists(self, user_kwargs, tmp_fnames, tmp_scale_factors):
-        '''If the user passes in a scale factor or filename, we have to do some cropping to ensure they align.
-        Used by subclasses during initialization.'''
+        """
+        If the user passes in a scale factor or filename, we have to do some cropping to ensure they align.
+        Used by subclasses during initialization.
+        :param user_kwargs
+            Kwargs passed in by the user
+        :param tmp_fnames
+            Fnames found in the directory
+        :param tmp_scale_factors
+            Similar to fnames, scale factors found in disk
+        """
 
         sf_idxs = []  # store the indicies, as they have applications elsewhere
 
