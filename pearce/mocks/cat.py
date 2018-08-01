@@ -5,6 +5,7 @@ on catalogs. '''
 
 from os import path
 from itertools import izip
+from functools import wraps
 from multiprocessing import cpu_count
 import inspect
 import warnings
@@ -51,14 +52,17 @@ VALID_HODS = {'redMagic', 'hsabRedMagic','abRedMagic','fsabRedMagic', 'fscabRedM
 DEFAULT_HODS = {'zheng07', 'leauthaud11', 'tinker13', 'hearin15'}
 
 
-def observable(func):
+def observable(func, particles = False):
     '''
     Decorator for observable methods. Checks that the catalog is properly loaded and calcualted.
     :param func:
         Function that calculates an observable on a populated catalog.
+    :param particles:
+        Boolean. Determines if particle catalogs need ot be checked as well.
     :return: func
     '''
 
+    @wraps(func)
     def _func(self, *args, **kwargs):
 
         if 'use_corrfunc' in kwargs and (kwargs['use_corrfunc'] and not CORRFUNC_AVAILABLE):
@@ -70,12 +74,20 @@ def observable(func):
             assert self.model is not None
             assert self.populated_once
         except AssertionError:
-            raise AssertionError("The cat must have a loaded model and catalog and be populated before calculating an observable.")
+            raise AssertionError("The cat must have a loaded model and catalog and be populated before calculating an\
+             observable.")
+
+        if particles:
+            try:
+                assert self.halocat.ptcl_table is not None
+            except AssertionError:
+                raise AssertionError("The function you called requires the loading of particles, but the catalog loaded\
+                 doesn't have a particle table. Please try a different catalog")
         return func(self, *args, **kwargs)
 
     # store the arguments, as the decorator destroys the spec
     _func.args = inspect.getargspec(func)[0]
-    _func.__doc__ = func.__doc__
+    #_func.__doc__ = func.__doc__
 
     return _func
 
@@ -830,7 +842,7 @@ class Cat(object):
 
         return self.calc_xi(rbins, n_cores, use_corrfunc, **xi_kwargs)/self.calc_xi_mm(rbins, n_cores, use_corrfunc)
 
-    @observable
+    @observable(particles=True)
     def calc_xi_gm(self, rbins, n_cores='all', use_corrfunc=False): #TODO add in halo? may not be worth it.
 
         n_cores = self._check_cores(n_cores)
@@ -1056,19 +1068,43 @@ class Cat(object):
 
         return wt*W
 
-    # TODO need to implement a particle check for some of these new functions
+    def _rp_from_ang(self, bins):
+        """
+        Helper function to convert angular bins to rp at the redshift of the box.
+        :param bins:
+            Angular bins in radians
+        :return:
+            rp_bins, in Mpc
+        """
+        return bins/self.cosmology.angular_diameter_distance(self.z).value
+
+    def _ang_from_rp(self, bins):
+        """
+        Helper function to convert rp_bins to angular bins at the redshift of the box
+        :param bins:
+            Projected radial bins in Mpc
+        :return:
+            ang_bins, in radians
+        """
+        return bins*self.cosmology.angular_diameter_distance(self.z).value
+
     # TODO may want to enable central/satellite cuts, etc
-    @observable
-    def calc_ds(self,rp_bins, n_cores='all'):
+    @observable(particle=True)
+    def calc_ds(self,bins, angular = False, n_cores='all'):
         """
         Calculate delta sigma, from a given galaxy and particle sample
         Returns in units of h*M_sun/pc^2, so be wary! 
-        :param rp_bins:
-            The projected radial binning in Mpc
+        :param bins:
+            If angular is False, the projected radial binning in Mpc
+            # TODO degrees instead of radians? would need to be everywhere
+            If angular is True, the angular bins in radians
+        :param angular:
+            Boolean. Whether or not to return the result in angular values in stead of rp.
+            Default is False
         :param n_cores:
             Number of cores to use for the calculation, default is "all"
         :return:
-            delta sigma, a numpy array of size (rp_bins.shape[0]-1,)
+            delta sigma, a numpy array of size (bins.shape[0]-1,)
         """
         try:
             assert hasattr(self, "_downsample_factor")
@@ -1083,7 +1119,7 @@ class Cat(object):
         x_m, y_m, z_m = [self.halocat.ptcl_table[c] for c in ['x', 'y', 'z']]
         pos_m = return_xyz_formatted_array(x_m, y_m, z_m, period=self.Lbox)
 
-
+        rp_bins = bins if not angular else self._rp_from_ang(bins)
 
         #Halotools wnats downsampling factor defined oppositley
         #TODO verify little h!
@@ -1092,20 +1128,34 @@ class Cat(object):
                            downsampling_factor = 1./self._downsample_factor, rp_bins = rp_bins,
                            period=self.Lbox / self.h, num_threads=n_cores,cosmology = self.cosmology)[1]/(1e12)
 
-    @observable
-    def calc_ds_analytic(self, rp_bins, n_cores = 'all', ds_kwargs = {}):
+    @observable(particles=True)
+    def calc_ds_analytic(self, bins, angular=False, n_cores = 'all', xi_kwargs = {}):
+        """
+        Calculate delta sigma by integratin xi_gm instead of projecting the box's matter distribution.
 
-        # NOTE this is compied stright from
-        assert 'do_jackknife' not in ds_kwargs
+        Works better for larger scales.
+        :param bins:
+            If angular is False, the rp_bins to compute delta sigma at.
+            If angular is True, the angular bins in radians to compute delta sigma for.
+         :param angular:
+            Boolean. Whether or not to return the result in angular values in stead of rp.
+            Default is False
+        :param n_cores:
+            Number of cores to use for the calculation, default is "all"
+        :param xi_kwargs:
+            a dictionay of any kwargs to be passed into xi_gm. Default is {}
+        :return:
+        """
+        assert 'do_jackknife' not in xi_kwargs
         try:
             assert CCL_AVAILABLE
         except AssertionError:
-            raise AssertionError("CCL is required for calc_wt. Please install, or choose another function.")
+            raise AssertionError("CCL is required for calc_ds_analytic. Please install, or choose another function.")
 
         n_cores = self._check_cores(n_cores)
         # calculate xi_gg first
         rbins = np.logspace(-1.3, 1.6, 16)
-        xi = self.calc_xi_gm(rbins,n_cores=n_cores, **ds_kwargs)
+        xi = self.calc_xi_gm(rbins,n_cores=n_cores, **xi_kwargs)
 
         if np.any(xi<=0):
             warnings.warn("Some values of xi are less than 0. Setting to a small nonzero value. This may have unexpected behavior, check your HOD")
@@ -1175,6 +1225,8 @@ class Cat(object):
         def DS_integrand_medium_scales(lR, sigma_interp):
             return np.exp(2*lR)*sigma_interp(np.log10(np.exp(lR)))
 
+        rp_bins = bins if not angular else self._rp_from_ang(bins)
+
         rp_points = (rp_bins[1:] + rp_bins[:-1])/2.0
         lrmin = np.log(rp_points[0])
         ds = np.zeros_like(rp_points)
@@ -1186,17 +1238,21 @@ class Cat(object):
 
         return self.h * ds
 
-    def calc_sigma_crit_inv(self, zbins, dNdzs):
+    def calc_sigma_crit_inv(self, zbins, dNs):
         """
-
+        Calculate the inverse of sigma crit by integrating over the N_z distribution for a lensed sample
         :param zbins:
-        :param dNdz:
+            Redshift bins
+        :param dNs:
+            Number fo galaxies in each bin of zbins, normalized (i.e. sum(dNs) == 1.0).
+
         :return:
+            sigma_crit_inv, in units of pc^2/Msun.
         """
         Scrit = 0
         Dl = self.cosmology.angular_diameter_distance(self.z)
         Dl_t = self.cosmology.comoving_distance(self.z)
-        for idx, dN in enumerate(dNdzs):
+        for idx, dN in enumerate(dNs):
             zs = zbins[idx]
             if dN ==0 or zs < self.z:
                 continue
@@ -1208,22 +1264,24 @@ class Cat(object):
 
         return (Scrit*Dl*4*np.pi*const.G/(const.c**2)).to("(pc^2)/Msun").value
 
-    @observable
-    def calc_gt(self, theta_bins, rp_bins, sigma_crit_inv, n_cores='all', ds_kwargs = {}):
+    @observable(particles=True)
+    def calc_gt(self, theta_bins, sigma_crit_inv, n_cores='all', ds_kwargs = {}):
         """
-
+        Calculate the tangential shear gamma tvia delta sigma
         :param theta_bins:
-        :param rbins:
+            Angular bins (in radians) to compute gamma t
+        :param sigma_crit_inv:
+            The inverse of sigma_crit for the lensing sample
         :param n_cores:
+            Number of cores to use in the calculation. Default is 'all'
         :param ds_kwargs:
+            Any kwargs to pass into delta_sigma. Default is {}.
         :return:
+            Gamma t
         """
 
-        # TODO no rp_bins; figured out what they are from theta
         n_cores = self._check_cores(n_cores)
-        if type(rp_bins) is list:
-            rp_bins = np.array(rp_bins)
-
+        rp_bins = self._rp_from_ang(theta_bins)
         # TODO my own rp_bins
         rpbc = (rp_bins[1:]+rp_bins[:-1])/2.0
 
@@ -1239,23 +1297,7 @@ class Cat(object):
             ds_ls = self.calc_ds_analytic(rp_bins, n_cores=n_cores, **ds_kwargs)
             ds[start_idx-1:] = ds_ls[start_idx-1:]
 
-        print ds
-        gamma_r = sigma_crit_inv*ds #hope user has converter ds to pc from Mpc
-        print gamma_r
-
-
-        gamma_r_interp = interp1d(np.log10(rpbc), np.log10(gamma_r) )
-
-        Da = self.cosmology.angular_diameter_distance(self.z).value
-
-        tbc = (theta_bins[1:]+theta_bins[:-1])/2.0
-        gamma_t = np.zeros_like(tbc)
-
-        for i, t in enumerate(np.radians(tbc)):
-            try:
-                gamma_t[i] = 10**gamma_r_interp(np.log10(t*Da))
-            except ValueError: # TODO fix?
-                gamma_t[i] = 0.0
+        gamma_t = sigma_crit_inv*ds #hope user has converter ds to pc from Mpc
 
         return gamma_t
 
