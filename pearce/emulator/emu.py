@@ -1645,26 +1645,3 @@ class ExtraCrispy(Emu):
 
         return results
 
-class SpicyBuffalo(Emu):
-    def __init__(self, filename, nn_init_func, cost_func, optimizer_init_func, train_dict, **kwargs):
-        self._nn_init_func = nn_init_func
-        super(SpicyBuffalo, self).__init__(filename, method = 'nn', **kwargs)
-        self.train_nn(self, cost_func, optimizer_init_func, train_dict)
-
-    # TODO this could be in Emu since it is copied from OR
-    def _downsample_data(self):
-
-        N_points = self.x.shape[0]/self.n_bins #sample full HOD/cosmo points,
-        downsample_N_points = int(self._downsample_factor*N_points)
-        self.downsample_x = np.zeros((downsample_N_points*self.n_bins, self.x.shape[1]))
-        self.downsample_y = np.zeros((downsample_N_points*self.n_bins))
-        self.downsample_yerr = np.zeros((downsample_N_points*self.n_bins))
-
-        downsampled_points = np.random.choice(N_points, downsample_N_points, replace = False)
-
-        for i, dp in enumerate(downsampled_points):
-            self.downsample_x[i*self.n_bins:(i+1)*self.n_bins] = self.x[dp*self.n_bins: (dp+1)*self.n_bins]
-            self.downsample_y[i*self.n_bins:(i+1)*self.n_bins] = self.y[dp*self.n_bins: (dp+1)*self.n_bins]
-            self.downsample_yerr[i*self.n_bins:(i+1)*self.n_bins] = self.yerr[dp*self.n_bins: (dp+1)*self.n_bins]
-
-    def _build_nn(self, hyperparams):

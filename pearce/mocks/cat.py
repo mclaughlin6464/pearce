@@ -734,7 +734,7 @@ class Cat(object):
             self.populated_once = True
 
     # TODO how to handle analytic v observed nd
-    @observable
+    @observable()
     def calc_number_density(self):
         '''
         Return the number density for a populated box.
@@ -745,7 +745,7 @@ class Cat(object):
         return self.model.mock.number_density*self.h**3
 
     # TODO do_jackknife to cov?
-    @observable
+    @observable()
     def calc_xi(self, rbins, n_cores='all', do_jackknife=False, use_corrfunc=False, jk_args={}, halo=False):
         '''
         Calculate a 3-D correlation function on a populated catalog.
@@ -825,7 +825,7 @@ class Cat(object):
             return xi_all, xi_cov
         return xi_all
 
-    @observable
+    @observable()
     def calc_bias(self,rbins, n_cores='all', use_corrfunc=False, **xi_kwargs):
         """
         Calculate the bias in a clustering sample. Computes the clustering and divides by the matter clustering,
@@ -892,7 +892,7 @@ class Cat(object):
 
     # TODO use Joe's code. Remember to add sensible asserts when I do.
     # TODO Jackknife? A way to do it without Joe's code?
-    @observable
+    @observable()
     def calc_wp(self, rp_bins, pi_max=40, do_jackknife=True, use_corrfunc=False, n_cores='all', RSD=False, halo=False):
         '''
         Calculate the projected correlation on a populated catalog
@@ -940,7 +940,7 @@ class Cat(object):
             wp_all = wp(pos / self.h, rp_bins, pi_max / self.h, period=self.Lbox / self.h, num_threads=n_cores)
         return wp_all
 
-    @observable
+    @observable()
     def calc_wt_projected(self, theta_bins, do_jackknife=True, n_cores='all', halo = False):
         '''
         Calculate the angular correlation function, w(theta), from a populated catalog.
@@ -998,7 +998,7 @@ class Cat(object):
         return  (2*W/const.c).to("1/Mpc").value
 
 
-    @observable
+    @observable()
     def calc_wt(self, theta_bins, W, n_cores='all', halo = False, xi_kwargs = {}):
         """
         TODO docs
@@ -1094,7 +1094,7 @@ class Cat(object):
         return bins*self.cosmology.angular_diameter_distance(self.z).value
 
     # TODO may want to enable central/satellite cuts, etc
-    @observable(particle=True)
+    @observable(particles=True)
     def calc_ds(self,bins, angular = False, n_cores='all'):
         """
         Calculate delta sigma, from a given galaxy and particle sample
