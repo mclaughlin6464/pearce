@@ -569,7 +569,7 @@ class Trainer(object):
             call(command, shell=self.system == 'sherlock')
 
 
-def make_kils_command(jobname, max_time, outputdir, queue='kipac-ibq'):  # 'bulletmpi'):
+def make_kils_command(jobname, max_time, outputdir, queue='long'):  # 'bulletmpi'):
     '''
     Return a list of strings that comprise a bash command to call trainingHelper.py on the cluster.
     Designed to work on ki-ls's batch system
@@ -588,7 +588,7 @@ def make_kils_command(jobname, max_time, outputdir, queue='kipac-ibq'):  # 'bull
     param_file = jobname + '.npy'
     command = ['bsub',
                '-q', queue,
-               '-n', str(16),
+               '-n', str(8),
                '-J', jobname,
                '-oo', path.join(outputdir, log_file),
                '-W', '%d:00' % max_time,

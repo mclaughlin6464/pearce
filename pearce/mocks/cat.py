@@ -1094,7 +1094,7 @@ class Cat(object):
         return bins*self.cosmology.angular_diameter_distance(self.z).value
 
     # TODO may want to enable central/satellite cuts, etc
-    @observable(particle=True)
+    @observable(particles=True)
     def calc_ds(self,bins, angular = False, n_cores='all'):
         """
         Calculate delta sigma, from a given galaxy and particle sample

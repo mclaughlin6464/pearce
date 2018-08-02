@@ -373,7 +373,7 @@ class TrainingBox(Cat):
         Lbox = 1050.0  # Mpc/h
         self.npart = 1400
         # Need to make a way to combine all the params
-        if system == 'ki-ls':
+        if system == 'ki-ls' or system == 'long':
             param_file = '~swmclau2/des/LH_eigenspace_lnA_np7_n40_s556.dat'
         else: #sherlock
             param_file = '/scratch/users/swmclau2/TrainingBoxes/LH_eigenspace_lnA_np7_n40_s556.dat'
@@ -391,6 +391,7 @@ class TrainingBox(Cat):
                      'sherlock': ['/home/users/swmclau2/scratch/NewTrainingBoxes/Box0%02d/',
                                   '/home/users/swmclau2/scratch/NewTrainingBoxes/Box0%02d/']}
                       #same place on sherlock
+        locations['long'] = locations['ki-ls']
         assert system in locations
         #loc = locations[system][0]
         loc_list = locations[system]
