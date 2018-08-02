@@ -14,7 +14,6 @@ import yaml
 import numpy as np
 from scipy.optimize import minimize_scalar
 import pandas as pd
-from mpi4py import MPI
 import h5py
 
 from pearce.mocks import cat_dict
@@ -100,7 +99,7 @@ class Trainer(object):
         # In the future if there are more annoying params i'll turn this into a loop or something.
         # TODO does yaml parse these to bools automatically?
         self._particles = bool(cosmo_cfg['particles']) if 'particles' in cosmo_cfg else False
-        print cosmo_cfg.keys()
+        #print cosmo_cfg.keys()
         self._downsample_factor = float(cosmo_cfg['downsample_factor']) if 'downsample_factor' in cosmo_cfg else 1e-3
 
     def prep_hod(self, hod_cfg):
@@ -244,6 +243,7 @@ class Trainer(object):
                 "Observable %s is not available. Please check if you specified correctly, only\n observables that are calc_<> cat functions are allowed." %self.obs)
 
         # check to see if there are kwargs for calc_observable
+        #print calc_observable
         args = calc_observable.args  # get function args
         kwargs = {}
         # obs_cfg may have args for our function.
@@ -346,7 +346,7 @@ class Trainer(object):
                                 xrange(self._hod_param_vals.shape[0]))))
 
         n_combos = len(all_param_idxs)
-        n_per_node = np.ceil(float(n_combos)/size)
+        n_per_node = int(np.ceil(float(n_combos)/size))
         remainder = n_combos%size
         zero_remainder = remainder == 0
 
@@ -428,7 +428,7 @@ class Trainer(object):
                     obs_repops = np.zeros((self._n_repops,))
 
                 for repop in xrange(self._n_repops):
-                    print repop
+                    #print repop
                     cat.populate(hod_params, min_ptcl= self._min_ptcl)
                     obs_repops[repop] = self._transform_func(calc_observable())
 
@@ -567,6 +567,7 @@ class Trainer(object):
             # the odd shell call is to deal with minute differences in the systems.
             # TODO make this more general
             call(command, shell=self.system == 'sherlock')
+            break
 
 
 def make_kils_command(jobname, max_time, outputdir, queue='long'):  # 'bulletmpi'):
@@ -623,12 +624,14 @@ def make_sherlock_command(jobname, max_time, outputdir, queue=None):
                      '--output=%s' % path.join(outputdir, log_file),
                      '--error=%s' % path.join(outputdir, err_file),
                      '--time=%d:00' % (max_time * 60),  # max_time is in minutes
-                     '--qos=normal',
-                     '--nodes=%d' % 1,
-                     # '--exclusive',
-                     '--mem-per-cpu=32000',
-                     '--ntasks-per-node=%d' % 1,
-                     '--cpus-per-task=%d' % 16]
+                     '--ntasks=1',
+                     '--cpus-per-task=8',
+                     '--mem-per-cpu=MaxMemPerCPU']
+                     #'--qos=normal',
+                     #'--nodes=%d' % 1,
+                     #'--exclusive']#,
+                     #'--mem-per-cpu=32000',
+                     #'--cpus-per-task=%d' % 16]
 
     sbatch_header = '\n#SBATCH '.join(sbatch_header)
 
@@ -649,7 +652,6 @@ CONFIG_FNAME = 'config.yaml'
 if __name__ == '__main__':
     from sys import argv
     config_fname = argv[1] # could implement full argparse if i want i guess
-    comm = MPI.COMM_WORLD
 
     trainer = Trainer(config_fname)
     if trainer._skip_queue:
@@ -662,6 +664,8 @@ if __name__ == '__main__':
 
         trainer.queue_skipper(make_command, config_fname)
     else:
+
+        from mpi4py import MPI
         comm = MPI.COMM_WORLD
         trainer.run(comm)
 
