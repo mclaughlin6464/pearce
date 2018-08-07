@@ -5,6 +5,7 @@ Rather than firing off many jobs to do the training, will do everying with MPI i
 Will also write to an hdf5 file, to reduce the enormous clutter produced so far.
 """
 from os import path
+from glob import glob
 from shutil import copyfile
 from subprocess import call
 from time import time
@@ -534,7 +535,7 @@ class Trainer(object):
         if rank == 0:
             self.write_hdf5_file(all_output, all_output_cov)
 
-    def queue_skipper(self, make_command, config_fname):
+    def queue_skipper(self, make_command, config_fname, rerun = False):
         """
         A dark twisted thing. The standard run command does the "right" thing, creating a large MPI job
         that does all the training in parallel. However, this can frequently get stuck in the queue of clusters.
@@ -551,18 +552,28 @@ class Trainer(object):
 
         output_directory = path.dirname(self.output_fname)
         # Only have to write HOD info. Rest is uniquely specified by the config.
-        np.savetxt(path.join(output_directory, HOD_FNAME), self._hod_param_vals, header = '\t'.join(self._hod_param_names))
-        copyfile(config_fname, path.join(output_directory, CONFIG_FNAME))
+        if not rerun:
+            np.savetxt(path.join(output_directory, HOD_FNAME), self._hod_param_vals, header = '\t'.join(self._hod_param_names))
+            copyfile(config_fname, path.join(output_directory, CONFIG_FNAME))
 
-        #split into a unique job per scale factor and cosmology
-        all_param_idxs = self._divide_tasks(self.n_jobs)
+            #split into a unique job per scale factor and cosmology
+            all_param_idxs = self._divide_tasks(self.n_jobs)
 
-        for idx, param_idxs in enumerate(all_param_idxs):
+        else:
+            assert self.n_jobs == len(glob(path.join(output_directory, 'trainer_????.npy'))), 'n_jobs has changed, cannot rerun'
+
+
+        for idx in xrange(self.n_jobs):
 
             # slice out a portion of the poitns
             jobname = 'trainer_%04d' %idx
             param_filename = path.join(output_directory, jobname + '.npy')
-            np.savetxt(param_filename, param_idxs)
+            if not rerun:
+                np.savetxt(param_filename, all_param_idxs[idx])
+            elif path.exists(path.join(output_directory, 'output_%04.npy'%idx)) or\
+                path.exists(path.join(output_directory, 'output_%03.npy'%idx)): #backwards compatible
+
+                continue # this one ran successfull
 
             # TODO allow queue changing
             command = make_command(jobname, self.max_time, output_directory)
@@ -653,10 +664,18 @@ CONFIG_FNAME = 'config.yaml'
 
 
 if __name__ == '__main__':
-    from sys import argv
-    config_fname = argv[1] # could implement full argparse if i want i guess
+    import argparse
+
+    parser = argparse.ArgumentParser(description='Train an emulator from a config file.')
+    parser.add_argument('config_fname', type=str, help='Config YAML File')
+    parser.add_argument('--rerun', action='store_true')
+    args = vars(parser.parse_args())
+
+    config_fname = args['config_fname'] # could implement full argparse if i want i guess
 
     trainer = Trainer(config_fname)
+
+    rerun = args['rerun']
     if trainer._skip_queue:
         # unclear if having this here or elsewhere is better.
         # My thinking currently is that this functionality enables other systems more transparently.
