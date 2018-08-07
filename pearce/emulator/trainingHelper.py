@@ -39,8 +39,8 @@ def compute_on_subset(param_fname):
     param_idxs = np.loadtxt(param_fname)
     output, output_cov = trainer.compute_measurement(param_idxs)
 
-    np.save(path.join(output_directory, 'output_%03d.npy'%job_number), output)
-    np.save(path.join(output_directory, 'output_cov_%03d.npy'%job_number), output_cov)
+    np.save(path.join(output_directory, 'output_%04d.npy'%job_number), output)
+    np.save(path.join(output_directory, 'output_cov_%04d.npy'%job_number), output_cov)
 
 
 def consolidate_outputs(directory):

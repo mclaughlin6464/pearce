@@ -376,6 +376,7 @@ class Trainer(object):
 
     def compute_measurement(self, param_idxs, rank = None):
 
+        param_idxs = param_idxs.astype(int)
         if self.n_bins > 1 :
             output = np.zeros((param_idxs.shape[0], self.n_bins))
             output_cov = np.zeros((param_idxs.shape[0], self.n_bins, self.n_bins))
@@ -408,6 +409,7 @@ class Trainer(object):
 
                 scale_factor = self._scale_factors[scale_factor_idx]
 
+                #print self._scale_factors, scale_factor_idx, scale_factor
                 cat.load(scale_factor, HOD= self.hod, particles = self._particles,
                          downsample_factor=self._downsample_factor, hod_kwargs= self._hod_kwargs  )
 
@@ -558,7 +560,7 @@ class Trainer(object):
         for idx, param_idxs in enumerate(all_param_idxs):
 
             # slice out a portion of the poitns
-            jobname = 'trainer_%03d' %idx
+            jobname = 'trainer_%04d' %idx
             param_filename = path.join(output_directory, jobname + '.npy')
             np.savetxt(param_filename, param_idxs)
 
@@ -567,7 +569,6 @@ class Trainer(object):
             # the odd shell call is to deal with minute differences in the systems.
             # TODO make this more general
             call(command, shell=self.system == 'sherlock')
-            break
 
 
 def make_kils_command(jobname, max_time, outputdir, queue='long'):  # 'bulletmpi'):
@@ -593,6 +594,8 @@ def make_kils_command(jobname, max_time, outputdir, queue='long'):  # 'bulletmpi
                '-J', jobname,
                '-oo', path.join(outputdir, log_file),
                '-W', '%d:00' % max_time,
+               '-R span[ptile=8]',
+               '--exclusive',
                'python', path.join(path.dirname(__file__), 'trainingHelper.py'),
                path.join(outputdir, param_file)]
 

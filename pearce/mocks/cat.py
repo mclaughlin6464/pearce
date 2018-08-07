@@ -410,7 +410,7 @@ class Cat(object):
                 reader.halo_table['halo_local_density_%d'%(int(r))] = densities[:, r_idx]/(volume*mean_particle_density)
     # adding **kwargs cuz some invalid things can be passed in, hopefully not a pain
     # TODO some sort of spell check in the input file
-    def load(self, scale_factor, HOD='redMagic', tol=0.05,particles=False,downsample_factor=1e-3, hod_kwargs = {}, **kwargs):
+    def load(self, scale_factor, HOD='redMagic', tol=0.01,particles=False,downsample_factor=1e-3, hod_kwargs = {}, **kwargs):
         '''
         Load both a halocat and a model to prepare for population and calculation.
         :param scale_factor:
@@ -1047,9 +1047,9 @@ class Cat(object):
         tpoints = (theta_bins[1:] + theta_bins[:-1])/2.0
         wt = np.zeros_like(tpoints)
         # need this distance for computation
-        x = self.cosmology.comoving_distance(self.z)/self.h
+        x = self.cosmology.comoving_distance(self.z).to("Mpc").value#/self.h
 
-        assert tpoints[0]*x.to("Mpc").value/self.h >= xi_rmin #TODO explain this check
+        assert tpoints[0]*x/self.h >= xi_rmin #TODO explain this check
 
         def small_scales_integrand(log_u, x, t, xi_interp):
             r2 = np.power(10, 2*log_u) + (x*t)**2
@@ -1065,9 +1065,9 @@ class Cat(object):
         for bin_no, t_med in enumerate(tpoints):
             log_u_ss_max = np.log10(xi_rmax**2 - (t_med*x)**2)/2.0 #max we can integrate to on small scales
             log_u_ls_max = np.log10(big_xi_rmax**2 - (t_med*x)**2)/2.0 #max we can integrate to on small scales
-            small_scales_contribution = quad(small_scales_integrand, -10, log_u_ss_max, args = (x.value, t_med, xi_interp))[0]
+            small_scales_contribution = quad(small_scales_integrand, -10, log_u_ss_max, args = (x, t_med, xi_interp))[0]
             large_scales_contribution = quad(large_scales_integrand, log_u_ss_max, log_u_ls_max,\
-                                             args = (x.value, t_med, bias2, xi_mm_interp))[0]
+                                             args = (x, t_med, bias2, xi_mm_interp))[0]
 
             wt[bin_no] = (small_scales_contribution + large_scales_contribution)/self.h #TODO check little h's
 
@@ -1081,7 +1081,7 @@ class Cat(object):
         :return:
             rp_bins, in Mpc
         """
-        return bins/self.cosmology.angular_diameter_distance(self.z).value
+        return np.radians(bins)*self.cosmology.angular_diameter_distance(self.z).value
 
     def _ang_from_rp(self, bins):
         """
@@ -1089,9 +1089,9 @@ class Cat(object):
         :param bins:
             Projected radial bins in Mpc
         :return:
-            ang_bins, in radians
+            ang_bins, in degrees 
         """
-        return bins*self.cosmology.angular_diameter_distance(self.z).value
+        return np.degrees(bins/self.cosmology.angular_diameter_distance(self.z).value)
 
     # TODO may want to enable central/satellite cuts, etc
     @observable(particles=True)
@@ -1101,8 +1101,7 @@ class Cat(object):
         Returns in units of h*M_sun/pc^2, so be wary! 
         :param bins:
             If angular is False, the projected radial binning in Mpc
-            # TODO degrees instead of radians? would need to be everywhere
-            If angular is True, the angular bins in radians
+            If angular is True, the angular bins in degrees 
         :param angular:
             Boolean. Whether or not to return the result in angular values in stead of rp.
             Default is False
@@ -1141,7 +1140,7 @@ class Cat(object):
         Works better for larger scales.
         :param bins:
             If angular is False, the rp_bins to compute delta sigma at.
-            If angular is True, the angular bins in radians to compute delta sigma for.
+            If angular is True, the angular bins in degrees to compute delta sigma for.
          :param angular:
             Boolean. Whether or not to return the result in angular values in stead of rp.
             Default is False
@@ -1270,7 +1269,7 @@ class Cat(object):
         return (Scrit*Dl*4*np.pi*const.G/(const.c**2)).to("(pc^2)/Msun").value
 
     @observable(particles=True)
-    def calc_gt(self, theta_bins, sigma_crit_inv, n_cores='all', ds_kwargs = {}):
+    def calc_gt(self, theta_bins, sigma_crit_inv, n_cores=4, ds_kwargs = {}):
         """
         Calculate the tangential shear gamma tvia delta sigma
         :param theta_bins:
@@ -1287,6 +1286,7 @@ class Cat(object):
 
         n_cores = self._check_cores(n_cores)
         rp_bins = self._rp_from_ang(theta_bins)
+        print rp_bins
         # TODO my own rp_bins
         rpbc = (rp_bins[1:]+rp_bins[:-1])/2.0
 
