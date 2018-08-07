@@ -688,7 +688,7 @@ if __name__ == '__main__':
         else:
             make_command = make_kils_command
 
-        trainer.queue_skipper(make_command, config_fname)
+        trainer.queue_skipper(make_command, config_fname, rerun)
     else:
 
         from mpi4py import MPI
