@@ -433,7 +433,11 @@ class Trainer(object):
                 for repop in xrange(self._n_repops):
                     #print repop
                     cat.populate(hod_params, min_ptcl= self._min_ptcl)
-                    obs_repops[repop] = self._transform_func(calc_observable())
+                    try:
+                        obs_repops[repop] = self._transform_func(calc_observable())
+                    except ValueError: #likely an issue with population. If it comes up again, send it up
+                        cat.populate(hod_params, min_ptcl= self._min_ptcl)
+                        obs_repops[repop] = self._transform_func(calc_observable())
 
                 obs_val = np.mean(obs_repops, axis=0)
                 obs_cov = np.cov(obs_repops, rowvar=False)

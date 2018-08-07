@@ -1181,7 +1181,7 @@ class Cat(object):
 
         cosmo = ccl.Cosmology(**param_dict)
 
-        big_rbins = np.logspace(1, 2.1, 21)
+        big_rbins = np.logspace(1, 2.3, 21)
         big_rpoints = (big_rbins[1:] + big_rbins[:-1])/2.0
         big_xi_rmax = big_rpoints[-1]
         xi_mm = ccl.correlation_3d(cosmo, self.a, big_rpoints)
@@ -1203,7 +1203,7 @@ class Cat(object):
 
         ### calculate sigma first###
 
-        sigma_rpoints = np.logspace(-1.1, 2.0, 15)
+        sigma_rpoints = np.logspace(-1.1, 2.2, 15)
 
         sigma = np.zeros_like(sigma_rpoints)
         for i, rp in enumerate(sigma_rpoints):
