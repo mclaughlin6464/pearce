@@ -439,8 +439,6 @@ class Trainer(object):
                         cat.populate(hod_params, min_ptcl= self._min_ptcl)
                         obs_repops[repop] = self._transform_func(calc_observable())
 
-                print obs_repops
-                print '*'*30
                 obs_val = np.mean(obs_repops, axis=0)
                 obs_cov = np.cov(obs_repops, rowvar=False)
             output[output_idx] = obs_val
@@ -584,7 +582,6 @@ class Trainer(object):
             # the odd shell call is to deal with minute differences in the systems.
             # TODO make this more general
             call(command, shell=self.system == 'sherlock')
-            break
 
 
 def make_kils_command(jobname, max_time, outputdir, queue='medium'):  # 'bulletmpi'):

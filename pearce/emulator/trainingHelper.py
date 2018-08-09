@@ -49,7 +49,7 @@ def consolidate_outputs(directory):
     :param directory:
         The directory with the outputs in them
     """
-    all_output_fnames = sorted(glob(path.join(directory), 'output_*') )
+    all_output_fnames = sorted(glob(path.join(directory, 'output_*') ))
     output_fnames, output_cov_fnames = [], []
 
     for fname in all_output_fnames:
@@ -61,8 +61,8 @@ def consolidate_outputs(directory):
     all_output, all_output_cov = [], []
     # i'd like to find a way to make the numpy arrays a priori but not sure how
     for o_fname, cov_fname in izip(output_fnames, output_cov_fnames):
-        all_output.append(np.loadtxt(o_fname))
-        all_output_cov.append(np.loadtxt(cov_fname))
+        all_output.append(np.load(o_fname))
+        all_output_cov.append(np.load(cov_fname))
 
     all_output = np.array(all_output)
     all_output_cov = np.array(all_output_cov)
@@ -73,7 +73,8 @@ def consolidate_outputs(directory):
 
     #clean up
     for fname in all_output_fnames:
-        remove(fname)
+        pass
+        #remove(fname)
 
     remove(path.join(directory, HOD_FNAME))
     remove(path.join(directory, CONFIG_FNAME))
