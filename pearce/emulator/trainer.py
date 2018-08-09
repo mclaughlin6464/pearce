@@ -439,6 +439,8 @@ class Trainer(object):
                         cat.populate(hod_params, min_ptcl= self._min_ptcl)
                         obs_repops[repop] = self._transform_func(calc_observable())
 
+                print obs_repops
+                print '*'*30
                 obs_val = np.mean(obs_repops, axis=0)
                 obs_cov = np.cov(obs_repops, rowvar=False)
             output[output_idx] = obs_val
@@ -564,7 +566,7 @@ class Trainer(object):
             all_param_idxs = self._divide_tasks(self.n_jobs)
 
         else:
-            assert self.n_jobs == len(glob(path.join(output_directory, 'trainer_????.npy'))), 'n_jobs has changed, cannot rerun'
+            assert self.n_jobs == len(glob(path.join(output_directory, 'trainer_*.npy'))), 'n_jobs has changed, cannot rerun'
 
 
         for idx in xrange(self.n_jobs):
@@ -574,9 +576,7 @@ class Trainer(object):
             param_filename = path.join(output_directory, jobname + '.npy')
             if not rerun:
                 np.savetxt(param_filename, all_param_idxs[idx])
-            elif path.exists(path.join(output_directory, 'output_%04.npy'%idx)) or\
-                path.exists(path.join(output_directory, 'output_%03.npy'%idx)): #backwards compatible
-
+            elif path.exists(path.join(output_directory, 'output_%04d.npy'%idx)):\
                 continue # this one ran successfull
 
             # TODO allow queue changing
@@ -584,9 +584,10 @@ class Trainer(object):
             # the odd shell call is to deal with minute differences in the systems.
             # TODO make this more general
             call(command, shell=self.system == 'sherlock')
+            break
 
 
-def make_kils_command(jobname, max_time, outputdir, queue='long'):  # 'bulletmpi'):
+def make_kils_command(jobname, max_time, outputdir, queue='medium'):  # 'bulletmpi'):
     '''
     Return a list of strings that comprise a bash command to call trainingHelper.py on the cluster.
     Designed to work on ki-ls's batch system

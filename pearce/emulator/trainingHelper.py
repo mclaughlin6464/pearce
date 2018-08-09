@@ -31,7 +31,7 @@ def compute_on_subset(param_fname):
     :param param_fname:
     :return:
     """
-    job_number = int(path.basename(param_fname).split('.')[0][-3:])
+    job_number = int(path.basename(param_fname).split('.')[0][-4:])
     output_directory = path.dirname(param_fname)
     print job_number
     trainer = get_trainer(output_directory)

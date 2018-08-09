@@ -1011,7 +1011,7 @@ class Cat(object):
 
         n_cores = self._check_cores(n_cores)
         # calculate xi_gg first
-        rbins = np.logspace(-1.1, 1.6, 17) #make my own bins
+        rbins = np.logspace(-1.1, 1.8, 17) #make my own bins
         xi = self.calc_xi(rbins,do_jackknife=False,n_cores=n_cores, halo=halo, **xi_kwargs)
 
         if np.any(xi<=0):
@@ -1034,16 +1034,20 @@ class Cat(object):
 
         cosmo = ccl.Cosmology(**param_dict)
 
-        big_rbins = np.logspace(1, 2.1, 21)
+        big_rbins = np.logspace(1, 2.3, 21)
         big_rpoints = (big_rbins[1:] + big_rbins[:-1])/2.0
+        big_xi_rmin = big_rpoints[0]
         big_xi_rmax = big_rpoints[-1]
         xi_mm = ccl.correlation_3d(cosmo, self.a, big_rpoints)
+
 
         xi_mm_interp = interp1d(np.log10(big_rpoints), np.log10(xi_mm))
 
         #correction factor
         bias2 = np.power(10, xi_interp(1.2)-xi_mm_interp(1.2))
 
+
+        theta_bins = np.radians(theta_bins)
         tpoints = (theta_bins[1:] + theta_bins[:-1])/2.0
         wt = np.zeros_like(tpoints)
         # need this distance for computation
@@ -1052,23 +1056,39 @@ class Cat(object):
         assert tpoints[0]*x/self.h >= xi_rmin #TODO explain this check
 
         def small_scales_integrand(log_u, x, t, xi_interp):
-            r2 = np.power(10, 2*log_u) + (x*t)**2
+            r2 = np.exp(2*log_u) + (x*t)**2
             return np.power(10, xi_interp(0.5*np.log10(r2)))
 
         def large_scales_integrand(log_u, x, t, bias2, xi_mm_interp):
-            r2 = np.power(10, 2*log_u) + (x*t)**2
+            r2 = np.exp(2*log_u) + (x*t)**2
+
             try:
-                return bias2*np.power(10, xi_mm_interp(0.5*np.log10(r2)))
+                out = bias2*np.power(10, xi_mm_interp(0.5*np.log10(r2)))
+                if np.isnan(out):
+                    raise ValueError
+                return out
             except ValueError: #usually out of bounds interpolation
                 return 0.0
 
         for bin_no, t_med in enumerate(tpoints):
-            log_u_ss_max = np.log10(xi_rmax**2 - (t_med*x)**2)/2.0 #max we can integrate to on small scales
-            log_u_ls_max = np.log10(big_xi_rmax**2 - (t_med*x)**2)/2.0 #max we can integrate to on small scales
-            small_scales_contribution = quad(small_scales_integrand, -10, log_u_ss_max, args = (x, t_med, xi_interp))[0]
-            large_scales_contribution = quad(large_scales_integrand, log_u_ss_max, log_u_ls_max,\
+            log_u_ss_max = np.log(xi_rmax**2 - (t_med*x)**2)/2.0 #max we can integrate to on small scales
+            log_u_ls_max = np.log(big_xi_rmax**2 - (t_med*x)**2)/2.0 #max we can integrate to on small scales
+
+            if not np.isnan(log_u_ss_max):
+                #print large_scales_integrand(log_u_ss_max, x, t_med, bias2, xi_mm_interp)
+
+                small_scales_contribution = quad(small_scales_integrand, -10, log_u_ss_max, args = (x, t_med, xi_interp))[0]
+                large_scales_contribution = quad(large_scales_integrand, log_u_ss_max, log_u_ls_max,\
+                                             args = (x, t_med, bias2, xi_mm_interp))[0]
+            else:
+                small_scales_contribution = 0.0
+
+                large_scales_contribution = quad(large_scales_integrand, np.log(big_xi_rmin), log_u_ls_max,\
                                              args = (x, t_med, bias2, xi_mm_interp))[0]
 
+
+
+            print small_scales_contribution, large_scales_contribution
             wt[bin_no] = (small_scales_contribution + large_scales_contribution)/self.h #TODO check little h's
 
         return wt*W
