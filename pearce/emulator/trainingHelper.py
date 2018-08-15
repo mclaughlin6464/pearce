@@ -76,8 +76,8 @@ def consolidate_outputs(directory):
         pass
         #remove(fname)
 
-    remove(path.join(directory, HOD_FNAME))
-    remove(path.join(directory, CONFIG_FNAME))
+    #remove(path.join(directory, HOD_FNAME))
+    #remove(path.join(directory, CONFIG_FNAME))
 
 
 if __name__ == '__main__':

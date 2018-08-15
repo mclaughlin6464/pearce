@@ -1148,7 +1148,7 @@ class Cat(object):
         #Halotools wnats downsampling factor defined oppositley
         #TODO verify little h!
         # TODO maybe split into a few lines for clarity
-        return self.h*delta_sigma(pos_g / self.h,pos_m/self.h, self.pmass/self.h,
+        return delta_sigma(pos_g / self.h,pos_m/self.h, self.pmass/self.h,
                            downsampling_factor = 1./self._downsample_factor, rp_bins = rp_bins,
                            period=self.Lbox / self.h, num_threads=n_cores,cosmology = self.cosmology)[1]/(1e12)
 
@@ -1206,6 +1206,7 @@ class Cat(object):
         big_xi_rmax = big_rpoints[-1]
         xi_mm = ccl.correlation_3d(cosmo, self.a, big_rpoints)
 
+        xi_mm[xi_mm<0] = 1e-6 #may wanna change this?
         xi_mm_interp = interp1d(np.log10(big_rpoints), np.log10(xi_mm))
 
         #correction factor
@@ -1232,6 +1233,8 @@ class Cat(object):
 
             if not np.isnan(log_u_ss_max): # rp > xi_rmax
                 small_scales_contribution = quad(sigma_integrand_medium_scales, -10, log_u_ss_max, args=(rp, xi_interp))[0]
+                Rz = np.exp(log_u_ls_max)
+
                 large_scales_contribution = quad(sigma_integrand_large_scales, log_u_ss_max,log_u_ls_max,\
                                              args=(rp, bias, xi_mm_interp))[0]
             elif not np.isnan(log_u_ls_max):
@@ -1241,6 +1244,7 @@ class Cat(object):
             else:
                 small_scales_contribution = large_scales_contribution = 0.0
 
+            assert not any(np.isnan(c) for c in (small_scales_contribution, large_scales_contribution)), "NaN found, aborting calculation"
             sigma[i] = (small_scales_contribution+large_scales_contribution)*rhom*2;
         
         sigma_interp = interp1d(np.log10(sigma_rpoints), sigma)
@@ -1260,7 +1264,7 @@ class Cat(object):
             #print result, rp, sigma_interp(np.log10(rp))
             ds[i] = result * 2 / (rp ** 2) - sigma_interp(np.log10(rp))
 
-        return self.h * ds
+        return ds
 
     def calc_sigma_crit_inv(self, zbins, dNs):
         """
@@ -1289,13 +1293,17 @@ class Cat(object):
         return (Scrit*Dl*4*np.pi*const.G/(const.c**2)).to("(pc^2)/Msun").value
 
     @observable(particles=True)
-    def calc_gt(self, theta_bins, sigma_crit_inv, n_cores=4, ds_kwargs = {}):
+    def calc_gt(self, theta_bins, sigma_crit_inv, use_halotools = True, n_cores=4, ds_kwargs = {}):
         """
         Calculate the tangential shear gamma tvia delta sigma
         :param theta_bins:
             Angular bins (in radians) to compute gamma t
         :param sigma_crit_inv:
             The inverse of sigma_crit for the lensing sample
+        :param use_halotools:
+            How to compute delta_sigma. If we use halotools, small scales will be more accuate, but larger
+            scales will be more accurate with the analytic techinques (scales comparable to the boxsize). 
+            Default is True.
         :param n_cores:
             Number of cores to use in the calculation. Default is 'all'
         :param ds_kwargs:
@@ -1306,22 +1314,21 @@ class Cat(object):
 
         n_cores = self._check_cores(n_cores)
         rp_bins = self._rp_from_ang(theta_bins)
-        print rp_bins
         # TODO my own rp_bins
         rpbc = (rp_bins[1:]+rp_bins[:-1])/2.0
 
-        ds = np.zeros_like(rpbc)
-        small_scales = rp_bins < 1.5 #smaller then an MPC, compute with ht
+        #ds = np.zeros_like(rpbc)
+        #small_scales = rp_bins < 10 #smaller then an MPC, compute with ht
         # compute the small scales using halotools, but integrate xi_mm to larger scales.
-        start_idx = np.sum(small_scales)
-        if np.sum(small_scales) >0:
-            ds_ss = self.calc_ds(rp_bins,n_cores =n_cores, **ds_kwargs)
-            ds[:start_idx-1] = ds_ss[:start_idx-1]
+        #start_idx = np.sum(small_scales)
+        #if np.sum(small_scales) >0:
+        #    ds_ss = self.calc_ds(rp_bins,n_cores =n_cores, **ds_kwargs)
+        #    ds[:start_idx-1] = ds_ss[:start_idx-1]
 
-        if np.sum(~small_scales) > 0:
-            ds_ls = self.calc_ds_analytic(rp_bins, n_cores=n_cores, **ds_kwargs)
-            ds[start_idx-1:] = ds_ls[start_idx-1:]
-
+        #if np.sum(~small_scales) > 0:
+        #    ds_ls = self.calc_ds_analytic(rp_bins, n_cores=n_cores, **ds_kwargs)
+        #    ds[start_idx-1:] = ds_ls[start_idx-1:]
+        ds = self.calc_ds(rp_bins, n_cores = n_cores, **ds_kwargs) if use_halotools else self.calc_ds_analytic(rp_bins, n_cores=n_cores, **ds_kwargs)
         gamma_t = sigma_crit_inv*ds #hope user has converter ds to pc from Mpc
 
         return gamma_t

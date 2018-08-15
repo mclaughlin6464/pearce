@@ -202,8 +202,7 @@ class Emu(object):
             for sf_group_name, sf_group in cosmo_group.iteritems():
                 z = 1.0/float(sf_group_name[-5:]) - 1.0
 
-                # TODO fudge factors?
-                if 'z' in fixed_params and z != fixed_params['z']:
+                if 'z' in fixed_params and np.abs(z-fixed_params['z'])> 1e-3:
                     continue
 
                 obs_dset = sf_group['obs']
