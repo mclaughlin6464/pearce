@@ -1039,7 +1039,7 @@ class Cat(object):
         big_xi_rmin = big_rpoints[0]
         big_xi_rmax = big_rpoints[-1]
         xi_mm = ccl.correlation_3d(cosmo, self.a, big_rpoints)
-
+        xi_mm[xi_mm<0] = 1e-6
 
         xi_mm_interp = interp1d(np.log10(big_rpoints), np.log10(xi_mm))
 
@@ -1071,6 +1071,7 @@ class Cat(object):
 
             wt[bin_no] = quad(integrand, 1e-6, u_ls_max,\
                                 args = (x, t_med, bias2, xi_interp, xi_mm_interp))[0]
+            print wt
 
         return wt*W
 
