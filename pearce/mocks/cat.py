@@ -1067,9 +1067,9 @@ class Cat(object):
                 return 0 
 
         for bin_no, t_med in enumerate(tpoints):
-            log_u_ls_max = np.log(big_xi_rmax**2 - (t_med*x)**2)/2.0 #max we can integrate to on small scales
+            u_ls_max = np.sqrt(big_xi_rmax**2 - (t_med*x)**2) #max we can integrate to on small scales
 
-            wt[bin_no] = quad(integrand, -10, log_u_ls_max,\
+            wt[bin_no] = quad(integrand, 1e-6, u_ls_max,\
                                 args = (x, t_med, bias2, xi_interp, xi_mm_interp))[0]
 
         return wt*W
