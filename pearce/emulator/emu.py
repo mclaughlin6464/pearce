@@ -62,6 +62,8 @@ class Emu(object):
         '''
 
         assert method in self.valid_methods
+        if method == 'nn':
+            assert type(self) is SpicyBuffalo #only one to do nn
 
         assert independent_variable in {None, 'r2'}  # no bias for now.
 
@@ -117,7 +119,7 @@ class Emu(object):
         except KeyError:
             cosmo_param_vals = np.array(f['attrs/cosmo_param_vals'])
             hod_param_vals = np.array(f['attrs/hod_param_vals'])
-        
+
         fixed_cosmo = 'cosmo' in fixed_params or cosmo_param_vals.shape[0] == 1
         fixed_hod = 'HOD' in fixed_params or hod_param_vals.shape[0] == 1
 
@@ -146,7 +148,7 @@ class Emu(object):
         elif fixed_cosmo and not fixed_hod:
             min_max_vals = zip(hod_param_vals.min(axis=0), hod_param_vals.max(axis=0))
             ordered_params = OrderedDict(izip(hod_param_names, min_max_vals))
-        elif not fixed_hod and not fixed_cosmo: 
+        elif not fixed_hod and not fixed_cosmo:
             op_names = list(cosmo_param_names[:])
             op_names.extend(hod_param_names)
 
@@ -190,7 +192,6 @@ class Emu(object):
         num_skipped = 0
         num_used = 0
 
-
         for cosmo_group_name, cosmo_group in f.iteritems():
             # we're fixed to a particular cosmology #
             if cosmo_group_name == 'attrs':
@@ -207,7 +208,6 @@ class Emu(object):
 
                 obs_dset = sf_group['obs']
                 cov_dset = sf_group['cov']
-
 
                 cosmo = cosmo_param_vals[cosmo_no, :]
                 # efficiency note. If I don't iterate over the datasets, just the indicies,
@@ -229,9 +229,9 @@ class Emu(object):
 
                     params = []
                     # I wonder if this is annoyingly inefficient. Probably not a huge deal.
-                    if not fixed_cosmo: 
+                    if not fixed_cosmo:
                         params.extend(list(cosmo))
-                    if not fixed_hod: 
+                    if not fixed_hod:
                         params.extend(list(HOD))
                     if 'z' not in fixed_params:
                         params.append(z)
@@ -259,8 +259,6 @@ class Emu(object):
                         ycov.append(_c)
 
                     num_used += 1
-
-
 
         if give_warning:
             warnings.warn('WARNING: NaN detected. Skipped %d points in training data.' % (num_skipped))
@@ -292,7 +290,7 @@ class Emu(object):
 
         # whiten the training data
         self._x_mean, self._x_std = x.mean(axis = 0), x.std(axis = 0)
-        self._y_mean, self._y_std = y.mean(axis = 0), y.std(axis = 0)
+        self._y_mean, self._y_std = 0.0, 1.0#y.mean(axis = 0), y.std(axis = 0)
 
         ycov/=(np.outer(self._y_std, self._y_std) + 1e-5)
 
@@ -597,12 +595,23 @@ class Emu(object):
         # default
         ig = {'amp': 1}
         ig.update({pname: 0.1 for pname in self._ordered_params})
-
         if self.obs == 'xi':
             if independent_variable is None:
-                ig.update({'amp': 0.481, 'logMmin': 0.1349, 'sigma_logM': 0.089,
-                           'logM0': 2.0, 'logM1': 0.204, 'alpha': 0.039,
-                           'f_c': 0.041, 'r': 0.040, 'z': 1.0})
+                ig.update({'H0': 0.12537079874409196,
+                 'Neff': 9.682153059967076e-06,
+                  'alpha': 0.5004939102700954,
+                   'amp': 1.2829697978941474,
+                    'ln10As': 0.00031695820887261153,
+                     'logM0': 2.3482346005542763e-05,
+                      'logM1': 1.208270935044776e-05,
+                       'logMmin': 0.00028373036165162114,
+                        'ns': 4398.317466650228,
+                         'ombh2': 895166.4721378284,
+                          'omch2': 78304.65404301183,
+                           'sigma_logM': 10092.715146305698,
+                            'w0': 5.3884384426082236e-05,
+                            'r': 0.40,
+                            'z':1.0})
             else:
                 # could have other guesses for this case, but don't have any now
                 # leave this structure in case I make more later
@@ -610,7 +619,7 @@ class Emu(object):
         # TODO  change with mean_function
         elif self.obs == 'wp':
             if independent_variable is None:
-                ig.update({'logMmin': 4.635891111, 'Neff': 8.767158, 'amp': 0.050649375, 'f_c': 3.535979, 'logM0': 0.33752477, 'logM1': 0.81730183, 'H0': 279.72348, 'w0': 0.496905639, 'sigma_logM': 3700.95379, 'r': 0.227461101, 'omch2': 5.313913, 'ln10As': 10.251330035, 'alpha': 1651.3668747, 'ns': 31708.0857, 'ombh2': 535.765296,
+                ig.update({'logMmin': 2.84216e1, 'Neff': 5.6002e10, 'amp': 3.4007e-2, 'f_c': 1.4535e1, 'logM0': 0.33952477, 'logM1': 2.17317, 'H0': 1.943e1, 'w0': 8.15016e19, 'sigma_logM': 1.678e1, 'r': 0.26096, 'omch2': 3.368e1, 'ln10As': 4.672e1, 'alpha': 2.8585e1, 'ns': 9.7638e10, 'ombh2': 5.339e-1,
                         'z': 1.0,
                            'mean_occupation_satellites_assembias_split1': 21.02835102,
                            'mean_occupation_satellites_assembias_slope1': 225.64738711,
@@ -679,7 +688,7 @@ class Emu(object):
         # TODO other kernels?
         return a * ExpSquaredKernel(metric[1:], ndim=self.emulator_ndim)+a*Matern32Kernel(metric[1:], ndim=self.emulator_ndim)+a
         #return a * ExpSquaredKernel(metric[1:], ndim=self.emulator_ndim)*Matern32Kernel(metric[1:], ndim=self.emulator_ndim)
-        # return a * Matern32Kernel(metric[1:], ndim=self.emulator_ndim)
+        #return a * Matern32Kernel(metric[1:], ndim=self.emulator_ndim) + a
 
     ###Emulation and methods that Utilize it############################################################################
     def emulate(self, em_params, gp_errs=False):
@@ -962,14 +971,14 @@ class Emu(object):
         assert statistic in {'r2', 'rms', 'rmsfd', 'abs', 'log_abs', 'frac', 'log_frac'}
         if N is not None:
             assert N > 0 and int(N) == N
-        
+
         x, y, _, info = self.get_data(truth_file, self.fixed_params, self.independent_variable)
 
         x = (x - self._x_mean)/(self._x_std + 1e-5)
-        #y = (_y - self._y_mean)/(self._y_std + 1e-5)
+        #y = (y - self._y_mean)/(self._y_std + 1e-5)
 
         scale_bin_centers = info['sbc']
-        scale_nbins = len(scale_bin_centers) if 'r' not in self.fixed_params else 1 
+        scale_nbins = len(scale_bin_centers) if 'r' not in self.fixed_params else 1
 
         np.random.seed(int(time()))
 
@@ -979,7 +988,7 @@ class Emu(object):
 
             x, y = x[idxs], y[idxs]
         
-       
+
         pred_y = self._emulate_helper(x, False)
 
         if scale_nbins > 1:
@@ -1293,7 +1302,7 @@ def get_leaves_helper(node, leaves):
 class ExtraCrispy(Emu):
     """Emulator that emulates with a mixture of expert learners rather than a single one."""
 
-    def __init__(self, training_dir, experts, overlap=1, partition_scheme='random', **kwargs):
+    def __init__(self, filename, experts, overlap=1, partition_scheme='random', **kwargs):
         """
         Similar initialization as the superclass with one additional parameter: Em_param
         :param training_dir:
@@ -1317,9 +1326,9 @@ class ExtraCrispy(Emu):
         self.overlap = int(overlap)
         self.partition_scheme = partition_scheme
 
-        super(ExtraCrispy, self).__init__(training_dir, **kwargs)
+        super(ExtraCrispy, self).__init__(filename, **kwargs)
 
-    def load_training_data(self, training_dir, custom_mean_function = None):
+    def load_training_data(self, filename, custom_mean_function = None):
         """
         Read the training data for the emulator and attach it to the object.
         :param training_dir:
@@ -1328,7 +1337,7 @@ class ExtraCrispy(Emu):
             Parameters to hold fixed. Only available if data in training_dir is a full hypercube, not a latin hypercube.
         :return: None
         """
-        super(ExtraCrispy, self).load_training_data(training_dir, custom_mean_function)
+        super(ExtraCrispy, self).load_training_data(filename, custom_mean_function)
 
         # now, parition the data as specified by the user
         # note that ppe does not include overlap
@@ -1636,3 +1645,27 @@ class ExtraCrispy(Emu):
             emulator.recompute()
 
         return results
+
+class SpicyBuffalo(Emu):
+    def __init__(self, filename, nn_init_func, cost_func, optimizer_init_func, train_dict, **kwargs):
+        self._nn_init_func = nn_init_func
+        super(SpicyBuffalo, self).__init__(filename, method = 'nn', **kwargs)
+        self.train_nn(self, cost_func, optimizer_init_func, train_dict)
+
+    # TODO this could be in Emu since it is copied from OR
+    def _downsample_data(self):
+
+        N_points = self.x.shape[0]/self.n_bins #sample full HOD/cosmo points,
+        downsample_N_points = int(self._downsample_factor*N_points)
+        self.downsample_x = np.zeros((downsample_N_points*self.n_bins, self.x.shape[1]))
+        self.downsample_y = np.zeros((downsample_N_points*self.n_bins))
+        self.downsample_yerr = np.zeros((downsample_N_points*self.n_bins))
+
+        downsampled_points = np.random.choice(N_points, downsample_N_points, replace = False)
+
+        for i, dp in enumerate(downsampled_points):
+            self.downsample_x[i*self.n_bins:(i+1)*self.n_bins] = self.x[dp*self.n_bins: (dp+1)*self.n_bins]
+            self.downsample_y[i*self.n_bins:(i+1)*self.n_bins] = self.y[dp*self.n_bins: (dp+1)*self.n_bins]
+            self.downsample_yerr[i*self.n_bins:(i+1)*self.n_bins] = self.yerr[dp*self.n_bins: (dp+1)*self.n_bins]
+
+    def _build_nn(self, hyperparams):

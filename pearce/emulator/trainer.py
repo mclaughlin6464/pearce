@@ -10,6 +10,7 @@ import warnings
 from itertools import product
 import yaml
 import numpy as np
+from scipy.optimize import minimize_scalar
 import pandas as pd
 from mpi4py import MPI
 import h5py
@@ -97,7 +98,8 @@ class Trainer(object):
         # In the future if there are more annoying params i'll turn this into a loop or something.
         # TODO does yaml parse these to bools automatically?
         self._particles = bool(cosmo_cfg['particles']) if 'particles' in cosmo_cfg else False
-        self._downsample_factor = float(cosmo_cfg['downsample_factor']) if 'downsample_facor' in cosmo_cfg else 1e-3
+        print cosmo_cfg.keys()
+        self._downsample_factor = float(cosmo_cfg['downsample_factor']) if 'downsample_factor' in cosmo_cfg else 1e-3
 
     def prep_hod(self, hod_cfg):
         """
@@ -137,6 +139,13 @@ class Trainer(object):
 
             # make a LHC from scratch
             ordered_params = hod_cfg['ordered_params']
+
+            if 'fixed_nd' in hod_cfg and 'logMmin' in ordered_params:
+                self._logMmin_bounds = ordered_params['logMmin']
+                del ordered_params['logMmin'] # do I want to keep this for any reason?
+            else:
+                self._logMmin_bounds = None
+
             self._hod_param_names = ordered_params.keys()
             self._hod_param_vals = self._make_LHC(ordered_params, hod_cfg['num_hods'])
 
@@ -148,6 +157,12 @@ class Trainer(object):
             del hod_cfg['min_ptcl']
         else:
             self._min_ptcl = 200 #default
+
+        try:
+            self._fixed_nd = float(hod_cfg['fixed_nd'])
+            del hod_cfg['fixed_nd']
+        except KeyError:
+            self._fixed_nd = None
 
         self._hod_kwargs = hod_cfg
         # need scale factors too, but just use them from cosmology
@@ -283,6 +298,26 @@ class Trainer(object):
         """
         return "cosmo_no_%02d/a_%.3f"%(cosmo_idx, self._scale_factors[scale_factor])
 
+    def _add_logMmin(self, hod_params, cat):
+        """
+        In the fixed number density case, find the logMmin value that will match the nd given hod_params
+        :param: hod_params:
+            The other parameters besides logMmin
+        :param cat:
+            the catalog in question
+        :return:
+            None. hod_params will have logMmin added to it.
+        """
+        hod_params['logMmin'] = 13.0 #initial guess
+        #cat.populate(hod_params) #may be overkill, but will ensure params are written everywhere
+        def func(logMmin, hod_params):
+            hod_params.update({'logMmin':logMmin}) 
+            return (cat.calc_analytic_nd(hod_params) - self._fixed_nd)**2
+
+        res = minimize_scalar(func, bounds = self._logMmin_bounds, args = (hod_params,), options = {'maxiter':100})
+
+        # assuming this doens't fail
+        hod_params['logMmin'] = res.x
 
     def run(self, comm):
         """
@@ -345,14 +380,14 @@ class Trainer(object):
         else:
             all_param_idxs_send = None
 
+        print rank, size
         #param_idxs= np.empty([n_per_node, 3], dtype = 'i')
         #comm.barrier()
         param_idxs = comm.scatter(all_param_idxs_send, root=0)
         #param_idxs = all_param_idxs_send[rank]
         #comm.Scatter(sendbuf, param_idxs, root = 0)
 
-
-        #print all_param_idxs
+        print param_idxs
 
         if self.n_bins > 1 :
             output = np.zeros((param_idxs.shape[0], self.n_bins))
@@ -389,7 +424,10 @@ class Trainer(object):
 
                 calc_observable = self._get_calc_observable(cat)
 
+            print 'hi'
             hod_params = dict(zip(self._hod_param_names, self._hod_param_vals[hod_idx, :]))
+            if self._fixed_nd is not None:
+                self._add_logMmin(hod_params, cat)
             #continue
             if self._n_repops == 1:
                 cat.populate(hod_params, min_ptcl = self._min_ptcl)
@@ -402,6 +440,7 @@ class Trainer(object):
                     obs_repops = np.zeros((self._n_repops,))
 
                 for repop in xrange(self._n_repops):
+                    print repop
                     cat.populate(hod_params, min_ptcl= self._min_ptcl)
                     obs_repops[repop] = self._transform_func(calc_observable())
 
@@ -446,14 +485,27 @@ class Trainer(object):
             all_cosmo_sf_pairs = np.array(list(product(xrange(len(self.cats)), xrange(len(self._scale_factors)))))
 
             f = h5py.File(self.output_fname, 'w')
-            f.attrs['obs'] = self.obs
-            f.attrs['min_ptcl'] = self._min_ptcl
-            f.attrs['cosmo_param_names'] = self._cosmo_param_names
-            f.attrs['cosmo_param_vals'] = self._cosmo_param_vals
-            f.attrs['scale_factors'] = self._scale_factors
-            f.attrs['hod_param_names'] = self._hod_param_names
-            f.attrs['hod_param_vals'] = self._hod_param_vals
-            f.attrs['scale_bins'] = self.scale_bins
+            try:
+                f.attrs['obs'] = self.obs
+                f.attrs['min_ptcl'] = self._min_ptcl
+                f.attrs['cosmo_param_names'] = self._cosmo_param_names
+                f.attrs['cosmo_param_vals'] = self._cosmo_param_vals
+                f.attrs['scale_factors'] = self._scale_factors
+                f.attrs['hod_param_names'] = self._hod_param_names
+                f.attrs['hod_param_vals'] = self._hod_param_vals
+                f.attrs['scale_bins'] = self.scale_bins
+            except RuntimeError: #data too large
+                attrs = f.create_group('attrs')
+
+                f.attrs['obs'] = self.obs
+                f.attrs['min_ptcl'] = self._min_ptcl
+                f.attrs['cosmo_param_names'] = self._cosmo_param_names
+                f.attrs['scale_factors'] = self._scale_factors
+                f.attrs['hod_param_names'] = self._hod_param_names
+                f.attrs['scale_bins'] = self.scale_bins
+
+                attrs.create_dataset('cosmo_param_vals', data= self._cosmo_param_vals)
+                attrs.create_dataset('hod_param_vals', data= self._hod_param_vals)
 
             for cosmo_sf_pair in all_cosmo_sf_pairs:
                 group_name = self._get_group_name(*cosmo_sf_pair)

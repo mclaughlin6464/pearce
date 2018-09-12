@@ -7,6 +7,7 @@ Each takes two kwargs: "filenames" and "scale_factors", both lists which allow t
 which particular files are cached/loaded/etc. '''
 
 from glob import glob
+from os import path
 import numpy as np
 from astropy import cosmology
 import pandas as pd
@@ -167,10 +168,9 @@ class Chinchilla(Cat):
             # add a subdirectory
             loc += 'c%d-%d/' % (int(Lbox), int(npart))
 
-            if system == 'ki-ls' or system == 'long':  # differences in how the files are stored
-                gadget_loc = loc
-                loc += '/rockstar/hlists/'
-                gadget_loc += '/output/'
+            gadget_loc = loc
+            loc += '/rockstar/hlists/'
+            gadget_loc += '/output/'
 
             tmp_fnames = sorted(glob(loc + 'hlist_*.list'))  # snag all the hlists
             tmp_fnames = [fname[len(loc):] for fname in tmp_fnames]  # just want the names in the dir
@@ -189,11 +189,13 @@ class Chinchilla(Cat):
                                          version_name=version_name, Lbox=Lbox,
                                          pmass=pmass, cosmo=cosmo, gadget_loc=gadget_loc, **new_kwargs)
         # Chinchillas also have to be cached differently.
-        cache_locs = {'ki-ls': '/u/ki/swmclau2/des/halocats/hlist_%.2f.list.%s_%s.hdf5',
-                      'sherlock': '/scratch/users/swmclau2/halocats/hlist_%.2f.list.%s_%s.hdf5'}
+        cache_locs = {'ki-ls': '/u/ki/swmclau2/des/halocats/',
+                      'sherlock': '/scratch/users/swmclau2/halocats/'}
+        fname = 'hlist_%.2f.list.%s_%s.hdf5'
         cache_locs['long'] = cache_locs['ki-ls']
-        self.cache_filenames = [cache_locs[system] % (a, self.simname, self.version_name)
-                           for a in self.scale_factors]  # make sure we don't have redunancies.
+        self.cache_loc = cache_locs[system]
+        self.cache_filenames = [path.join(self.cache_loc, fname % (a, self.simname, self.version_name)
+ )                          for a in self.scale_factors]  # make sure we don't have redunancies.
     def _get_cosmo_param_names_vals(self):
         # TODO docs
         names = ['Omega_m', 'Omega_b','h', 'sigma8', 'n_s']
@@ -462,11 +464,13 @@ class TestBox(Cat):
         self.realization = realization
 
         simname = 'testbox'# not sure if something with Emu would work better, but wanna separate from Emu..
-        columns_to_keep = OUTLIST_COLS.copy()  # OUTLIST_BGC2_COLS
-        del columns_to_keep['halo_mvir']
-        columns_to_keep['halo_m200b'] = (2, 'f4')
-        del columns_to_keep['halo_rvir']
-        columns_to_keep['halo_r200b'] = (5, 'f4')
+        columns_to_keep =  OUTLIST_BGC2_COLS.copy()
+        # Add duplicate columns for mvir if allowed
+        # TODO this sucks but halotools is tough here.
+        del columns_to_keep['halo_m200b']
+        columns_to_keep['halo_mvir'] = (2, 'f4')
+        del columns_to_keep['halo_r200b']
+        columns_to_keep['halo_rvir'] = (5, 'f4')
 
         Lbox = 1050.0  # Mpc/h
         self.npart = 1400
@@ -487,9 +491,9 @@ class TestBox(Cat):
         locations = {'ki-ls': ['/nfs/slac/des/fs1/g/sims/beckermr/tinkers_emu/TestBox00%d-00%d/halos/m200b/',
                                        '/nfs/slac/g/ki/ki22/cosmo/beckermr/tinkers_emu/TestBox00%d-00%d/halos/m200b/',
                                        '/nfs/slac/g/ki/ki23/des/beckermr/tinkers_emu/TestBox00%d-00%d/halos/m200b/'],
-                     'sherlock': ['/home/swmclau2/scratch/TestBoxes/TestBox0%02d-00%d/',
-                                  '/home/swmclau2/scratch/TestBoxes/TestBox0%02d-00%d/',
-                                  '/home/swmclau2/scratch/TestBoxes/TestBox0%02d-00%d/']} #all the same for Sherlock
+                     'sherlock': ['/home/users/swmclau2/scratch/NewTrainingBoxes/TestBox0%02d-00%d/',
+                                  '/home/users/swmclau2/scratch/NewTrainingBoxes/TestBox0%02d-00%d/',
+                                  '/home/users/swmclau2/scratch/NewTrainingBoxes/TestBox0%02d-00%d/']} #all the same for Sherlock
         assert system in locations
         #loc = locations[system][0]
         loc_list = locations[system]
@@ -500,6 +504,9 @@ class TestBox(Cat):
             loc = loc_list[1]%(boxno, realization)
         else:
             loc = loc_list[2]%(boxno, realization)
+
+        gadget_loc = loc + 'output/'
+        loc += 'halos/m200b/'
 
         tmp_fnames = ['outbgc2_%d.list' % i for i in xrange(10)]
         #tmp_fnames = ['TestBox00%d-000_out_parents_5.list' % boxno]
@@ -515,12 +522,12 @@ class TestBox(Cat):
         version_name = 'most_recent_%02d_%d'%(boxno, realization)
 
         super(TestBox, self).__init__(simname=simname, loc=loc, columns_to_keep=columns_to_keep, Lbox=Lbox,
-                                      pmass=pmass, cosmo=cosmo, version_name = version_name, **new_kwargs)
+                                      pmass=pmass, cosmo=cosmo, version_name = version_name, gadget_loc=gadget_loc,**new_kwargs)
 
-        cache_locs = {'ki-ls': '/u/ki/swmclau2/des/halocats/hlist_%.2f.list.%s_%02d.hdf5',
-                      'sherlock': '/scratch/users/swmclau2/halocats/hlist_%.2f.list.%s_%02d.hdf5'}
+        cache_locs = {'ki-ls': '/u/ki/swmclau2/des/halocats/hlist_%.2f.list.%s_%02d_%d.hdf5',
+                      'sherlock': '/scratch/users/swmclau2/halocats/hlist_%.2f.list.%s_%02d_%d.hdf5'}
         cache_locs['long'] = cache_locs['ki-ls']
-        self.cache_filenames = [cache_locs[system] % (a, self.simname, boxno)
+        self.cache_filenames = [cache_locs[system] % (a, self.simname, boxno, realization )
                                 for a in self.scale_factors]  # make sure we don't have redunancies.
 
     def _get_cosmo(self):
