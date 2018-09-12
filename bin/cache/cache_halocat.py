@@ -8,8 +8,8 @@ from pearce.mocks.kittens import cat_dict
 
 #cat.cache(overwrite = True, add_local_density=False, add_particles=True,downsample_factor = 1e-3)
 
-for boxno in xrange(5,7):
-    for realization in xrange(5):
+for boxno in xrange(7):
+    for realization in xrange(1):
 #for boxno in xrange(40):
         cat = cat_dict['testbox'](boxno, realization,scale_factors = [1.0], system = 'ki-ls')
 #    cat = cat_dict['trainingbox'](boxno, scale_factors = [0.8, 1.0], system = 'ki-ls')

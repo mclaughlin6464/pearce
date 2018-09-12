@@ -489,9 +489,9 @@ class TestBox(Cat):
 
         self.prim_haloprop_key = 'halo_m200b'
         #locations = {'ki-ls': ['/u/ki/swmclau2/des/testbox_findparents/']}
-        locations = {'ki-ls': ['/nfs/slac/des/fs1/g/sims/beckermr/tinkers_emu/TestBox00%d-00%d/halos/m200b/',
-                                       '/nfs/slac/g/ki/ki22/cosmo/beckermr/tinkers_emu/TestBox00%d-00%d/halos/m200b/',
-                                       '/nfs/slac/g/ki/ki23/des/beckermr/tinkers_emu/TestBox00%d-00%d/halos/m200b/'],
+        locations = {'ki-ls': ['/nfs/slac/des/fs1/g/sims/beckermr/tinkers_emu/TestBox00%d-00%d/',
+                                       '/nfs/slac/g/ki/ki22/cosmo/beckermr/tinkers_emu/TestBox00%d-00%d/',
+                                       '/nfs/slac/g/ki/ki23/des/beckermr/tinkers_emu/TestBox00%d-00%d/'],
                      'sherlock': ['/home/users/swmclau2/scratch/NewTrainingBoxes/TestBox0%02d-00%d/',
                                   '/home/users/swmclau2/scratch/NewTrainingBoxes/TestBox0%02d-00%d/',
                                   '/home/users/swmclau2/scratch/NewTrainingBoxes/TestBox0%02d-00%d/']} #all the same for Sherlock

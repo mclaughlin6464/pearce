@@ -219,9 +219,11 @@ class Emu(object):
                     if any(np.any(np.isnan(arr)) for arr in [_obs, _cov]):
                         # skip NaN points. May wanna change this behavior.
                         give_warning = True
-                        num_skipped += 1
+                        num_skipped += 0#1
                         #print _obs
-                        continue
+                        #continue
+                        _obs[np.isnan(_obs)] = -2
+                        _cov[np.isnan(_cov)] = 0 # made up values for now
 
                     HOD = hod_param_vals[HOD_no, :]
 

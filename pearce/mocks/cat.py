@@ -1071,7 +1071,6 @@ class Cat(object):
 
             wt[bin_no] = quad(integrand, 1e-6, u_ls_max,\
                                 args = (x, t_med, bias2, xi_interp, xi_mm_interp))[0]
-            print wt
 
         return wt*W
 
