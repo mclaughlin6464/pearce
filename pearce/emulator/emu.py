@@ -62,8 +62,8 @@ class Emu(object):
         '''
 
         assert method in self.valid_methods
-        if method == 'nn':
-            assert type(self) is SpicyBuffalo #only one to do nn
+        #if method == 'nn':
+        #    assert type(self) is SpicyBuffalo #only one to do nn
 
         assert independent_variable in {None, 'r2'}  # no bias for now.
 
