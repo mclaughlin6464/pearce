@@ -1,0 +1,261 @@
+/home/users/swmclau2/.local/lib/python2.7/site-packages/h5py/__init__.py:36: FutureWarning: Conversion of the second argument of issubdtype from `float` to `np.floating` is deprecated. In future, it will be treated as `np.float64 == np.dtype(float).type`.
+  from ._conv import register_converters as _register_converters
+2018-09-24 15:32:53.384633: I tensorflow/core/platform/cpu_feature_guard.cc:140] Your CPU supports instructions that this TensorFlow binary was not compiled to use: AVX2 FMA
+2018-09-24 15:32:53.722976: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1212] Found device 0 with properties: 
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:07:00.0
+totalMemory: 15.75GiB freeMemory: 15.34GiB
+2018-09-24 15:32:53.723023: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1312] Adding visible gpu devices: 0
+2018-09-24 15:33:00.166594: I tensorflow/core/common_runtime/gpu/gpu_device.cc:993] Creating TensorFlow device (/device:GPU:0 with 14858 MB memory) -> physical GPU (device: 0, name: Tesla V100-SXM2-16GB, pci bus id: 0000:07:00.0, compute capability: 7.0)
+/home/users/swmclau2/.local/lib/python2.7/site-packages/pearce/emulator/emu.py:264: UserWarning: WARNING: NaN detected. Skipped 0 points in training data.
+  warnings.warn('WARNING: NaN detected. Skipped %d points in training data.' % (num_skipped))
+/home/users/swmclau2/.local/lib/python2.7/site-packages/sklearn/neural_network/multilayer_perceptron.py:564: ConvergenceWarning: Stochastic Optimizer: Maximum iterations (10) reached and the optimization hasn't converged yet.
+  % self.max_iter, ConvergenceWarning)
+2018-09-24 15:34:06.051918: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1312] Adding visible gpu devices: 0
+2018-09-24 15:34:06.052651: I tensorflow/core/common_runtime/gpu/gpu_device.cc:993] Creating TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 555 MB memory) -> physical GPU (device: 0, name: Tesla V100-SXM2-16GB, pci bus id: 0000:07:00.0, compute capability: 7.0)
+[u'/device:GPU:0']
+Iteration 1, loss = 0.73652813
+Iteration 2, loss = 0.35475848
+Iteration 3, loss = 0.25515321
+Iteration 4, loss = 0.19201384
+Iteration 5, loss = 0.16345806
+Iteration 6, loss = 0.14293825
+Iteration 7, loss = 0.12493863
+Iteration 8, loss = 0.10940881
+Iteration 9, loss = 0.09835130
+Iteration 10, loss = 0.09166334
+{'z': 0.0}
+[100]
+1000
+1e-07 0.1
+Epoch 0, loss = 5.610900e+09
+Val score: -0.170638, 79030.80 % Loss
+Epoch 10, loss = 1.101874e+09
+Val score: -0.023944, 61180.13 % Loss
+Epoch 20, loss = 2.183077e+09
+Val score: 0.102436, 32483.38 % Loss
+Epoch 30, loss = 5.129318e+09
+Val score: 0.168555, 23102.82 % Loss
+Epoch 40, loss = 2.210960e+09
+Val score: 0.198345, 21704.05 % Loss
+Epoch 50, loss = 2.856675e+09
+Val score: 0.207882, 20034.76 % Loss
+Epoch 60, loss = 2.411000e+09
+Val score: 0.223226, 19495.82 % Loss
+Epoch 70, loss = 2.745802e+09
+Val score: 0.222740, 19593.43 % Loss
+Epoch 80, loss = 1.622476e+09
+Val score: 0.228377, 19783.80 % Loss
+Epoch 90, loss = 2.994288e+09
+Val score: 0.217914, 21649.65 % Loss
+Epoch 100, loss = 3.444877e+09
+Val score: 0.233726, 19529.49 % Loss
+Epoch 110, loss = 1.613245e+09
+Val score: 0.223423, 21310.36 % Loss
+Epoch 120, loss = 3.993169e+09
+Val score: 0.234956, 20499.64 % Loss
+Epoch 130, loss = 2.625610e+09
+Val score: 0.217652, 25371.84 % Loss
+Epoch 140, loss = 3.027926e+09
+Val score: 0.238508, 22912.47 % Loss
+Epoch 150, loss = 2.431804e+09
+Val score: 0.250301, 23100.86 % Loss
+Epoch 160, loss = 3.155971e+09
+Val score: 0.220787, 29767.95 % Loss
+Epoch 170, loss = 1.766446e+09
+Val score: 0.242261, 26486.75 % Loss
+Epoch 180, loss = 3.598145e+09
+Val score: 0.252925, 26520.84 % Loss
+Epoch 190, loss = 3.209989e+09
+Val score: 0.247537, 29665.88 % Loss
+Epoch 200, loss = 2.667102e+09
+Val score: 0.236376, 32946.92 % Loss
+Epoch 210, loss = 2.000636e+09
+Val score: 0.249764, 28309.97 % Loss
+Epoch 220, loss = 2.166303e+09
+Val score: 0.257658, 28386.88 % Loss
+Epoch 230, loss = 2.563502e+09
+Val score: 0.265193, 24000.11 % Loss
+Epoch 240, loss = 2.573011e+09
+Val score: 0.258779, 23416.88 % Loss
+Epoch 250, loss = 3.670847e+09
+Val score: 0.245267, 25023.08 % Loss
+Epoch 260, loss = 3.257452e+09
+Val score: 0.270500, 20855.52 % Loss
+Epoch 270, loss = 2.874927e+09
+Val score: 0.261071, 20190.23 % Loss
+Epoch 280, loss = 2.760509e+09
+Val score: 0.273371, 18107.46 % Loss
+Epoch 290, loss = 2.856727e+09
+Val score: 0.265825, 18507.32 % Loss
+Epoch 300, loss = 3.269385e+09
+Val score: 0.274082, 17964.24 % Loss
+Epoch 310, loss = 2.113128e+09
+Val score: 0.270482, 17298.24 % Loss
+Epoch 320, loss = 3.592841e+09
+Val score: 0.234615, 21877.62 % Loss
+Epoch 330, loss = 2.266778e+09
+Val score: 0.251830, 19409.02 % Loss
+Epoch 340, loss = 1.468121e+09
+Val score: 0.225752, 23216.00 % Loss
+Epoch 350, loss = 3.297976e+09
+Val score: 0.243036, 21564.64 % Loss
+Epoch 360, loss = 2.728115e+09
+Val score: 0.248136, 21749.10 % Loss
+Epoch 370, loss = 2.191443e+09
+Val score: 0.239486, 22337.72 % Loss
+Epoch 380, loss = 2.310280e+09
+Val score: 0.213641, 24845.40 % Loss
+Epoch 390, loss = 3.674616e+09
+Val score: 0.186476, 28359.12 % Loss
+Epoch 400, loss = 2.228579e+09
+Val score: 0.214200, 24600.10 % Loss
+Epoch 410, loss = 1.306212e+09
+Val score: 0.204910, 25816.49 % Loss
+Epoch 420, loss = 2.212389e+09
+Val score: 0.205236, 26278.26 % Loss
+Epoch 430, loss = 1.832231e+09
+Val score: 0.208572, 24721.82 % Loss
+Epoch 440, loss = 2.061456e+09
+Val score: 0.188475, 28017.16 % Loss
+Epoch 450, loss = 9.031816e+08
+Val score: 0.176108, 31962.51 % Loss
+Epoch 460, loss = 2.511575e+09
+Val score: 0.130693, 38658.37 % Loss
+Epoch 470, loss = 2.141728e+09
+Val score: 0.122956, 44344.67 % Loss
+Epoch 480, loss = 3.019537e+09
+Val score: 0.101545, 52208.79 % Loss
+Epoch 490, loss = 2.869516e+09
+Val score: 0.121262, 50742.73 % Loss
+Epoch 500, loss = 2.134753e+09
+Val score: 0.112142, 57855.14 % Loss
+Epoch 510, loss = 1.835164e+09
+Val score: 0.115906, 70976.78 % Loss
+Epoch 520, loss = 1.892710e+09
+Val score: 0.104035, 87544.67 % Loss
+Epoch 530, loss = 1.777562e+09
+Val score: 0.139497, 68960.35 % Loss
+Epoch 540, loss = 1.838121e+09
+Val score: 0.131787, 69190.54 % Loss
+Epoch 550, loss = 1.483912e+09
+Val score: 0.154753, 54378.08 % Loss
+Epoch 560, loss = 1.331694e+09
+Val score: 0.209462, 35334.58 % Loss
+Epoch 570, loss = 2.156806e+09
+Val score: 0.203785, 33511.58 % Loss
+Epoch 580, loss = 1.499909e+09
+Val score: 0.177478, 36794.55 % Loss
+Epoch 590, loss = 2.342835e+09
+Val score: 0.179324, 36869.88 % Loss
+Epoch 600, loss = 1.927177e+09
+Val score: 0.167962, 38535.38 % Loss
+Epoch 610, loss = 1.186137e+09
+Val score: 0.172220, 37550.32 % Loss
+Epoch 620, loss = 1.503499e+09
+Val score: 0.172190, 37155.40 % Loss
+Epoch 630, loss = 2.171899e+09
+Val score: 0.172897, 33695.60 % Loss
+Epoch 640, loss = 1.425922e+09
+Val score: 0.191114, 33210.22 % Loss
+Epoch 650, loss = 1.187829e+09
+Val score: 0.208012, 29592.28 % Loss
+Epoch 660, loss = 2.723328e+09
+Val score: 0.195501, 31508.99 % Loss
+Epoch 670, loss = 2.466917e+09
+Val score: 0.196919, 31242.36 % Loss
+Epoch 680, loss = 1.578411e+09
+Val score: 0.192131, 33673.90 % Loss
+Epoch 690, loss = 2.555738e+09
+Val score: 0.176207, 31782.71 % Loss
+Epoch 700, loss = 1.963590e+09
+Val score: 0.136789, 38810.74 % Loss
+Epoch 710, loss = 1.946362e+09
+Val score: 0.149636, 37472.73 % Loss
+Epoch 720, loss = 2.255192e+09
+Val score: 0.127369, 43391.17 % Loss
+Epoch 730, loss = 9.242564e+08
+Val score: 0.141959, 38904.09 % Loss
+Epoch 740, loss = 9.658122e+08
+Val score: 0.127901, 37634.35 % Loss
+Epoch 750, loss = 1.192695e+09
+Val score: 0.134935, 35786.01 % Loss
+Epoch 760, loss = 1.700791e+09
+Val score: 0.112187, 38292.69 % Loss
+Epoch 770, loss = 1.433796e+09
+Val score: 0.118374, 37251.61 % Loss
+Epoch 780, loss = 1.891410e+09
+Val score: 0.132904, 33591.21 % Loss
+Epoch 790, loss = 1.550812e+09
+Val score: 0.121099, 36964.42 % Loss
+Epoch 800, loss = 1.636997e+09
+Val score: 0.118291, 36043.43 % Loss
+Epoch 810, loss = 2.061892e+09
+Val score: 0.129175, 33348.79 % Loss
+Epoch 820, loss = 1.552514e+09
+Val score: 0.125056, 37434.92 % Loss
+Epoch 830, loss = 1.186610e+09
+Val score: 0.125682, 38937.12 % Loss
+Epoch 840, loss = 1.942211e+09
+Val score: 0.142742, 39869.68 % Loss
+Epoch 850, loss = 1.112140e+09
+Val score: 0.186109, 30821.39 % Loss
+Epoch 860, loss = 1.340494e+09
+Val score: 0.207434, 28671.79 % Loss
+Epoch 870, loss = 1.234876e+09
+Val score: 0.226441, 28386.96 % Loss
+Epoch 880, loss = 1.259963e+09
+Val score: 0.225453, 29300.17 % Loss
+Epoch 890, loss = 1.734413e+09
+Val score: 0.232455, 29383.18 % Loss
+Epoch 900, loss = 2.166761e+09
+Val score: 0.259360, 27320.64 % Loss
+Epoch 910, loss = 2.130446e+09
+Val score: 0.266207, 29080.65 % Loss
+Epoch 920, loss = 1.384490e+09
+Val score: 0.255992, 32084.34 % Loss
+Epoch 930, loss = 1.498492e+09
+Val score: 0.247088, 33464.17 % Loss
+Epoch 940, loss = 1.345033e+09
+Val score: 0.235174, 35342.16 % Loss
+Epoch 950, loss = 6.493292e+08
+Val score: 0.236044, 38239.45 % Loss
+Epoch 960, loss = 1.749985e+09
+Val score: 0.227519, 43224.05 % Loss
+Epoch 970, loss = 1.498451e+09
+Val score: 0.254087, 35767.43 % Loss
+Epoch 980, loss = 6.037125e+08
+Val score: 0.239092, 36915.34 % Loss
+Epoch 990, loss = 1.346715e+09
+Val score: 0.220569, 39982.17 % Loss
+Epoch 1000, loss = 1.313928e+09
+Val score: 0.216104, 44052.50 % Loss
+Epoch 1010, loss = 7.048224e+08
+Val score: 0.212133, 47652.23 % Loss
+Epoch 1020, loss = 9.251929e+08
+Val score: 0.205482, 48379.88 % Loss
+Epoch 1030, loss = 8.623473e+08
+Val score: 0.227643, 42535.21 % Loss
+Epoch 1040, loss = 1.474890e+09
+Val score: 0.218394, 41636.74 % Loss
+Epoch 1050, loss = 1.807230e+09
+Val score: 0.232562, 35892.10 % Loss
+Epoch 1060, loss = 8.502700e+08
+Val score: 0.243270, 32105.84 % Loss
+Epoch 1070, loss = 1.166581e+09
+Val score: 0.247240, 32537.26 % Loss
+Epoch 1080, loss = 9.987588e+08
+Val score: 0.246071, 33343.36 % Loss
+Epoch 1090, loss = 7.056579e+08
+Val score: 0.244101, 37413.30 % Loss
+Epoch 1100, loss = 8.159351e+08
+Val score: 0.222599, 44275.23 % Loss
+Epoch 1110, loss = 1.672434e+09
+Val score: 0.248075, 41059.77 % Loss
+Epoch 1120, loss = 1.683585e+09
+Val score: 0.253821, 40748.15 % Loss
+Epoch 1130, loss = 7.486070e+08
+Val score: 0.230387, 43855.33 % Loss
+Epoch 1140, loss = 8.015021e+08
+Val score: 0.234969, 42956.66 % Loss
+Epocslurmstepd: error: *** JOB 26818268 ON sh-113-14 CANCELLED AT 2018-09-24T16:30:12 DUE TO TIME LIMIT ***
