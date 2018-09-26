@@ -218,12 +218,13 @@ class Emu(object):
                         continue
                     if any(np.any(np.isnan(arr)) for arr in [_obs, _cov]):
                         # skip NaN points. May wanna change this behavior.
-                        give_warning = True
-                        num_skipped += 0#1
+                        pass
+                        #give_warning = True
+                        #num_skipped += 0#1
                         #print _obs
                         #continue
-                        _obs[np.isnan(_obs)] = -2
-                        _cov[np.isnan(_cov)] = 0 # made up values for now
+                        #_obs[np.isnan(_obs)] = -2
+                        #_cov[np.isnan(_cov)] = 1e3 # made up values for now
 
                     HOD = hod_param_vals[HOD_no, :]
 
@@ -260,17 +261,39 @@ class Emu(object):
 
                     num_used += 1
 
-        if give_warning:
+        f.close()
+
+        x, y, _ycov = np.vstack(x), np.hstack(y), np.dstack(ycov)
+
+        if np.any(np.isnan(_ycov))  or np.any(np.isnan(y)):
+            print 'Hi'
+            y_nans = np.isnan(y)
+            y
+            ycov_nans = np.sum(np.isnan(_ycov), axis = 1).astype(bool).reshape((-1,))
+            nan_idxs = np.logical_or(y_nans ,ycov_nans ) 
+            num_skipped = np.sum(nan_idxs)
+
+            x = x[~nan_idxs]#, :]
+            y = y[~nan_idxs]
+            ycov_list = []
+
+            for i in xrange(_ycov.shape[-1]):
+                mat = _ycov[:,:,i]
+                idxs = nan_idxs[i*mat.shape[0]: (i+1)*mat.shape[0]]
+                ycov_list.append(mat[~idxs,:][:, ~idxs])
+
+            ycov = ycov_list#np.dstack(ycov_list)
+
             warnings.warn('WARNING: NaN detected. Skipped %d points in training data.' % (num_skipped))
 
-        f.close()
+
         # stack so xs have shape (n points, n params)
         # ys have shape (npoints)
         # and ycov has shape (n_bins, n_bins, n_points/n_bins)
         if attach_params:
-            return np.vstack(x), np.hstack(y), np.dstack(ycov)
+            return x, y, ycov    
         else:
-            return np.vstack(x), np.hstack(y), np.dstack(ycov), info
+            return x,y, ycov, info
 
 
     def load_training_data(self, filename, custom_mean_function = None):
@@ -292,7 +315,9 @@ class Emu(object):
         self._x_mean, self._x_std = x.mean(axis = 0), x.std(axis = 0)
         self._y_mean, self._y_std = 0.0, 1.0#y.mean(axis = 0), y.std(axis = 0)
 
-        ycov/=(np.outer(self._y_std, self._y_std) + 1e-5)
+        ycov_list = []
+        for yc in ycov: 
+            ycov_list.append(yc/(np.outer(self._y_std, self._y_std) + 1e-5))
 
         self.x = (x - self._x_mean)/(self._x_std + 1e-5)
         self.y = (y - self._y_mean)/(self._y_std + 1e-5) # TODO could make getters that do this work for you when you want these.
@@ -303,14 +328,24 @@ class Emu(object):
 
         # in general, the full cov matrix will be too big, and we won't need it. store the diagonal, and
         # an average
-        split_ycov = np.dsplit(ycov, ycov.shape[-1])
+        #split_ycov = np.dsplit(ycov, ycov.shape[-1])
+        #print split_ycov.shape
+        #print split_ycov
         #fullcov = block_diag(*[yc[:,:,0] for yc in split_ycov])
-        self.yerr = np.sqrt(np.hstack(np.diag(syc[:,:,0]) for syc in split_ycov))
+        self.yerr = np.sqrt(np.hstack(np.diag(syc[:,:]) for syc in ycov))
         #self.yerr = np.hstack([yerr for i in xrange(self.x.shape[0] / fullcov.shape[0])])
 
 
         #compute the average covaraince matrix
-        self.ycov = np.mean(split_ycov, axis = 2)
+        self.ycov = np.zeros((self.n_bins, self.n_bins))
+        n_right_shape = 0
+        for yc in ycov:
+            if yc.shape[0] != self.n_bins:
+                continue
+            n_right_shape+=1
+            self.ycov+=yc
+
+        self.ycov/=n_right_shape
 
         ndim = self.x.shape[1]
         self.emulator_ndim = ndim  # The number of params for the emulator is different than those in sampling.
@@ -633,19 +668,29 @@ class Emu(object):
         elif self.obs == 'wt':
             # TODO parameter name has changed, update
             if independent_variable is None:
-                ig.update({'logMmin': 3.84345171761, 'f_c': 1.80188170556, 'logM0':14.11665461,
-                    'sigma_logM': 17.7239294539, 'alpha': 0.18960822912, 'r': 0.306139450843,
-                    'logM1': 1.0554692015, 'amp': 2.52461085754, 'z': 1.0,
-                    'mean_occupation_satellites_assembias_param1':2.45298658504,
+                #ig.update({'logMmin': 3.84345171761, 'f_c': 1.80188170556, 'logM0':14.11665461,
+                #    'sigma_logM': 17.7239294539, 'alpha': 0.18960822912, 'r': 0.306139450843,
+                #    'logM1': 1.0554692015, 'amp': 2.52461085754, 'z': 1.0,
+                #    'mean_occupation_satellites_assembias_param1':2.45298658504,
+                #    'mean_occupation_centrals_assembias_param1':27.2832783025})
+                ig.update({"amp1":0.991516,"amp2": 0.104155, 
+                           'logMmin': 3.2496991210194732, 'f_c': 6.5225471765230409, 'logM0': 0.90031876392525889, 'logM1': 5.7115389793138123, 'r': 0.85251205183917733, 'sigma_logM': 81.17344472376017, 'alpha': 156.63415402538018,'mean_occupation_satellites_assembias_param1':2.45298658504,
                     'mean_occupation_centrals_assembias_param1':27.2832783025})
 
-        elif self.obs == 'ds':
+
+        elif self.obs == 'ds' or self.obs == 'gt':
             if independent_variable is None:
-                ig.update({'logMmin': 3.6176310032, 'f_c': 0.574766597478, 'logM0':45.5862423685,
-                    'sigma_logM': 1.3220351031, 'alpha': 2.31333123015, 'r': 0.17221523,
-                    'logM1': 2.16453187021, 'amp': 0.42810696, 'z': 1.0,
-                    'mean_occupation_satellites_assembias_param1': 6.65437027486,
-                    'mean_occupation_centrals_assembias_param1': 3.1539620393})
+                #ig.update({'logMmin': 3.6176310032, 'f_c': 0.574766597478, 'logM0':45.5862423685,
+                #    'sigma_logM': 1.3220351031, 'alpha': 2.31333123015, 'r': 0.17221523,
+                #    'logM1': 2.16453187021, 'amp': 0.42810696, 'z': 1.0,
+                #    'mean_occupation_satellites_assembias_param1': 6.65437027486,
+                #    'mean_occupation_centrals_assembias_param1': 3.1539620393})
+                ig.update({"amp1" : 0.15371, "amp2" : 3.425e-2, 'logMmin': 0.034503709757514989,\
+                          'f_c': 4.0430901762813942, 'logM0': 9.3787807296144319, 
+                          'logM1': 0.15371477344245249, 'r': 234.93989162754283, 
+                          'sigma_logM': 27.693005736447112, 'alpha': 2.2594726287088052,
+                          'mean_occupation_satellites_assembias_param1': 6.65437027486,
+                          'mean_occupation_centrals_assembias_param1': 3.1539620393})
 
 
         else:
@@ -673,7 +718,11 @@ class Emu(object):
         else:
             ig = metric  # use the user's initial guesses
 
-        metric = [ig['amp']]
+        if 'amp1' in ig:
+            a1, a2 = ig['amp1'], ig['amp2']    
+        else:
+            a1 = a2 = ig['amp']
+        metric = []
         for pname in self._ordered_params:
             try:
                 metric.append(ig[pname])
@@ -684,11 +733,12 @@ class Emu(object):
         metric = np.array(metric)
 
 
-        a = metric[0]
         # TODO other kernels?
-        return a * ExpSquaredKernel(metric[1:], ndim=self.emulator_ndim)+a*Matern32Kernel(metric[1:], ndim=self.emulator_ndim)+a
+        #return a * ExpSquaredKernel(metric[1:], ndim=self.emulator_ndim)+a*Matern32Kernel(metric[1:], ndim=self.emulator_ndim)+a
         #return a * ExpSquaredKernel(metric[1:], ndim=self.emulator_ndim)*Matern32Kernel(metric[1:], ndim=self.emulator_ndim)
         #return a * Matern32Kernel(metric[1:], ndim=self.emulator_ndim) + a
+        #return a * ExpSquaredKernel(metric[1:], ndim=self.emulator_ndim) + a
+        return a2 * Matern52Kernel(metric, ndim=self.emulator_ndim) + a1
 
     ###Emulation and methods that Utilize it############################################################################
     def emulate(self, em_params, gp_errs=False):
