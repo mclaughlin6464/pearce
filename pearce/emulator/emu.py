@@ -268,7 +268,6 @@ class Emu(object):
         if np.any(np.isnan(_ycov))  or np.any(np.isnan(y)):
             print 'Hi'
             y_nans = np.isnan(y)
-            y
             ycov_nans = np.sum(np.isnan(_ycov), axis = 1).astype(bool).reshape((-1,))
             nan_idxs = np.logical_or(y_nans ,ycov_nans ) 
             num_skipped = np.sum(nan_idxs)
@@ -788,7 +787,7 @@ class Emu(object):
     def _emulate_helper(self, t, gp_errs=False):
         pass
 
-    def emulate_wrt_r(self, em_params, r_bin_centers, gp_errs=False):
+    def emulate_wrt_r(self, em_params, r_bin_centers=None, gp_errs=False):
         """
         Helper function to emulate over r bins.
         :param em_params:
@@ -803,6 +802,8 @@ class Emu(object):
                 errs, if returned, has the same shape
         """
         # TODO this should have scale bin centers as teh default, duh!
+        if r_bin_centers is None:
+            r_bin_centers = self.scale_bin_centers
         ep = {}
         ep.update(em_params)
         # extract z from the emulator params, if it's there
@@ -1696,3 +1697,291 @@ class ExtraCrispy(Emu):
 
         return results
 
+
+class SpicyBuffalo(Emu):
+    """Emulator that emulates with one emulator per scale bin rather than having it be a parameter.
+       In practice this has better accuracy."""
+
+    def load_training_data(self, filename, custom_mean_function = None):
+        """
+        Read the training data for the emulator and attach it to the object.
+        :param training_dir:
+            Directory where training data from trainginData is stored.
+        :param fixed_params:
+            Parameters to hold fixed. Only available if data in training_dir is a full hypercube, not a latin hypercube.
+        :return: None
+        """
+        super(SpicyBuffalo, self).load_training_data(filename, custom_mean_function)
+
+        # now, parition the data as specified by the user
+        # note that ppe does not include overlap
+        points_per_expert = int(1.0 * self.x.shape[0]/self.n_bins)
+
+        try:
+            assert points_per_expert > 0
+        except AssertionError:
+            raise AssertionError("You have too many scale bins!")
+
+        # we have to have lists, since some may have been dropped due to Nans.
+        # There's definetly a better way to do this ...
+        _x = [ [] for i in xrange(self.n_bins)]
+        _y = [ [] for i in xrange(self.n_bins)]
+        _yerr = [[] for i in xrange(self.n_bins)]
+
+        r_idx = self.get_param_names().index('r')
+        skip_r_idx = np.ones((self.n_bins), dtype = bool)
+        skip_r_idx[r_idx] = False
+        scale_bin_center_map = dict(zip((self.scale_bin_centers - self._x_mean[r_idx])/(self._x_std[r_idx]+1e-6),\
+                                                range(self.n_bins)))
+
+        for (x_row, y_row, yerr_row) in izip(self.x, self.y, self.yerr):
+            row_idx = scale_bin_center_map[x_row[r_idx]] #figure out what expert to send this to
+            _x[row_idx].append(x_row[skip_r_idx])
+            _y[row_idx].append(y_row)
+            _yerr[row_idx].append(yerr_row)
+
+        # now attach these final versions
+        self.x = []
+        self.y = []
+        self.yerr = []
+
+        # copy the lists to the attached object, and convert them to numpy arrays
+        for attached_item, tmp_item in izip([self.x, self.y, self.yerr], [_x, _y, _yerr]):
+            while tmp_item:
+                attached_item.append(np.array(tmp_item.pop(0)))
+
+    def _downsample_data(self):
+
+        N_points = max([_x.shape[0] for _x in self.x]) # don't sample full HOD/cosmo points. Already broken up in experts
+        downsample_N_points = int(self._downsample_factor * N_points)
+        self.downsample_x = [np.zeros((downsample_N_points, self.x[0].shape[1] )) for i in xrange(self.n_bins)]
+        self.downsample_y = [np.zeros((downsample_N_points, self.x[0].shape[1] )) for i in xrange(self.n_bins)]
+        self.downsample_yerr = [ np.zeros((downsample_N_points, self.x[0].shape[1] )) for i in xrange(self.n_bins)]
+
+        for e in xrange(self.n_bins):
+
+            downsampled_points = np.random.choice(len(self.x[e]), downsample_N_points, replace=False)
+
+            for i, dp in enumerate(downsampled_points):
+                self.downsample_x[e][i :(i + 1)] = self.x[e][dp : (dp + 1)]
+                self.downsample_y[e][i :(i + 1) ] = self.y[e][dp: (dp + 1)]
+                self.downsample_yerr[e][i:(i + 1)] = self.yerr[e][dp: (dp + 1)]
+
+    def _build_gp(self, hyperparams):
+        """
+        Initialize the GP emulator using an MOE model.
+        :param hyperparams:
+            Key word parameters for the emulator
+        :return: None
+        """
+        if 'metric' in hyperparams:
+            metric = hyperparams['metric']
+            del hyperparams['metric']
+        else:
+            metric = {}
+        kernel = self._make_kernel(metric)
+
+        # now, make a list of emulators
+        self._emulators = []
+
+        if self._downsample_factor == 1.0:
+            x = self.x
+            yerr = self.yerr
+        else:
+            x = self.downsample_x
+            yerr = self.downsample_yerr
+
+        for _x, _yerr in izip(x, yerr):
+            emulator = george.GP(kernel)
+
+            emulator.compute(_x, _yerr,**hyperparams)  # NOTE I'm using a modified version of george!
+
+            self._emulators.append(emulator)
+
+    def _build_skl(self, hyperparams):
+        """
+        Build a scikit learn emulator using a mixtrue of experts.
+        :param hyperparams:
+            Key word parameters for the emulator
+        :return: None
+        """
+        skl_methods = {'gbdt': GradientBoostingRegressor, 'rf': RandomForestRegressor, \
+                       'svr': SVR, 'krr': KernelRidge}
+
+        # Same kernel concerns as above.
+        if self.method in {'svr', 'krr'}:  # kernel based method
+            metric = hyperparams['metric'] if 'metric' in hyperparams else {}
+            kernel = self._make_kernel(metric)
+            if 'metric' in hyperparams:
+                del hyperparams['metric']
+            if self.method == 'svr':  # slight difference in these, sadly
+                hyperparams['kernel'] = kernel.value
+            else:  # krr
+                hyperparams['kernel'] = lambda x1, x2: kernel.value(np.array([x1]), np.array([x2]))
+
+        self._emulators = [self.skl_methods[self.method](**hyperparams) for i in xrange(self.n_bins)]
+
+        if self._downsample_factor == 1.0:
+            x = self.x
+            y = self.y
+        else:
+            x = self.downsample_x
+            y = self.downsample_y
+        for i, (emulator, _x, _y) in enumerate(izip(self._emulators, x, y)):
+            emulator.fit(_x, _y)
+
+    def _emulate_helper(self, t, gp_errs=False):
+        """
+        Helper function that takes a dependent variable matrix and makes a prediction.
+        :param t:
+            Dependent variable matrix. Assumed to be in the order defined by ordered_params
+        :param gp_errs:
+            Whether or not to return errors in the gp case
+        :return:
+            mu, err (if gp_errs True). Predicted value for dependetn variable t.
+            mu and err both have shape (npoints*self.redshift_bin_centers*self.scale_bin_centers)
+        """
+        #
+        param_names = self.get_param_names()
+        r_idx = param_names.index('r')
+        skip_r_idx = np.ones(len(param_names), dtype = bool)
+        skip_r_idx[r_idx] = False
+
+        scale_bin_center_map = dict(zip((self.scale_bin_centers - self._x_mean[r_idx]) / (self._x_std[r_idx] + 1e-6), \
+                                        range(self.n_bins)))
+        t_r_bins = t[:, ~skip_r_idx]
+        trb = -1
+        try:
+            t_r_idxs = np.array(scale_bin_center_map[trb] for trb in t_r_bins)
+        except KeyError: #Invalid r value
+            raise KeyError("The scale value %f was invalid for SpicyBuffalo"%trb)
+
+        # Note, reshape so there are n_bins lists, with each in corresponding to the bin
+        # will enable me to iterate over it, and make all preds at the same time
+        mean_func_at_params = self.mean_function(t)
+        mfap = [[] for i in xrange(self.n_bins)]
+        _t = t[:, ~skip_r_idx]
+
+        t = [[] for i in xrange(self.n_bins)]
+
+        for t_row, t_idx, mfc in izip(_t, t_r_idxs, mean_func_at_params):
+            t[t_idx] = t_row
+            mfap[t_idx] = mfc
+
+        t = [np.array(st) for st in t]
+        mean_func_at_params = [np.array(m) for m in mfc]
+
+        if self._downsample_factor == 1.0:
+            y = self.y
+        else:
+            y = self.downsample_y
+
+        mu = []
+        err = []
+
+        for bin_no, t_in_bin, mfc,_y, emulator in enumerate(izip(t, mean_func_at_params, self.y, self._emulators)):
+            if self.method == 'gp':
+                if gp_errs:
+                    local_mu, local_err = emulator.predict(_y, t, return_cov = False,return_var=True)
+                else:
+                    local_mu, local_err = emulator.predict(_y, t, return_cov = False,return_var=False), 1.0
+
+            else:
+                local_mu = emulator.predict(t)
+                local_err = 1.0  # weight with this instead of the errors.
+
+            mu.append(self._y_std*(local_mu + mean_func_at_params) + self._y_mean)
+            err.append(local_err*self._y_std)
+
+        #now, figure out how to return to the shape of t
+        combined_mu = np.zeros_like(t_r_idxs, dtype=float)
+        combined_err = np.zeros_like(t_r_idxs, dtype=float)
+
+        loc_in_arrays = [0 for i in xrange(self.n_bins)]
+
+        for mu_idx, r_idx in izip(t_r_idxs):
+            combined_mu[mu_idx] =  mu[r_idx][loc_in_arrays[r_idx]]
+            combined_err[mu_idx] =  err[r_idx][loc_in_arrays[r_idx]]
+
+            loc_in_arrays[r_idx]+=1
+
+
+        # Reshape to be consistent with my other implementation
+        if not gp_errs:
+            return combined_mu
+
+        return combined_mu, combined_err
+
+    def _emulator_lnlikelihood(self):
+        """
+        """
+        assert self.method == 'gp'
+
+        ll = 0
+        gll = 0
+        if self._downsample_factor == 1.0:
+            y = self.y
+        else:
+            y = self.downsample_y
+
+        for idx, (emulator, _y) in enumerate(izip(self._emulators, y)):
+            ll += emulator.lnlikelihood(_y, quiet=True)
+            gll += emulator.grad_lnlikelihood(_y, quiet=True)
+
+        # The scipy optimizer doesn't play well with infinities.
+
+        ll = ll if np.isfinite(ll) else -1e25
+
+
+        return ll, gll
+
+
+    # TODO could make this learn the metric for other kernel based emulators...
+    def train_metric(self, p0=None,  **kwargs):
+        """
+        Train the emulator. Has a spotty record of working. Better luck may be had with the NAMEME code.
+        :param kwargs:
+            Kwargs that will be passed into the scipy.optimize.minimize
+        :return: success: True if the training was successful.
+        """
+
+        assert self.method == 'gp'
+
+        # emulators is a list containing refernces to the same object. this should still work!
+        if self._downsample_factor == 1.0:
+            y = self.y
+        else:
+            y = self.downsample_y
+
+        # move these outside? hm.
+        def nll(p):
+            # Update the kernel parameters and compute the likelihood.
+            # params are log(a) and log(m)
+            ll = 0
+            for emulator, _y in izip(self._emulators, y):
+                emulator.set_parameter_vector(p)
+                ll += emulator.lnlikelihood(_y, quiet=True)
+
+            # The scipy optimizer doesn't play well with infinities.
+            return -ll if np.isfinite(ll) else 1e25
+
+        # And the gradient of the objective function.
+        def grad_nll(p):
+            # Update the kernel parameters and compute the likelihood.
+            gll = 0
+            for emulator, _y in izip(self._emulators, y):
+                emulator.set_parameter_vector(p)
+                gll += emulator.grad_lnlikelihood(_y, quiet=True)
+            return -gll
+
+        if p0 is None:
+            p0 = self._emulators[0].get_parameter_vector()
+
+        results = op.minimize(nll, p0, jac=grad_nll, **kwargs)
+
+
+        for emulator in self._emulators:
+            emulator.set_parameter_vector(results.x)
+            emulator.recompute()
+
+        return results
