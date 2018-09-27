@@ -406,7 +406,7 @@ class TrainingBox(Cat):
         gadget_loc = loc + 'output/'
         loc += 'halos/m200b/'
 
-        tmp_fnames = ['outbgc2_%d.list' % i for i in xrange(10)]
+        tmp_fnames = ['outbgc2_rs_%d.list' % i for i in xrange(10)]
         #tmp_fnames = ['TestBox00%d-000_out_parents_5.list' % boxno]
         tmp_scale_factors = [0.25, 0.333, 0.5, 0.540541, 0.588235, 0.645161, 0.714286, 0.8, 0.909091, 1.0]
         #tmp_scale_factors = [0.645161]
@@ -510,7 +510,7 @@ class TestBox(Cat):
         gadget_loc = loc + 'output/'
         loc += 'halos/m200b/'
 
-        tmp_fnames = ['outbgc2_%d.list' % i for i in xrange(10)]
+        tmp_fnames = ['outbgc2_rs_%d.list' % i for i in xrange(10)]
         #tmp_fnames = ['TestBox00%d-000_out_parents_5.list' % boxno]
         tmp_scale_factors = [0.25, 0.333, 0.5, 0.540541, 0.588235, 0.645161, 0.714286, 0.8, 0.909091, 1.0]
         #tmp_scale_factors = [0.645161]
@@ -587,7 +587,7 @@ class ResolutionTestBox(Cat):
         assert system in locations
         loc = locations[system]%boxno
 
-        tmp_fnames = ['outbgc2_%d.list' % i for i in xrange(10)]
+        tmp_fnames = ['outbgc2_rs_%d.list' % i for i in xrange(10)]
         #tmp_fnames = ['TestBox00%d-000_out_parents_5.list' % boxno]
         tmp_scale_factors = [0.25, 0.333, 0.5, 0.540541, 0.588235, 0.645161, 0.714286, 0.8, 0.909091, 1.0]
         #tmp_scale_factors = [0.645161]
