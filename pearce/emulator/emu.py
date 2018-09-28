@@ -266,7 +266,6 @@ class Emu(object):
         x, y, _ycov = np.vstack(x), np.hstack(y), np.dstack(ycov)
 
         if np.any(np.isnan(_ycov))  or np.any(np.isnan(y)):
-            print 'Hi'
             y_nans = np.isnan(y)
             ycov_nans = np.sum(np.isnan(_ycov), axis = 1).astype(bool).reshape((-1,))
             nan_idxs = np.logical_or(y_nans ,ycov_nans ) 
@@ -284,6 +283,11 @@ class Emu(object):
             ycov = ycov_list#np.dstack(ycov_list)
 
             warnings.warn('WARNING: NaN detected. Skipped %d points in training data.' % (num_skipped))
+
+        else:
+            ycov = np.dstack(ycov) 
+
+            print ycov.shape
 
 
         # stack so xs have shape (n points, n params)
@@ -331,7 +335,7 @@ class Emu(object):
         #print split_ycov.shape
         #print split_ycov
         #fullcov = block_diag(*[yc[:,:,0] for yc in split_ycov])
-        self.yerr = np.sqrt(np.hstack(np.diag(syc[:,:]) for syc in ycov))
+        self.yerr = np.sqrt(np.hstack(np.diag(syc) for syc in ycov))
         #self.yerr = np.hstack([yerr for i in xrange(self.x.shape[0] / fullcov.shape[0])])
 
 
@@ -1729,13 +1733,16 @@ class SpicyBuffalo(Emu):
         _yerr = [[] for i in xrange(self.n_bins)]
 
         r_idx = self.get_param_names().index('r')
-        skip_r_idx = np.ones((self.n_bins), dtype = bool)
+        skip_r_idx = np.ones((self.x.shape[1]), dtype = bool)
         skip_r_idx[r_idx] = False
-        scale_bin_center_map = dict(zip((self.scale_bin_centers - self._x_mean[r_idx])/(self._x_std[r_idx]+1e-6),\
-                                                range(self.n_bins)))
+        mean_sub_scale_bins = (np.log10(self.scale_bin_centers) - self._x_mean[r_idx])/(self._x_std[r_idx]+1e-6)#,4 )
+        msb = [round(i, 4) for i in mean_sub_scale_bins]
 
+        scale_bin_center_map = dict(zip(msb,range(self.n_bins)))
+        print scale_bin_center_map.keys()
         for (x_row, y_row, yerr_row) in izip(self.x, self.y, self.yerr):
-            row_idx = scale_bin_center_map[x_row[r_idx]] #figure out what expert to send this to
+            print x_row[r_idx]
+            row_idx = scale_bin_center_map[round(x_row[r_idx], 4)] #figure out what expert to send this to
             _x[row_idx].append(x_row[skip_r_idx])
             _y[row_idx].append(y_row)
             _yerr[row_idx].append(yerr_row)
