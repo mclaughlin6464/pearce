@@ -287,7 +287,6 @@ class Emu(object):
         else:
             ycov = np.dstack(ycov) 
 
-            print ycov.shape
 
 
         # stack so xs have shape (n points, n params)
@@ -310,6 +309,8 @@ class Emu(object):
 
         # make sure we attach metadata to the object
         x, y, ycov = self.get_data(filename, self.fixed_params, self.independent_variable, attach_params=True)
+
+        #print x.shape, y.shape, ycov.shape
 
         # store the data loading args, if we wanna reload later
         # useful ofr sampling the training data
@@ -335,18 +336,32 @@ class Emu(object):
         #print split_ycov.shape
         #print split_ycov
         #fullcov = block_diag(*[yc[:,:,0] for yc in split_ycov])
-        self.yerr = np.sqrt(np.hstack(np.diag(syc) for syc in ycov))
+
+        if type(ycov) is not list:
+            self.yerr = np.sqrt(np.hstack(np.diag(syc) for syc in ycov.T))
+        else:
+            self.yerr = np.sqrt(np.hstack(np.diag(np.array(syc)) for syc in ycov))
+
+        print self.yerr.shape, self.x.shape, self.y.shape
+
         #self.yerr = np.hstack([yerr for i in xrange(self.x.shape[0] / fullcov.shape[0])])
 
 
         #compute the average covaraince matrix
         self.ycov = np.zeros((self.n_bins, self.n_bins))
         n_right_shape = 0
-        for yc in ycov:
-            if yc.shape[0] != self.n_bins:
-                continue
-            n_right_shape+=1
-            self.ycov+=yc
+        if len(ycov) == 1 and type(ycov) is not list:
+            for yc in ycov.T:
+                if yc.shape[0] != self.n_bins:
+                    continue
+                n_right_shape+=1
+                self.ycov+=yc
+        else:
+            for yc in ycov:
+                if yc.shape[0] != self.n_bins:
+                    continue
+                n_right_shape+=1
+                self.ycov+=yc
 
         self.ycov/=n_right_shape
 
@@ -737,11 +752,11 @@ class Emu(object):
 
 
         # TODO other kernels?
-        #return a * ExpSquaredKernel(metric[1:], ndim=self.emulator_ndim)+a*Matern32Kernel(metric[1:], ndim=self.emulator_ndim)+a
+        return a2 * ExpSquaredKernel(metric, ndim=self.emulator_ndim)+a2*Matern32Kernel(metric, ndim=self.emulator_ndim)+a1
         #return a * ExpSquaredKernel(metric[1:], ndim=self.emulator_ndim)*Matern32Kernel(metric[1:], ndim=self.emulator_ndim)
         #return a * Matern32Kernel(metric[1:], ndim=self.emulator_ndim) + a
         #return a * ExpSquaredKernel(metric[1:], ndim=self.emulator_ndim) + a
-        return a2 * Matern52Kernel(metric, ndim=self.emulator_ndim) + a1
+        #return a2 * Matern52Kernel(metric, ndim=self.emulator_ndim) + a1
 
     ###Emulation and methods that Utilize it############################################################################
     def emulate(self, em_params, gp_errs=False):
@@ -1736,13 +1751,13 @@ class SpicyBuffalo(Emu):
         skip_r_idx = np.ones((self.x.shape[1]), dtype = bool)
         skip_r_idx[r_idx] = False
         mean_sub_scale_bins = (np.log10(self.scale_bin_centers) - self._x_mean[r_idx])/(self._x_std[r_idx]+1e-6)#,4 )
-        msb = [round(i, 4) for i in mean_sub_scale_bins]
+        msb = [round(i, 2) for i in mean_sub_scale_bins]
 
         scale_bin_center_map = dict(zip(msb,range(self.n_bins)))
-        print scale_bin_center_map.keys()
+        #print scale_bin_center_map.keys()
         for (x_row, y_row, yerr_row) in izip(self.x, self.y, self.yerr):
-            print x_row[r_idx]
-            row_idx = scale_bin_center_map[round(x_row[r_idx], 4)] #figure out what expert to send this to
+            #print x_row[r_idx]
+            row_idx = scale_bin_center_map[round(x_row[r_idx], 2)] #figure out what expert to send this to
             _x[row_idx].append(x_row[skip_r_idx])
             _y[row_idx].append(y_row)
             _yerr[row_idx].append(yerr_row)
@@ -1799,6 +1814,7 @@ class SpicyBuffalo(Emu):
             yerr = self.downsample_yerr
 
         for _x, _yerr in izip(x, yerr):
+            print _x.shape, _yerr.shape
             emulator = george.GP(kernel)
 
             emulator.compute(_x, _yerr,**hyperparams)  # NOTE I'm using a modified version of george!
