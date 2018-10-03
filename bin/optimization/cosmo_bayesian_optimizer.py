@@ -15,7 +15,7 @@ fixed_params = {'z':z, 'r': 24.06822623}
 #n_leaves, n_overlap = 1000, 1
 
 em_method = 'gp'
-emu = OriginalRecipe(training_file, method = em_method, fixed_params=fixed_params, downsample_factor = 0.05, custom_mean_function = 'linear')
+emu = OriginalRecipe(training_file, method = em_method, fixed_params=fixed_params, downsample_factor = 0.7, custom_mean_function = 'linear')
 
 #emu = ExtraCrispy(training_file, n_leaves, n_overlap, split_method='random', method = em_method, fixed_params=fixed_params,
 #                             custom_mean_function = 'linear', downsample_factor = 0.5)
