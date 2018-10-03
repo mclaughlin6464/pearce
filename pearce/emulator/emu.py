@@ -187,9 +187,9 @@ class Emu(object):
 
         # book keeping vars.
         # only want to warn the user once.
-        give_warning = False
+        #give_warning = False
         # these can be useful for debugging
-        num_skipped = 0
+        #num_skipped = 0
         num_used = 0
 
         for cosmo_group_name, cosmo_group in f.iteritems():
@@ -411,59 +411,6 @@ class Emu(object):
             return self._ordered_params[param]
         except KeyError:
             raise KeyError("Parameter %s could not be found." % param)
-
-    def _get_ordered_params(self, dirname, fixed_params, with_fixed_params=False):
-        """
-        Load the ordered params from directory 'dirname.' Remove params that
-        are held fixed by the emulator. Check that there are no violations and,
-        if it is not currently attached to the object, attach it. Optionally return
-        a version that does not have the fixed parameters removed, which is necessary for some functions
-        :param dirname:
-            name of the directory to load ordered_params from
-        :param fixed_params:
-            Iterator of fixed parameters. Will be removed from ordered params
-        :param with_fixed_params:
-            Boolean. Whether to return the ordered params without the fixed_params removed.
-            This is unfrotunately a little hacky, but it is necessary for the training_file_loc
-            feature.
-        :return: if with_fixed_params, ordered_params_with_fixed_params, a version of the attached object with the fixed
-        params left in place.
-        """
-        # get the defined param ordered for the training data, and ensure its ok.
-        ordered_params = params_file_reader(dirname)
-
-        # this will not contain 'z' or 'r'. Add them to the end.
-        # note that the bounds of these parameters will be updated later in get_data, if not here.
-        if hasattr(self, "redshift_bin_centers") and hasattr(self, "scale_bin_centers"):
-            # if we know the actual bounds, attach them
-            ordered_params['z'] = (np.min(self.redshift_bin_centers), np.max(self.redshift_bin_centers))
-            ordered_params['r'] = (np.min(self.scale_bin_centers), np.max(self.scale_bin_centers))
-        else:
-            ordered_params['z'] = (0, 1)
-            ordered_params['r'] = (0, 1)
-
-        # store in case we have to return this
-        op_with_fixed = ordered_params.copy()
-
-        for pname in fixed_params:
-            if pname in ordered_params:
-                del ordered_params[pname]
-            else:
-                raise KeyError('Parameter %s is in fixed_params but not in ordered_params!' % pname)
-
-        attached_or = getattr(self, "_ordered_params", None)
-        # attach the ordered params if its new. Otherwise, ensure that the ordering in this dir is the same as what
-        # we have already.
-        if attached_or is None:
-            self._ordered_params = ordered_params
-        else:
-            try:
-                assert ordered_params == attached_or
-            except AssertionError:
-                raise AssertionError("ordered_params in %s did not match the value attached to this object." % dirname)
-
-        if with_fixed_params:
-            return op_with_fixed
 
     # TODO Should I unify some syntax between this and the one below?
     def check_param_names(self, param_names, ignore=[]):
@@ -1748,6 +1695,9 @@ class SpicyBuffalo(Emu):
         _yerr = [[] for i in xrange(self.n_bins)]
 
         r_idx = self.get_param_names().index('r')
+        self.r_idx = r_idx # we'll need this later, too
+        del self._ordered_params['r'] # remove r!
+
         skip_r_idx = np.ones((self.x.shape[1]), dtype = bool)
         skip_r_idx[r_idx] = False
         mean_sub_scale_bins = (np.log10(self.scale_bin_centers) - self._x_mean[r_idx])/(self._x_std[r_idx]+1e-6)#,4 )
@@ -1865,14 +1815,13 @@ class SpicyBuffalo(Emu):
             mu and err both have shape (npoints*self.redshift_bin_centers*self.scale_bin_centers)
         """
         #
-        param_names = self.get_param_names()
-        r_idx = param_names.index('r')
-        skip_r_idx = np.ones(len(param_names), dtype = bool)
+        r_idx = self.r_idx
+        skip_r_idx = np.ones(self.x[0].shape[0]+1, dtype = bool)
         skip_r_idx[r_idx] = False
 
         scale_bin_center_map = dict(zip((self.scale_bin_centers - self._x_mean[r_idx]) / (self._x_std[r_idx] + 1e-6), \
                                         range(self.n_bins)))
-        t_r_bins = t[:, ~skip_r_idx]
+        t_r_bins = t[:, skip_r_idx]
         trb = -1
         try:
             t_r_idxs = np.array(scale_bin_center_map[trb] for trb in t_r_bins)
@@ -1883,7 +1832,7 @@ class SpicyBuffalo(Emu):
         # will enable me to iterate over it, and make all preds at the same time
         mean_func_at_params = self.mean_function(t)
         mfap = [[] for i in xrange(self.n_bins)]
-        _t = t[:, ~skip_r_idx]
+        _t = t[:, skip_r_idx]
 
         t = [[] for i in xrange(self.n_bins)]
 
