@@ -9,7 +9,8 @@ any method of any component model. It subclasses `HeavisideAssembias` and
 from functools import wraps
 import numpy as np
 
-from halotools.empirical_models.assembias_models import HeavisideAssembias, FreeSplitAssembias
+from halotools.empirical_models.assembias_models import HeavisideAssembias
+from . import  FreeSplitAssembias
 from halotools.empirical_models import model_helpers
 from halotools.custom_exceptions import HalotoolsError
 from halotools.utils.array_utils import custom_len

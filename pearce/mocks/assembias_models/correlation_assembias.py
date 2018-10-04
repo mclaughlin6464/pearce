@@ -9,10 +9,10 @@ from functools import wraps
 import numpy as np
 from scipy.stats import poisson, bernoulli, rankdata
 
-from . import HeavisideAssembias
+from halotools.empirical_models.assembias_models import HeavisideAssembias
 from halotools.custom_exceptions import HalotoolsError
 from halotools.utils.array_utils import custom_len
-from halotools.utils.table_utils import compute_conditional_percentiles, compute_conditional_decorator
+from .table_utils import compute_conditional_percentiles, compute_conditional_decorator
 from halotools.empirical_models.abunmatch.noisy_percentile import noisy_percentile
 
 __all__ = ('CorrelationAssembias',)

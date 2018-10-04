@@ -1,5 +1,52 @@
-Result [ 12.          12.          12.          12.          12.          12.
-  11.67920429   6.81656135  12.           1.92715272  12.           7.72884642
-  12.         -12.           2.57697301  12.           8.85016763
-   9.96558899   6.24704116  12.          12.         -12.         -12.         -12.
-  12.        ]
+(40000,) (40000, 11) (40000,)
+Traceback (most recent call last):
+  File "/u/ki/swmclau2/Git/pearce/bin/optimization/cosmo_bayesian_optimizer.py", line 51, in <module>
+    print len(num_params)
+TypeError: object of type 'int' has no len()
+
+------------------------------------------------------------
+Sender: LSF System <lsf@fell0062>
+Subject: Job 963985: <cosmo_bo> in cluster <slac> Exited
+
+Job <cosmo_bo> was submitted from host <ki-ls10> by user <swmclau2> in cluster <slac> at Wed Oct  3 11:44:48 2018.
+Job was executed on host(s) <8*fell0062>, in queue <long>, as user <swmclau2> in cluster <slac> at Wed Oct  3 11:44:49 2018.
+</u/ki/swmclau2> was used as the home directory.
+</u/ki/swmclau2/Git/pearce/bin/optimization> was used as the working directory.
+Started at Wed Oct  3 11:44:49 2018.
+Terminated at Wed Oct  3 11:49:51 2018.
+Results reported at Wed Oct  3 11:49:51 2018.
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+###!/bin/bash
+#BSUB -q long 
+#BSUB -W 24:00
+#BSUB -J cosmo_bo
+#BSUB -oo /u/ki/swmclau2/Git/pearce/bin/optimization/cosmo_bayesian_optimizer.out    
+#BSUB -n 8 
+#BSUB -R span[ptile=8]
+#BSUB --exclusive
+
+python /u/ki/swmclau2/Git/pearce/bin/optimization/cosmo_bayesian_optimizer.py
+
+------------------------------------------------------------
+
+Exited with exit code 1.
+
+Resource usage summary:
+
+    CPU time :                                   1037.30 sec.
+    Max Memory :                                 12150 MB
+    Average Memory :                             7285.90 MB
+    Total Requested Memory :                     -
+    Delta Memory :                               -
+    Max Swap :                                   -
+    Max Processes :                              5
+    Max Threads :                                22
+    Run time :                                   302 sec.
+    Turnaround time :                            303 sec.
+
+The output (if any) is above this job summary.
+

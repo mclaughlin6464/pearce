@@ -5,17 +5,19 @@ import numpy as np
 from os import path
 import GPyOpt
 
-training_file = '/u/ki/swmclau2/des/xi_cosmo_trainer/PearceRedMagicXiCosmoFixedNd.hdf5'
+#training_file = '/u/ki/swmclau2/des/xi_cosmo_trainer/PearceRedMagicXiCosmoFixedNd.hdf5'
+training_file = '/u/ki/swmclau2/des/wt_trainer3/PearceRedMagicChinchillaWT.hdf5'
 
-a = 1.0
+
+a = 0.81120 #1.0
 z = 1./a-1.0
 
-fixed_params = {'z':z, 'r': 24.06822623}
+fixed_params = {'z':z}#, 'r': 24.06822623}
 
 #n_leaves, n_overlap = 1000, 1
 
 em_method = 'gp'
-emu = OriginalRecipe(training_file, method = em_method, fixed_params=fixed_params, downsample_factor = 0.7, custom_mean_function = 'linear')
+emu = OriginalRecipe(training_file, method = em_method, fixed_params=fixed_params, downsample_factor = 1.0, custom_mean_function = 'linear')
 
 #emu = ExtraCrispy(training_file, n_leaves, n_overlap, split_method='random', method = em_method, fixed_params=fixed_params,
 #                             custom_mean_function = 'linear', downsample_factor = 0.5)
@@ -47,11 +49,6 @@ param_names_2.extend(param_names)
 num_params = 2*(1+len(param_names)) + 1
 
 space = [{'name': name, 'type': 'continuous', 'domain': (-12, 12)} for name in param_names_2]
-
-print len(num_params)
-print len(param_names_2)
-print len(space)
-print len(emu._emulator.kernel)#.vector)
 
 feasible_region = GPyOpt.Design_space(space = space)
 

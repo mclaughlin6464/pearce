@@ -7,7 +7,7 @@ is a free parameter.  It subclasses `HeavisideAssembias` and extends its feature
 
 import numpy as np
 
-from . import HeavisideAssembias
+from halotools.empirical_models.assembias_models import HeavisideAssembias
 from halotools.empirical_models import model_helpers
 from halotools.custom_exceptions import HalotoolsError
 from halotools.utils.array_utils import custom_len
@@ -63,7 +63,6 @@ class FreeSplitAssembias(HeavisideAssembias):
     def _get_free_split_assembias_param_dict_key(self, ipar):
         return self._method_name_to_decorate + '_' + self.gal_type + '_assembias_split' + str(ipar + 1)
 
-    @model_helpers.bounds_enforcing_decorator_factory(0, 1)
     def percentile_splitting_function(self, prim_haloprop):
         """
         Method returns the fraction of halos that are ``type-2``
@@ -93,4 +92,6 @@ class FreeSplitAssembias(HeavisideAssembias):
                 self._split_abscissa, split_ordinates, k=3)
             result = spline_function(prim_haloprop)
 
+        result[result<0] = 0
+        result[result>0] = 1
         return result

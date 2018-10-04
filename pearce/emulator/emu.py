@@ -342,7 +342,6 @@ class Emu(object):
         else:
             self.yerr = np.sqrt(np.hstack(np.diag(np.array(syc)) for syc in ycov))
 
-        print self.yerr.shape, self.x.shape, self.y.shape
 
         #self.yerr = np.hstack([yerr for i in xrange(self.x.shape[0] / fullcov.shape[0])])
 
@@ -1697,6 +1696,7 @@ class SpicyBuffalo(Emu):
         r_idx = self.get_param_names().index('r')
         self.r_idx = r_idx # we'll need this later, too
         del self._ordered_params['r'] # remove r!
+        self.emulator_ndim-=1
 
         skip_r_idx = np.ones((self.x.shape[1]), dtype = bool)
         skip_r_idx[r_idx] = False
@@ -1727,8 +1727,8 @@ class SpicyBuffalo(Emu):
         N_points = max([_x.shape[0] for _x in self.x]) # don't sample full HOD/cosmo points. Already broken up in experts
         downsample_N_points = int(self._downsample_factor * N_points)
         self.downsample_x = [np.zeros((downsample_N_points, self.x[0].shape[1] )) for i in xrange(self.n_bins)]
-        self.downsample_y = [np.zeros((downsample_N_points, self.x[0].shape[1] )) for i in xrange(self.n_bins)]
-        self.downsample_yerr = [ np.zeros((downsample_N_points, self.x[0].shape[1] )) for i in xrange(self.n_bins)]
+        self.downsample_y = [np.zeros((downsample_N_points, )) for i in xrange(self.n_bins)]
+        self.downsample_yerr = [ np.zeros((downsample_N_points, )) for i in xrange(self.n_bins)]
 
         for e in xrange(self.n_bins):
 
@@ -1763,8 +1763,8 @@ class SpicyBuffalo(Emu):
             x = self.downsample_x
             yerr = self.downsample_yerr
 
+
         for _x, _yerr in izip(x, yerr):
-            print _x.shape, _yerr.shape
             emulator = george.GP(kernel)
 
             emulator.compute(_x, _yerr,**hyperparams)  # NOTE I'm using a modified version of george!
@@ -1816,15 +1816,18 @@ class SpicyBuffalo(Emu):
         """
         #
         r_idx = self.r_idx
-        skip_r_idx = np.ones(self.x[0].shape[0]+1, dtype = bool)
+        skip_r_idx = np.ones(self.emulator_ndim+1, dtype = bool)
         skip_r_idx[r_idx] = False
 
         scale_bin_center_map = dict(zip((self.scale_bin_centers - self._x_mean[r_idx]) / (self._x_std[r_idx] + 1e-6), \
                                         range(self.n_bins)))
-        t_r_bins = t[:, skip_r_idx]
+
+        t_r_bins = round(t[:, r_idx],4)
+        print t_r_bins
         trb = -1
         try:
-            t_r_idxs = np.array(scale_bin_center_map[trb] for trb in t_r_bins)
+            t_r_idxs = np.array([scale_bin_center_map[trb] for trb in t_r_bins])
+
         except KeyError: #Invalid r value
             raise KeyError("The scale value %f was invalid for SpicyBuffalo"%trb)
 
