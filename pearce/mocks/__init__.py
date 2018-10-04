@@ -1,4 +1,4 @@
 from .cat import *
 from .customHODModels import *
 from.kittens import *
-from .continuousAssembias import *
+from pearce.mocks.assembias_models.continuousAssembias import *
