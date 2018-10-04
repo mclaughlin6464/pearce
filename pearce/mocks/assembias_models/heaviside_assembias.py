@@ -8,11 +8,11 @@ any method of any component model, as in
 import numpy as np
 from warnings import warn
 
-from .. import model_defaults, model_helpers
+from halotools.empirical_models import model_defaults, model_helpers
 
-from ...utils.array_utils import custom_len
-from ...custom_exceptions import HalotoolsError
-from ...utils.table_utils import compute_conditional_percentiles
+from halotools.utils.array_utils import custom_len
+from halotools.custom_exceptions import HalotoolsError
+from halotools.utils.table_utils import compute_conditional_percentiles
 import collections
 
 __all__ = ('HeavisideAssembias', )

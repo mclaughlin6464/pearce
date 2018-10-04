@@ -10,9 +10,10 @@ import numpy as np
 from scipy.stats import poisson, bernoulli, rankdata
 
 from . import HeavisideAssembias
-from ...custom_exceptions import HalotoolsError
-from ...utils.array_utils import custom_len
-from ...utils.table_utils import compute_conditional_percentiles, compute_conditional_decorator
+from halotools.custom_exceptions import HalotoolsError
+from halotools.utils.array_utils import custom_len
+from halotools.utils.table_utils import compute_conditional_percentiles, compute_conditional_decorator
+from halotools.empirical_models.abunmatch.noisy_percentile import noisy_percentile
 
 __all__ = ('CorrelationAssembias',)
 __author__ = ('Sean McLaughlin', )
@@ -39,7 +40,7 @@ def compute_conditional_shuffled_ranks(indices_of_prim_haloprop_bin, sec_halopro
     original_ranks = rankdata(sec_haloprop[indices_of_prim_haloprop_bin], 'ordinal') - 0.5
     original_ranks /= num_in_bin
 
-    return noisy_percentile(original_ranks, correlation_coeff=correlation)
+    return noisy_percentile(original_ranks, correlation_coeff=correlation_coeff)
 
 
 class CorrelationAssembias(HeavisideAssembias):

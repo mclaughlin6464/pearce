@@ -8,9 +8,9 @@ is a free parameter.  It subclasses `HeavisideAssembias` and extends its feature
 import numpy as np
 
 from . import HeavisideAssembias
-from .. import model_helpers
-from ...custom_exceptions import HalotoolsError
-from ...utils.array_utils import custom_len
+from halotools.empirical_models import model_helpers
+from halotools.custom_exceptions import HalotoolsError
+from halotools.utils.array_utils import custom_len
 
 __all__ = ('FreeSplitAssembias', )
 __author__ = ('Sean McLaughlin', )
