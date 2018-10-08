@@ -15,7 +15,7 @@ fixed_params = {'z':z, 'r': 24.06822623}
 #n_leaves, n_overlap = 1000, 1
 
 em_method = 'gp'
-emu = OriginalRecipe(training_file, method = em_method, fixed_params=fixed_params, downsample_factor = 0.05, custom_mean_function = 'linear')
+emu = OriginalRecipe(training_file, method = em_method, fixed_params=fixed_params, downsample_factor = 1.0, custom_mean_function = 'linear')
 
 #emu = ExtraCrispy(training_file, n_leaves, n_overlap, split_method='random', method = em_method, fixed_params=fixed_params,
 #                             custom_mean_function = 'linear', downsample_factor = 0.5)
@@ -48,11 +48,6 @@ num_params = 2*(1+len(param_names)) + 1
 
 space = [{'name': name, 'type': 'continuous', 'domain': (-12, 12)} for name in param_names_2]
 
-print len(num_params)
-print len(param_names_2)
-print len(space)
-print len(emu._emulator.kernel)#.vector)
-
 feasible_region = GPyOpt.Design_space(space = space)
 
 initial_design = GPyOpt.experiment_design.initial_design('random', feasible_region, 10)
@@ -76,7 +71,7 @@ bo = GPyOpt.methods.ModularBayesianOptimization(model, feasible_region, objectiv
 max_iter  = 1000 
 tol = 1e-8
 
-bo.run_optimization(max_iter = max_iter, max_time = 24*60*60, eps = tol, verbosity=False) 
+bo.run_optimization(max_iter = max_iter, max_time = 24*60*60, eps = tol, verbosity=True) 
 
 print 'Result', bo.x_opt
 

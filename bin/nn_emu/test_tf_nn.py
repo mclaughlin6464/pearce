@@ -132,7 +132,7 @@ def novel_fc(x, hidden_sizes, training=False, l = (1e-6, 1e-6, 1e-6), p = (0.5, 
 
 
 # Optimizier function
-def optimizer_init_fn(learning_rate = 1e-4):
+def optimizer_init_fn(learning_rate = 1e-6):
     return tf.train.AdamOptimizer(learning_rate)#, beta1=0.9, beta2=0.999, epsilon=1e-6)
 
 
@@ -207,12 +207,13 @@ def train(model_init_fn, optimizer_init_fn,num_params, train_data, val_data, hid
 
 
 print fixed_params
-sizes = [1000]#, 2000, 2000, 1000]#, 100]
+#sizes = [100, 250, 500, 250, 100]#, 2000, 1000]#, 100]
+sizes = [10,10,10,10]
 bs = 1000
-l, p = 1e-7, 0.1
+l, p = 1e-5, 0.3
 print sizes
 print bs
 print l, p
 
-train(n_layer_fc, optimizer_init_fn, x_train.shape[1], (x_train, y_train, yerr_train), (x_test, y_test), sizes, num_epochs= int(1e5),           batch_size = bs, l = l, p = p, print_every = 10)
+train(n_layer_fc, optimizer_init_fn, x_train.shape[1], (x_train, y_train, yerr_train), (x_test, y_test), sizes, num_epochs= int(1e5),           batch_size = bs, l = l, p = p, print_every = 100)
 
