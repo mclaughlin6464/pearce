@@ -326,8 +326,8 @@ class Emu(object):
         for yc in ycov: 
             ycov_list.append(yc/(np.outer(self._y_std, self._y_std) + 1e-5))
 
-        self.x = (x - self._x_mean)/(self._x_std + 1e-5)
-        self.y = (y - self._y_mean)/(self._y_std + 1e-5) # TODO could make getters that do this work for you when you want these.
+        self.x = self._whiten(x)[0]
+        self.y = self._whiten(y, arr ='y')[0]
 
         # TODO differnet hyperparams depending on what this is.
         self.mean_function = self._make_custom_mean_function(custom_mean_function)
@@ -372,6 +372,22 @@ class Emu(object):
 
         ndim = self.x.shape[1]
         self.emulator_ndim = ndim  # The number of params for the emulator is different than those in sampling.
+
+    def _whiten(self, x, arr = 'x'):
+        """
+        Whiten array x according to x_mean, x_std
+        :param x:
+            array to whiten
+        :return:
+            white_x, a whiened version of x, and None
+        """
+        # TODO check for dimensionality, existence of the means, etc
+        if arr == 'x':
+            return (x - self._x_mean)/(self._x_std + 1e-5), None
+        elif arr == 'y':
+            return (x - self._y_mean)/(self._y_std + 1e-5), None
+        else:
+            raise NotImplementedError
 
     def _make_custom_mean_function(self, custom_mean_function =None):
         """
@@ -622,7 +638,7 @@ class Emu(object):
                             'z':1.0})
             else:
                 # could have other guesses for this case, but don't have any now
-                # leave this structure in case I make more later
+                # leave this structure in case I make more later pass
                 pass
         # TODO  change with mean_function
         elif self.obs == 'wp':
@@ -757,14 +773,17 @@ class Emu(object):
         if len(t.shape) == 1:
             t = np.array([t])
 
-        # whiten
-        t-=self._x_mean
-        t/=(self._x_std + 1e-5)
+        # whiten, but only non- Spicy Buffalo versions
+        # I'm not psyched about this, but handling it in _emulator_helper is just easier
+        # I need to know what rows corredspond to what rs for later
+        # TODO standardize this
+        #if hasattr(self, 'r_idx'):
+        t, old_idxs = self._whiten(t)
 
-        return self._emulate_helper(t, gp_errs)
+        return self._emulate_helper(t, gp_errs, old_idxs = old_idxs)
 
     @abstractmethod
-    def _emulate_helper(self, t, gp_errs=False):
+    def _emulate_helper(self, t, gp_errs=False, old_idxs = None):
         pass
 
     def emulate_wrt_r(self, em_params, r_bin_centers=None, gp_errs=False):
@@ -1005,7 +1024,7 @@ class Emu(object):
 
         x, y, _, info = self.get_data(truth_file, self.fixed_params, self.independent_variable)
 
-        x = (x - self._x_mean)/(self._x_std + 1e-5)
+        x, old_idxs  = self._whiten(x)
         #y = (y - self._y_mean)/(self._y_std + 1e-5)
 
         scale_bin_centers = info['sbc']
@@ -1020,7 +1039,7 @@ class Emu(object):
             x, y = x[idxs], y[idxs]
         
 
-        pred_y = self._emulate_helper(x, False)
+        pred_y = self._emulate_helper(x, False, old_idxs = old_idxs)
 
         if scale_nbins > 1:
             try:
@@ -1212,7 +1231,7 @@ class OriginalRecipe(Emu):
 
         self._emulator.fit(x, y)
 
-    def _emulate_helper(self, t, gp_errs):
+    def _emulate_helper(self, t, gp_errs, old_idxs = None):
         """
         Helper function that takes a dependent variable matrix and makes a prediction.
         :param t:
@@ -1548,7 +1567,7 @@ class ExtraCrispy(Emu):
         for i, (emulator, _x, _y) in enumerate(izip(self._emulators, x, y)):
             emulator.fit(_x, _y)
 
-    def _emulate_helper(self, t, gp_errs=False):
+    def _emulate_helper(self, t, gp_errs=False, old_idxs = None):
         """
         Helper function that takes a dependent variable matrix and makes a prediction.
         :param t:
@@ -1764,7 +1783,7 @@ class SpicyBuffalo(Emu):
 
             self.x.append((x_in_bin - x_mean)/(x_std + 1e-5) )
             self.y.append((y[bin_idxs] - y_mean)/(y_std+1e-5) )
-            self.yerr.append(yerr[bin_idxs]/(y_std+1e-5)**2)
+            self.yerr.append(yerr[bin_idxs]/(y_std+1e-5))
 
             self._x_mean.append(x_mean)
             self._x_std.append(x_std)
@@ -1776,6 +1795,44 @@ class SpicyBuffalo(Emu):
         self.mean_function = self._make_custom_mean_function(custom_mean_function)
         for i, mf in enumerate(self.mean_function(self.x)):
             self.y[i]-=mf
+
+    def _whiten(self, x, arr = 'x'):
+        """
+        TODO
+        :param x:
+        :param arr:
+        :return:
+        """
+        if len(x) == self.n_bins:
+            out = []
+            if arr == 'x':
+                for x_in_bin, x_mean, x_std in izip(x, self._x_mean, self._x_std):
+                   out.append(((x_in_bin - x_mean)/(x_std + 1e-5) ) )
+            elif arr == 'y':
+                for x_in_bin, x_mean, x_std in izip(x, self._y_mean, self._y_std):
+                    out.append(((x_in_bin - x_mean)/(x_std + 1e-5) ) )
+            else:
+                raise NotImplementedError
+            return out, None
+
+        elif x.shape[1] == self.emulator_ndim+1: #has an r axies
+            assert arr == 'x'
+            r_idx = self.r_idx
+            skip_r_idx = np.ones(self.emulator_ndim+1, dtype = bool)
+            skip_r_idx[r_idx] = False
+
+            # Note, reshape so there are n_bins lists, with each in corresponding to the bin
+            # will enable me to iterate over it, and make all preds at the same time
+            out = []
+            all_bin_idxs = []
+            for bin_no, sbc in enumerate(np.log10(self.scale_bin_centers)):
+                bin_idxs = np.isclose(sbc, x[:, r_idx])
+                out.append((x[bin_idxs, :][:, skip_r_idx] - self._x_mean[bin_no])/(self._x_std[bin_no]+1e-5))
+                all_bin_idxs.append(bin_idxs)
+
+            return out, all_bin_idxs
+        else:
+            raise NotImplementedError
 
 
     def _make_custom_mean_function(self, custom_mean_function =None):
@@ -1803,8 +1860,6 @@ class SpicyBuffalo(Emu):
 
         else:
             raise NotImplementedError #TODO add something better! 
-
-               
 
     def check_param_names(self, param_names, ignore=[]):
         #see above, just adding 'r' to ignore by default
@@ -1893,7 +1948,7 @@ class SpicyBuffalo(Emu):
         for i, (emulator, _x, _y) in enumerate(izip(self._emulators, x, y)):
             emulator.fit(_x, _y)
 
-    def _emulate_helper(self, t, gp_errs=False):
+    def _emulate_helper(self, t, gp_errs=False, old_idxs = None):
         """
         Helper function that takes a dependent variable matrix and makes a prediction.
         :param t:
@@ -1905,32 +1960,9 @@ class SpicyBuffalo(Emu):
             mu and err both have shape (npoints*self.redshift_bin_centers*self.scale_bin_centers)
         """
         #
-        r_idx = self.r_idx
-        skip_r_idx = np.ones(self.emulator_ndim+1, dtype = bool)
-        skip_r_idx[r_idx] = False
-        t_r_bins = np.round(t[:, r_idx],2)
+        t_size = np.sum([_t.shape[0] for _t in t])
 
-        trb = -1
-        try:
-            t_r_idxs = np.array([self._scale_bin_center_map[trb] for trb in t_r_bins])
-
-        except KeyError: #Invalid r value
-            raise KeyError("The scale value %f was invalid for SpicyBuffalo"%trb)
-
-        # Note, reshape so there are n_bins lists, with each in corresponding to the bin
-        # will enable me to iterate over it, and make all preds at the same time
         mean_func_at_params = self.mean_function(t)
-        mfap_in_bins = [[] for i in xrange(self.n_bins)]
-        _t = t[:, skip_r_idx]
-
-        t = [[] for i in xrange(self.n_bins)]
-
-        for t_row, t_idx, mfc in izip(_t, t_r_idxs, mean_func_at_params):
-            t[t_idx].append(t_row)
-            mfap_in_bins[t_idx].append(mfc)
-
-        t = [np.array(st) for st in t]
-        mean_func_at_params = [np.array(m) for m in mfap_in_bins]
 
         if self._downsample_factor == 1.0:
             y = self.y
@@ -1952,21 +1984,16 @@ class SpicyBuffalo(Emu):
                 local_mu = emulator.predict(t)
                 local_err = np.ones_like(local_mu)  # weight with this instead of the errors.
 
-            mu.append(self._y_std*(local_mu + mfc) + self._y_mean)
-            err.append(local_err*self._y_std)
+            mu.append(self._y_std[bin_no]*(local_mu + mfc) + self._y_mean[bin_no])
+            err.append(local_err*self._y_std[bin_no])
 
         #now, figure out how to return to the shape of t
-        combined_mu = np.zeros_like(t_r_idxs, dtype=float)
-        combined_err = np.zeros_like(t_r_idxs, dtype=float)
+        combined_mu = np.zeros((t_size,))
+        combined_err = np.zeros((t_size,))
 
-        loc_in_arrays = [0 for i in xrange(self.n_bins)]
-
-        for mu_idx, r_idx in enumerate(t_r_idxs):
-            combined_mu[mu_idx] =  mu[r_idx][loc_in_arrays[r_idx]]
-            combined_err[mu_idx] =  err[r_idx][loc_in_arrays[r_idx]]
-
-            loc_in_arrays[r_idx]+=1
-
+        for r_idx, bin_idxs in enumerate(old_idxs):
+            combined_mu[bin_idxs] =  mu[r_idx]
+            combined_err[bin_idxs] =  err[r_idx]
 
         # Reshape to be consistent with my other implementation
         if not gp_errs:
