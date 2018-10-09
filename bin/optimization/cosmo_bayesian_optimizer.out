@@ -1,20 +1,44 @@
-(40000,) (40000, 11) (40000,)
+bullet0042
+/u/ki/swmclau2/.conda/envs/hodemulator/lib/python2.7/site-packages/sklearn/ensemble/weight_boosting.py:29: DeprecationWarning: numpy.core.umath_tests is an internal NumPy module and should not be imported. It will be removed in a future NumPy release.
+  from numpy.core.umath_tests import inner1d
+--------------------------------------------------------------------------
+An MPI process has executed an operation involving a call to the
+"fork()" system call to create a child process.  Open MPI is currently
+operating in a condition that could result in memory corruption or
+other system errors; your MPI job may hang, crash, or produce silent
+data corruption.  The use of fork() (or system() or other calls that
+create child processes) is strongly discouraged.  
+
+The process that invoked fork was:
+
+  Local host:          bullet0042 (PID 4815)
+  MPI_COMM_WORLD rank: 0
+
+If you are *absolutely sure* that your application will successfully
+and correctly survive a call to fork(), you may disable this warning
+by setting the mpi_warn_on_fork MCA parameter to 0.
+--------------------------------------------------------------------------
+no nans
 Traceback (most recent call last):
-  File "/u/ki/swmclau2/Git/pearce/bin/optimization/cosmo_bayesian_optimizer.py", line 51, in <module>
-    print len(num_params)
-TypeError: object of type 'int' has no len()
+  File "/u/ki/swmclau2/Git/pearce/bin/optimization/cosmo_bayesian_optimizer.py", line 20, in <module>
+    emu = OriginalRecipe(training_file, method = em_method, fixed_params=fixed_params, downsample_factor = 1.0, custom_mean_function = 'linear')
+  File "/u/ki/swmclau2/.local/lib/python2.7/site-packages/pearce/emulator/emu.py", line 76, in __init__
+    self.load_training_data(filename, custom_mean_function)
+  File "/u/ki/swmclau2/.local/lib/python2.7/site-packages/pearce/emulator/emu.py", line 365, in load_training_data
+    self.ycov+=yc
+ValueError: operands could not be broadcast together with shapes (20,20) (20,1000) (20,20) 
 
 ------------------------------------------------------------
-Sender: LSF System <lsf@fell0062>
-Subject: Job 963985: <cosmo_bo> in cluster <slac> Exited
+Sender: LSF System <lsf@bullet0042>
+Subject: Job 608722: <cosmo_bo> in cluster <slac> Exited
 
-Job <cosmo_bo> was submitted from host <ki-ls10> by user <swmclau2> in cluster <slac> at Wed Oct  3 11:44:48 2018.
-Job was executed on host(s) <8*fell0062>, in queue <long>, as user <swmclau2> in cluster <slac> at Wed Oct  3 11:44:49 2018.
+Job <cosmo_bo> was submitted from host <ki-ls07> by user <swmclau2> in cluster <slac> at Mon Oct  8 14:26:02 2018.
+Job was executed on host(s) <8*bullet0042>, in queue <long>, as user <swmclau2> in cluster <slac> at Mon Oct  8 15:17:13 2018.
 </u/ki/swmclau2> was used as the home directory.
 </u/ki/swmclau2/Git/pearce/bin/optimization> was used as the working directory.
-Started at Wed Oct  3 11:44:49 2018.
-Terminated at Wed Oct  3 11:49:51 2018.
-Results reported at Wed Oct  3 11:49:51 2018.
+Started at Mon Oct  8 15:17:13 2018.
+Terminated at Mon Oct  8 15:18:01 2018.
+Results reported at Mon Oct  8 15:18:01 2018.
 
 Your job looked like:
 
@@ -27,8 +51,10 @@ Your job looked like:
 #BSUB -oo /u/ki/swmclau2/Git/pearce/bin/optimization/cosmo_bayesian_optimizer.out    
 #BSUB -n 8 
 #BSUB -R span[ptile=8]
+#BSUB -R "rhel60"
 #BSUB --exclusive
 
+echo $HOSTNAME
 python /u/ki/swmclau2/Git/pearce/bin/optimization/cosmo_bayesian_optimizer.py
 
 ------------------------------------------------------------
@@ -37,16 +63,16 @@ Exited with exit code 1.
 
 Resource usage summary:
 
-    CPU time :                                   1037.30 sec.
-    Max Memory :                                 12150 MB
-    Average Memory :                             7285.90 MB
+    CPU time :                                   8.59 sec.
+    Max Memory :                                 57 MB
+    Average Memory :                             57.00 MB
     Total Requested Memory :                     -
     Delta Memory :                               -
     Max Swap :                                   -
     Max Processes :                              5
-    Max Threads :                                22
-    Run time :                                   302 sec.
-    Turnaround time :                            303 sec.
+    Max Threads :                                55
+    Run time :                                   48 sec.
+    Turnaround time :                            3119 sec.
 
 The output (if any) is above this job summary.
 
