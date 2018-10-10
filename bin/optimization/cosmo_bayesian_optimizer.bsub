@@ -5,6 +5,8 @@
 #BSUB -oo /u/ki/swmclau2/Git/pearce/bin/optimization/cosmo_bayesian_optimizer.out    
 #BSUB -n 8 
 #BSUB -R span[ptile=8]
+#BSUB -R "rhel60"
 #BSUB --exclusive
 
+echo $HOSTNAME
 python /u/ki/swmclau2/Git/pearce/bin/optimization/cosmo_bayesian_optimizer.py

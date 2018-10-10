@@ -5,12 +5,14 @@ import numpy as np
 from os import path
 import GPyOpt
 
-training_file = '/u/ki/swmclau2/des/xi_cosmo_trainer/PearceRedMagicXiCosmoFixedNd.hdf5'
+#training_file = '/u/ki/swmclau2/des/xi_cosmo_trainer/PearceRedMagicXiCosmoFixedNd.hdf5'
+training_file = '/u/ki/swmclau2/des/wt_trainer3/PearceRedMagicChinchillaWT.hdf5'
 
-a = 1.0
+
+a = 0.81120 #1.0
 z = 1./a-1.0
 
-fixed_params = {'z':z, 'r': 24.06822623}
+fixed_params = {'z':z}#, 'r': 24.06822623}
 
 #n_leaves, n_overlap = 1000, 1
 

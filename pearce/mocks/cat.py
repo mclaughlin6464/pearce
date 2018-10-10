@@ -565,12 +565,15 @@ class Cat(object):
                 self.model = PrebuiltHodModelFactory(HOD, **hod_kwargs)
         else:
             cens_occ = HOD[0](redshift=z, **hod_kwargs)
-            sats_occ = HOD[1](redshift=z, **hod_kwargs)
+            #NOTE don't know if should always modulate, but I always do.
+            sats_occ = HOD[1](redshift=z, cenocc_model=cens_occ, **hod_kwargs)
             self.model = HodModelFactory(
                 centrals_occupation=cens_occ,
                 centrals_profile=TrivialPhaseSpace(redshift=z),
                 satellites_occupation=sats_occ,
                 satellites_profile=NFWPhaseSpace(redshift=z))
+
+        self.populated_once = False #cover for loadign new ones
 
     def get_assembias_key(self, gal_type):
         '''

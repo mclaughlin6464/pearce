@@ -187,9 +187,9 @@ class Emu(object):
 
         # book keeping vars.
         # only want to warn the user once.
-        give_warning = False
+        #give_warning = False
         # these can be useful for debugging
-        num_skipped = 0
+        #num_skipped = 0
         num_used = 0
 
         for cosmo_group_name, cosmo_group in f.iteritems():
@@ -212,16 +212,16 @@ class Emu(object):
                 # efficiency note. If I don't iterate over the datasets, just the indicies,
                 # I avoid loading them from disk in fixed HOD scenarios
                 # Those will be rare enough for now that I don't care.
+                counter = 0
                 for HOD_no, (_obs, _cov) in enumerate(izip(obs_dset, cov_dset)):
 
                     if "HOD" in fixed_params and HOD_no != fixed_params['HOD']:
                         continue
-                    if any(np.any(np.isnan(arr)) for arr in [_obs, _cov]):
+                    #if any(np.any(np.isnan(arr)) for arr in [_obs, _cov]):
                         # skip NaN points. May wanna change this behavior.
-                        pass
+                        #pass
                         #give_warning = True
                         #num_skipped += 0#1
-                        #print _obs
                         #continue
                         #_obs[np.isnan(_obs)] = -2
                         #_cov[np.isnan(_cov)] = 1e3 # made up values for now
@@ -265,10 +265,16 @@ class Emu(object):
 
         x, y, _ycov = np.vstack(x), np.hstack(y), np.dstack(ycov)
 
+
         if np.any(np.isnan(_ycov))  or np.any(np.isnan(y)):
+            reshape_y = y.reshape((-1, scale_bin_centers.shape[0]))
+            #print reshape_y.shape
+            #print np.sum(np.isnan(reshape_y), axis = 0)
             y_nans = np.isnan(y)
-            ycov_nans = np.sum(np.isnan(_ycov), axis = 1).astype(bool).reshape((-1,))
-            nan_idxs = np.logical_or(y_nans ,ycov_nans ) 
+            #print 'y_nans', np.sum(y_nans)
+            #ycov_nans = np.sum(np.isnan(_ycov), axis = 1).astype(bool).reshape((-1,))
+            #print 'ycov_nans', np.sum(ycov_nans)
+            nan_idxs = y_nans#np.logical_or(y_nans ,ycov_nans ) 
             num_skipped = np.sum(nan_idxs)
 
             x = x[~nan_idxs]#, :]
@@ -285,9 +291,8 @@ class Emu(object):
             warnings.warn('WARNING: NaN detected. Skipped %d points in training data.' % (num_skipped))
 
         else:
+            print 'no nans'
             ycov = np.dstack(ycov) 
-
-
 
         # stack so xs have shape (n points, n params)
         # ys have shape (npoints)
@@ -310,8 +315,6 @@ class Emu(object):
         # make sure we attach metadata to the object
         x, y, ycov = self.get_data(filename, self.fixed_params, self.independent_variable, attach_params=True)
 
-        #print x.shape, y.shape, ycov.shape
-
         # store the data loading args, if we wanna reload later
         # useful ofr sampling the training data
 
@@ -323,8 +326,8 @@ class Emu(object):
         for yc in ycov: 
             ycov_list.append(yc/(np.outer(self._y_std, self._y_std) + 1e-5))
 
-        self.x = (x - self._x_mean)/(self._x_std + 1e-5)
-        self.y = (y - self._y_mean)/(self._y_std + 1e-5) # TODO could make getters that do this work for you when you want these.
+        self.x = self._whiten(x)[0]
+        self.y = self._whiten(y, arr ='y')[0]
 
         # TODO differnet hyperparams depending on what this is.
         self.mean_function = self._make_custom_mean_function(custom_mean_function)
@@ -333,8 +336,6 @@ class Emu(object):
         # in general, the full cov matrix will be too big, and we won't need it. store the diagonal, and
         # an average
         #split_ycov = np.dsplit(ycov, ycov.shape[-1])
-        #print split_ycov.shape
-        #print split_ycov
         #fullcov = block_diag(*[yc[:,:,0] for yc in split_ycov])
 
         if type(ycov) is not list:
@@ -342,7 +343,6 @@ class Emu(object):
         else:
             self.yerr = np.sqrt(np.hstack(np.diag(np.array(syc)) for syc in ycov))
 
-        print self.yerr.shape, self.x.shape, self.y.shape
 
         #self.yerr = np.hstack([yerr for i in xrange(self.x.shape[0] / fullcov.shape[0])])
 
@@ -354,12 +354,17 @@ class Emu(object):
             for yc in ycov.T:
                 if yc.shape[0] != self.n_bins:
                     continue
+                elif np.any(np.isnan(yc)):
+                    continue
                 n_right_shape+=1
                 self.ycov+=yc
         else:
             for yc in ycov:
                 if yc.shape[0] != self.n_bins:
                     continue
+                elif np.any(np.isnan(yc)):
+                    continue
+
                 n_right_shape+=1
                 self.ycov+=yc
 
@@ -367,6 +372,22 @@ class Emu(object):
 
         ndim = self.x.shape[1]
         self.emulator_ndim = ndim  # The number of params for the emulator is different than those in sampling.
+
+    def _whiten(self, x, arr = 'x'):
+        """
+        Whiten array x according to x_mean, x_std
+        :param x:
+            array to whiten
+        :return:
+            white_x, a whiened version of x, and None
+        """
+        # TODO check for dimensionality, existence of the means, etc
+        if arr == 'x':
+            return (x - self._x_mean)/(self._x_std + 1e-5), None
+        elif arr == 'y':
+            return (x - self._y_mean)/(self._y_std + 1e-5), None
+        else:
+            raise NotImplementedError
 
     def _make_custom_mean_function(self, custom_mean_function =None):
         """
@@ -412,59 +433,6 @@ class Emu(object):
         except KeyError:
             raise KeyError("Parameter %s could not be found." % param)
 
-    def _get_ordered_params(self, dirname, fixed_params, with_fixed_params=False):
-        """
-        Load the ordered params from directory 'dirname.' Remove params that
-        are held fixed by the emulator. Check that there are no violations and,
-        if it is not currently attached to the object, attach it. Optionally return
-        a version that does not have the fixed parameters removed, which is necessary for some functions
-        :param dirname:
-            name of the directory to load ordered_params from
-        :param fixed_params:
-            Iterator of fixed parameters. Will be removed from ordered params
-        :param with_fixed_params:
-            Boolean. Whether to return the ordered params without the fixed_params removed.
-            This is unfrotunately a little hacky, but it is necessary for the training_file_loc
-            feature.
-        :return: if with_fixed_params, ordered_params_with_fixed_params, a version of the attached object with the fixed
-        params left in place.
-        """
-        # get the defined param ordered for the training data, and ensure its ok.
-        ordered_params = params_file_reader(dirname)
-
-        # this will not contain 'z' or 'r'. Add them to the end.
-        # note that the bounds of these parameters will be updated later in get_data, if not here.
-        if hasattr(self, "redshift_bin_centers") and hasattr(self, "scale_bin_centers"):
-            # if we know the actual bounds, attach them
-            ordered_params['z'] = (np.min(self.redshift_bin_centers), np.max(self.redshift_bin_centers))
-            ordered_params['r'] = (np.min(self.scale_bin_centers), np.max(self.scale_bin_centers))
-        else:
-            ordered_params['z'] = (0, 1)
-            ordered_params['r'] = (0, 1)
-
-        # store in case we have to return this
-        op_with_fixed = ordered_params.copy()
-
-        for pname in fixed_params:
-            if pname in ordered_params:
-                del ordered_params[pname]
-            else:
-                raise KeyError('Parameter %s is in fixed_params but not in ordered_params!' % pname)
-
-        attached_or = getattr(self, "_ordered_params", None)
-        # attach the ordered params if its new. Otherwise, ensure that the ordering in this dir is the same as what
-        # we have already.
-        if attached_or is None:
-            self._ordered_params = ordered_params
-        else:
-            try:
-                assert ordered_params == attached_or
-            except AssertionError:
-                raise AssertionError("ordered_params in %s did not match the value attached to this object." % dirname)
-
-        if with_fixed_params:
-            return op_with_fixed
-
     # TODO Should I unify some syntax between this and the one below?
     def check_param_names(self, param_names, ignore=[]):
         """
@@ -478,10 +446,13 @@ class Emu(object):
             True if all param_names are in ordered_params, and vice verse. False otherwise
         """
         op_set = set(self._ordered_params.iterkeys())
-        for ig in ignore:
-            op_set.remove(ig)
-
         ip_set = set(param_names)
+
+        for ig in ignore:
+            if ig in op_set:
+                op_set.remove(ig)
+            if ig in ip_set:
+                ip_set.remove(ig)
 
         return len(op_set ^ ip_set) == 0
 
@@ -667,7 +638,7 @@ class Emu(object):
                             'z':1.0})
             else:
                 # could have other guesses for this case, but don't have any now
-                # leave this structure in case I make more later
+                # leave this structure in case I make more later pass
                 pass
         # TODO  change with mean_function
         elif self.obs == 'wp':
@@ -784,9 +755,15 @@ class Emu(object):
 
         # create the dependent variable matrix
         t_list = [input_params[pname] for pname in self._ordered_params if pname in em_params]
+        # cover spicy_buffalo edge case
+        t_dim = self.emulator_ndim
+        if hasattr(self, 'r_idx') and 'r' in input_params:
+            t_list.insert(self.r_idx, input_params['r'])
+            t_dim+=1
+
         t_grid = np.meshgrid(*t_list)
         t = np.stack(t_grid).T
-        t = t.reshape((-1, self.emulator_ndim))
+        t = t.reshape((-1, t_dim))
 
         # TODO george can sort?
         _t = self._sort_params(t)
@@ -796,14 +773,17 @@ class Emu(object):
         if len(t.shape) == 1:
             t = np.array([t])
 
-        # whiten
-        t-=self._x_mean
-        t/=(self._x_std + 1e-5)
+        # whiten, but only non- Spicy Buffalo versions
+        # I'm not psyched about this, but handling it in _emulator_helper is just easier
+        # I need to know what rows corredspond to what rs for later
+        # TODO standardize this
+        #if hasattr(self, 'r_idx'):
+        t, old_idxs = self._whiten(t)
 
-        return self._emulate_helper(t, gp_errs)
+        return self._emulate_helper(t, gp_errs, old_idxs = old_idxs)
 
     @abstractmethod
-    def _emulate_helper(self, t, gp_errs=False):
+    def _emulate_helper(self, t, gp_errs=False, old_idxs = None):
         pass
 
     def emulate_wrt_r(self, em_params, r_bin_centers=None, gp_errs=False):
@@ -1044,7 +1024,7 @@ class Emu(object):
 
         x, y, _, info = self.get_data(truth_file, self.fixed_params, self.independent_variable)
 
-        x = (x - self._x_mean)/(self._x_std + 1e-5)
+        x, old_idxs  = self._whiten(x)
         #y = (y - self._y_mean)/(self._y_std + 1e-5)
 
         scale_bin_centers = info['sbc']
@@ -1059,11 +1039,14 @@ class Emu(object):
             x, y = x[idxs], y[idxs]
         
 
-        pred_y = self._emulate_helper(x, False)
+        pred_y = self._emulate_helper(x, False, old_idxs = old_idxs)
 
         if scale_nbins > 1:
-            y = y.reshape((-1, scale_nbins))
-            pred_y = pred_y.reshape((-1, scale_nbins))
+            try:
+                y = y.reshape((-1, scale_nbins))
+                pred_y = pred_y.reshape((-1, scale_nbins))
+            except ValueError: #Can't reshpae, ahwell
+                pass
 
         # TODO untested
 
@@ -1248,7 +1231,7 @@ class OriginalRecipe(Emu):
 
         self._emulator.fit(x, y)
 
-    def _emulate_helper(self, t, gp_errs):
+    def _emulate_helper(self, t, gp_errs, old_idxs = None):
         """
         Helper function that takes a dependent variable matrix and makes a prediction.
         :param t:
@@ -1584,7 +1567,7 @@ class ExtraCrispy(Emu):
         for i, (emulator, _x, _y) in enumerate(izip(self._emulators, x, y)):
             emulator.fit(_x, _y)
 
-    def _emulate_helper(self, t, gp_errs=False):
+    def _emulate_helper(self, t, gp_errs=False, old_idxs = None):
         """
         Helper function that takes a dependent variable matrix and makes a prediction.
         :param t:
@@ -1614,26 +1597,13 @@ class ExtraCrispy(Emu):
                 local_mu = emulator.predict(t)
                 local_err = 1.0  # weight with this instead of the errors.
 
-            #print i
-            #print local_mu
-            #print local_err
-            #print mean_func_at_params
-            #print self._y_mean, self._y_std
-            #print '*'*30
-
             mu[i, :] = self._y_std*(local_mu + mean_func_at_params) + self._y_mean
             err[i, :] = local_err*self._y_std
 
 
-        #print 'Endgame'
-        #print mu
-        #print err
         # now, combine with weighted average
         combined_var = np.reciprocal(np.sum(np.reciprocal(err ** 2), axis=0))
-        #print np.std(combined_var), np.max(combined_var), np.min(combined_var)
         combined_mu = combined_var * np.sum(np.reciprocal(err ** 2) * mu, axis=0)
-        #print combined_mu
-        #print combined_var
 
         # Reshape to be consistent with my other implementation
         if not gp_errs:
@@ -1730,11 +1700,52 @@ class SpicyBuffalo(Emu):
             Parameters to hold fixed. Only available if data in training_dir is a full hypercube, not a latin hypercube.
         :return: None
         """
-        super(SpicyBuffalo, self).load_training_data(filename, custom_mean_function)
+        # make sure we attach metadata to the object
+        x, y, ycov = self.get_data(filename, self.fixed_params, self.independent_variable, attach_params=True)
+
+        # store the data loading args, if we wanna reload later
+        # useful ofr sampling the training data
+
+        y_std = 1.0 #y.mean(axis = 0), y.std(axis = 0)
+
+        ycov_list = []
+        for yc in ycov: 
+            ycov_list.append(yc/(np.outer(y_std, y_std) + 1e-5))
+
+        ycov = ycov_list 
+        yerr = np.sqrt(np.hstack(np.diag(np.array(syc)) for syc in ycov))
+
+        # in general, the full cov matrix will be too big, and we won't need it. store the diagonal, and
+        # an average
+        
+        #compute the average covaraince matrix
+        self.ycov = np.zeros((self.n_bins, self.n_bins))
+        n_right_shape = 0
+        #if len(ycov) == 1 and type(ycov) is not list:
+        #    for yc in ycov.T:
+        #        if yc.shape[0] != self.n_bins:
+        #            continue
+        #        elif np.any(np.isnan(yc)):
+        #            continue
+        #        n_right_shape+=1
+        #        self.ycov+=yc
+        for yc in ycov:
+            if yc.shape[0] != self.n_bins:
+                continue
+            elif np.any(np.isnan(yc)):
+                continue
+
+            n_right_shape+=1
+            self.ycov+=yc
+
+        self.ycov/=n_right_shape
+
+        ndim = x.shape[1] -1
+        self.emulator_ndim = ndim  # The number of params for the emulator is different than those in sampling.
 
         # now, parition the data as specified by the user
         # note that ppe does not include overlap
-        points_per_expert = int(1.0 * self.x.shape[0]/self.n_bins)
+        points_per_expert = int(1.0 * x.shape[0]/self.n_bins)
 
         try:
             assert points_per_expert > 0
@@ -1743,42 +1754,126 @@ class SpicyBuffalo(Emu):
 
         # we have to have lists, since some may have been dropped due to Nans.
         # There's definetly a better way to do this ...
-        _x = [ [] for i in xrange(self.n_bins)]
-        _y = [ [] for i in xrange(self.n_bins)]
-        _yerr = [[] for i in xrange(self.n_bins)]
-
-        r_idx = self.get_param_names().index('r')
-        skip_r_idx = np.ones((self.x.shape[1]), dtype = bool)
-        skip_r_idx[r_idx] = False
-        mean_sub_scale_bins = (np.log10(self.scale_bin_centers) - self._x_mean[r_idx])/(self._x_std[r_idx]+1e-6)#,4 )
-        msb = [round(i, 2) for i in mean_sub_scale_bins]
-
-        scale_bin_center_map = dict(zip(msb,range(self.n_bins)))
-        #print scale_bin_center_map.keys()
-        for (x_row, y_row, yerr_row) in izip(self.x, self.y, self.yerr):
-            #print x_row[r_idx]
-            row_idx = scale_bin_center_map[round(x_row[r_idx], 2)] #figure out what expert to send this to
-            _x[row_idx].append(x_row[skip_r_idx])
-            _y[row_idx].append(y_row)
-            _yerr[row_idx].append(yerr_row)
-
-        # now attach these final versions
         self.x = []
         self.y = []
         self.yerr = []
 
-        # copy the lists to the attached object, and convert them to numpy arrays
-        for attached_item, tmp_item in izip([self.x, self.y, self.yerr], [_x, _y, _yerr]):
-            while tmp_item:
-                attached_item.append(np.array(tmp_item.pop(0)))
+        self._x_mean, self._x_std = [], []
+        self._y_mean, self._y_std = 0.0, 1.0 # [], []
+
+        # TODO differnet hyperparams depending on what this is.
+
+        r_idx = self.get_param_names().index('r')
+        self.r_idx = r_idx # we'll need this later, too
+        del self._ordered_params['r'] # remove r!
+
+        skip_r_idx = np.ones((x.shape[1]), dtype = bool)
+        skip_r_idx[r_idx] = False
+
+        for bin_no, sbc in enumerate(np.log10(self.scale_bin_centers)):
+            bin_idxs = np.isclose(sbc, x[:, r_idx])
+
+            x_in_bin = x[bin_idxs,:][:, skip_r_idx]
+            x_mean, x_std = x_in_bin.mean(axis = 0), x_in_bin.std(axis = 0)
+
+            if type(self._y_mean) is list: # don't do the calculation if we've decided we don't whiten y
+                y_mean, y_std = y[bin_idxs].mean(), y[bin_idxs].std()
+            else:
+                y_mean, y_std = self._y_mean, self._y_std
+
+            self.x.append((x_in_bin - x_mean)/(x_std + 1e-5) )
+            self.y.append((y[bin_idxs] - y_mean)/(y_std+1e-5) )
+            self.yerr.append(yerr[bin_idxs]/(y_std+1e-5))
+
+            self._x_mean.append(x_mean)
+            self._x_std.append(x_std)
+
+            if type(self._y_mean) is list:
+                self._y_mean.append(y_mean)
+                self._y_std.append(y_std)
+
+        self.mean_function = self._make_custom_mean_function(custom_mean_function)
+        for i, mf in enumerate(self.mean_function(self.x)):
+            self.y[i]-=mf
+
+    def _whiten(self, x, arr = 'x'):
+        """
+        TODO
+        :param x:
+        :param arr:
+        :return:
+        """
+        if len(x) == self.n_bins:
+            out = []
+            if arr == 'x':
+                for x_in_bin, x_mean, x_std in izip(x, self._x_mean, self._x_std):
+                   out.append(((x_in_bin - x_mean)/(x_std + 1e-5) ) )
+            elif arr == 'y':
+                for x_in_bin, x_mean, x_std in izip(x, self._y_mean, self._y_std):
+                    out.append(((x_in_bin - x_mean)/(x_std + 1e-5) ) )
+            else:
+                raise NotImplementedError
+            return out, None
+
+        elif x.shape[1] == self.emulator_ndim+1: #has an r axies
+            assert arr == 'x'
+            r_idx = self.r_idx
+            skip_r_idx = np.ones(self.emulator_ndim+1, dtype = bool)
+            skip_r_idx[r_idx] = False
+
+            # Note, reshape so there are n_bins lists, with each in corresponding to the bin
+            # will enable me to iterate over it, and make all preds at the same time
+            out = []
+            all_bin_idxs = []
+            for bin_no, sbc in enumerate(np.log10(self.scale_bin_centers)):
+                bin_idxs = np.isclose(sbc, x[:, r_idx])
+                out.append((x[bin_idxs, :][:, skip_r_idx] - self._x_mean[bin_no])/(self._x_std[bin_no]+1e-5))
+                all_bin_idxs.append(bin_idxs)
+
+            return out, all_bin_idxs
+        else:
+            raise NotImplementedError
+
+
+    def _make_custom_mean_function(self, custom_mean_function =None):
+        """
+        Generate a custom mean function to make training better behaved (in theory)
+        """
+        # TODO docs
+
+        if custom_mean_function is None:
+            return lambda x: np.zeros((self.n_bins,)) 
+
+        elif custom_mean_function == 'linear' or custom_mean_function == 1:
+            self._mean_func = [LinearRegression() for i in xrange(self.n_bins)]#TODO hyperparams
+            for i, mf in enumerate(self._mean_func):
+                mf.fit(self.x[i], self.y[i])
+
+            return lambda x: np.array([mf.predict(_x) for _x, mf  in izip(x, self._mean_func)])
+
+        elif type(custom_mean_function) is int and custom_mean_function > 0: # TODO would like to take a dict here maybe, for kwargs
+            self._mean_func = [make_pipeline(PolynomialFeatures(custom_mean_function), LinearRegression()) for i in xrange(self.n_bins)]
+            for i, mf in enumerate(self._mean_func):
+                mf.fit(self.x[i], self.y[i])
+
+            return lambda x: np.array([mf.predict(_x) for _x, mf  in izip(x, self._mean_func)])
+
+        else:
+            raise NotImplementedError #TODO add something better! 
+
+    def check_param_names(self, param_names, ignore=[]):
+        #see above, just adding 'r' to ignore by default
+        ig = ['r'] if 'r' not in ignore else []
+        ig.extend(ignore)
+        return super(SpicyBuffalo, self).check_param_names(param_names, ig)
 
     def _downsample_data(self):
 
         N_points = max([_x.shape[0] for _x in self.x]) # don't sample full HOD/cosmo points. Already broken up in experts
         downsample_N_points = int(self._downsample_factor * N_points)
         self.downsample_x = [np.zeros((downsample_N_points, self.x[0].shape[1] )) for i in xrange(self.n_bins)]
-        self.downsample_y = [np.zeros((downsample_N_points, self.x[0].shape[1] )) for i in xrange(self.n_bins)]
-        self.downsample_yerr = [ np.zeros((downsample_N_points, self.x[0].shape[1] )) for i in xrange(self.n_bins)]
+        self.downsample_y = [np.zeros((downsample_N_points, )) for i in xrange(self.n_bins)]
+        self.downsample_yerr = [ np.zeros((downsample_N_points, )) for i in xrange(self.n_bins)]
 
         for e in xrange(self.n_bins):
 
@@ -1813,8 +1908,8 @@ class SpicyBuffalo(Emu):
             x = self.downsample_x
             yerr = self.downsample_yerr
 
+
         for _x, _yerr in izip(x, yerr):
-            print _x.shape, _yerr.shape
             emulator = george.GP(kernel)
 
             emulator.compute(_x, _yerr,**hyperparams)  # NOTE I'm using a modified version of george!
@@ -1853,7 +1948,7 @@ class SpicyBuffalo(Emu):
         for i, (emulator, _x, _y) in enumerate(izip(self._emulators, x, y)):
             emulator.fit(_x, _y)
 
-    def _emulate_helper(self, t, gp_errs=False):
+    def _emulate_helper(self, t, gp_errs=False, old_idxs = None):
         """
         Helper function that takes a dependent variable matrix and makes a prediction.
         :param t:
@@ -1865,34 +1960,9 @@ class SpicyBuffalo(Emu):
             mu and err both have shape (npoints*self.redshift_bin_centers*self.scale_bin_centers)
         """
         #
-        param_names = self.get_param_names()
-        r_idx = param_names.index('r')
-        skip_r_idx = np.ones(len(param_names), dtype = bool)
-        skip_r_idx[r_idx] = False
+        t_size = np.sum([_t.shape[0] for _t in t])
 
-        scale_bin_center_map = dict(zip((self.scale_bin_centers - self._x_mean[r_idx]) / (self._x_std[r_idx] + 1e-6), \
-                                        range(self.n_bins)))
-        t_r_bins = t[:, ~skip_r_idx]
-        trb = -1
-        try:
-            t_r_idxs = np.array(scale_bin_center_map[trb] for trb in t_r_bins)
-        except KeyError: #Invalid r value
-            raise KeyError("The scale value %f was invalid for SpicyBuffalo"%trb)
-
-        # Note, reshape so there are n_bins lists, with each in corresponding to the bin
-        # will enable me to iterate over it, and make all preds at the same time
         mean_func_at_params = self.mean_function(t)
-        mfap = [[] for i in xrange(self.n_bins)]
-        _t = t[:, ~skip_r_idx]
-
-        t = [[] for i in xrange(self.n_bins)]
-
-        for t_row, t_idx, mfc in izip(_t, t_r_idxs, mean_func_at_params):
-            t[t_idx] = t_row
-            mfap[t_idx] = mfc
-
-        t = [np.array(st) for st in t]
-        mean_func_at_params = [np.array(m) for m in mfc]
 
         if self._downsample_factor == 1.0:
             y = self.y
@@ -1902,32 +1972,28 @@ class SpicyBuffalo(Emu):
         mu = []
         err = []
 
-        for bin_no, t_in_bin, mfc,_y, emulator in enumerate(izip(t, mean_func_at_params, self.y, self._emulators)):
+        for bin_no, (t_in_bin, mfc,_y, emulator) in enumerate(izip(t, mean_func_at_params, y, self._emulators)):
             if self.method == 'gp':
                 if gp_errs:
-                    local_mu, local_err = emulator.predict(_y, t, return_cov = False,return_var=True)
+                    local_mu, local_err = emulator.predict(_y, t_in_bin, return_cov = False,return_var=True)
                 else:
-                    local_mu, local_err = emulator.predict(_y, t, return_cov = False,return_var=False), 1.0
+                    local_mu = emulator.predict(_y, t_in_bin, return_cov = False,return_var=False)
+                    local_err = np.ones_like(local_mu)
 
             else:
                 local_mu = emulator.predict(t)
-                local_err = 1.0  # weight with this instead of the errors.
+                local_err = np.ones_like(local_mu)  # weight with this instead of the errors.
 
-            mu.append(self._y_std*(local_mu + mean_func_at_params) + self._y_mean)
-            err.append(local_err*self._y_std)
+            mu.append(self._y_std[bin_no]*(local_mu + mfc) + self._y_mean[bin_no])
+            err.append(local_err*self._y_std[bin_no])
 
         #now, figure out how to return to the shape of t
-        combined_mu = np.zeros_like(t_r_idxs, dtype=float)
-        combined_err = np.zeros_like(t_r_idxs, dtype=float)
+        combined_mu = np.zeros((t_size,))
+        combined_err = np.zeros((t_size,))
 
-        loc_in_arrays = [0 for i in xrange(self.n_bins)]
-
-        for mu_idx, r_idx in izip(t_r_idxs):
-            combined_mu[mu_idx] =  mu[r_idx][loc_in_arrays[r_idx]]
-            combined_err[mu_idx] =  err[r_idx][loc_in_arrays[r_idx]]
-
-            loc_in_arrays[r_idx]+=1
-
+        for r_idx, bin_idxs in enumerate(old_idxs):
+            combined_mu[bin_idxs] =  mu[r_idx]
+            combined_err[bin_idxs] =  err[r_idx]
 
         # Reshape to be consistent with my other implementation
         if not gp_errs:
