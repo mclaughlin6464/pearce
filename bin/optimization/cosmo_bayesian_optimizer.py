@@ -1,15 +1,15 @@
-import emcee as mc
-from pearce.emulator import OriginalRecipe, ExtraCrispy
+from pearce.emulator import OriginalRecipe, ExtraCrispy, SpicyBuffalo
 from pearce.mocks import cat_dict
 import numpy as np
 from os import path
 import GPyOpt
 
 #training_file = '/u/ki/swmclau2/des/xi_cosmo_trainer/PearceRedMagicXiCosmoFixedNd.hdf5'
-training_file = '/u/ki/swmclau2/des/wt_trainer3/PearceRedMagicChinchillaWT.hdf5'
+training_file = '/home/users/swmclau2/scratch/PearceRedMagicXiCosmoFixedNd.hdf5'
+#training_file = '/u/ki/swmclau2/des/wt_trainer3/PearceRedMagicChinchillaWT.hdf5'
 
 
-a = 0.81120 #1.0
+a = 1.0#0.81120 #1.0
 z = 1./a-1.0
 
 fixed_params = {'z':z}#, 'r': 24.06822623}
@@ -17,10 +17,13 @@ fixed_params = {'z':z}#, 'r': 24.06822623}
 #n_leaves, n_overlap = 1000, 1
 
 em_method = 'gp'
-emu = OriginalRecipe(training_file, method = em_method, fixed_params=fixed_params, downsample_factor = 1.0, custom_mean_function = 'linear')
+#emu = OriginalRecipe(training_file, method = em_method, fixed_params=fixed_params, downsample_factor = 1.0, custom_mean_function = 'linear')
 
 #emu = ExtraCrispy(training_file, n_leaves, n_overlap, split_method='random', method = em_method, fixed_params=fixed_params,
 #                             custom_mean_function = 'linear', downsample_factor = 0.5)
+
+emu = SpicyBuffalo(training_file, method = em_method, fixed_params=fixed_params,
+                 custom_mean_function = 'linear', downsample_factor = 0.1)
 
 def nll(p):
     # Update the kernel parameters and compute the likelihood.
@@ -29,11 +32,20 @@ def nll(p):
     #for emulator, _y in izip(self._emulators, self.y):
     #    emulator.kernel[:] = p
     #    ll += emulator.lnlikelihood(_y, quiet=True)
-    print len(p[0])
-    emu._emulator.set_parameter_vector(p[0])
+    #print len(p[0])
+    for _emu in emu._emulators:
+        _emu.set_parameter_vector(p[0])
+        _emu.recompute()
+
     #print p
     y = getattr(emu, "downsample_y", emu.y)
-    ll= emu._emulator.lnlikelihood(y, quiet=False)
+
+    #ll= emu._emulator.lnlikelihood(y, quiet=False)
+
+    ll = 0
+    for _y, _emu in zip(y, emu._emulators):
+        ll+=_emu.lnlikelihood(_y, quiet = False)
+
 
     # The scipy optimizer doesn't play well with infinities.
     return -ll if np.isfinite(ll) else 1e25
@@ -70,7 +82,7 @@ evaluator = GPyOpt.core.evaluators.Sequential(acquisition)
 
 bo = GPyOpt.methods.ModularBayesianOptimization(model, feasible_region, objective, acquisition, evaluator, initial_design)
 
-max_iter  = 1000 
+max_iter  = 1000
 tol = 1e-8
 
 bo.run_optimization(max_iter = max_iter, max_time = 24*60*60, eps = tol, verbosity=True) 

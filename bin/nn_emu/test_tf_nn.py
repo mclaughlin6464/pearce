@@ -208,12 +208,12 @@ def train(model_init_fn, optimizer_init_fn,num_params, train_data, val_data, hid
 
 print fixed_params
 #sizes = [100, 250, 500, 250, 100]#, 2000, 1000]#, 100]
-sizes = [10,10,10,10]
+sizes = [10,10,10,10,10]
 bs = 1000
 l, p = 1e-5, 0.3
 print sizes
 print bs
 print l, p
 
-train(n_layer_fc, optimizer_init_fn, x_train.shape[1], (x_train, y_train, yerr_train), (x_test, y_test), sizes, num_epochs= int(1e5),           batch_size = bs, l = l, p = p, print_every = 100)
+train(n_layer_fc, optimizer_init_fn, x_train.shape[1], (x_train, y_train, yerr_train), (x_test, y_test), sizes, num_epochs= int(1e5),           batch_size = bs, l = l, p = p, print_every = 5)
 
