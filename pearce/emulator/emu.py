@@ -267,9 +267,6 @@ class Emu(object):
 
 
         if np.any(np.isnan(_ycov))  or np.any(np.isnan(y)):
-            reshape_y = y.reshape((-1, scale_bin_centers.shape[0]))
-            #print reshape_y.shape
-            #print np.sum(np.isnan(reshape_y), axis = 0)
             y_nans = np.isnan(y)
             #print 'y_nans', np.sum(y_nans)
             #ycov_nans = np.sum(np.isnan(_ycov), axis = 1).astype(bool).reshape((-1,))
@@ -358,6 +355,17 @@ class Emu(object):
                     continue
                 n_right_shape+=1
                 self.ycov+=yc
+        elif type(ycov) is not list:
+            #TODO this bugs out for different implementatiosn
+            for yc in ycov:
+                if yc.shape[0] != self.n_bins:
+                    continue
+                elif np.any(np.isnan(yc)):
+                    continue
+
+                n_right_shape+=1
+                self.ycov+=yc
+
         else:
             for yc in ycov:
                 if yc.shape[0] != self.n_bins:
@@ -1018,7 +1026,7 @@ class Emu(object):
             What G.O.F. statistic to calculate. Default is r2. Other options are rmsfd, abs(olute), and rel(ative).
         :return: values, a numpy arrray of the calculated statistics at each of the N training points.
         """
-        assert statistic in {'r2', 'rms', 'rmsfd', 'abs', 'log_abs', 'frac', 'log_frac'}
+        assert statistic in {'r2', 'rms', 'rmsfd', 'abs', 'log_abs', 'frac', 'log_frac', None}
         if N is not None:
             assert N > 0 and int(N) == N
 
@@ -1079,7 +1087,18 @@ class Emu(object):
             pred_y = np.array(new_mu)
             y = y[:, self.scale_bin_centers[0] <= bin_centers <= self.scale_bin_centers[-1]]
 
-        if statistic == 'rmsfd':
+        if statistic is None:
+            if hasattr(self, 'r_idx'): #resshape
+                pred_out, out  = [], []
+                for i in xrange(self.n_bins):
+                    pred_out.append(pred_y[old_idxs[i]])
+                    out.append(y[old_idxs[i]])
+
+                return pred_out, out
+            else:
+                return pred_y, y
+
+        elif statistic == 'rmsfd':
             return np.sqrt(np.mean((((pred_y - y) ** 2) / (y ** 2)), axis=0))
 
         elif statistic == 'rms':

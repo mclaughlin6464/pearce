@@ -1,4 +1,4 @@
-bullet0042
+bullet0236
 /u/ki/swmclau2/.conda/envs/hodemulator/lib/python2.7/site-packages/sklearn/ensemble/weight_boosting.py:29: DeprecationWarning: numpy.core.umath_tests is an internal NumPy module and should not be imported. It will be removed in a future NumPy release.
   from numpy.core.umath_tests import inner1d
 --------------------------------------------------------------------------
@@ -11,34 +11,43 @@ create child processes) is strongly discouraged.
 
 The process that invoked fork was:
 
-  Local host:          bullet0042 (PID 4815)
+  Local host:          bullet0236 (PID 35884)
   MPI_COMM_WORLD rank: 0
 
 If you are *absolutely sure* that your application will successfully
 and correctly survive a call to fork(), you may disable this warning
 by setting the mpi_warn_on_fork MCA parameter to 0.
 --------------------------------------------------------------------------
+hi
 no nans
+<type 'numpy.ndarray'> 1
+0 0.095817335
+hi
+<type 'list'> 40000
 Traceback (most recent call last):
-  File "/u/ki/swmclau2/Git/pearce/bin/optimization/cosmo_bayesian_optimizer.py", line 20, in <module>
-    emu = OriginalRecipe(training_file, method = em_method, fixed_params=fixed_params, downsample_factor = 1.0, custom_mean_function = 'linear')
-  File "/u/ki/swmclau2/.local/lib/python2.7/site-packages/pearce/emulator/emu.py", line 76, in __init__
-    self.load_training_data(filename, custom_mean_function)
-  File "/u/ki/swmclau2/.local/lib/python2.7/site-packages/pearce/emulator/emu.py", line 365, in load_training_data
-    self.ycov+=yc
-ValueError: operands could not be broadcast together with shapes (20,20) (20,1000) (20,20) 
+  File "/u/ki/swmclau2/Git/pearce/bin/optimization/cosmo_bayesian_optimizer.py", line 91, in <module>
+    bo.run_optimization(max_iter = max_iter, max_time = 24*60*60, eps = tol, verbosity=False) 
+  File "/u/ki/swmclau2/.local/lib/python2.7/site-packages/GPyOpt/core/bo.py", line 120, in run_optimization
+    self.Y, cost_values = self.objective.evaluate(self.X)
+  File "/u/ki/swmclau2/.local/lib/python2.7/site-packages/GPyOpt/core/task/objective.py", line 50, in evaluate
+    f_evals, cost_evals = self._eval_func(x)
+  File "/u/ki/swmclau2/.local/lib/python2.7/site-packages/GPyOpt/core/task/objective.py", line 74, in _eval_func
+    rlt = self.func(np.atleast_2d(x[i]))
+  File "/u/ki/swmclau2/Git/pearce/bin/optimization/cosmo_bayesian_optimizer.py", line 40, in nll
+    for i, _emu in enumerate(emu._emulators):
+AttributeError: 'OriginalRecipe' object has no attribute '_emulators'
 
 ------------------------------------------------------------
-Sender: LSF System <lsf@bullet0042>
-Subject: Job 608722: <cosmo_bo> in cluster <slac> Exited
+Sender: LSF System <lsf@bullet0236>
+Subject: Job 999054: <cosmo_bo> in cluster <slac> Exited
 
-Job <cosmo_bo> was submitted from host <ki-ls07> by user <swmclau2> in cluster <slac> at Mon Oct  8 14:26:02 2018.
-Job was executed on host(s) <8*bullet0042>, in queue <long>, as user <swmclau2> in cluster <slac> at Mon Oct  8 15:17:13 2018.
+Job <cosmo_bo> was submitted from host <ki-ls10> by user <swmclau2> in cluster <slac> at Tue Oct 16 14:12:55 2018.
+Job was executed on host(s) <8*bullet0236>, in queue <long>, as user <swmclau2> in cluster <slac> at Tue Oct 16 14:18:08 2018.
 </u/ki/swmclau2> was used as the home directory.
 </u/ki/swmclau2/Git/pearce/bin/optimization> was used as the working directory.
-Started at Mon Oct  8 15:17:13 2018.
-Terminated at Mon Oct  8 15:18:01 2018.
-Results reported at Mon Oct  8 15:18:01 2018.
+Started at Tue Oct 16 14:18:08 2018.
+Terminated at Tue Oct 16 14:22:48 2018.
+Results reported at Tue Oct 16 14:22:48 2018.
 
 Your job looked like:
 
@@ -46,7 +55,7 @@ Your job looked like:
 # LSBATCH: User input
 ###!/bin/bash
 #BSUB -q long 
-#BSUB -W 24:00
+#BSUB -W 48:00
 #BSUB -J cosmo_bo
 #BSUB -oo /u/ki/swmclau2/Git/pearce/bin/optimization/cosmo_bayesian_optimizer.out    
 #BSUB -n 8 
@@ -63,16 +72,16 @@ Exited with exit code 1.
 
 Resource usage summary:
 
-    CPU time :                                   8.59 sec.
-    Max Memory :                                 57 MB
-    Average Memory :                             57.00 MB
+    CPU time :                                   760.21 sec.
+    Max Memory :                                 11927 MB
+    Average Memory :                             5507.00 MB
     Total Requested Memory :                     -
     Delta Memory :                               -
     Max Swap :                                   -
     Max Processes :                              5
-    Max Threads :                                55
-    Run time :                                   48 sec.
-    Turnaround time :                            3119 sec.
+    Max Threads :                                63
+    Run time :                                   291 sec.
+    Turnaround time :                            593 sec.
 
 The output (if any) is above this job summary.
 
