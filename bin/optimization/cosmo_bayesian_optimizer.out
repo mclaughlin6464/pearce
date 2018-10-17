@@ -1,0 +1,19 @@
+/home/users/swmclau2/.local/lib/python2.7/site-packages/h5py/__init__.py:36: FutureWarning: Conversion of the second argument of issubdtype from `float` to `np.floating` is deprecated. In future, it will be treated as `np.float64 == np.dtype(float).type`.
+  from ._conv import register_converters as _register_converters
+[sh-20-15:33335] *** Process received signal ***
+[sh-20-15:33335] Signal: Segmentation fault (11)
+[sh-20-15:33335] Signal code: Address not mapped (1)
+[sh-20-15:33335] Failing at address: 0x2c82d70
+[sh-20-15:33336] *** Process received signal ***
+[sh-20-15:33336] Signal: Segmentation fault (11)
+[sh-20-15:33336] Signal code: Address not mapped (1)
+[sh-20-15:33336] Failing at address: 0x2c82d70
+[sh-20-15:33337] *** Process received signal ***
+[sh-20-15:33337] Signal: Segmentation fault (11)
+[sh-20-15:33337] Signal code: Address not mapped (1)
+[sh-20-15:33337] Failing at address: 0x2c82d70
+[sh-20-15:33338] *** Process received signal ***
+[sh-20-15:33338] Signal: Segmentation fault (11)
+[sh-20-15:33338] Signal code: Address not mapped (1)
+[sh-20-15:33338] Failing at address: 0x2c82d70
+slurmstepd: error: *** JOB 28884747 ON sh-20-15 CANCELLED AT 2018-10-15T12:15:02 ***

@@ -1,6 +1,6 @@
 ###!/bin/bash
 #BSUB -q long 
-#BSUB -W 24:00
+#BSUB -W 48:00
 #BSUB -J cosmo_bo
 #BSUB -oo /u/ki/swmclau2/Git/pearce/bin/optimization/cosmo_bayesian_optimizer.out    
 #BSUB -n 8 

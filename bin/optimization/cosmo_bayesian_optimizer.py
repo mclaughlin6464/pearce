@@ -12,30 +12,33 @@ training_file = '/home/users/swmclau2/scratch/PearceRedMagicXiCosmoFixedNd.hdf5'
 a = 1.0#0.81120 #1.0
 z = 1./a-1.0
 
-fixed_params = {'z':z}#, 'r': 24.06822623}
+fixed_params = {'z':z, 'r': 24.06822623}
 
 #n_leaves, n_overlap = 1000, 1
 
 em_method = 'gp'
-#emu = OriginalRecipe(training_file, method = em_method, fixed_params=fixed_params, downsample_factor = 1.0, custom_mean_function = 'linear')
+emu = OriginalRecipe(training_file, method = em_method, fixed_params=fixed_params, downsample_factor = 0.05, custom_mean_function = 'linear')
 
 #emu = ExtraCrispy(training_file, n_leaves, n_overlap, split_method='random', method = em_method, fixed_params=fixed_params,
 #                             custom_mean_function = 'linear', downsample_factor = 0.5)
 
-emu = SpicyBuffalo(training_file, method = em_method, fixed_params=fixed_params,
-                 custom_mean_function = 'linear', downsample_factor = 0.1)
+#emu = SpicyBuffalo(training_file, method = em_method, fixed_params=fixed_params,
+#                 custom_mean_function = 'linear', downsample_factor = 0.1)
+sbc = emu.scale_bin_centers
 
 def nll(p):
     # Update the kernel parameters and compute the likelihood.
     # params are log(a) and log(m)
+    y = getattr(emu, "downsample_y", emu.y)
+
     #ll = 0
     #for emulator, _y in izip(self._emulators, self.y):
     #    emulator.kernel[:] = p
     #    ll += emulator.lnlikelihood(_y, quiet=True)
     #print len(p[0])
-    for _emu in emu._emulators:
-        _emu.set_parameter_vector(p[0])
-        _emu.recompute()
+    #for _emu in emu._emulators:
+    #    _emu.set_parameter_vector(p[0])
+    #    _emu.recompute()
 
     #print p
     y = getattr(emu, "downsample_y", emu.y)
@@ -45,7 +48,6 @@ def nll(p):
     ll = 0
     for _y, _emu in zip(y, emu._emulators):
         ll+=_emu.lnlikelihood(_y, quiet = False)
-
 
     # The scipy optimizer doesn't play well with infinities.
     return -ll if np.isfinite(ll) else 1e25
@@ -64,28 +66,35 @@ space = [{'name': name, 'type': 'continuous', 'domain': (-12, 12)} for name in p
 
 feasible_region = GPyOpt.Design_space(space = space)
 
-initial_design = GPyOpt.experiment_design.initial_design('random', feasible_region, 10)
-# --- CHOOSE the objective
-objective = GPyOpt.core.task.SingleObjective(nll)
-
-# --- CHOOSE the model type
-model = GPyOpt.models.GPModel(exact_feval=True,optimize_restarts=10,verbose=False)
-
-# --- CHOOSE the acquisition optimizer
-aquisition_optimizer = GPyOpt.optimization.AcquisitionOptimizer(feasible_region)
-
-# --- CHOOSE the type of acquisition
-acquisition = GPyOpt.acquisitions.AcquisitionEI(model, feasible_region, optimizer=aquisition_optimizer)
-
-# --- CHOOSE a collection method
-evaluator = GPyOpt.core.evaluators.Sequential(acquisition)
-
-bo = GPyOpt.methods.ModularBayesianOptimization(model, feasible_region, objective, acquisition, evaluator, initial_design)
-
-max_iter  = 1000
+max_iter  = 500 
 tol = 1e-8
 
-bo.run_optimization(max_iter = max_iter, max_time = 24*60*60, eps = tol, verbosity=True) 
+for idx, r in enumerate(sbc):
+    print idx, r
+    fixed_params['r'] = r
 
-print 'Result', bo.x_opt
+    emu = OriginalRecipe(training_file, method = em_method, fixed_params=fixed_params, downsample_factor = 1.0, custom_mean_function = 'linear')
+
+    initial_design = GPyOpt.experiment_design.initial_design('random', feasible_region, 10)
+    # --- CHOOSE the objective
+    objective = GPyOpt.core.task.SingleObjective(nll)
+
+    # --- CHOOSE the model type
+    model = GPyOpt.models.GPModel(exact_feval=True,optimize_restarts=10,verbose=False)
+
+    # --- CHOOSE the acquisition optimizer
+    aquisition_optimizer = GPyOpt.optimization.AcquisitionOptimizer(feasible_region)
+
+    # --- CHOOSE the type of acquisition
+    acquisition = GPyOpt.acquisitions.AcquisitionEI(model, feasible_region, optimizer=aquisition_optimizer)
+
+    # --- CHOOSE a collection method
+    evaluator = GPyOpt.core.evaluators.Sequential(acquisition)
+
+    bo = GPyOpt.methods.ModularBayesianOptimization(model, feasible_region, objective, acquisition, evaluator, initial_design)
+
+
+    bo.run_optimization(max_iter = max_iter, max_time = 24*60*60, eps = tol, verbosity=False) 
+
+    print 'Result', bo.x_opt
 

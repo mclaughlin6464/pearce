@@ -267,9 +267,6 @@ class Emu(object):
 
 
         if np.any(np.isnan(_ycov))  or np.any(np.isnan(y)):
-            reshape_y = y.reshape((-1, scale_bin_centers.shape[0]))
-            #print reshape_y.shape
-            #print np.sum(np.isnan(reshape_y), axis = 0)
             y_nans = np.isnan(y)
             #print 'y_nans', np.sum(y_nans)
             #ycov_nans = np.sum(np.isnan(_ycov), axis = 1).astype(bool).reshape((-1,))
@@ -324,7 +321,7 @@ class Emu(object):
 
         ycov_list = []
         for yc in ycov: 
-            ycov_list.append(yc/(np.outer(self._y_std, self._y_std) + 1e-5))
+            ycov_list.append(yc/(np.outer(self._y_std+1e-5, self._y_std+1e-5)))
 
         self.x = self._whiten(x)[0]
         self.y = self._whiten(y, arr ='y')[0]
@@ -358,6 +355,17 @@ class Emu(object):
                     continue
                 n_right_shape+=1
                 self.ycov+=yc
+        elif type(ycov) is not list:
+            #TODO this bugs out for different implementatiosn
+            for yc in ycov:
+                if yc.shape[0] != self.n_bins:
+                    continue
+                elif np.any(np.isnan(yc)):
+                    continue
+
+                n_right_shape+=1
+                self.ycov+=yc
+
         else:
             for yc in ycov:
                 if yc.shape[0] != self.n_bins:
@@ -1018,7 +1026,7 @@ class Emu(object):
             What G.O.F. statistic to calculate. Default is r2. Other options are rmsfd, abs(olute), and rel(ative).
         :return: values, a numpy arrray of the calculated statistics at each of the N training points.
         """
-        assert statistic in {'r2', 'rms', 'rmsfd', 'abs', 'log_abs', 'frac', 'log_frac'}
+        assert statistic in {'r2', 'rms', 'rmsfd', 'abs', 'log_abs', 'frac', 'log_frac', None}
         if N is not None:
             assert N > 0 and int(N) == N
 
@@ -1034,19 +1042,38 @@ class Emu(object):
 
         # TODO this is busted
         if N is not None:  # make a random choice
-            idxs = np.random.choice(y.shape[0], N*scale_nbins, replace=False)
+            if hasattr(self, 'r_idx'):
+                _x, _y = [], []
+                _old_idxs = []
+                 
+                idxs = sorted(np.random.choice(old_idxs[0].shape[0], N*self.n_bins, replace = False))
+                for i in xrange(self.n_bins):
 
-            x, y = x[idxs], y[idxs]
+                    in_bin_idxs = old_idxs[i][idxs]
+                    _old_idxs.append(in_bin_idxs)
+
+                    #sub_idxs = np.zeros((x[i].shape[0],), dtype = bool)
+                    sub_idxs = np.isin(np.where(old_idxs[i])[0], idxs, assume_unique = True)
+                    _x.append(x[i][sub_idxs])
+                    _y.extend(y[old_idxs[i]][sub_idxs])
+                    #_old_idxs[i] = old_idxs[i][idxs]
+
+                x, y = _x, np.array(_y)
+                old_idxs = _old_idxs
+            else:
+                idxs = np.random.choice(y.shape[0], N*scale_nbins, replace=False)
+
+                x, y = x[idxs], y[idxs]
         
 
         pred_y = self._emulate_helper(x, False, old_idxs = old_idxs)
 
-        if scale_nbins > 1:
-            try:
-                y = y.reshape((-1, scale_nbins))
-                pred_y = pred_y.reshape((-1, scale_nbins))
-            except ValueError: #Can't reshpae, ahwell
-                pass
+        #if scale_nbins > 1:
+        #    try:
+        #        y = y.reshape((-1, scale_nbins))
+        #        pred_y = pred_y.reshape((-1, scale_nbins))
+        #    except ValueError: #Can't reshpae, ahwell
+        #        pass
 
         # TODO untested
 
@@ -1060,7 +1087,18 @@ class Emu(object):
             pred_y = np.array(new_mu)
             y = y[:, self.scale_bin_centers[0] <= bin_centers <= self.scale_bin_centers[-1]]
 
-        if statistic == 'rmsfd':
+        if statistic is None:
+            if hasattr(self, 'r_idx'): #resshape
+                pred_out, out  = [], []
+                for i in xrange(self.n_bins):
+                    pred_out.append(pred_y[old_idxs[i]])
+                    out.append(y[old_idxs[i]])
+
+                return pred_out, out
+            else:
+                return pred_y, y
+
+        elif statistic == 'rmsfd':
             return np.sqrt(np.mean((((pred_y - y) ** 2) / (y ** 2)), axis=0))
 
         elif statistic == 'rms':
@@ -1080,7 +1118,13 @@ class Emu(object):
             return pred_y - y
             # return np.mean((pred_y - y), axis=0)
         elif statistic == 'log_frac':  # 'rel'
-            return np.abs(pred_y - y) / np.abs(y)
+            out = np.abs(pred_y - y) / np.abs(y)
+            if hasattr(self, 'r_idx'): #resshape
+                _out = []
+                for i in xrange(self.n_bins):
+                    _out.append(out[old_idxs[i]])
+                out = _out
+            return out 
             # return np.mean((pred_y - y) / y, axis=0)
         else:  # 'frac'
             return np.abs(10 ** pred_y - 10 ** y) / np.abs(10 ** y)
@@ -1759,7 +1803,7 @@ class SpicyBuffalo(Emu):
         self.yerr = []
 
         self._x_mean, self._x_std = [], []
-        self._y_mean, self._y_std = 0.0, 1.0 # [], []
+        self._y_mean, self._y_std = np.zeros((self.n_bins,)), np.ones((self.n_bins,)) # [], []
 
         # TODO differnet hyperparams depending on what this is.
 
@@ -1779,11 +1823,11 @@ class SpicyBuffalo(Emu):
             if type(self._y_mean) is list: # don't do the calculation if we've decided we don't whiten y
                 y_mean, y_std = y[bin_idxs].mean(), y[bin_idxs].std()
             else:
-                y_mean, y_std = self._y_mean, self._y_std
+                y_mean, y_std = self._y_mean[bin_no], self._y_std[bin_no]
 
             self.x.append((x_in_bin - x_mean)/(x_std + 1e-5) )
             self.y.append((y[bin_idxs] - y_mean)/(y_std+1e-5) )
-            self.yerr.append(yerr[bin_idxs]/(y_std+1e-5))
+            self.yerr.append(yerr[bin_idxs])
 
             self._x_mean.append(x_mean)
             self._x_std.append(x_std)
@@ -1803,23 +1847,25 @@ class SpicyBuffalo(Emu):
         :param arr:
         :return:
         """
-        if len(x) == self.n_bins:
+        r_idx = self.r_idx
+        skip_r_idx = np.ones(self.emulator_ndim+1, dtype = bool)
+        skip_r_idx[r_idx] = False
+
+        if type(x) is list and len(x) == self.n_bins:
             out = []
             if arr == 'x':
                 for x_in_bin, x_mean, x_std in izip(x, self._x_mean, self._x_std):
-                   out.append(((x_in_bin - x_mean)/(x_std + 1e-5) ) )
+                    out.append(((x_in_bin - x_mean)/(x_std + 1e-5) ) )
             elif arr == 'y':
                 for x_in_bin, x_mean, x_std in izip(x, self._y_mean, self._y_std):
                     out.append(((x_in_bin - x_mean)/(x_std + 1e-5) ) )
             else:
                 raise NotImplementedError
+            out = np.array(out)
             return out, None
 
         elif x.shape[1] == self.emulator_ndim+1: #has an r axies
             assert arr == 'x'
-            r_idx = self.r_idx
-            skip_r_idx = np.ones(self.emulator_ndim+1, dtype = bool)
-            skip_r_idx[r_idx] = False
 
             # Note, reshape so there are n_bins lists, with each in corresponding to the bin
             # will enable me to iterate over it, and make all preds at the same time
@@ -1827,9 +1873,12 @@ class SpicyBuffalo(Emu):
             all_bin_idxs = []
             for bin_no, sbc in enumerate(np.log10(self.scale_bin_centers)):
                 bin_idxs = np.isclose(sbc, x[:, r_idx])
-                out.append((x[bin_idxs, :][:, skip_r_idx] - self._x_mean[bin_no])/(self._x_std[bin_no]+1e-5))
-                all_bin_idxs.append(bin_idxs)
+                val = (x[bin_idxs, :][:, skip_r_idx] - self._x_mean[bin_no])/(self._x_std[bin_no]+1e-5)
+                if type(val) is float:
+                    val = np.array([val])
 
+                out.append(val)
+                all_bin_idxs.append(bin_idxs)
             return out, all_bin_idxs
         else:
             raise NotImplementedError
@@ -1910,6 +1959,7 @@ class SpicyBuffalo(Emu):
 
 
         for _x, _yerr in izip(x, yerr):
+
             emulator = george.GP(kernel)
 
             emulator.compute(_x, _yerr,**hyperparams)  # NOTE I'm using a modified version of george!
@@ -1973,17 +2023,24 @@ class SpicyBuffalo(Emu):
         err = []
 
         for bin_no, (t_in_bin, mfc,_y, emulator) in enumerate(izip(t, mean_func_at_params, y, self._emulators)):
+
+            #print '_y', _y
+
             if self.method == 'gp':
                 if gp_errs:
                     local_mu, local_err = emulator.predict(_y, t_in_bin, return_cov = False,return_var=True)
                 else:
+                    #print _y
+                    #print t_in_bin
                     local_mu = emulator.predict(_y, t_in_bin, return_cov = False,return_var=False)
+                    #print local_mu
                     local_err = np.ones_like(local_mu)
 
             else:
                 local_mu = emulator.predict(t)
                 local_err = np.ones_like(local_mu)  # weight with this instead of the errors.
 
+            #print 'local_mu, mfc', local_mu, mfc
             mu.append(self._y_std[bin_no]*(local_mu + mfc) + self._y_mean[bin_no])
             err.append(local_err*self._y_std[bin_no])
 
