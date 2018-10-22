@@ -441,6 +441,7 @@ class Trainer(object):
 
                 obs_val = np.mean(obs_repops, axis=0)
                 obs_cov = np.cov(obs_repops, rowvar=False)
+
             output[output_idx] = obs_val
             output_cov[output_idx] = obs_cov
 
