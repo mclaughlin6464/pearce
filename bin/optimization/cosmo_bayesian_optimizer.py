@@ -31,23 +31,16 @@ def nll(p):
     # params are log(a) and log(m)
     y = getattr(emu, "downsample_y", emu.y)
 
-    #ll = 0
-    #for emulator, _y in izip(self._emulators, self.y):
-    #    emulator.kernel[:] = p
-    #    ll += emulator.lnlikelihood(_y, quiet=True)
-    #print len(p[0])
-    #for _emu in emu._emulators:
-    #    _emu.set_parameter_vector(p[0])
-    #    _emu.recompute()
 
-    #print p
-    y = getattr(emu, "downsample_y", emu.y)
+    if hasattr(emu, "_emulator"):
+        emu._emulator.set_parameter_vector(p[0])
+        ll= emu._emulator.lnlikelihood(y, quiet=False)
+    else:
 
-    #ll= emu._emulator.lnlikelihood(y, quiet=False)
-
-    ll = 0
-    for _y, _emu in zip(y, emu._emulators):
-        ll+=_emu.lnlikelihood(_y, quiet = False)
+        ll = 0
+        for _y, _emu in zip(y, emu._emulators):
+            _emu.set_parameter_vector(p[0])
+            ll+=_emu.lnlikelihood(_y, quiet = False)
 
     # The scipy optimizer doesn't play well with infinities.
     return -ll if np.isfinite(ll) else 1e25
@@ -73,7 +66,7 @@ for idx, r in enumerate(sbc):
     print idx, r
     fixed_params['r'] = r
 
-    emu = OriginalRecipe(training_file, method = em_method, fixed_params=fixed_params, downsample_factor = 1.0, custom_mean_function = 'linear')
+    emu = OriginalRecipe(training_file, method = em_method, fixed_params=fixed_params, downsample_factor = 0.1, custom_mean_function = 'linear')
 
     initial_design = GPyOpt.experiment_design.initial_design('random', feasible_region, 10)
     # --- CHOOSE the objective

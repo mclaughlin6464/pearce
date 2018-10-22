@@ -5,4 +5,5 @@
 #SBATCH -p iric 
 #SBATCH -o test_nn_emu.out 
 
+module load py-tensorflow
 python test_tf_nn.py 
