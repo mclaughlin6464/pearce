@@ -1,111 +1,111 @@
-from pearce.emulator import OriginalRecipe, ExtraCrispy
+from pearce.emulator import OriginalRecipe, ExtraCrispy, SpicyBuffalo
 from pearce.mocks.customHODModels import *
 from pearce.mocks import cat_dict
 from pearce.inference import run_mcmc_iterator
 from astropy.table import Table
+from scipy.optimize import minimize_scalar
 from halotools.mock_observables import wp
 import numpy as np
 from os import path
 
-training_dir = '/u/ki/swmclau2/des/PearceLHC_wp_z_corrab_emulator/'
+training_file = '/u/ki/swmclau2/des/xi_cosmo_trainer/PearceRedMagicXiCosmoFixedNd.hdf5'
 
 em_method = 'gp'
 split_method = 'random'
 
 load_fixed_params = {'z':0.0}
 
-emu = ExtraCrispy(training_dir,10, 2, split_method, method=em_method, fixed_params=load_fixed_params)
+#emu = ExtraCrispy(training_dir,10, 2, split_method, method=em_method, fixed_params=load_fixed_params)
+emu = SpicyBuffalo(training_file, method = em_method, fixed_params=load_fixed_params,
+                         custom_mean_function = 'linear', downsample_factor = 0.1)
+
+v = [ 12. ,         12. ,         12.  ,        12.   ,       12.     ,     12.,
+      11.67920429 ,  6.81656135 , 12.   ,        1.92715272 , 12.    ,       7.72884642,
+      12.,        -12.     ,      2.57697301,  12. ,          8.85016763,
+      9.96558899 ,  6.24704116 , 12.      ,    12.   ,      -12.    ,     -12. ,        -12.,
+      12.    ]
+
+if hasattr(emu, "_emulator"):
+    emu._emulator.set_parameter_vector(v)
+    emu._emulator.recompute()
+else:
+    for _emulator in emu._emulators:
+        _emulator.set_parameter_vector(v)
+        _emulator.recompute()
 
 #Remember if training data is an LHC can't load a fixed set, do that after
-fixed_params = {'f_c':1.0}#,'logM1': 13.8 }# 'z':0.0}
+fixed_params = {}#'f_c':1.0}#,'logM1': 13.8 }# 'z':0.0}
 
-cosmo_params = {'simname':'chinchilla', 'Lbox':400.0, 'scale_factors':[1.0], 'system': 'sherlock'}
+cosmo_params = {'simname':'testbox', 'boxno': 3, 'realization':0, 'scale_factors':[1.0], 'system': 'long'}
 cat = cat_dict[cosmo_params['simname']](**cosmo_params)#construct the specified catalog!
-#mbc = np.loadtxt('/nfs/slac/g/ki/ki18/des/swmclau2/AB_tests/mbc.npy')
-#cen_hod = np.loadtxt('/nfs/slac/g/ki/ki18/des/swmclau2/AB_tests/cen_hod.npy')
-#sat_hod = np.loadtxt('/nfs/slac/g/ki/ki18/des/swmclau2/AB_tests/sat_hod.npy')
 
-#cat.load_model(1.0, HOD=(HSAssembiasTabulatedCens, HSAssembiasTabulatedSats),\
-#                hod_kwargs = {'prim_haloprop_vals': mbc,
-#                              'cen_hod_vals':cen_hod,
-#                              'sat_hod_vals':sat_hod})
-#cat.load_catalog(1.0)
-cat.load(1.0, HOD='corrRedMagic')
-emulation_point = [('f_c', 0.2), ('logM0', 12.0), ('sigma_logM', 0.366), 
-                    ('alpha', 1.083),('logM1', 13.7), ('logMmin', 12.233)]
-emulation_point.extend( [('mean_occupation_centrals_assembias_param1',0.6),\
-                    ('mean_occupation_satellites_assembias_param1',-0.7)])
+cat.load(1.0, HOD='zheng07')
+
+emulation_point = [('logM0', 14.0), ('sigma_logM', 0.2), 
+                    ('alpha', 1.083),('logM1', 13.7)]#, ('logMmin', 12.233)]
 
 em_params = dict(emulation_point)
-
 em_params.update(fixed_params)
-#del em_params['z']
 
-#rp_bins =  np.logspace(-1.1,1.6,18) 
-#rp_bins.pop(1)
-#rp_bins = np.array(rp_bins)
-#rp_bins = np.loadtxt('/nfs/slac/g/ki/ki18/des/swmclau2/AB_tests/rp_bins.npy')
-rp_bins = np.loadtxt(training_dir+'a_1.00000/global_file.npy')
-rpoints = (rp_bins[1:]+rp_bins[:-1])/2.0
+def add_logMmin(hod_params, cat):
+    """
+    In the fixed number density case, find the logMmin value that will match the nd given hod_params
+    :param: hod_params:
+        The other parameters besides logMmin
+    :param cat:
+        the catalog in question
+    :return:
+        None. hod_params will have logMmin added to it.
+    """
+    hod_params['logMmin'] = 13.0 #initial guess
+    #cat.populate(hod_params) #may be overkill, but will ensure params are written everywhere
+    def func(logMmin, hod_params):
+        hod_params.update({'logMmin':logMmin})
+        return (cat.calc_analytic_nd(hod_params) - 1e-4)**2
 
-#compute the sham clustering and nd here unambiguously
-#shuffle_type = 'sh_shuffled'
-shuffle_type = ''
-mag_type = 'vpeak'
-if shuffle_type:
-    mag_key = 'halo_%s_%s_mag'%(shuffle_type, mag_type)
-else:
-    mag_key = 'halo_%s_mag'%(mag_type)
+    res = minimize_scalar(func, bounds = (12, 16), args = (hod_params,), options = {'maxiter':100})
 
+    # assuming this doens't fail
+    hod_params['logMmin'] = res.x
 
-PMASS = 591421440.0000001 #chinchilla 400/ 2048
-halo_catalog = Table.read('/u/ki/swmclau2/des/AB_tests/abmatched_halos.hdf5', format = 'hdf5')
+add_logMmin(em_params, cat)
 
-mag_cut = -21
-min_ptcl = 200
+r_bins = np.logspace(-1.1, 1.6, 19)
+rpoints = emu.scale_bin_centers 
 
-halo_catalog = halo_catalog[halo_catalog['halo_mvir'] > min_ptcl*cat.pmass] #mass cut
-galaxy_catalog = halo_catalog[ halo_catalog[mag_key] < mag_cut ] # mag cut
-
-if shuffle_type:
-    sham_pos = np.c_[galaxy_catalog['halo_%s_x'%shuffle_type],\
-                 galaxy_catalog['halo_%s_y'%shuffle_type],\
-                 galaxy_catalog['halo_%s_z'%shuffle_type]]
-else:
-    sham_pos = np.c_[galaxy_catalog['halo_x'],\
-                 galaxy_catalog['halo_y'],\
-                 galaxy_catalog['halo_z']]
-
-y = np.log10(wp(sham_pos*cat.h, rp_bins, 40.0*cat.h, period=cat.Lbox*cat.h, num_threads=1))
-obs_nd = len(galaxy_catalog)*1.0/((cat.Lbox*cat.h)**3)
-
-wp_vals = []
-nds = []
+xi_vals = []
 for i in xrange(50):
     cat.populate(em_params)
-    wp_vals.append(cat.calc_wp(rp_bins, 40))
-    nds.append(cat.calc_number_density())
+    xi_vals.append(cat.calc_xi(r_bins))
 #y = np.mean(np.log10(np.array(wp_vals)),axis = 0 )
 # TODO need a way to get a measurement cov for the shams
-cov = np.cov(np.log10(np.array(wp_vals).T))#/np.sqrt(50)
+xi_vals = np.log10(np.array(xi_vals))
+y = xi_vals.mean(axis = 0) #take one example as our xi. could also use the mean, but lets not cheat.
+cov = np.cov(xi_vals.T)#/np.sqrt(50)
+
+# get cosmo params
+del em_params['logMmin']
+cpv = cat._get_cosmo_param_names_vals()
+
+cosmo_param_dict = {key: val for key, val in zip(cpv[0], cpv[1])}
+
+em_params.update( cosmo_param_dict)
 
 #obs_nd = np.mean(np.array(nds))
-obs_nd_err = np.std(np.array(nds))
-
 param_names = [k for k in em_params.iterkeys() if k not in fixed_params]
 
-nwalkers = 200 
-nsteps = 5000
+nwalkers = 1000 
+nsteps = 10000
 nburn = 0 
 
 savedir = '/u/ki/swmclau2/des/PearceMCMC/'
-chain_fname = path.join(savedir, '%d_walkers_%d_steps_chain_vpeak_sham_corr.npy'%(nwalkers, nsteps))
+chain_fname = path.join(savedir, '%d_walkers_%d_steps_chain_cosmo_zheng_xi_3.npy'%(nwalkers, nsteps))
 
 with open(chain_fname, 'w') as f:
     f.write('#' + '\t'.join(param_names)+'\n')
 
-for pos in run_mcmc_iterator(emu, cat, param_names, y, cov, rpoints,obs_nd, obs_nd_err,'calc_analytic_nd', fixed_params = fixed_params,nwalkers = nwalkers, nsteps = nsteps, nburn = nburn):#,\
-#        resume_from_previous = path.join(savedir, '%d_walkers_%d_steps_chain_vpeak_sham_no_ab.npy'%(nwalkers, nsteps))):
+print 'starting mcmc'
+for pos in run_mcmc_iterator(emu, cat, param_names, y, cov, rpoints, fixed_params = fixed_params,nwalkers = nwalkers, nsteps = nsteps, nburn = nburn, resume_from_previous='/u/ki/swmclau2/des/PearceMCMC/1000_walkers_10000_steps_chain_cosmo_zheng_xi_2.npy'):#,\
 
         with open(chain_fname, 'a') as f:
             np.savetxt(f, pos)
