@@ -35,7 +35,7 @@ def lnprior(theta, param_names, *args):
     return 0
 
 
-def lnlike(theta, param_names, fixed_params, r_bin_centers, y, combined_inv_cov, obs_nd, obs_nd_err, nd_func_name):
+def lnlike(theta, param_names, fixed_params, r_bin_centers, y, combined_inv_cov, obs_nd= None, obs_nd_err=None, nd_func_name=None):
     """
     :param theta:
         Proposed parameters.
@@ -72,10 +72,17 @@ def lnlike(theta, param_names, fixed_params, r_bin_centers, y, combined_inv_cov,
     #print obs_nd
     #print '*'*10
 
+    if np.random.rand() > 0.999: #print a subsample of the time
+        print y_bar
+        print y
+        print '*'*30
+
     chi2 = -0.5 * np.dot(delta, np.dot(combined_inv_cov, delta))
 
-    return chi2 - 0.5 * ((obs_nd - getattr(_cat, nd_func_name)(param_dict)) / obs_nd_err) ** 2
-
+    if obs_nd is not None:
+        chi2-= 0.5 * ((obs_nd - getattr(_cat, nd_func_name)(param_dict)) / obs_nd_err) ** 2
+    
+    return chi2
 
 def lnprob(theta, *args):
     """
@@ -93,7 +100,7 @@ def lnprob(theta, *args):
 
     return lp + lnlike(theta, *args)
 
-def _run_tests(y, cov, r_bin_centers, param_names, fixed_params, ncores, nd_func_name):
+def _run_tests(y, cov, r_bin_centers, param_names, fixed_params, ncores, nd_func_name=None):
     """
     Run tests to ensure inputs are valid. Params are the same as in run_mcmc.
 
@@ -119,13 +126,13 @@ def _run_tests(y, cov, r_bin_centers, param_names, fixed_params, ncores, nd_func
     assert y.shape[0] == r_bin_centers.shape[0]
 
     # check we've defined all necessary params
-    assert _emu.emulator_ndim == len(fixed_params) + len(param_names) + 1  # for r
+    assert _emu.emulator_ndim <= len(fixed_params) + len(param_names) + 1  # for r
     tmp = param_names[:]
     assert not any([key in param_names for key in fixed_params])  # param names can't include the
     tmp.extend(fixed_params.keys())
     assert _emu.check_param_names(tmp, ignore=['r'])
 
-    assert hasattr(_cat, nd_func_name)
+    assert nd_func_name is None or hasattr(_cat, nd_func_name)
 
     return ncores
 
@@ -172,7 +179,7 @@ def _random_initial_guess(param_names, nwalkers, num_params):
 
     return pos0
 
-def run_mcmc(emu, cat, param_names, y, cov, r_bin_centers, obs_nd, obs_nd_err, nd_func_name, \
+def run_mcmc(emu, cat, param_names, y, cov, r_bin_centers, obs_nd=None, obs_nd_err=None, nd_func_name=None, \
              fixed_params={}, resume_from_previous=None, nwalkers=1000, nsteps=100, nburn=20, ncores='all'):
     """
     Run an MCMC using emcee and the emu. Includes some sanity checks and does some precomputation.
@@ -240,7 +247,7 @@ def run_mcmc(emu, cat, param_names, y, cov, r_bin_centers, obs_nd, obs_nd_err, n
 
     return chain
 
-def run_mcmc_iterator(emu, cat, param_names, y, cov, r_bin_centers, obs_nd, obs_nd_err, nd_func_name, \
+def run_mcmc_iterator(emu, cat, param_names, y, cov, r_bin_centers, obs_nd=None, obs_nd_err=None, nd_func_name=None, \
              fixed_params={}, resume_from_previous=None, nwalkers=1000, nsteps=100, nburn=20, ncores='all'):
     """
     Run an MCMC using emcee and the emu. Includes some sanity checks and does some precomputation.

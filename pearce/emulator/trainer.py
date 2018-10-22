@@ -328,7 +328,7 @@ class Trainer(object):
             hod_params.update({'logMmin':logMmin}) 
             return (cat.calc_analytic_nd(hod_params) - self._fixed_nd)**2
 
-        res = minimize_scalar(func, bounds = self._logMmin_bounds, args = (hod_params,), options = {'maxiter':100})
+        res = minimize_scalar(func, bounds = self._logMmin_bounds, args = (hod_params,), options = {'maxiter':100}, method = 'Bounded')
 
         # assuming this doens't fail
         hod_params['logMmin'] = res.x
@@ -441,6 +441,7 @@ class Trainer(object):
 
                 obs_val = np.mean(obs_repops, axis=0)
                 obs_cov = np.cov(obs_repops, rowvar=False)
+
             output[output_idx] = obs_val
             output_cov[output_idx] = obs_cov
 

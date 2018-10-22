@@ -59,7 +59,7 @@ space = [{'name': name, 'type': 'continuous', 'domain': (-12, 12)} for name in p
 
 feasible_region = GPyOpt.Design_space(space = space)
 
-max_iter  = 500 
+max_iter  = 50 
 tol = 1e-8
 
 for idx, r in enumerate(sbc):
