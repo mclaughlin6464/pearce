@@ -331,6 +331,7 @@ class Trainer(object):
         res = minimize_scalar(func, bounds = self._logMmin_bounds, args = (hod_params,), options = {'maxiter':100}, method = 'Bounded')
 
         # assuming this doens't fail
+        print 'logMmin', res.x
         hod_params['logMmin'] = res.x
 
     def _divide_tasks(self, size):

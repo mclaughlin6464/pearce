@@ -132,7 +132,7 @@ def novel_fc(x, hidden_sizes, training=False, l = (1e-6, 1e-6, 1e-6), p = (0.5, 
 
 
 # Optimizier function
-def optimizer_init_fn(learning_rate = 1e-3):
+def optimizer_init_fn(learning_rate = 1e-5):
     return tf.train.AdamOptimizer(learning_rate)#, beta1=0.9, beta2=0.999, epsilon=1e-6)
 
 
@@ -177,8 +177,7 @@ def train(model_init_fn, optimizer_init_fn,num_params, train_data, val_data, hid
         #loss = tf.reduce_mean(loss)
         
     with tf.device('/cpu:0'):
-        loss = tf.losses.mean_squared_error(labels=y,                    predictions=preds, weights = weights)#weights?
-        #loss = tf.losses.absolute_difference(labels=y, predictions=preds, weights = tf.abs(1.0/y))#weights?
+        loss = tf.losses.mean_squared_error(labels=y,                    predictions=preds, weights = weights)#weights?  #loss = tf.losses.absolute_difference(labels=y, predictions=preds, weights = tf.abs(1.0/y))#weights?
 
     with tf.device(device):
         optimizer = optimizer_init_fn()
@@ -209,11 +208,11 @@ def train(model_init_fn, optimizer_init_fn,num_params, train_data, val_data, hid
 print fixed_params
 #sizes = [100, 250, 500, 250, 100]#, 2000, 1000]#, 100]
 sizes = [500, 1000,1000,500]#,10]
-bs = 1000
+bs = 100
 l, p = 1e-5, 0.3
 print sizes
 print bs
 print l, p
 
-train(n_layer_fc, optimizer_init_fn, x_train.shape[1], (x_train, y_train, yerr_train), (x_test, y_test), sizes, num_epochs= int(1e5),           batch_size = bs, l = l, p = p, print_every = 5)
+train(n_layer_fc, optimizer_init_fn, x_train.shape[1], (x_train, y_train, yerr_train), (x_test, y_test), sizes, num_epochs= int(1e5),           batch_size = bs, l = l, p = p, print_every = 100)
 
