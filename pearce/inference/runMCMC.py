@@ -161,8 +161,8 @@ def _random_initial_guess(param_names, nwalkers, num_params):
 
     return pos0
 
-def run_mcmc(emus,  param_names, ys, covs, r_bin_centers, \
-             fixed_params={}, resume_from_previous=None, nwalkers=1000, nsteps=100, nburn=20, ncores='all'):
+def run_mcmc(emus,  param_names, ys, covs, r_bin_centers,fixed_params = {}, \
+             resume_from_previous=None, nwalkers=1000, nsteps=100, nburn=20, ncores='all', return_lnprob = False):
     """
     Run an MCMC using emcee and the emu. Includes some sanity checks and does some precomputation.
     Also optimized to be more efficient than using emcee naively with the emulator.
@@ -191,6 +191,9 @@ def run_mcmc(emus,  param_names, ys, covs, r_bin_centers, \
         Number of burn in steps, default is 20
     :param ncores:
         Number of cores. Default is 'all', which will use all cores available
+    :param return_lnprob:
+        Whether or not to return the lnprobs of the samples along with the samples. Default is False, which returns
+        just the samples.
     :return:
         chain, collaposed to the shape ((nsteps-nburn)*nwalkers, len(param_names))
     """
@@ -234,12 +237,13 @@ def run_mcmc(emus,  param_names, ys, covs, r_bin_centers, \
 
     chain = sampler.chain[:, nburn:, :].reshape((-1, num_params))
 
-    #TODO make use of the liklihood in some way too so i can do a BIC analysis
-
+    if return_lnprob:
+        lnprob_chain = sampler.lnprobability[:, nburn:].reshape((-1, )) # TODO think this will have the right shape
+        return chain, lnprob_chain
     return chain
 
-def run_mcmc_iterator(emus, param_names, ys, covs, r_bin_centers, \
-             fixed_params={}, resume_from_previous=None, nwalkers=1000, nsteps=100, nburn=20, ncores='all'):
+def run_mcmc_iterator(emus, param_names, ys, covs, r_bin_centers,fixed_params={},
+                      resume_from_previous=None, nwalkers=1000, nsteps=100, nburn=20, ncores='all', return_lnprob=False):
     """
     Run an MCMC using emcee and the emu. Includes some sanity checks and does some precomputation.
     Also optimized to be more efficient than using emcee naively with the emulator.
@@ -270,6 +274,9 @@ def run_mcmc_iterator(emus, param_names, ys, covs, r_bin_centers, \
         Number of burn in steps, default is 20
     :param ncores:
         Number of cores. Default is 'all', which will use all cores available
+    :param return_lnprob:
+        Whether to return the evaluation of lnprob on the samples along with the samples. Default is Fasle,
+        which only returns samples.
     :yield:
         chain, collaposed to the shape ((nsteps-nburn)*nwalkers, len(param_names))
     """
@@ -310,4 +317,7 @@ def run_mcmc_iterator(emus, param_names, ys, covs, r_bin_centers, \
         pos0 = _random_initial_guess(param_names, nwalkers, num_params)
 
     for result in sampler.sample(pos0, iterations=nsteps, storechain=False):
-        yield result[0]
+        if return_lnprob:
+            yield result[0], result[1]
+        else:
+            yield result[0]
