@@ -26,62 +26,42 @@ def lnprior(theta, param_names, *args):
     """
     for p, t in izip(param_names, theta):
         low, high = _emu.get_param_bounds(p)
-        #low = 0
-        #high = 17
-        #if p[:3] != 'log':
-        #    high = 1.2
+
         if np.isnan(t) or t < low or t > high:
             return -np.inf
     return 0
 
-
-def lnlike(theta, param_names, fixed_params, r_bin_centers, y, combined_inv_cov, obs_nd= None, obs_nd_err=None, nd_func_name=None):
+def lnlike(theta, param_names, fixed_params, r_bin_centers, ys, combined_inv_covs):
     """
     :param theta:
         Proposed parameters.
     :param param_names:
         The names of the parameters in theta
+    :param fixed_params:
+        Dictionary of parameters necessary to predict y_bar but are not being sampled over.
     :param r_bin_centers:
         The centers of the r bins y is measured in, angular or radial.
-    :param y:
-        The measured value of the observable to compare to the emulator.
+    :param ys:
+        The measured values of the observables to compare to the emulators. Must be an interable that contains
+        predictions of each observable.
     :param combined_inv_cov:
-        The inverse covariance matrix. Explicitly, the inverse of the sum of the mesurement covaraince matrix
-        and the matrix from the emulator. Both are independent of emulator parameters, so can be precomputed.
-    :param obs_nd
-        Observed number density
-    :param obs_nd_err
-        Uncertainty in the observed nd
-    :param nd_func
-        Function that can compute the number density given a dictionary of HOD params.
+        The inverse covariance matrices. Explicitly, the inverse of the sum of the mesurement covaraince matrix
+        and the matrix from the emulator, both for each observable. Both are independent of emulator parameters,
+         so can be precomputed. Must be an iterable with a matrixfor each observable.
     :return:
         The log liklihood of theta given the measurements and the emulator.
     """
     param_dict = dict(izip(param_names, theta))
     param_dict.update(fixed_params)
 
-    #return - 0.5 * ((obs_nd - getattr(_cat, nd_func_name)(param_dict)) / obs_nd_err) ** 2
+    chi2 = 0
+    for _emu, y , combined_inv_cov in izip(_emus, ys, combined_inv_covs):
+        y_bar = _emu.emulate_wrt_r(param_dict, r_bin_centers)[0]
 
-    y_bar = _emu.emulate_wrt_r(param_dict, r_bin_centers)[0]
-    #y_bar = np.log10(y_bar)
-    # should chi2 be calculated in log or linear?
-    # answer: the user is responsible for taking the log before it comes here.
-    delta = y_bar - y
-    #delta = np.log10(y_bar) - np.log10(y)
-    #print getattr(_cat, nd_func_name)(param_dict)
-    #print obs_nd
-    #print '*'*10
+        delta = y_bar - y
 
-    if np.random.rand() > 0.999: #print a subsample of the time
-        print y_bar
-        print y
-        print '*'*30
+        chi2 -= np.dot(delta, np.dot(combined_inv_cov, delta))
 
-    chi2 = -0.5 * np.dot(delta, np.dot(combined_inv_cov, delta))
-
-    if obs_nd is not None:
-        chi2-= 0.5 * ((obs_nd - getattr(_cat, nd_func_name)(param_dict)) / obs_nd_err) ** 2
-    
     return chi2
 
 def lnprob(theta, *args):
@@ -100,7 +80,7 @@ def lnprob(theta, *args):
 
     return lp + lnlike(theta, *args)
 
-def _run_tests(y, cov, r_bin_centers, param_names, fixed_params, ncores, nd_func_name=None):
+def _run_tests(ys, covs, r_bin_centers, param_names, fixed_params, ncores):
     """
     Run tests to ensure inputs are valid. Params are the same as in run_mcmc.
 
@@ -122,8 +102,11 @@ def _run_tests(y, cov, r_bin_centers, param_names, fixed_params, ncores, nd_func
         ncores = max_cores
         # else, we're good!
 
-    assert y.shape[0] == cov.shape[0] and cov.shape[1] == cov.shape[0]
-    assert y.shape[0] == r_bin_centers.shape[0]
+    #make sure all inputs are of consistent shape
+    for y, cov in izip(ys, covs):
+        assert y.shape[0] == cov.shape[0] and cov.shape[1] == cov.shape[0]
+        assert y.shape[0] == r_bin_centers.shape[0]
+        # TODO informative error message when the array is jsut of the wrong shape?/
 
     # check we've defined all necessary params
     assert _emu.emulator_ndim <= len(fixed_params) + len(param_names) + 1  # for r
@@ -132,10 +115,9 @@ def _run_tests(y, cov, r_bin_centers, param_names, fixed_params, ncores, nd_func
     tmp.extend(fixed_params.keys())
     assert _emu.check_param_names(tmp, ignore=['r'])
 
-    assert nd_func_name is None or hasattr(_cat, nd_func_name)
-
     return ncores
 
+# TOOD make functions that save/restore a state, not just the chains.
 def _resume_from_previous(resume_from_previous, nwalkers, num_params):
     """
     Create initial guess by loading previous chain's last position.
@@ -179,28 +161,26 @@ def _random_initial_guess(param_names, nwalkers, num_params):
 
     return pos0
 
-def run_mcmc(emu, cat, param_names, y, cov, r_bin_centers, obs_nd=None, obs_nd_err=None, nd_func_name=None, \
+def run_mcmc(emus,  param_names, ys, covs, r_bin_centers, \
              fixed_params={}, resume_from_previous=None, nwalkers=1000, nsteps=100, nburn=20, ncores='all'):
     """
     Run an MCMC using emcee and the emu. Includes some sanity checks and does some precomputation.
     Also optimized to be more efficient than using emcee naively with the emulator.
 
-    :param emu:
-        A trained instance of the Emu object
+    :param emus:
+        A trained instance of the Emu object. If there are multiple observables, should be a list. Otherwiese,
+        can be a single emu object
     :param param_names:
         Names of the parameters to constrain
-    :param y:
-        data to constrain against
-    :param cov:
-        measured covariance of y
+    :param ys:
+        data to constrain against. either one array of observables, or multiple where each new observable is a column.
+    # TODO figure out whether it should be row or column and assign appropriately
+    :param covs:
+        measured covariance of y for each y. Should have the same iteration properties as ys
     :param r_bin_centers:
-        The scale bins corresponding to y
-    :param obs_nd
-        Observed number density
-    :param obs_nd_err
-        Uncertainty in the observed nd
-    :param nd_func
-        Function that can compute the number density given a dictionary of HOD params.
+        The scale bins corresponding to all y in ys
+    :param resume_from_previous:
+        String listing filename of a previous chain to resume from. Default is None, which starts a new chain.
     :param fixed_params:
         Any values held fixed during the emulation, default is {}
     :param nwalkers:
@@ -215,18 +195,29 @@ def run_mcmc(emu, cat, param_names, y, cov, r_bin_centers, obs_nd=None, obs_nd_e
         chain, collaposed to the shape ((nsteps-nburn)*nwalkers, len(param_names))
     """
     # make emu global so it can be accessed by the liklihood functions
-    _emu = emu
-    _cat = cat
-    global _emu
-    global _cat
+    if type(emus) is not list:
+        emus = [emus]
+    _emus = emus
+    global _emus
 
-    ncores= _run_tests(y, cov, r_bin_centers,param_names, fixed_params, ncores, nd_func_name)
+    if type(ys) is list:
+        ys = np.array(ys)
+    if type(covs) is list:
+        covs = np.array(covs)
+
+    if len(ys.shape) ==1: # only one measurement
+        ys = ys.reshape((-1, 1))
+        covs = covs.reshape((-1, 1))
+
+    ncores= _run_tests(ys, covs, r_bin_centers,param_names, fixed_params, ncores)
     num_params = len(param_names)
-    combined_inv_cov = inv(_emu.ycov + cov)
+
+    combined_inv_covs = np.ones_like(covs)
+    for i, _emu, cov in enumerate(covs):
+        combined_inv_covs[i] = inv(_emu.ycov + cov)
 
     sampler = mc.EnsembleSampler(nwalkers, num_params, lnprob,
-                                 threads=ncores, args=(param_names, fixed_params, r_bin_centers, y, combined_inv_cov, \
-                                                       obs_nd, obs_nd_err, nd_func_name))
+                                 threads=ncores, args=(param_names, fixed_params, r_bin_centers, ys, combined_inv_covs))
 
     if resume_from_previous is not None:
         try:
@@ -247,7 +238,7 @@ def run_mcmc(emu, cat, param_names, y, cov, r_bin_centers, obs_nd=None, obs_nd_e
 
     return chain
 
-def run_mcmc_iterator(emu, cat, param_names, y, cov, r_bin_centers, obs_nd=None, obs_nd_err=None, nd_func_name=None, \
+def run_mcmc_iterator(emus, param_names, ys, covs, r_bin_centers, \
              fixed_params={}, resume_from_previous=None, nwalkers=1000, nsteps=100, nburn=20, ncores='all'):
     """
     Run an MCMC using emcee and the emu. Includes some sanity checks and does some precomputation.
@@ -255,22 +246,20 @@ def run_mcmc_iterator(emu, cat, param_names, y, cov, r_bin_centers, obs_nd=None,
 
     This version, as opposed to run_mcmc, "yields" each step of the chain, to write to file or to print.
 
-    :param emu:
-        A trained instance of the Emu object
+    :param emus:
+        A trained instance of the Emu object. If there are multiple observables, should be a list. Otherwiese,
+        can be a single emu object
     :param param_names:
         Names of the parameters to constrain
-    :param y:
-        data to constrain against
-    :param cov:
-        measured covariance of y
+    :param ys:
+        data to constrain against. either one array of observables, or multiple where each new observable is a column.
+    # TODO figure out whether it should be row or column and assign appropriately
+    :param covs:
+        measured covariance of y for each y. Should have the same iteration properties as ys
     :param r_bin_centers:
-        The scale bins corresponding to y
-    :param obs_nd
-        Observed number density
-    :param obs_nd_err
-        Uncertainty in the observed nd
-    :param nd_func
-        Function that can compute the number density given a dictionary of HOD params.
+        The scale bins corresponding to all y in ys
+    :param resume_from_previous:
+        String listing filename of a previous chain to resume from. Default is None, which starts a new chain.
     :param fixed_params:
         Any values held fixed during the emulation, default is {}
     :param nwalkers:
@@ -285,21 +274,30 @@ def run_mcmc_iterator(emu, cat, param_names, y, cov, r_bin_centers, obs_nd=None,
         chain, collaposed to the shape ((nsteps-nburn)*nwalkers, len(param_names))
     """
 
-    _emu = emu
-    _cat = cat
-    global _emu
-    global _cat
+    if type(emus) is not list:
+        emus = [emus]
 
-    ncores = _run_tests(y, cov, r_bin_centers, param_names, fixed_params, ncores, nd_func_name)
+    _emu = emus
+    global _emu
+
+    if type(ys) is list:
+        ys = np.array(ys)
+    if type(covs) is list:
+        covs = np.array(covs)
+
+    if len(ys.shape) ==1: # only one measurement
+        ys = ys.reshape((-1, 1))
+        covs = covs.reshape((-1, 1))
+
+    ncores = _run_tests(ys, covs, r_bin_centers, param_names, fixed_params, ncores)
     num_params = len(param_names)
 
-    combined_inv_cov = inv(_emu.ycov + cov)
-
-    #combined_inv_cov = inv(cov)
+    combined_inv_covs = np.ones_like(covs)
+    for i, _emu, cov in enumerate(covs):
+        combined_inv_covs[i] = inv(_emu.ycov + cov)
 
     sampler = mc.EnsembleSampler(nwalkers, num_params, lnprob,
-                                 threads=ncores, args=(param_names, fixed_params, r_bin_centers, y, combined_inv_cov, \
-                                                       obs_nd, obs_nd_err, nd_func_name))
+                                 threads=ncores, args=(param_names, fixed_params, r_bin_centers, ys, combined_inv_covs))
 
     if resume_from_previous is not None:
         try:
