@@ -5,7 +5,8 @@ import numpy as np
 from os import path
 import GPyOpt
 
-training_file = '/u/ki/swmclau2/des/xi_cosmo_trainer/PearceRedMagicXiCosmoFixedNd.hdf5'
+training_file = '/u/ki/swmclau2/des/PearceRedMagicXiCosmoFixedNd.hdf5'
+#training_file = '/u/ki/swmclau2/des/xi_cosmo_trainer/PearceRedMagicXiCosmoFixedNd.hdf5'
 #training_file = '/u/ki/swmclau2/des/wt_trainer3/PearceRedMagicChinchillaWT.hdf5'
 
 
@@ -18,7 +19,8 @@ fixed_params = {'z':z, 'r': 24.06822623}
 
 em_method = 'gp'
 
-emu = OriginalRecipe(training_file, method = em_method, fixed_params=fixed_params, downsample_factor = 0.1, custom_mean_function = 'linear')
+np.random.seed(0)
+emu = OriginalRecipe(training_file, method = em_method, fixed_params=fixed_params, downsample_factor = 0.5, custom_mean_function = 'linear')
 
 #emu = ExtraCrispy(training_file, n_leaves, n_overlap, split_method='random', method = em_method, fixed_params=fixed_params,
 #                             custom_mean_function = 'linear', downsample_factor = 0.5)
@@ -56,39 +58,39 @@ param_names_2.extend(param_names)
 
 num_params = 2*(1+len(param_names)) + 1
 
-space = [{'name': name, 'type': 'continuous', 'domain': (-12, 12)} for name in param_names_2]
+space = [{'name': name, 'type': 'continuous', 'domain': (-5, 5)} for name in param_names_2]
 
 feasible_region = GPyOpt.Design_space(space = space)
 
-max_iter  = 50 
+max_iter  = 1000 
 tol = 1e-8
 
-for idx, r in enumerate(sbc):
-    print idx, r
-    fixed_params['r'] = r
+#for idx, r in enumerate(sbc):
+#    print idx, r
+#    fixed_params['r'] = r
 
-    emu = OriginalRecipe(training_file, method = em_method, fixed_params=fixed_params, downsample_factor = 0.5, custom_mean_function = 'linear')
+#    emu = OriginalRecipe(training_file, method = em_method, fixed_params=fixed_params, downsample_factor = 0.5, custom_mean_function = 'linear')
 
-    initial_design = GPyOpt.experiment_design.initial_design('random', feasible_region, 10)
-    # --- CHOOSE the objective
-    objective = GPyOpt.core.task.SingleObjective(nll)
+initial_design = GPyOpt.experiment_design.initial_design('random', feasible_region, 10)
+# --- CHOOSE the objective
+objective = GPyOpt.core.task.SingleObjective(nll)
 
-    # --- CHOOSE the model type
-    model = GPyOpt.models.GPModel(exact_feval=True,optimize_restarts=10,verbose=False)
+# --- CHOOSE the model type
+model = GPyOpt.models.GPModel(exact_feval=True,optimize_restarts=10,verbose=False)
 
-    # --- CHOOSE the acquisition optimizer
-    aquisition_optimizer = GPyOpt.optimization.AcquisitionOptimizer(feasible_region)
+# --- CHOOSE the acquisition optimizer
+aquisition_optimizer = GPyOpt.optimization.AcquisitionOptimizer(feasible_region)
 
-    # --- CHOOSE the type of acquisition
-    acquisition = GPyOpt.acquisitions.AcquisitionEI(model, feasible_region, optimizer=aquisition_optimizer)
+# --- CHOOSE the type of acquisition
+acquisition = GPyOpt.acquisitions.AcquisitionEI(model, feasible_region, optimizer=aquisition_optimizer)
 
-    # --- CHOOSE a collection method
-    evaluator = GPyOpt.core.evaluators.Sequential(acquisition)
+# --- CHOOSE a collection method
+evaluator = GPyOpt.core.evaluators.Sequential(acquisition)
 
-    bo = GPyOpt.methods.ModularBayesianOptimization(model, feasible_region, objective, acquisition, evaluator, initial_design)
+bo = GPyOpt.methods.ModularBayesianOptimization(model, feasible_region, objective, acquisition, evaluator, initial_design)
 
 
-    bo.run_optimization(max_iter = max_iter, max_time = 24*60*60, eps = tol, verbosity=False) 
+bo.run_optimization(max_iter = max_iter, max_time = 24*60*60, eps = tol, verbosity=True) 
 
-    print 'Result', bo.x_opt
+print 'Result', bo.x_opt
 

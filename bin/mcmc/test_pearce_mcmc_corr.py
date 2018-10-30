@@ -8,7 +8,7 @@ from halotools.mock_observables import wp
 import numpy as np
 from os import path
 
-training_file = '/u/ki/swmclau2/des/xi_cosmo_trainer/PearceRedMagicXiCosmoFixedNd.hdf5'
+training_file = '/u/ki/swmclau2/des/PearceRedMagicXiCosmoFixedNd.hdf5'
 
 em_method = 'gp'
 split_method = 'random'
@@ -16,6 +16,7 @@ split_method = 'random'
 load_fixed_params = {'z':0.0}
 
 #emu = ExtraCrispy(training_dir,10, 2, split_method, method=em_method, fixed_params=load_fixed_params)
+np.random.seed(0)
 emu = SpicyBuffalo(training_file, method = em_method, fixed_params=load_fixed_params,
                          custom_mean_function = 'linear', downsample_factor = 0.1)
 
@@ -74,7 +75,7 @@ r_bins = np.logspace(-1.1, 1.6, 19)
 rpoints = emu.scale_bin_centers 
 
 xi_vals = []
-for i in xrange(50):
+for i in xrange(5):
     cat.populate(em_params)
     xi_vals.append(cat.calc_xi(r_bins))
 #y = np.mean(np.log10(np.array(wp_vals)),axis = 0 )
@@ -89,31 +90,34 @@ cpv = cat._get_cosmo_param_names_vals()
 
 cosmo_param_dict = {key: val for key, val in zip(cpv[0], cpv[1])}
 
-em_params.update( cosmo_param_dict)
+fixed_params.update(em_params)
+#em_params = cosmo_param_dict
+
+#em_params.update( cosmo_param_dict)
+fixed_params.update(cosmo_param_dict)
+
+last_param = 'alpha'
+em_params = {last_param: fixed_params[last_param]}
+del fixed_params[last_param]
 
 #obs_nd = np.mean(np.array(nds))
 param_names = [k for k in em_params.iterkeys() if k not in fixed_params]
 
-nwalkers = 1000 
-nsteps = 10000
+nwalkers = 20 
+nsteps = 5000
 nburn = 0 
 
 savedir = '/u/ki/swmclau2/des/PearceMCMC/'
-chain_fname = path.join(savedir, '%d_walkers_%d_steps_chain_cosmo_zheng_xi_3.npy'%(nwalkers, nsteps))
+chain_fname = path.join(savedir, '%d_walkers_%d_steps_chain_cosmo_zheng_xi_fixed_%s.npy'%(nwalkers, nsteps, last_param))
 
 with open(chain_fname, 'w') as f:
     f.write('#' + '\t'.join(param_names)+'\n')
 
 print 'starting mcmc'
-for pos in run_mcmc_iterator(emu, cat, param_names, y, cov, rpoints, fixed_params = fixed_params,nwalkers = nwalkers, nsteps = nsteps, nburn = nburn, resume_from_previous='/u/ki/swmclau2/des/PearceMCMC/1000_walkers_10000_steps_chain_cosmo_zheng_xi_2.npy'):#,\
+for pos in run_mcmc_iterator(emu, cat, param_names, y, cov, rpoints, fixed_params = fixed_params,nwalkers = nwalkers, nsteps = nsteps, nburn = nburn, ncores = 1):#, resume_from_previous='/u/ki/swmclau2/des/PearceMCMC/1000_walkers_10000_steps_chain_cosmo_zheng_xi_2.npy'):#,\
 
         with open(chain_fname, 'a') as f:
             np.savetxt(f, pos)
 
-#np.savetxt(path.join(savedir, '%d_walkers_%d_steps_chain_shuffled_sham_3.npy'%(nwalkers, nsteps)), chain)
-#np.savetxt(path.join(savedir, '%d_walkers_%d_steps_truth_ld_errors_2.npy'%(nwalkers, nsteps)),\
-#                                np.array([em_params[p] for p in param_names]))
-#np.savetxt(path.join(savedir, '%d_walkers_%d_steps_fixed_old_errors_2.npy'%(nwalkers, nsteps)),\
-#                                np.array([fixed_params[p] for p in param_names if p in fixed_params]))
 
 
