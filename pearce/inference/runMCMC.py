@@ -31,6 +31,7 @@ def lnprior(theta, param_names, *args):
         #if p[:3] != 'log':
         #    high = 1.2
         if np.isnan(t) or t < low or t > high:
+            #print p, t, low, high
             return -np.inf
     return 0
 
@@ -72,10 +73,10 @@ def lnlike(theta, param_names, fixed_params, r_bin_centers, y, combined_inv_cov,
     #print obs_nd
     #print '*'*10
 
-    if np.random.rand() > 0.999: #print a subsample of the time
-        print y_bar
-        print y
-        print '*'*30
+    #if np.random.rand() > 0.999: #print a subsample of the time
+    #print y_bar
+    #print y
+    #print '*'*30
 
     chi2 = -0.5 * np.dot(delta, np.dot(combined_inv_cov, delta))
 

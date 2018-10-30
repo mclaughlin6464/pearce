@@ -74,7 +74,7 @@ class Emu(object):
         self._downsample_factor = downsample_factor
 
         self.load_training_data(filename, custom_mean_function)
-        self.build_emulator(hyperparams)
+        #self.build_emulator(hyperparams)
 
     ###Data Loading and Manipulation####################################################################################
     # This function is a little long, but I'm not certain there's a need to break it up
@@ -107,6 +107,7 @@ class Emu(object):
         for key in ['cosmo', 'HOD']:
             if key in fixed_params:
                 assert type(fixed_params[key]) is int
+
 
         f = h5py.File(filename, 'r')
 
@@ -274,14 +275,14 @@ class Emu(object):
             nan_idxs = y_nans#np.logical_or(y_nans ,ycov_nans ) 
             num_skipped = np.sum(nan_idxs)
 
-            x = x[~nan_idxs]#, :]
-            y = y[~nan_idxs]
+            #x = x[~nan_idxs]#, :]
+            #y = y[~nan_idxs]
             ycov_list = []
 
             for i in xrange(_ycov.shape[-1]):
                 mat = _ycov[:,:,i]
                 idxs = nan_idxs[i*mat.shape[0]: (i+1)*mat.shape[0]]
-                ycov_list.append(mat[~idxs,:][:, ~idxs])
+                ycov_list.append(mat)#[~idxs,:][:, ~idxs])
 
             ycov = ycov_list#np.dstack(ycov_list)
 
