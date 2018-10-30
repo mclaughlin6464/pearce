@@ -1,4 +1,3 @@
-import emcee as mc
 from pearce.emulator import OriginalRecipe, ExtraCrispy, SpicyBuffalo
 from pearce.mocks import cat_dict
 import numpy as np
@@ -10,7 +9,7 @@ training_file = '/u/ki/swmclau2/des/PearceRedMagicXiCosmoFixedNd.hdf5'
 #training_file = '/u/ki/swmclau2/des/wt_trainer3/PearceRedMagicChinchillaWT.hdf5'
 
 
-a = 1.0
+a = 1.0#0.81120 #1.0
 z = 1./a-1.0
 
 fixed_params = {'z':z, 'r': 24.06822623}
@@ -26,8 +25,7 @@ emu = OriginalRecipe(training_file, method = em_method, fixed_params=fixed_param
 #                             custom_mean_function = 'linear', downsample_factor = 0.5)
 
 #emu = SpicyBuffalo(training_file, method = em_method, fixed_params=fixed_params,
-#                         custom_mean_function = 'linear', downsample_factor = 0.01)
-
+#                 custom_mean_function = 'linear', downsample_factor = 0.1)
 sbc = emu.scale_bin_centers
 
 def nll(p):
@@ -35,15 +33,16 @@ def nll(p):
     # params are log(a) and log(m)
     y = getattr(emu, "downsample_y", emu.y)
 
-    #ll = 0
-    #for i, _emu in enumerate(emu._emulators):
-    #    _emu.set_parameter_vector(p[0])
-    #    ll+= _emu.lnlikelihood(y[i], quiet=False)
-    #    if not np.isfinite(ll):
-    #        break
 
-    emu._emulator.set_parameter_vector(p[0])
-    ll = emu._emulator.lnlikelihood(y, quiet = False)
+    if hasattr(emu, "_emulator"):
+        emu._emulator.set_parameter_vector(p[0])
+        ll= emu._emulator.lnlikelihood(y, quiet=False)
+    else:
+
+        ll = 0
+        for _y, _emu in zip(y, emu._emulators):
+            _emu.set_parameter_vector(p[0])
+            ll+=_emu.lnlikelihood(_y, quiet = False)
 
     # The scipy optimizer doesn't play well with infinities.
     return -ll if np.isfinite(ll) else 1e25

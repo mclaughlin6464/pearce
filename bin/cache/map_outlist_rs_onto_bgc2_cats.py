@@ -6,8 +6,8 @@ fieldnames = '#ID DescID M200b Vmax Vrms R200b Rs Np X Y Z VX VY VZ Parent_ID'.s
 missed_keys = dict()
 
 #for cosmo_idx in xrange(40):
-for cosmo_idx in xrange(40):
-    for realization_idx in xrange(1):
+for cosmo_idx in xrange(39, 40):
+    for realization_idx in xrange(4,10):
         halodir = '/home/users/swmclau2/scratch/NewTrainingBoxes/Box%03d/halos/m200b/'%cosmo_idx
         #halodir = '/home/users/swmclau2/scratch/TrainingBoxes/Box000/halos/m200b/'
         #halodir = '/home/users/swmclau2/scratch/NewTrainingBoxes/TestBox%03d-%03d/halos/m200b/'%(cosmo_idx, realization_idx)
@@ -28,8 +28,11 @@ for cosmo_idx in xrange(40):
                 reader = DictReader(filter(lambda row: row[0]!='#' or row[:3]=='#ID', oldfile), delimiter = ' ')
                 writer = DictWriter(newfile, fieldnames, delimiter = ' ')
                 writer.writeheader()
-
+                print_first = True
                 for row in reader:
+                    if print_first:
+                        print row
+                        print_first = False
                     try:
                         row['Rs'] = outlist_rs[row['#ID']]
                     except KeyError:
@@ -39,4 +42,3 @@ for cosmo_idx in xrange(40):
                     writer.writerow(row)
 
             print len(missed_keys)
-            break

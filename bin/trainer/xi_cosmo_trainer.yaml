@@ -18,5 +18,10 @@ observation:
         n_repops: 10 
         log_obs: True
 computation:
-        filename: /home/users/swmclau2/scratch/PearceRedMagicXiCosmoFixedNd.hdf5 
+        filename: /home/users/swmclau2/scratch/xi_zheng07_cosmo/PearceRedMagicXiCosmoFixedNd.hdf5 
         overwrite: True
+        queue_skipper: True
+        system: sherlock
+        n_jobs: 400
+        max_time: 6
+

@@ -424,7 +424,8 @@ class TrainingBox(Cat):
 
         cache_locs = {'ki-ls': '/u/ki/swmclau2/des/halocats/hlist_%.2f.list.%s_%02d.hdf5',
                       'sherlock': '/scratch/users/swmclau2/halocats/hlist_%.2f.list.%s_%02d.hdf5'}
-        cache_locs['long'] = cache_locs['ki-ls']
+        cache_locs['long'] = path.dirname(cache_locs['ki-ls'])
+        self.cache_loc = path.dirname(cache_locs[system])#%(a, self.simname, boxno)
         self.cache_filenames = [cache_locs[system] % (a, self.simname, boxno)
                                 for a in self.scale_factors]  # make sure we don't have redunancies.
 
@@ -529,6 +530,7 @@ class TestBox(Cat):
         cache_locs = {'ki-ls': '/u/ki/swmclau2/des/halocats/hlist_%.2f.list.%s_%02d_%d.hdf5',
                       'sherlock': '/scratch/users/swmclau2/halocats/hlist_%.2f.list.%s_%02d_%d.hdf5'}
         cache_locs['long'] = cache_locs['ki-ls']
+        self.cache_loc = path.dirname(cache_locs[system])#%(a, self.simname, boxno)
         self.cache_filenames = [cache_locs[system] % (a, self.simname, boxno, realization )
                                 for a in self.scale_factors]  # make sure we don't have redunancies.
 
