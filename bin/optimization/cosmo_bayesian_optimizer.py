@@ -61,14 +61,14 @@ space = [{'name': name, 'type': 'continuous', 'domain': (-5, 5)} for name in par
 
 feasible_region = GPyOpt.Design_space(space = space)
 
-max_iter  = 1000 
+max_iter  = 2000 
 tol = 1e-8
 
 #for idx, r in enumerate(sbc):
 #    print idx, r
 #    fixed_params['r'] = r
 
-#    emu = OriginalRecipe(training_file, method = em_method, fixed_params=fixed_params, downsample_factor = 0.5, custom_mean_function = 'linear')
+#    emu = OriginalRecipe(training_file, method = em_method, fixed_params=fixed_params, downsample_factor = 0.1, custom_mean_function = 'linear')
 
 initial_design = GPyOpt.experiment_design.initial_design('random', feasible_region, 10)
 # --- CHOOSE the objective
