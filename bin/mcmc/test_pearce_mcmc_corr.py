@@ -1,10 +1,7 @@
 from pearce.emulator import OriginalRecipe, ExtraCrispy, SpicyBuffalo
-from pearce.mocks.customHODModels import *
 from pearce.mocks import cat_dict
 from pearce.inference import run_mcmc_iterator
-from astropy.table import Table
 from scipy.optimize import minimize_scalar
-from halotools.mock_observables import wp
 import numpy as np
 from os import path
 
@@ -74,11 +71,19 @@ add_logMmin(em_params, cat)
 r_bins = np.logspace(-1.1, 1.6, 19)
 rpoints = emu.scale_bin_centers 
 
+<<<<<<< HEAD
 #xi_vals = []
 #for i in xrange(5):
 #    cat.populate(em_params)
 #    xi_vals.append(cat.calc_xi(r_bins))
 #y = np.mean(np.log10(np.array(wp_vals)),axis = 0 )
+=======
+xi_vals = []
+for i in xrange(50):
+    cat.populate(em_params)
+    xi_vals.append(cat.calc_xi(r_bins))
+
+>>>>>>> a7cf37e46f9c4880b1d6da74775f097ee441fd39
 # TODO need a way to get a measurement cov for the shams
 #xi_vals = np.log10(np.array(xi_vals))
 
@@ -104,7 +109,6 @@ last_param = 'alpha'
 em_params = {last_param: fixed_params[last_param]}
 del fixed_params[last_param]
 
-#obs_nd = np.mean(np.array(nds))
 param_names = [k for k in em_params.iterkeys() if k not in fixed_params]
 
 nwalkers = 20 
@@ -118,7 +122,12 @@ with open(chain_fname, 'w') as f:
     f.write('#' + '\t'.join(param_names)+'\n')
 
 print 'starting mcmc'
+<<<<<<< HEAD
 for pos in run_mcmc_iterator(emu, cat, param_names, y, cov, rpoints, fixed_params = fixed_params,nwalkers = nwalkers, nsteps = nsteps, nburn = nburn, ncores = 1):#, resume_from_previous='/u/ki/swmclau2/des/PearceMCMC/1000_walkers_10000_steps_chain_cosmo_zheng_xi_2.npy'):#,\
+=======
+for pos in run_mcmc_iterator(emu, cat, param_names, y, cov, rpoints, fixed_params = fixed_params,nwalkers = nwalkers,\
+                             nsteps = nsteps, nburn = nburn, resume_from_previous='/u/ki/swmclau2/des/PearceMCMC/1000_walkers_10000_steps_chain_cosmo_zheng_xi_2.npy'):#,\
+>>>>>>> a7cf37e46f9c4880b1d6da74775f097ee441fd39
 
         with open(chain_fname, 'a') as f:
             np.savetxt(f, pos)
