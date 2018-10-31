@@ -64,7 +64,7 @@ def add_logMmin(hod_params, cat):
         hod_params.update({'logMmin':logMmin})
         return (cat.calc_analytic_nd(hod_params) - 1e-4)**2
 
-    res = minimize_scalar(func, bounds = (12, 16), args = (hod_params,), options = {'maxiter':100})
+    res = minimize_scalar(func, bounds = (12, 16), args = (hod_params,), options = {'maxiter':100}, method='Bounded')
 
     # assuming this doens't fail
     hod_params['logMmin'] = res.x

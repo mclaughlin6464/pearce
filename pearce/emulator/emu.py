@@ -79,7 +79,7 @@ class Emu(object):
     ###Data Loading and Manipulation####################################################################################
     # This function is a little long, but I'm not certain there's a need to break it up
     # it's shorter than it used to be, too.
-    def get_data(self, filename, fixed_params, independent_variable, attach_params = False):
+    def get_data(self, filename, fixed_params, independent_variable, attach_params = False, skip_nans = True):
         """
         Read data in the format compatible with this object and return it.
 
@@ -219,6 +219,7 @@ class Emu(object):
                     if "HOD" in fixed_params and HOD_no != fixed_params['HOD']:
                         continue
                     #if any(np.any(np.isnan(arr)) for arr in [_obs, _cov]):
+                        #continue
                         # skip NaN points. May wanna change this behavior.
                         #pass
                         #give_warning = True
@@ -272,7 +273,11 @@ class Emu(object):
             #print 'y_nans', np.sum(y_nans)
             #ycov_nans = np.sum(np.isnan(_ycov), axis = 1).astype(bool).reshape((-1,))
             #print 'ycov_nans', np.sum(ycov_nans)
-            nan_idxs = y_nans#np.logical_or(y_nans ,ycov_nans ) 
+            if skip_nans:
+                nan_idxs = y_nans#np.logical_or(y_nans ,ycov_nans ) 
+            else:
+                nan_idxs = np.zeros_like(y_nans, dtype = bool)
+            # TODO could probably make the skipping more efficient.
             num_skipped = np.sum(nan_idxs)
 
             x = x[~nan_idxs, :]

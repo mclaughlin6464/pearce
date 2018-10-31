@@ -208,7 +208,7 @@ def train(model_init_fn, optimizer_init_fn,num_params, train_data, val_data, hid
 print fixed_params
 #sizes = [100, 250, 500, 250, 100]#, 2000, 1000]#, 100]
 sizes = [500, 1000,1000,500]#,10]
-bs = 100
+bs = 2000
 l, p = 1e-5, 0.3
 print sizes
 print bs
