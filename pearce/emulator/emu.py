@@ -6,6 +6,7 @@ from itertools import izip
 from collections import OrderedDict
 from os import path
 from time import time
+import cPickle as pickle
 from abc import ABCMeta, abstractmethod
 
 import numpy as np
@@ -23,6 +24,8 @@ from sklearn.neural_network import MLPRegressor
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.pipeline import make_pipeline
 
+DEFAULT_METRIC_PICKLE_FNAME= 'default_metrics.pkl'
+
 class Emu(object):
     '''Main Emulator base class. Cannot itself be instatiated; can only be accessed via subclasses.
        controls all loading, manipulation, and emulation of data.
@@ -35,7 +38,7 @@ class Emu(object):
             'svr': SVR, 'krr': KernelRidge, 'linear': LinearRegression, 'nn': MLPRegressor}
 
     def __init__(self, filename, method='gp', hyperparams={}, fixed_params={},\
-                        downsample_factor = 1.0, independent_variable=None, custom_mean_function = None):
+                        downsample_factor = 1.0, custom_mean_function = None):
         '''
         Initialize the Emu
         :param filename:
@@ -65,12 +68,9 @@ class Emu(object):
         #if method == 'nn':
         #    assert type(self) is SpicyBuffalo #only one to do nn
 
-        assert independent_variable in {None, 'r2'}  # no bias for now.
-
         self.method = method
 
         self.fixed_params = fixed_params
-        self.independent_variable = independent_variable
         self._downsample_factor = downsample_factor
 
         self.load_training_data(filename, custom_mean_function)
@@ -79,7 +79,7 @@ class Emu(object):
     ###Data Loading and Manipulation####################################################################################
     # This function is a little long, but I'm not certain there's a need to break it up
     # it's shorter than it used to be, too.
-    def get_data(self, filename, fixed_params, independent_variable, attach_params = False):
+    def get_data(self, filename, fixed_params, attach_params = False):
         """
         Read data in the format compatible with this object and return it.
 
@@ -91,8 +91,6 @@ class Emu(object):
             of scale (distance in Mpc, angle in degrees, etc) and redshift respectively.
             Cosmo and HOD can only be fixed to an integer number, representing the index of the cosmo/HOD to hold fixed
             across HODs/Cosmologies respectively. Multiple fixed params can be specified.
-        :param independent_variable:
-            Independant variable to emulate. Options are xi, r2xi
         :return: x, y, yerr, ycov, all numpy arrays.
                  x is (n_data_points, n_params)
                  y is (n_data_points, ), yerr is (n_data_points)
@@ -245,9 +243,9 @@ class Emu(object):
 
                         #we hve to transform the data (take a log, multiply, etc)
                         # TODO this may not work with things like r2 anymore
-                        _o, _c = self._iv_transform(independent_variable, _obs, _cov)
-                        y.append(np.array([_o[r_idx]]))
-                        ycov.append(np.array(_c[r_idx, r_idx]))
+                        # _o, _c = self._iv_transform(independent_variable, _obs, _cov)
+                        y.append(np.array([_obs[r_idx]]))
+                        ycov.append(np.array(_cov[r_idx, r_idx]))
 
                     else:
                         _params = np.zeros((scale_bin_centers.shape[0], len(params) + 1))
@@ -255,9 +253,9 @@ class Emu(object):
                         _params[:, -1] = np.log10(scale_bin_centers)
                         x.append(_params)
 
-                        _o, _c = self._iv_transform(independent_variable, _obs, _cov)
-                        y.append(_o)
-                        ycov.append(_c)
+                        #_o, _c = self._iv_transform(independent_variable, _obs, _cov)
+                        y.append(_obs)
+                        ycov.append(_cov)
 
                     num_used += 1
 
@@ -310,7 +308,7 @@ class Emu(object):
         """
 
         # make sure we attach metadata to the object
-        x, y, ycov = self.get_data(filename, self.fixed_params, self.independent_variable, attach_params=True)
+        x, y, ycov = self.get_data(filename, self.fixed_params, attach_params=True)
 
         # store the data loading args, if we wanna reload later
         # useful ofr sampling the training data
@@ -513,6 +511,7 @@ class Emu(object):
 
     def _iv_transform(self, independent_variable, obs, cov=None):
         """
+        Depreceated. # TODO remove
         Independent variable tranform. Helper function that consolidates this operation all in one place.
         :param independent_variable:
             Which iv to transform to. Current options are None (just take log) and r2.
@@ -615,90 +614,37 @@ class Emu(object):
     def _build_skl(self, hyperparams):
         pass
 
-    def _get_initial_guess(self, independent_variable):
-        """
-        Return the initial guess of the metric for the emulator, based on what the iv is. Guesses are learned from
-        previous experiments.
-        :param independent_variable:
-            Which variable to return the guesses for.
-        :return: initial_guesses, a dictionary of the guess for each parameter
-        """
-
-        # default
-        ig = {'amp': 1}
-        ig.update({pname: 0.1 for pname in self._ordered_params})
-        if self.obs == 'xi':
-            if independent_variable is None:
-                ig.update({'H0': 0.12537079874409196,
-                 'Neff': 9.682153059967076e-06,
-                  'alpha': 0.5004939102700954,
-                   'amp': 1.2829697978941474,
-                    'ln10As': 0.00031695820887261153,
-                     'logM0': 2.3482346005542763e-05,
-                      'logM1': 1.208270935044776e-05,
-                       'logMmin': 0.00028373036165162114,
-                        'ns': 4398.317466650228,
-                         'ombh2': 895166.4721378284,
-                          'omch2': 78304.65404301183,
-                           'sigma_logM': 10092.715146305698,
-                            'w0': 5.3884384426082236e-05,
-                            'r': 0.40,
-                            'z':1.0})
-            else:
-                # could have other guesses for this case, but don't have any now
-                # leave this structure in case I make more later pass
-                pass
-        # TODO  change with mean_function
-        elif self.obs == 'wp':
-            if independent_variable is None:
-                ig.update({'logMmin': 2.84216e1, 'Neff': 5.6002e10, 'amp': 3.4007e-2, 'f_c': 1.4535e1, 'logM0': 0.33952477, 'logM1': 2.17317, 'H0': 1.943e1, 'w0': 8.15016e19, 'sigma_logM': 1.678e1, 'r': 0.26096, 'omch2': 3.368e1, 'ln10As': 4.672e1, 'alpha': 2.8585e1, 'ns': 9.7638e10, 'ombh2': 5.339e-1,
-                        'z': 1.0,
-                           'mean_occupation_satellites_assembias_split1': 21.02835102,
-                           'mean_occupation_satellites_assembias_slope1': 225.64738711,
-                           'mean_occupation_satellites_assembias_param1': 89.17850468,
-                           'mean_occupation_satellites_assembias_corr1': 1.15892e3,
-                           'mean_occupation_centrals_assembias_split1': 66.97808312,
-                           'mean_occupation_centrals_assembias_slope1': 179.90950523,
-                           'mean_occupation_centrals_assembias_param1': 80.75541473,
-                           'mean_occupation_centrals_assembias_corr1': 3.9659e6})
-
-        elif self.obs == 'wt':
-            # TODO parameter name has changed, update
-            if independent_variable is None:
-                #ig.update({'logMmin': 3.84345171761, 'f_c': 1.80188170556, 'logM0':14.11665461,
-                #    'sigma_logM': 17.7239294539, 'alpha': 0.18960822912, 'r': 0.306139450843,
-                #    'logM1': 1.0554692015, 'amp': 2.52461085754, 'z': 1.0,
-                #    'mean_occupation_satellites_assembias_param1':2.45298658504,
-                #    'mean_occupation_centrals_assembias_param1':27.2832783025})
-                ig.update({"amp1":0.991516,"amp2": 0.104155, 
-                           'logMmin': 3.2496991210194732, 'f_c': 6.5225471765230409, 'logM0': 0.90031876392525889, 'logM1': 5.7115389793138123, 'r': 0.85251205183917733, 'sigma_logM': 81.17344472376017, 'alpha': 156.63415402538018,'mean_occupation_satellites_assembias_param1':2.45298658504,
-                    'mean_occupation_centrals_assembias_param1':27.2832783025})
+    def _get_default_metric(self):
 
 
-        elif self.obs == 'ds' or self.obs == 'gt':
-            if independent_variable is None:
-                #ig.update({'logMmin': 3.6176310032, 'f_c': 0.574766597478, 'logM0':45.5862423685,
-                #    'sigma_logM': 1.3220351031, 'alpha': 2.31333123015, 'r': 0.17221523,
-                #    'logM1': 2.16453187021, 'amp': 0.42810696, 'z': 1.0,
-                #    'mean_occupation_satellites_assembias_param1': 6.65437027486,
-                #    'mean_occupation_centrals_assembias_param1': 3.1539620393})
-                ig.update({"amp1" : 0.15371, "amp2" : 3.425e-2, 'logMmin': 0.034503709757514989,\
-                          'f_c': 4.0430901762813942, 'logM0': 9.3787807296144319, 
-                          'logM1': 0.15371477344245249, 'r': 234.93989162754283, 
-                          'sigma_logM': 27.693005736447112, 'alpha': 2.2594726287088052,
-                          'mean_occupation_satellites_assembias_param1': 6.65437027486,
-                          'mean_occupation_centrals_assembias_param1': 3.1539620393})
+        metric = {}
+        with open(DEFAULT_METRIC_PICKLE_FNAME, 'r') as f:
+            default_metrics = pickle.load(f)
 
+            if self.obs in default_metrics:
+               metric = default_metrics[self.obs]
 
-        else:
-            pass  # no other guesses saved yet.
+        for key in self._ordered_params:
+            if key not in metric:
+               metric[key] = 1.0
 
         # remove entries for variables that are being held fixed.
         for key in self.fixed_params.iterkeys():
-            if key in ig:
-                del ig[key]
+            if key in metric:
+                del metric[key]
 
-        return ig
+        return metric
+
+    def _save_as_default_metric(self, metric):
+        # TODO save for other obs?
+        with open(DEFAULT_METRIC_PICKLE_FNAME, 'r') as f:
+            default_metric = pickle.load(f)
+
+        default_metric[self.obs]= metric
+
+        with open(DEFAULT_METRIC_PICKLE_FNAME, 'w') as f:
+            pickle.dump(default_metric, f)
+
 
     def _make_kernel(self, hyperparams):
         """
@@ -731,7 +677,7 @@ class Emu(object):
             # TODO generalize this behavior to other kernels
 
             if 'amp' in metric:
-                if len(metric['amp']) == 2:
+                if type(metric['amp']) is not float and len(metric['amp']) == 2:
                     a1, a2 = metric['amp']
                 else:
                     a1 = a2 = metric['amp']
@@ -745,12 +691,12 @@ class Emu(object):
 
             m1, m2 = [], []
             for pname in self._ordered_params:
-                if len(metric['pname']) == 2:
-                    m1.append(metric['pname'][0])
-                    m2.append(metric['pname'][1])
+                if type(metric[pname]) is not float and  len(metric[pname]) == 2:
+                    m1.append(metric[pname][0])
+                    m2.append(metric[pname][1])
                 else:
-                    m1.append(metric['pname'])
-                    m2.append(metric['pname'])
+                    m1.append(metric[pname])
+                    m2.append(metric[pname])
 
             m1, m2 = np.array(m1), np.array(m2)
 
@@ -1006,7 +952,7 @@ class Emu(object):
 
         LHC = np.stack(points).T
 
-        ig = self._get_initial_guess(self.independent_variable)
+        ig = self._get_default_metric()
 
         likelihoods = np.zeros((LHC.shape[0],))
         t0 = time()
