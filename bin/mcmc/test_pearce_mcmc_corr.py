@@ -1,10 +1,7 @@
 from pearce.emulator import OriginalRecipe, ExtraCrispy, SpicyBuffalo
-from pearce.mocks.customHODModels import *
 from pearce.mocks import cat_dict
 from pearce.inference import run_mcmc_iterator
-from astropy.table import Table
 from scipy.optimize import minimize_scalar
-from halotools.mock_observables import wp
 import numpy as np
 from os import path
 
@@ -77,7 +74,7 @@ xi_vals = []
 for i in xrange(50):
     cat.populate(em_params)
     xi_vals.append(cat.calc_xi(r_bins))
-#y = np.mean(np.log10(np.array(wp_vals)),axis = 0 )
+
 # TODO need a way to get a measurement cov for the shams
 xi_vals = np.log10(np.array(xi_vals))
 y = xi_vals.mean(axis = 0) #take one example as our xi. could also use the mean, but lets not cheat.
@@ -91,7 +88,6 @@ cosmo_param_dict = {key: val for key, val in zip(cpv[0], cpv[1])}
 
 em_params.update( cosmo_param_dict)
 
-#obs_nd = np.mean(np.array(nds))
 param_names = [k for k in em_params.iterkeys() if k not in fixed_params]
 
 nwalkers = 1000 
@@ -105,15 +101,11 @@ with open(chain_fname, 'w') as f:
     f.write('#' + '\t'.join(param_names)+'\n')
 
 print 'starting mcmc'
-for pos in run_mcmc_iterator(emu, cat, param_names, y, cov, rpoints, fixed_params = fixed_params,nwalkers = nwalkers, nsteps = nsteps, nburn = nburn, resume_from_previous='/u/ki/swmclau2/des/PearceMCMC/1000_walkers_10000_steps_chain_cosmo_zheng_xi_2.npy'):#,\
+for pos in run_mcmc_iterator(emu, cat, param_names, y, cov, rpoints, fixed_params = fixed_params,nwalkers = nwalkers,\
+                             nsteps = nsteps, nburn = nburn, resume_from_previous='/u/ki/swmclau2/des/PearceMCMC/1000_walkers_10000_steps_chain_cosmo_zheng_xi_2.npy'):#,\
 
         with open(chain_fname, 'a') as f:
             np.savetxt(f, pos)
 
-#np.savetxt(path.join(savedir, '%d_walkers_%d_steps_chain_shuffled_sham_3.npy'%(nwalkers, nsteps)), chain)
-#np.savetxt(path.join(savedir, '%d_walkers_%d_steps_truth_ld_errors_2.npy'%(nwalkers, nsteps)),\
-#                                np.array([em_params[p] for p in param_names]))
-#np.savetxt(path.join(savedir, '%d_walkers_%d_steps_fixed_old_errors_2.npy'%(nwalkers, nsteps)),\
-#                                np.array([fixed_params[p] for p in param_names if p in fixed_params]))
 
 

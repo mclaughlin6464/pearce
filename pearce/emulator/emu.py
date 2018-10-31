@@ -700,7 +700,7 @@ class Emu(object):
 
         return ig
 
-    def _make_kernel(self, metric={}):
+    def _make_kernel(self, hyperparams):
         """
         Helper method to build a george kernel for GP's and kernel-based regressions.
         :param metric:
@@ -710,32 +710,51 @@ class Emu(object):
             A george ExpSquredKernel object with this metric
         """
 
-        if not metric:
-            ig = self._get_initial_guess(self.independent_variable)
+        # I'm gonna try having the user build a kernel and pass it in, else defaults passed to default kenrel
+        # lots of ways to take this but i'm just not feeling most of them
+        if 'kernel' in hyperparams:
+            return hyperparams['kernel'] # TODO keep values set here, or overwrite with our defaults?
+        #elif 'kernel_name' in hyperparams:
+            # TODO implement this with a dict
         else:
-            ig = metric  # use the user's initial guesses
+            metric = hyperparams['metric'] if 'metric' in hyperparams else {}
 
-        if 'amp1' in ig:
-            a1, a2 = ig['amp1'], ig['amp2']    
-        else:
-            a1 = a2 = ig['amp']
-        metric = []
-        for pname in self._ordered_params:
-            try:
-                metric.append(ig[pname])
-            except KeyError:
-                raise KeyError('Key %s was not in the metric.' % pname)
-                #metric.append(1.0)
+            default = self._get_default_metric()
 
-        metric = np.array(metric)
+            default.update(metric) # overwrite elements in the default with the passed in metric
 
+            metric = default
 
-        # TODO other kernels?
-        return a2 * ExpSquaredKernel(metric, ndim=self.emulator_ndim)+a2*Matern32Kernel(metric, ndim=self.emulator_ndim)+a1
-        #return a * ExpSquaredKernel(metric[1:], ndim=self.emulator_ndim)*Matern32Kernel(metric[1:], ndim=self.emulator_ndim)
-        #return a * Matern32Kernel(metric[1:], ndim=self.emulator_ndim) + a
-        #return a * ExpSquaredKernel(metric[1:], ndim=self.emulator_ndim) + a
-        #return a2 * Matern52Kernel(metric, ndim=self.emulator_ndim) + a1
+            assert all([pname in metric for pname in self._ordered_params])
+
+            # default kernel is two kernels added together. so we have to split the metric up
+            # TODO generalize this behavior to other kernels
+
+            if 'amp' in metric:
+                if len(metric['amp']) == 2:
+                    a1, a2 = metric['amp']
+                else:
+                    a1 = a2 = metric['amp']
+            else:
+                a1 = a2 = 1.0
+
+            if 'bias' in metric:
+                b = metric['bias']
+            else:
+                b = 0.0
+
+            m1, m2 = [], []
+            for pname in self._ordered_params:
+                if len(metric['pname']) == 2:
+                    m1.append(metric['pname'][0])
+                    m2.append(metric['pname'][1])
+                else:
+                    m1.append(metric['pname'])
+                    m2.append(metric['pname'])
+
+            m1, m2 = np.array(m1), np.array(m2)
+
+            return a1 * ExpSquaredKernel(m1, ndim=self.emulator_ndim)+a2*Matern32Kernel(m2, ndim=self.emulator_ndim)+b
 
     ###Emulation and methods that Utilize it############################################################################
     def emulate(self, em_params, gp_errs=False):
@@ -1235,8 +1254,7 @@ class OriginalRecipe(Emu):
         :return: None
         """
         # TODO could use more of the hyperparams...
-        metric = hyperparams['metric'] if 'metric' in hyperparams else {}
-        kernel = self._make_kernel(metric)
+        kernel = self._make_kernel(hyperparams)
 
         self._emulator = george.GP(kernel)
         # gp = george.GP(kernel, solver=george.HODLRSolver, nleaf=x.shape[0]+1,tol=1e-18)
