@@ -8,7 +8,7 @@ from halotools.mock_observables import wp
 import numpy as np
 from os import path
 
-training_file = '/scratch/users/swmclau2/xi_zheng07_cosmo/PearceRedMagicXiCosmoFixedNd.hdf5'
+training_file = '/u/ki/swmclau2/des/PearceRedMagicXiCosmoFixedNd.hdf5'
 
 em_method = 'gp'
 split_method = 'random'
@@ -37,7 +37,7 @@ else:
 #Remember if training data is an LHC can't load a fixed set, do that after
 fixed_params = {}#'f_c':1.0}#,'logM1': 13.8 }# 'z':0.0}
 
-cosmo_params = {'simname':'testbox', 'boxno': 3, 'realization':0, 'scale_factors':[1.0], 'system': 'sherlock'}
+cosmo_params = {'simname':'testbox', 'boxno': 3, 'realization':0, 'scale_factors':[1.0], 'system': 'long'}
 cat = cat_dict[cosmo_params['simname']](**cosmo_params)#construct the specified catalog!
 
 cat.load(1.0, HOD='zheng07')
@@ -74,21 +74,19 @@ add_logMmin(em_params, cat)
 r_bins = np.logspace(-1.1, 1.6, 19)
 rpoints = emu.scale_bin_centers 
 
-xi_vals = []
-for i in xrange(10):
-    cat.populate(em_params, min_ptcl = 100)
-    xi_vals.append(cat.calc_xi(r_bins))
+#xi_vals = []
+#for i in xrange(5):
+#    cat.populate(em_params)
+#    xi_vals.append(cat.calc_xi(r_bins))
 #y = np.mean(np.log10(np.array(wp_vals)),axis = 0 )
 # TODO need a way to get a measurement cov for the shams
-xi_vals = np.log10(np.array(xi_vals))
-y = xi_vals.mean(axis = 0) #take one example as our xi. could also use the mean, but lets not cheat.
-cov = np.cov(xi_vals.T)#/np.sqrt(50)
+#xi_vals = np.log10(np.array(xi_vals))
 
-np.savetxt("xi_gg_true.npy", y)
-np.savetxt("xi_gg_cov_true.npy", cov)
+#y = xi_vals.mean(axis = 0) #take one example as our xi. could also use the mean, but lets not cheat.
+#cov = np.cov(xi_vals.T)#/np.sqrt(50)
 
-from sys import exit
-exit(0)
+y = np.loadtxt('xi_gg_true.npy')
+cov = np.loadtxt('xi_gg_cov_true.npy')
 
 # get cosmo params
 del em_params['logMmin']
