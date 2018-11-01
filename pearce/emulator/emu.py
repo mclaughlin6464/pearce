@@ -5,6 +5,7 @@ import warnings
 from itertools import izip
 from collections import OrderedDict
 from os import path
+import sys
 from time import time
 import cPickle as pickle
 from abc import ABCMeta, abstractmethod
@@ -24,7 +25,8 @@ from sklearn.neural_network import MLPRegressor
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.pipeline import make_pipeline
 
-DEFAULT_METRIC_PICKLE_FNAME= 'default_metrics.pkl'
+DIR_PATH = path.abspath(path.dirname(__file__)) 
+DEFAULT_METRIC_PICKLE_FNAME= path.join(DIR_PATH, 'default_metrics.pkl')
 
 class Emu(object):
     '''Main Emulator base class. Cannot itself be instatiated; can only be accessed via subclasses.
@@ -671,6 +673,7 @@ class Emu(object):
 
             metric = default
 
+
             assert all([pname in metric for pname in self._ordered_params])
 
             # default kernel is two kernels added together. so we have to split the metric up
@@ -679,6 +682,7 @@ class Emu(object):
             if 'amp' in metric:
                 if type(metric['amp']) is not float and len(metric['amp']) == 2:
                     a1, a2 = metric['amp']
+                    a1, a2 = a1, a2
                 else:
                     a1 = a2 = metric['amp']
             else:
@@ -686,6 +690,8 @@ class Emu(object):
 
             if 'bias' in metric:
                 b = metric['bias']
+                if type(b) is list:
+                    b = b[0]
             else:
                 b = 0.0
 
@@ -700,7 +706,9 @@ class Emu(object):
 
             m1, m2 = np.array(m1), np.array(m2)
 
-            return a1 * ExpSquaredKernel(m1, ndim=self.emulator_ndim)+a2*Matern32Kernel(m2, ndim=self.emulator_ndim)+b
+            return ConstantKernel(b,  ndim = self.emulator_ndim) +\
+                   ConstantKernel(a1, ndim = self.emulator_ndim)*ExpSquaredKernel(np.exp(m1), ndim=self.emulator_ndim)+\
+                   ConstantKernel(a2, ndim = self.emulator_ndim)*Matern32Kernel(np.exp(m2), ndim=self.emulator_ndim)
 
     ###Emulation and methods that Utilize it############################################################################
     def emulate(self, em_params, gp_errs=False):
@@ -995,7 +1003,7 @@ class Emu(object):
         if N is not None:
             assert N > 0 and int(N) == N
 
-        x, y, _, info = self.get_data(truth_file, self.fixed_params, self.independent_variable)
+        x, y, _, info = self.get_data(truth_file, self.fixed_params)
 
         x, old_idxs  = self._whiten(x)
         #y = (y - self._y_mean)/(self._y_std + 1e-5)
@@ -1709,7 +1717,7 @@ class SpicyBuffalo(Emu):
         :return: None
         """
         # make sure we attach metadata to the object
-        x, y, ycov = self.get_data(filename, self.fixed_params, self.independent_variable, attach_params=True)
+        x, y, ycov = self.get_data(filename, self.fixed_params, attach_params=True)
 
         # store the data loading args, if we wanna reload later
         # useful ofr sampling the training data
