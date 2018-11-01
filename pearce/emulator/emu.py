@@ -357,7 +357,7 @@ class Emu(object):
                 self.ycov+=yc
         elif type(ycov) is not list:
             #TODO this bugs out for different implementatiosn
-            for yc in ycov:
+            for yc in ycov.T:
                 if yc.shape[0] != self.n_bins:
                     continue
                 elif np.any(np.isnan(yc)):
@@ -2009,7 +2009,7 @@ class SpicyBuffalo(Emu):
                     local_err = np.ones_like(local_mu)
 
             else:
-                local_mu = emulator.predict(t)
+                local_mu = emulator.predict(t_in_bin)
                 local_err = np.ones_like(local_mu)  # weight with this instead of the errors.
 
             #print 'local_mu, mfc', local_mu, mfc
