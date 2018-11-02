@@ -265,7 +265,6 @@ class Emu(object):
 
         x, y, _ycov = np.vstack(x), np.hstack(y), np.dstack(ycov)
 
-
         if np.any(np.isnan(_ycov))  or np.any(np.isnan(y)):
             y_nans = np.isnan(y)
             #print 'y_nans', np.sum(y_nans)
@@ -288,8 +287,7 @@ class Emu(object):
             warnings.warn('WARNING: NaN detected. Skipped %d points in training data.' % (num_skipped))
 
         else:
-            print 'no nans'
-            ycov = np.dstack(ycov) 
+            ycov = _ycov.T 
 
         # stack so xs have shape (n points, n params)
         # ys have shape (npoints)
@@ -336,45 +334,25 @@ class Emu(object):
         #fullcov = block_diag(*[yc[:,:,0] for yc in split_ycov])
 
         if type(ycov) is not list:
-            self.yerr = np.sqrt(np.hstack(np.diag(syc) for syc in ycov.T))
+            self.yerr = np.sqrt(np.hstack(np.diag(syc) for syc in ycov))
         else:
             self.yerr = np.sqrt(np.hstack(np.diag(np.array(syc)) for syc in ycov))
 
-
         #self.yerr = np.hstack([yerr for i in xrange(self.x.shape[0] / fullcov.shape[0])])
-
 
         #compute the average covaraince matrix
         self.ycov = np.zeros((self.n_bins, self.n_bins))
         n_right_shape = 0
-        if len(ycov) == 1 and type(ycov) is not list:
-            for yc in ycov.T:
-                if yc.shape[0] != self.n_bins:
-                    continue
-                elif np.any(np.isnan(yc)):
-                    continue
-                n_right_shape+=1
-                self.ycov+=yc
-        elif type(ycov) is not list:
-            #TODO this bugs out for different implementatiosn
-            for yc in ycov.T:
-                if yc.shape[0] != self.n_bins:
-                    continue
-                elif np.any(np.isnan(yc)):
-                    continue
 
-                n_right_shape+=1
-                self.ycov+=yc
+        #TODO this bugs out for different implementatiosn
+        for yc in ycov:
+            if yc.shape[0] != self.n_bins:
+                continue
+            elif np.any(np.isnan(yc)):
+                continue
 
-        else:
-            for yc in ycov:
-                if yc.shape[0] != self.n_bins:
-                    continue
-                elif np.any(np.isnan(yc)):
-                    continue
-
-                n_right_shape+=1
-                self.ycov+=yc
+            n_right_shape+=1
+            self.ycov+=yc
 
         self.ycov/=n_right_shape
 
@@ -705,6 +683,7 @@ class Emu(object):
                     m2.append(metric[pname])
 
             m1, m2 = np.array(m1), np.array(m2)
+
 
             return ConstantKernel(b,  ndim = self.emulator_ndim) +\
                    ConstantKernel(a1, ndim = self.emulator_ndim)*ExpSquaredKernel(np.exp(m1), ndim=self.emulator_ndim)+\
@@ -1547,7 +1526,7 @@ class ExtraCrispy(Emu):
         for _x, _yerr in izip(x, yerr):
             emulator = george.GP(kernel)
 
-            emulator.compute(_x, _yerr,**hyperparams)  # NOTE I'm using a modified version of george!
+            emulator.compute(_x, _yerr)#,**hyperparams)  # NOTE I'm using a modified version of george!
 
             self._emulators.append(emulator)
 
@@ -1745,6 +1724,7 @@ class SpicyBuffalo(Emu):
         #            continue
         #        n_right_shape+=1
         #        self.ycov+=yc
+        print len(ycov), len(ycov[0])
         for yc in ycov:
             if yc.shape[0] != self.n_bins:
                 continue
@@ -1934,7 +1914,8 @@ class SpicyBuffalo(Emu):
 
             emulator = george.GP(kernel)
 
-            emulator.compute(_x, _yerr,**hyperparams)  # NOTE I'm using a modified version of george!
+            # TODO remoinv the HPs, may be a mistake
+            emulator.compute(_x, _yerr)#,**hyperparams)  # NOTE I'm using a modified version of george!
 
             self._emulators.append(emulator)
 
