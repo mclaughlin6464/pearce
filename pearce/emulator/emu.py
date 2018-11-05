@@ -79,11 +79,7 @@ class Emu(object):
     ###Data Loading and Manipulation####################################################################################
     # This function is a little long, but I'm not certain there's a need to break it up
     # it's shorter than it used to be, too.
-<<<<<<< HEAD
-    def get_data(self, filename, fixed_params, independent_variable, attach_params = False, skip_nans = True):
-=======
     def get_data(self, filename, fixed_params, attach_params = False):
->>>>>>> a7cf37e46f9c4880b1d6da74775f097ee441fd39
         """
         Read data in the format compatible with this object and return it.
 

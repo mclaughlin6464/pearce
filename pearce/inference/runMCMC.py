@@ -59,14 +59,11 @@ def lnlike(theta, param_names, fixed_params, r_bin_centers, ys, combined_inv_cov
     for _emu, y , combined_inv_cov in izip(_emus, ys, combined_inv_covs):
         y_bar = _emu.emulate_wrt_r(param_dict, r_bin_centers)[0]
 
-<<<<<<< HEAD
     #if np.random.rand() > 0.999: #print a subsample of the time
     #print y_bar
     #print y
     #print '*'*30
-=======
         delta = y_bar - y
->>>>>>> a7cf37e46f9c4880b1d6da74775f097ee441fd39
 
         chi2 -= np.dot(delta, np.dot(combined_inv_cov, delta))
 
