@@ -294,7 +294,7 @@ class Emu(object):
 
         else:
             print 'no nans'
-            ycov = np.dstack(ycov) 
+            ycov = np.dstack(ycov).T 
 
         # stack so xs have shape (n points, n params)
         # ys have shape (npoints)
@@ -352,34 +352,13 @@ class Emu(object):
         #compute the average covaraince matrix
         self.ycov = np.zeros((self.n_bins, self.n_bins))
         n_right_shape = 0
-        if len(ycov) == 1 and type(ycov) is not list:
-            for yc in ycov.T:
-                if yc.shape[0] != self.n_bins:
-                    continue
-                elif np.any(np.isnan(yc)):
-                    continue
-                n_right_shape+=1
-                self.ycov+=yc
-        elif type(ycov) is not list:
-            #TODO this bugs out for different implementatiosn
-            for yc in ycov:
-                if yc.shape[0] != self.n_bins:
-                    continue
-                elif np.any(np.isnan(yc)):
-                    continue
-
-                n_right_shape+=1
-                self.ycov+=yc
-
-        else:
-            for yc in ycov:
-                if yc.shape[0] != self.n_bins:
-                    continue
-                elif np.any(np.isnan(yc)):
-                    continue
-
-                n_right_shape+=1
-                self.ycov+=yc
+        for yc in ycov:
+            if yc.shape[0] != self.n_bins:
+                continue
+            elif np.any(np.isnan(yc)):
+                continue
+            n_right_shape+=1
+            self.ycov+=yc
 
         self.ycov/=n_right_shape
 
@@ -1002,7 +981,7 @@ class Emu(object):
         if N is not None:
             assert N > 0 and int(N) == N
 
-        x, y, _, info = self.get_data(truth_file, self.fixed_params, self.independent_variable)
+        x, y, _, info = self.get_data(truth_file, self.fixed_params)#, self.independent_variable)
 
         x, old_idxs  = self._whiten(x)
         #y = (y - self._y_mean)/(self._y_std + 1e-5)
@@ -1716,7 +1695,7 @@ class SpicyBuffalo(Emu):
         :return: None
         """
         # make sure we attach metadata to the object
-        x, y, ycov = self.get_data(filename, self.fixed_params, self.independent_variable, attach_params=True)
+        x, y, ycov = self.get_data(filename, self.fixed_params, attach_params=True)
 
         # store the data loading args, if we wanna reload later
         # useful ofr sampling the training data
