@@ -25,7 +25,7 @@ def lnprior(theta, param_names, *args):
         Either 0 or -np.inf, depending if the params are allowed or not.
     """
     for p, t in izip(param_names, theta):
-        low, high = _emu.get_param_bounds(p)
+        low, high = _emus[0].get_param_bounds(p)
 
         if np.isnan(t) or t < low or t > high:
             return -np.inf
@@ -109,11 +109,11 @@ def _run_tests(ys, covs, r_bin_centers, param_names, fixed_params, ncores):
         # TODO informative error message when the array is jsut of the wrong shape?/
 
     # check we've defined all necessary params
-    assert _emu.emulator_ndim <= len(fixed_params) + len(param_names) + 1  # for r
+    assert all([ _emu.emulator_ndim <= len(fixed_params) + len(param_names) + 1 for _emu in _emus])  # for r
     tmp = param_names[:]
     assert not any([key in param_names for key in fixed_params])  # param names can't include the
     tmp.extend(fixed_params.keys())
-    assert _emu.check_param_names(tmp, ignore=['r'])
+    assert _emus[0].check_param_names(tmp, ignore=['r'])
 
     return ncores
 
@@ -155,7 +155,7 @@ def _random_initial_guess(param_names, nwalkers, num_params):
 
     pos0 = np.zeros((nwalkers, num_params))
     for idx, pname in enumerate(param_names):
-        low, high = _emu.get_param_bounds(pname)
+        low, high = _emus[0].get_param_bounds(pname)
         pos0[:, idx] = np.random.randn(nwalkers) * (np.abs(high - low) / 6.0) + (low + high) / 2.0
         # TODO variable with of the initial guess
 
@@ -216,7 +216,7 @@ def run_mcmc(emus,  param_names, ys, covs, r_bin_centers,fixed_params = {}, \
     num_params = len(param_names)
 
     combined_inv_covs = np.ones_like(covs)
-    for i, _emu, cov in enumerate(covs):
+    for i, (_emu, cov) in enumerate(zip(_emus, covs)):
         combined_inv_covs[i] = inv(_emu.ycov + cov)
 
     sampler = mc.EnsembleSampler(nwalkers, num_params, lnprob,
@@ -284,8 +284,8 @@ def run_mcmc_iterator(emus, param_names, ys, covs, r_bin_centers,fixed_params={}
     if type(emus) is not list:
         emus = [emus]
 
-    _emu = emus
-    global _emu
+    _emus = emus
+    global _emus
 
     if type(ys) is list:
         ys = np.array(ys)
@@ -300,8 +300,8 @@ def run_mcmc_iterator(emus, param_names, ys, covs, r_bin_centers,fixed_params={}
     num_params = len(param_names)
 
     combined_inv_covs = np.ones_like(covs)
-    for i, _emu, cov in enumerate(covs):
-        combined_inv_covs[i] = inv(_emu.ycov + cov)
+    for i, (_emu, cov) in enumerate(zip(_emus, covs)):
+        combined_inv_covs[i] = inv(cov)#inv(_emu.ycov + cov)
 
     sampler = mc.EnsembleSampler(nwalkers, num_params, lnprob,
                                  threads=ncores, args=(param_names, fixed_params, r_bin_centers, ys, combined_inv_covs))
