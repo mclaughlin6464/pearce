@@ -15,7 +15,6 @@ load_fixed_params = {'z':0.0}#, 'HOD': 0}
 
 metric = {'logM1': [5.5028042800000003, 1.64464882], 'Neff': [12.0, 7.1583221799999999], 'logM0': [10.56121261, 0.79122102000000005], 'sigma_logM': [12.0, 11.9455156], 'H0': [9.0079749899999992, 12.0], 'ln10As': [-8.8855688399999995, 3.3745027799999998], 'alpha': [0.59482347000000002, 4.0302020299999999], 'bias': [2.6860710800000001], 'omch2': [12.0, 0.25342134999999999], 'w0': [-11.18424935, 0.96977813999999996], 'amp': [-4.2960540299999996, -6.2436324499999998], 'ns': [-8.3977249399999998, 12.0], 'ombh2': [-12.0, -8.2664450499999997]}
 
-vals = [12.0 for k in metric]
 #metric = dict(zip(metric.keys(), vals))
 # TODO this metric input isnt working
 
@@ -39,7 +38,7 @@ v = [  2.68607108,  -4.29605403, -12.,          12.,         -11.18424935,
                    0.79122102,  11.9455156,    1.64464882,   4.03020203]
                                                      
 
-#v = np.ones_like(v)*12.0
+v = np.ones_like(v)*12.0
 
 if hasattr(emu, "_emulator"):
     emu._emulator.set_parameter_vector(v)
@@ -105,11 +104,15 @@ cpv = cat._get_cosmo_param_names_vals()
 
 cosmo_param_dict = {key: val for key, val in zip(cpv[0], cpv[1])}
 
-#em_params.update( cosmo_param_dict)
+em_params.update( cosmo_param_dict)
 
-fixed_params.update(em_params)
-em_params = cosmo_param_dict
+#fixed_params.update(em_params)
+#fixed_params.update(cosmo_param_dict)
+#em_params = cosmo_param_dict
 
+#last_param = 'omch2'
+#em_params = {last_param: fixed_params[last_param]}
+#del fixed_params[last_param]
 
 param_names = [k for k in em_params.iterkeys() if k not in fixed_params]
 
@@ -118,14 +121,14 @@ nsteps = 10000
 nburn = 0 
 
 savedir = '/u/ki/swmclau2/des/PearceMCMC/'
-chain_fname = path.join(savedir, '%d_walkers_%d_steps_chain_cosmo_zheng_xi_lowmsat_newhp2_fixedHOD.npy'%(nwalkers, nsteps))
+chain_fname = path.join(savedir, '%d_walkers_%d_steps_chain_cosmo_zheng_xi_lowmsat.npy'%(nwalkers, nsteps ))
 
 with open(chain_fname, 'w') as f:
     f.write('#' + '\t'.join(param_names)+'\n')
 
 print 'starting mcmc'
 for pos in run_mcmc_iterator([emu], param_names, [y], [cov], rpoints, fixed_params = fixed_params,nwalkers = nwalkers,\
-        nsteps = nsteps, nburn = nburn):
+        nsteps = nsteps, nburn = nburn, ncores = 1):#, resume_from_previous = chain_fname):
 
         with open(chain_fname, 'a') as f:
             np.savetxt(f, pos)
