@@ -6,7 +6,7 @@ import numpy as np
 from os import path
 
 #training_file = '/u/ki/swmclau2/des/xi_cosmo_trainer/PearceRedMagicXiCosmoFixedNd.hdf5'
-training_file = '/u/ki/swmclau2/des/PearceRedMagicXiCosmoFixedNdLowMsat.hdf5'
+training_file = '/scratch/users/swmclau2/xi_zheng07_cosmo_lowmsat/PearceRedMagicXiCosmoFixedNd.hdf5'
 
 em_method = 'gp'
 split_method = 'random'
@@ -51,7 +51,7 @@ else:
 #Remember if training data is an LHC can't load a fixed set, do that after
 fixed_params = {}#'f_c':1.0}#,'logM1': 13.8 }# 'z':0.0}
 
-cosmo_params = {'simname':'testbox', 'boxno': 3, 'realization':0, 'scale_factors':[1.0], 'system': 'long'}
+cosmo_params = {'simname':'testbox', 'boxno': 3, 'realization':0, 'scale_factors':[1.0], 'system': 'sherlock'}
 cat = cat_dict[cosmo_params['simname']](**cosmo_params)#construct the specified catalog!
 
 cat.load(1.0, HOD='zheng07')
@@ -116,22 +116,20 @@ em_params.update( cosmo_param_dict)
 
 param_names = [k for k in em_params.iterkeys() if k not in fixed_params]
 
-nwalkers = 500 
-nsteps = 10000
+nwalkers = 1000 
+nsteps = 50000
 nburn = 0 
 
-savedir = '/u/ki/swmclau2/des/PearceMCMC/'
-chain_fname = path.join(savedir, '%d_walkers_%d_steps_chain_cosmo_zheng_xi_lowmsat.npy'%(nwalkers, nsteps ))
+savedir = '/scratch/users/swmclau2/PearceMCMC/'
+#chain_fname = path.join(savedir, '%d_walkers_%d_steps_chain_cosmo_zheng_xi_lowmsat.npy'%(nwalkers, nsteps ))
+chain_fname = path.join(savedir, '%d_walkers_%d_steps_chain_cosmo_zheng_xi_lowmsat.npy'%(nwalkers, nsteps))
 
 with open(chain_fname, 'w') as f:
     f.write('#' + '\t'.join(param_names)+'\n')
 
 print 'starting mcmc'
 for pos in run_mcmc_iterator([emu], param_names, [y], [cov], rpoints, fixed_params = fixed_params,nwalkers = nwalkers,\
-        nsteps = nsteps, nburn = nburn, ncores = 1):#, resume_from_previous = chain_fname):
+        nsteps = nsteps, nburn = nburn):#, resume_from_previous = chain_fname):
 
         with open(chain_fname, 'a') as f:
             np.savetxt(f, pos)
-
-
-

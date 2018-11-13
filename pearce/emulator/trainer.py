@@ -83,6 +83,7 @@ class Trainer(object):
             # if there are multiple cosmos, they need to have a boxno kwarg
             # TODO need to do something similar for realizations, if they exist.
             for boxno in boxnos:
+                print cosmo_cfg
                 self.cats.append(
                     cat_dict[cosmo_cfg['simname']](boxno=boxno, **cosmo_cfg))  # construct the specified catalog!
 

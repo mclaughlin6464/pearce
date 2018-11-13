@@ -1506,12 +1506,7 @@ class ExtraCrispy(Emu):
             Key word parameters for the emulator
         :return: None
         """
-        if 'metric' in hyperparams:
-            metric = hyperparams['metric']
-            del hyperparams['metric']
-        else:
-            metric = {}
-        kernel = self._make_kernel(metric)
+        kernel = self._make_kernel(hyperparams)
 
         # now, make a list of emulators
         self._emulators = []
@@ -1724,7 +1719,6 @@ class SpicyBuffalo(Emu):
         #            continue
         #        n_right_shape+=1
         #        self.ycov+=yc
-        print len(ycov), len(ycov[0])
         for yc in ycov:
             if yc.shape[0] != self.n_bins:
                 continue
@@ -1892,12 +1886,7 @@ class SpicyBuffalo(Emu):
             Key word parameters for the emulator
         :return: None
         """
-        if 'metric' in hyperparams:
-            metric = hyperparams['metric']
-            del hyperparams['metric']
-        else:
-            metric = {}
-        kernel = self._make_kernel(metric)
+        kernel = self._make_kernel(hyperparams)
 
         # now, make a list of emulators
         self._emulators = []
