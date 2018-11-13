@@ -1079,7 +1079,13 @@ class Emu(object):
             return out 
             # return np.mean((pred_y - y) / y, axis=0)
         else:  # 'frac'
-            return np.abs(10 ** pred_y - 10 ** y) / np.abs(10 ** y)
+            out = np.abs(10**pred_y - 10**y) / np.abs(10**y)
+            if hasattr(self, 'r_idx'): #resshape
+                _out = []
+                for i in xrange(self.n_bins):
+                    _out.append(out[old_idxs[i]])
+                out = _out
+            return out 
 
     @abstractmethod
     def _emulator_lnlikelihood(self):
