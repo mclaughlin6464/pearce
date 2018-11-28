@@ -15,7 +15,7 @@ load_fixed_params = {'z':0.0}#, 'HOD': 0}
 
 emu = SpicyBuffalo(training_file, method = em_method, fixed_params=load_fixed_params, custom_mean_function = 'linear', downsample_factor = 0.1)
 
-print 'Metric': emu._emulators[0].get_parameter_vector()
+print 'Metric:', emu._emulators[0].get_parameter_vector()
 
 
 #if hasattr(emu, "_emulator"):
@@ -84,19 +84,19 @@ cosmo_param_dict = {key: val for key, val in zip(cpv[0], cpv[1])}
 
 em_params.update( cosmo_param_dict)
 
-fixed_params.update(em_params)
+#fixed_params.update(em_params)
 #fixed_params.update(cosmo_param_dict)
-em_params = cosmo_param_dict
+#em_params = cosmo_param_dict
 
 param_names = [k for k in em_params.iterkeys() if k not in fixed_params]
 
-nwalkers = 500 
-nsteps = 10000
+nwalkers = 1000 
+nsteps = 50000
 nburn = 0 
 
 savedir = '/scratch/users/swmclau2/PearceMCMC/'
 #chain_fname = path.join(savedir, '%d_walkers_%d_steps_chain_cosmo_zheng_xi_lowmsat.npy'%(nwalkers, nsteps ))
-chain_fname = path.join(savedir, '%d_walkers_%d_steps_chain_cosmo_zheng_xi_lowmsat_fixedHOD.npy'%(nwalkers, nsteps))
+chain_fname = path.join(savedir, '%d_walkers_%d_steps_chain_cosmo_zheng_xi_lowmsat.npy'%(nwalkers, nsteps))
 
 with open(chain_fname, 'w') as f:
     f.write('#' + '\t'.join(param_names)+'\n')

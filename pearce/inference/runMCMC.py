@@ -301,7 +301,7 @@ def run_mcmc_iterator(emus, param_names, ys, covs, r_bin_centers,fixed_params={}
 
     combined_inv_covs = np.ones_like(covs)
     for i, (_emu, cov) in enumerate(zip(_emus, covs)):
-        combined_inv_covs[i] = inv(_emu.ycov + cov)
+        combined_inv_covs[i] = inv(cov)#inv(_emu.ycov + cov)
 
     sampler = mc.EnsembleSampler(nwalkers, num_params, lnprob,
                                  threads=ncores, args=(param_names, fixed_params, r_bin_centers, ys, combined_inv_covs))

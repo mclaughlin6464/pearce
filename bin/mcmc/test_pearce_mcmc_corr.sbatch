@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=pearce_mcmc
-#SBATCH --time=24:00:00
+#SBATCH --time=08:00:00
 #SBATCH -p iric
 #SBATCH -o /home/users/swmclau2/Git/pearce/bin/mcmc/test_pearce_mcmc_corr.out
 #SBATCH --ntasks=16
