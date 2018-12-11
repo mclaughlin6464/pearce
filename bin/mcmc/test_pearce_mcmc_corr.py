@@ -66,15 +66,17 @@ add_logMmin(em_params, cat)
 r_bins = np.logspace(-1.1, 1.6, 19)
 rpoints = emu.scale_bin_centers 
 
-#xi_vals = []
-#for i in xrange(50):
-#    cat.populate(em_params)
-#    xi_vals.append(cat.calc_xi(r_bins))
+xi_vals = []
+for i in xrange(50):
+    cat.populate(em_params)
+    xi_vals.append(cat.calc_xi(r_bins))
 
 # TODO need a way to get a measurement cov for the shams
-#xi_vals = np.log10(np.array(xi_vals))
-y = np.loadtxt('xi_gg_true.npy') #xi_vals.mean(axis = 0) #take one example as our xi. could also use the mean, but lets not cheat.
-cov = np.loadtxt('xi_gg_cov_true.npy')#/np.sqrt(50)
+xi_vals = np.log10(np.array(xi_vals))
+y = xi_vals.mean(axis = 0)
+#y = np.loadtxt('xi_gg_true.npy') #xi_vals.mean(axis = 0) #take one example as our xi. could also use the mean, but lets not cheat.
+cov = np.cov(xi_vals, rowvar = False)
+#cov = np.loadtxt('xi_gg_cov_true.npy')#/np.sqrt(50)
 
 # get cosmo params
 del em_params['logMmin']
@@ -82,16 +84,16 @@ cpv = cat._get_cosmo_param_names_vals()
 
 cosmo_param_dict = {key: val for key, val in zip(cpv[0], cpv[1])}
 
-em_params.update( cosmo_param_dict)
+#em_params.update( cosmo_param_dict)
 
-#fixed_params.update(em_params)
+fixed_params.update(em_params)
 #fixed_params.update(cosmo_param_dict)
-#em_params = cosmo_param_dict
+em_params = cosmo_param_dict
 
 param_names = [k for k in em_params.iterkeys() if k not in fixed_params]
 
-nwalkers = 1000 
-nsteps = 50000
+nwalkers = 500 
+nsteps = 10000
 nburn = 0 
 
 savedir = '/scratch/users/swmclau2/PearceMCMC/'
