@@ -130,6 +130,12 @@ class Emu(object):
 
         scale_bins = f.attrs['scale_bins']
         scale_bin_centers = (scale_bins[1:] + scale_bins[:-1])/2.0 if scale_bins is not None else None
+
+        rmin = fixed_params['rmin'] if 'rmin' in fixed_params else 0.0
+            # instead of fixing values, just ensure values are greater than this values
+        gt_rmin = scale_bin_centers > rmin
+        scale_bin_centers = scale_bin_centers[gt_rmin]
+
         if 'r' in fixed_params:
             # this wil also fale if scb is None. but you can't fix when it's none anyway so.
             # may wanna have a friendlier error message htough.
@@ -164,7 +170,7 @@ class Emu(object):
             ordered_params['z'] = (np.min(redshift_bin_centers), np.max(redshift_bin_centers))
 
         if 'r' not in fixed_params:
-            ordered_params['r'] = (np.log10(np.min(scale_bins)), np.log10(np.max(scale_bins)))
+            ordered_params['r'] = (np.log10(np.min(scale_bin_centers)), np.log10(np.max(scale_bin_centers)))
 
         if attach_params: #attach certain parameters to the object
             self.obs = f.attrs['obs']
@@ -257,8 +263,8 @@ class Emu(object):
                         x.append(_params)
 
                         #_o, _c = self._iv_transform(independent_variable, _obs, _cov)
-                        y.append(_obs)
-                        ycov.append(_cov)
+                        y.append(_obs[gt_rmin])
+                        ycov.append(_cov[gt_rmin, :][:, gt_rmin])
 
                     num_used += 1
 
