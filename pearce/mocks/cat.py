@@ -851,7 +851,7 @@ class Cat(object):
         return self.calc_xi(rbins, n_cores, use_corrfunc, **xi_kwargs)/self.calc_xi_mm(rbins, n_cores, use_corrfunc)
 
     @observable(particles=True)
-    def calc_xi_gm(self, rbins, n_cores='all', use_corrfunc=False): #TODO add in halo? may not be worth it.
+    def calc_xi_gm(self, rbins, n_cores='all',do_jackknife = False,  use_corrfunc=False, jk_args = {}): #TODO add in halo? may not be worth it.
 
         n_cores = self._check_cores(n_cores)
 
@@ -888,10 +888,31 @@ class Cat(object):
             xi_all = convert_3d_counts_to_cf(len(x_g), len(x_m), rand_N1, rand_N2,
                                              D1D2, D1R2, D2R1, R1R2)
         else:
-            xi_all = tpcf(pos_g / self.h, rbins, sample2 = pos_m/self.h, period=self.Lbox / self.h, num_threads=n_cores,
-                          estimator='Landy-Szalay', do_auto=False)
 
+            if do_jackknife:
+                np.random.seed(int(time()))
+                if not jk_args:
+                    # TODO customize these?
+                    n_rands = 5
+                    n_sub = 5
+                else:
+                    n_rands = jk_args['n_rands']
+                    n_sub = jk_args['n_sub']
+
+                randoms = np.random.random((pos_g.shape[0] * n_rands,
+                                            3)) * self.Lbox / self.h  # Solution to NaNs: Just fuck me up with randoms
+                xi_all, xi_cov = tpcf_jackknife(pos_g / self.h, randoms, rbins,sample2 = pos_m/self.h, period=self.Lbox / self.h,
+                                                num_threads=n_cores, Nsub=n_sub, estimator='Landy-Szalay', do_auto=False)
+            else:
+                xi_all = tpcf(pos_g / self.h, rbins, period=self.Lbox / self.h, num_threads=n_cores,
+                              estimator='Landy-Szalay', do_auto=False)
+
+    # TODO 1, 2 halo terms?
+
+        if do_jackknife:
+            return xi_all, xi_cov
         return xi_all
+
 
     # TODO use Joe's code. Remember to add sensible asserts when I do.
     # TODO Jackknife? A way to do it without Joe's code?
