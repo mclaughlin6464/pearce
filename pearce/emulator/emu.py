@@ -136,6 +136,7 @@ class Emu(object):
             assert np.any(np.abs(fixed_params['r'] - scale_bin_centers) < 1e-4) # may need to include a fudge factor here
             r_idx = np.argmin(np.abs(fixed_params['r'] -  scale_bin_centers))
 
+
         # construct ordered_params
         # ordered_params is an ordered dict whose keys are the parameters in the
         # order they are in in the data. The values are their bounds in the training data
