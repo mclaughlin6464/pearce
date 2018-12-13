@@ -102,7 +102,7 @@ class Emu(object):
         assert path.isfile(filename)
         # fixed params can only fix an hod index, cosmo index, or z or r
         assert len(fixed_params) <= 4
-        assert all(key in {'cosmo', 'HOD', 'z', 'r'} for key in fixed_params)
+        assert all(key in {'cosmo', 'HOD', 'z', 'r', 'rmin'} for key in fixed_params)
 
         for key in ['cosmo', 'HOD']:
             if key in fixed_params:

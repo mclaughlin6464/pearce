@@ -901,10 +901,10 @@ class Cat(object):
 
                 randoms = np.random.random((pos_g.shape[0] * n_rands,
                                             3)) * self.Lbox / self.h  # Solution to NaNs: Just fuck me up with randoms
-                xi_all, xi_cov = tpcf_jackknife(pos_g / self.h, randoms, rbins,sample2 = pos_m/self.h, period=self.Lbox / self.h,
-                                                num_threads=n_cores, Nsub=n_sub, estimator='Landy-Szalay', do_auto=False)
+                _, xi_all,_,_, xi_cov,_ = tpcf_jackknife(pos_g / self.h, randoms, rbins,sample2 = pos_m/self.h, period=self.Lbox / self.h,
+                                                num_threads=n_cores, Nsub=n_sub, estimator='Landy-Szalay')#, do_auto=False)
             else:
-                xi_all = tpcf(pos_g / self.h, rbins, period=self.Lbox / self.h, num_threads=n_cores,
+                xi_all = tpcf(pos_g / self.h, rbins, sample2 = pos_m/self.h, period=self.Lbox / self.h, num_threads=n_cores,
                               estimator='Landy-Szalay', do_auto=False)
 
     # TODO 1, 2 halo terms?

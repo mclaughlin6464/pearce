@@ -56,8 +56,6 @@ def lnlike(theta, param_names, fixed_params, r_bin_centers, ys, combined_inv_cov
 
     chi2 = 0
     for _emu, y , combined_inv_cov in izip(_emus, ys, combined_inv_covs):
-        print param_dict
-        print r_bin_centers
         y_bar = _emu.emulate_wrt_r(param_dict, r_bin_centers)[0]
 
         y_bar = 10**y_bar
