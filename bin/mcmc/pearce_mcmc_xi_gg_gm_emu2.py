@@ -16,6 +16,7 @@ load_fixed_params['rmin'] = rmin
 
 np.random.seed(0)
 emu_gg = SpicyBuffalo(training_file_gg, method = em_method, fixed_params=load_fixed_params, custom_mean_function = 'linear', downsample_factor = 0.1)
+np.random.seed(0)
 emu_gm = SpicyBuffalo(training_file_gm, method = em_method, fixed_params=load_fixed_params, custom_mean_function = 'linear', downsample_factor = 0.1)
 
 fixed_params = {}#'f_c':1.0}#,'logM1': 13.8 }# 'z':0.0}
@@ -73,7 +74,8 @@ with open(chain_fname, 'w') as f:
 
 print 'starting mcmc'
 np.random.seed(0)
-for pos in run_mcmc_iterator([emu_gg, emu_gm], param_names, [y_gg, y_gm], [cov_gg, cov_gm], rpoints, fixed_params = fixed_params,nwalkers = nwalkers,\
+for pos in run_mcmc_iterator([emu_gg, emu_gm], param_names, [y_gg, y_gm], [cov_gg, cov_gm], rpoints,\
+                             fixed_params = fixed_params,nwalkers = nwalkers,\
         nsteps = nsteps, nburn = nburn):#, ncores = 1):#, resume_from_previous = chain_fname):
 
         with open(chain_fname, 'a') as f:
