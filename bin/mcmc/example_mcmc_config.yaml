@@ -3,13 +3,14 @@ emu:
     emu_type: 'SpicyBuffalo'
     training_file: '/scratch/users/swmclau2/xi_zheng07_cosmo_lowmsat/PearceRedMagicXiCosmoFixedNd.hdf5'
     fixed_params: {'z':0.0, 'rmin':1.0}
-    #metric: {}
-    emu_hps: {'custom_mean_function': 'lienar', 'downsample_factor': 0.1}
+    #metric: {} #put metric in hps
+    emu_hps: {'custom_mean_function': 'linear', 'downsample_factor': 0.1}
     seed: 0
 
 data:
     #true_data_fname: '' # if info is populated
     #true_cov_fname
+    #cosmo_params = {}
     sim:
       simname: 'testbox'
       sim_hps: {'boxno':0,'realization':1, 'system':'sherlock'}
@@ -32,4 +33,5 @@ chain:
     nwalkers: 500
     nsteps: 20000
     seed: 0
+    #iterator: True
     fixed_params: {} # could be str "hod" or "cosmo" as well as vals

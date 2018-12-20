@@ -2,14 +2,18 @@
 """This file hold the function run_mcmc, which  takes a trained emulator and a set of truth data and runs
     and MCMC analysis with a predefined number of steps and walkers."""
 
+from time import time
 from multiprocessing import cpu_count
 import warnings
 from itertools import izip
+from os import path
 
 import numpy as np
 import emcee as mc
 from scipy.linalg import inv
+import h5py
 
+from pearce.emulator import OriginalRecipe, ExtraCrispy, SpicyBuffalo
 
 # liklihood functions need to be defined here because the emulator will be made global
 
@@ -308,6 +312,7 @@ def run_mcmc_iterator(emus, param_names, ys, covs, r_bin_centers,fixed_params={}
     sampler = mc.EnsembleSampler(nwalkers, num_params, lnprob,
                                  threads=ncores, args=(param_names, fixed_params, r_bin_centers, ys, combined_inv_covs))
 
+    # TODO this is currently broken with the config option
     if resume_from_previous is not None:
         try:
             assert nburn == 0
@@ -323,3 +328,91 @@ def run_mcmc_iterator(emus, param_names, ys, covs, r_bin_centers,fixed_params={}
             yield result[0], result[1]
         else:
             yield result[0]
+
+def run_mcmc_config(config_fname):
+    """
+    Run an MCMC from a config file generated from intialize_mcmc.
+
+    Essentially, a re-skin of the above. However, this is the preferred
+    method for using this module, because it gurantees the state space
+    of the samples is explicitly saved with them.
+    :param config_fname:
+        An hdf5 filename prepared a la initialize_mcmc. Will have the chain added as a dataset
+    """
+
+    assert path.isfile(config_fname), "Invalid config fname for chain"
+
+    f = h5py.File(config_fname, 'r+')
+    emu_type_dict = {'OriginalRecipe':OriginalRecipe,
+                     'ExtraCrispy': ExtraCrispy,
+                     'SpicyBuffalo': SpicyBuffalo}
+    fixed_params = f.attrs['fixed_params']
+    fixed_params = {} if fixed_params is None else fixed_params
+    #metric = f.attrs['metric'] if 'metric' in f.attrs else {}
+    emu_hps = f.attrs['emu_hps']
+    emu_hps = {} if emu_hps is None else emu_hps
+
+    seed = f.attrs['seed']
+    seed = int(time()) if seed is None else seed
+
+    training_file = f.attrs['training_file']
+    emu_type = f.attrs['emu_type']
+
+    if type(training_file) is str:
+        training_file = [training_file]
+
+    if type(emu_type) is str:
+        emu_type = [emu_type]
+
+    emus = []
+
+    np.random.seed(seed)
+    for et, tf in zip(emu_type, training_file): # TODO iterate over the others?
+        emu = emu_type_dict[et](training_file = tf,
+                                 fixed_params = fixed_params,
+                                 **emu_hps)
+        emus.append(emu)
+
+    rbins = f.attrs['obs']['rbins']
+    rpoints = (rbins[1:]+rbins[:-1])/2.0
+
+    # un-stack these
+    # TODO once i have the covariance terms these will need to be propertly combined
+    ys = [d[-e.n_bins] for d, e in f['data'], emus]
+    covs = [c[-e.n_bins, :, :][:, -e.n_bins:] for c,e in f['cov'], emus]
+
+    nwalkers, nsteps = f.attrs['nwalkers'], f.attrs['nsteps']
+
+    nburn, seed, fixed_params = f.attrs['nburn'], f.attrs['seed'], f.attrs['fixed_params']
+
+    nburn = 0 if nburn is None else nburn
+    seed = int(time()) if seed is None else seed
+    fixed_params = {} if fixed_params is None else fixed_params
+
+    if fixed_params and type(fixed_params) is str:
+        assert fixed_params in {'HOD', 'cosmo'}, "Invalied fixed parameter value."
+        if fixed_params == 'HOD':
+            fixed_params = f.attrs['sim']['hod_params']
+        else:
+            assert 'cosmo_params' in f.attrs['sim'] or 'cosmo_params' in f.attrs.keys(), "Fixed cosmology requested, but the values of the cosmological\"" \
+                                                     "params were not specified. Please add them to the sim config."
+            fixed_params = f.attrs['sim']['cosmo_params']
+
+    #TODO resume from previous, will need to access the written chain
+    param_names = [pname for pname in emu.get_param_names() if pname not in fixed_params]
+
+    chain = np.zeros((nwalkers*nsteps, len(param_names)), dtype={'names':param_names,
+                                                                 'formats':['f8' for _ in param_names]})
+    chain_dset = f.create_dataset('chain', data = chain, chunks = True, compression = 'gzip')
+
+    lnprob = np.zeros((nwalkers*nsteps,))
+    lnprob_dset = f.create_dataset('lnprob', data = lnprob, chunks = True, compression = 'gzip')
+    np.random.seed(seed)
+    for step, pos in enumerate(run_mcmc_iterator(emus, param_names, ys, covs, rpoints,\
+                                                 fixed_params=fixed_params, nwalkers=nwalkers,\
+                                                 nsteps=nsteps, nburn=nburn, return_lnprob=True)):
+
+        chain_dset[step*nwalkers:(step+1)*nwalkers] = pos[0]
+        lnprob_dset[step*nwalkers:(step+1)*nwalkers] = pos[1]
+
+

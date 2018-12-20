@@ -56,7 +56,7 @@ def emu_config(f, cfg):
         assert key in cfg, "%s not in config but is required."%key
         f.attrs[key] = cfg[key]
 
-    optional_keys = ['fixed_params', 'metric', 'emu_hps', 'seed']
+    optional_keys = ['fixed_params', 'emu_hps', 'seed']
     #default_vals = [{}, {}, {}, None] #gonna None all these if empty
     # want to clafiy nothing specified
 
