@@ -917,13 +917,35 @@ class Cat(object):
                     # TODO customize these?
                     n_rands = 5
                     n_sub = 5
+                    
+                    if 'rand_scalecut' in jk_args:
+                        n_rands = [25, 5]
                 else:
                     n_rands = jk_args['n_rands']
                     n_sub = jk_args['n_sub']
 
-                randoms = np.random.random((pos_g.shape[0] * n_rands,
-                                            3)) * self.Lbox / self.h  # Solution to NaNs: Just fuck me up with randoms
-                _, xi_all,_,_, xi_cov,_ = tpcf_jackknife(pos_g / self.h, randoms, rbins,sample2 = pos_m/self.h, period=self.Lbox / self.h,
+                if 'rand_scalecut' in jk_args: # do the jk differently for different scale cuts
+                    assert hasattr(n_rands, "__iter__"), "rand_scalecut called but n_rands is not iterable."
+                    rand_scalecut = jk_args['rand_scalecut']
+                    rbins_small,rbins_large = rbins[rbins < rand_scalecut], rbins[rbins >= rand_scalecut]
+                    rbins_large.insert(0, rbins_small[-1]) # make sure the middle bin is not cut
+
+                    xis, covs = [], []
+                    for rb, nr in zip([rbins_small, rbins_large], n_rands): #
+                        randoms = np.random.random((pos_g.shape[0] * nr,
+                                                    3)) * self.Lbox / self.h  # Solution to NaNs: Just fuck me up with randoms
+                        _, xi,_, _,  cov, _ = tpcf_jackknife(pos_g / self.h, randoms, rb, sample2 = pos_m/self.h, period=self.Lbox / self.h,
+                                                    num_threads=n_cores, Nsub=n_sub, estimator='Landy-Szalay')
+                        xis.append(xi)
+                        covs.append(cov)
+
+                    xi_all = np.hstack(xis)
+                    xi_cov = block_diag(covs) # note this appraoch creates block_diag cov mat
+                else:
+
+                    randoms = np.random.random((pos_g.shape[0] * n_rands,
+                                                3)) * self.Lbox / self.h  # Solution to NaNs: Just fuck me up with randoms
+                    _, xi_all,_,_, xi_cov,_ = tpcf_jackknife(pos_g / self.h, randoms, rbins,sample2 = pos_m/self.h, period=self.Lbox / self.h,
                                                 num_threads=n_cores, Nsub=n_sub, estimator='Landy-Szalay')#, do_auto=False)
             else:
                 xi_all = tpcf(pos_g / self.h, rbins, sample2 = pos_m/self.h, period=self.Lbox / self.h, num_threads=n_cores,
