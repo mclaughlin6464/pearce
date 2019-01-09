@@ -7,6 +7,7 @@ from multiprocessing import cpu_count
 import warnings
 from itertools import izip
 from os import path
+from ast import literal_eval
 
 import numpy as np
 import emcee as mc
@@ -110,6 +111,7 @@ def _run_tests(ys, covs, r_bin_centers, param_names, fixed_params, ncores):
 
     #make sure all inputs are of consistent shape
     for y, cov in izip(ys, covs):
+        print y.shape, cov.shape
         assert y.shape[0] == cov.shape[0] and cov.shape[1] == cov.shape[0]
         assert y.shape[0] == r_bin_centers.shape[0]
         # TODO informative error message when the array is jsut of the wrong shape?/
@@ -347,10 +349,11 @@ def run_mcmc_config(config_fname):
                      'ExtraCrispy': ExtraCrispy,
                      'SpicyBuffalo': SpicyBuffalo}
     fixed_params = f.attrs['fixed_params']
-    fixed_params = {} if fixed_params is None else fixed_params
+    print 'fp', fixed_params
+    fixed_params = {} if fixed_params is None else literal_eval(fixed_params)
     #metric = f.attrs['metric'] if 'metric' in f.attrs else {}
     emu_hps = f.attrs['emu_hps']
-    emu_hps = {} if emu_hps is None else emu_hps
+    emu_hps = {} if emu_hps is None else literal_eval(emu_hps)
 
     seed = f.attrs['seed']
     seed = int(time()) if seed is None else seed
@@ -368,51 +371,73 @@ def run_mcmc_config(config_fname):
 
     np.random.seed(seed)
     for et, tf in zip(emu_type, training_file): # TODO iterate over the others?
-        emu = emu_type_dict[et](training_file = tf,
+        emu = emu_type_dict[et](tf,
                                  fixed_params = fixed_params,
                                  **emu_hps)
         emus.append(emu)
+        # TODO write hps to the file too
 
-    rbins = f.attrs['obs']['rbins']
+    assert 'obs' in f.attrs.keys(), "No obs info in config file."
+    obs_cfg = literal_eval(f.attrs['obs'])
+    rbins = np.array(obs_cfg['rbins'])
     rpoints = (rbins[1:]+rbins[:-1])/2.0
+    rpoints = rpoints[-emu.n_bins:]
 
     # un-stack these
     # TODO once i have the covariance terms these will need to be propertly combined
-    ys = [d[-e.n_bins] for d, e in f['data'], emus]
-    covs = [c[-e.n_bins, :, :][:, -e.n_bins:] for c,e in f['cov'], emus]
+
+    ys = [d[-e.n_bins:] for d, e in zip(f['data'], emus)]
+    covs = [c[-e.n_bins:, :][:, -e.n_bins:] for c,e in zip(f['cov'], emus)]
 
     nwalkers, nsteps = f.attrs['nwalkers'], f.attrs['nsteps']
 
-    nburn, seed, fixed_params = f.attrs['nburn'], f.attrs['seed'], f.attrs['fixed_params']
+    nburn, seed, fixed_params = f.attrs['nburn'], f.attrs['seed'], f.attrs['chain_fixed_params']
 
     nburn = 0 if nburn is None else nburn
     seed = int(time()) if seed is None else seed
-    fixed_params = {} if fixed_params is None else fixed_params
+    fixed_params = {} if fixed_params is None else literal_eval(fixed_params)
 
     if fixed_params and type(fixed_params) is str:
         assert fixed_params in {'HOD', 'cosmo'}, "Invalied fixed parameter value."
+        assert 'sim' in f.attrs.keys(), "No sim information in config file."
+        sim_cfg = literal_eval(f.attrs['sim'])
         if fixed_params == 'HOD':
-            fixed_params = f.attrs['sim']['hod_params']
+            fixed_params = sm_cfg['hod_params']
         else:
-            assert 'cosmo_params' in f.attrs['sim'] or 'cosmo_params' in f.attrs.keys(), "Fixed cosmology requested, but the values of the cosmological\"" \
+            assert 'cosmo_params' in sim_cfg, "Fixed cosmology requested, but the values of the cosmological\"" \
                                                      "params were not specified. Please add them to the sim config."
-            fixed_params = f.attrs['sim']['cosmo_params']
+            fixed_params = sim_cfg['cosmo_params']
 
     #TODO resume from previous, will need to access the written chain
     param_names = [pname for pname in emu.get_param_names() if pname not in fixed_params]
 
     chain = np.zeros((nwalkers*nsteps, len(param_names)), dtype={'names':param_names,
                                                                  'formats':['f8' for _ in param_names]})
-    chain_dset = f.create_dataset('chain', data = chain, chunks = True, compression = 'gzip')
+    # TODO warning? Overwrite key?
+    if 'chain' in f.keys():
+        f['chain'][:,:] = chain
+        # TODO anyway to make sure all shpaes are right?
+        chain_dset = f['chain']
+    else:
+        chain_dset = f.create_dataset('chain', data = chain, chunks = True, compression = 'gzip')
 
     lnprob = np.zeros((nwalkers*nsteps,))
-    lnprob_dset = f.create_dataset('lnprob', data = lnprob, chunks = True, compression = 'gzip')
+    if 'lnprob' in f.keys():
+        f['lnprob'][:] = lnprob 
+        # TODO anyway to make sure all shpaes are right?
+        lnprob_dset = f['lnprob']
+    else:
+        lnprob_dset = f.create_dataset('lnprob', data = lnprob, chunks = True, compression = 'gzip')
+
     np.random.seed(seed)
     for step, pos in enumerate(run_mcmc_iterator(emus, param_names, ys, covs, rpoints,\
                                                  fixed_params=fixed_params, nwalkers=nwalkers,\
-                                                 nsteps=nsteps, nburn=nburn, return_lnprob=True)):
+                                                 nsteps=nsteps, nburn=nburn, return_lnprob=True, ncores = 1)):
 
         chain_dset[step*nwalkers:(step+1)*nwalkers] = pos[0]
         lnprob_dset[step*nwalkers:(step+1)*nwalkers] = pos[1]
 
 
+if __name__ == "__main__":
+    from sys import argv
+    run_mcmc_config(argv[1])

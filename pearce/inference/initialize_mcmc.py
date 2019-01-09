@@ -29,7 +29,7 @@ def main(config_fname):
 
     filename = cfg['fname']
 
-    assert path.isfile(filename), "%s is not a valid output filename"%filename
+    #assert path.isfile(filename), "%s is not a valid output filename"%filename
     f = h5py.File(filename, 'w')
 
     emu_cfg = cfg['emu']
@@ -61,7 +61,9 @@ def emu_config(f, cfg):
     # want to clafiy nothing specified
 
     for key in optional_keys:
-        f.attrs[key] = cfg[key] if key in cfg else None
+        attr = cfg[key] if key in cfg else None
+        attr = str(attr) if type(attr) is dict else attr 
+        f.attrs[key] = attr 
 
 def data_config(f, cfg):
     """
@@ -82,7 +84,7 @@ def data_config(f, cfg):
         data, cov = _compute_data(cfg)
 
     for key in ['sim', 'obs', 'cov']:
-        f.attrs[key] = cfg[key] if key in cfg else None
+        f.attrs[key] = str(cfg[key]) if key in cfg else None
         if key not in cfg:
             warnings.warn("Not all data attributes were specified. This is not reccomended, since the chain may not be well described in the future!")
 
@@ -136,10 +138,10 @@ def _compute_data(cfg):
 
     # TODO add shams
     if sim_cfg['gal_type'] == 'HOD':
-        cat.load(sim_cfg['scale_factors'], HOD=sim_cfg['hod_name'])
+        cat.load(sim_cfg['scale_factor'], HOD=sim_cfg['hod_name'])
 
         em_params = sim_cfg['hod_params']
-        add_logMmin(em_params, cat, sim_cfg['nd'])
+        add_logMmin(em_params, cat, float(sim_cfg['nd']))
 
         # TODO logspace
         r_bins = obs_cfg['rbins']
@@ -155,7 +157,7 @@ def _compute_data(cfg):
 
         assert len(obs) == len(emu_cov_fname), "Emu cov not same length as obs!"
 
-        n_bins = r_bins.shape[0]-1
+        n_bins = len(r_bins)-1
         data = np.zeros((len(obs), n_bins))
         cov = np.zeros((len(obs), n_bins, n_bins))
 
@@ -165,7 +167,7 @@ def _compute_data(cfg):
             shot_cov = covjk = np.zeros((n_bins, n_bins))
 
             calc_observable = getattr(cat, 'calc_%s' % o)
-            if obs_cfg['mean'] or cov_cfg['shot']: #TODO add number of pop
+            if obs_cfg['mean'] or 'shot' in cov_cfg: #TODO add number of pop
                 xi_vals = []
                 for i in xrange(50):
                     cat.populate(em_params)
@@ -178,7 +180,7 @@ def _compute_data(cfg):
             if 'jackknife_hps' in cov_cfg:
                 cat.populate(em_params)
                 # TODO need to fix jackknife
-                yjk, covjk = cat.calc_observable(r_bins, do_jackknife=True, jk_args=cov_cfg['jackknife_hps'])
+                yjk, covjk = calc_observable(r_bins, do_jackknife=True, jk_args=cov_cfg['jackknife_hps'])
 
             assert path.isfile(ecf), "Invalid emu covariance specified."
             emu_cov = np.loadtxt(ecf)
@@ -240,10 +242,19 @@ def chain_config(f, cfg):
         assert key in cfg, "%s not in config but is required."%key
         f.attrs[key] = cfg[key]
 
-    optional_keys = ['nburn', 'seed', 'fixed_params']
+    optional_keys = ['nburn', 'seed']#, 'fixed_params']
     for key in optional_keys:
-        f.attrs[key] = cfg[key] if key in cfg else None
+        attr = cfg[key] if key in cfg else None
+        attr = str(attr) if type(attr) is dict else attr
+        f.attrs[key] = attr 
+
+    key = 'fixed_params'
+    attr = cfg[key] if key in cfg else None
+    attr = str(attr) if type(attr) is dict else attr
+    f.attrs['chain_fixed_params'] = attr 
+
 
 if __name__ == '__main__':
     from sys import argv
+    print argv[1]
     main(argv[1])
