@@ -7,7 +7,7 @@ from os import path
 
 fixed_params = {}#'f_c':1.0}#,'logM1': 13.8 }# 'z':0.0}
 
-boxno, realization = 6, 4
+boxno, realization = 3, 0
 cosmo_params = {'simname':'testbox', 'boxno': boxno, 'realization': realization, 'scale_factors':[1.0], 'system': 'sherlock'}
 cat = cat_dict[cosmo_params['simname']](**cosmo_params)#construct the specified catalog!
 

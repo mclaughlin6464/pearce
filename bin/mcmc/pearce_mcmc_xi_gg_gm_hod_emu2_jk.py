@@ -16,18 +16,19 @@ load_fixed_params['rmin'] = rmin
 
 np.random.seed(0)
 emu_gg = SpicyBuffalo(training_file_gg, method = em_method, fixed_params=load_fixed_params, custom_mean_function = 'linear', downsample_factor = 0.1)
+np.random.seed(0)
 emu_gm = SpicyBuffalo(training_file_gm, method = em_method, fixed_params=load_fixed_params, custom_mean_function = 'linear', downsample_factor = 0.1)
 
 fixed_params = {}#'f_c':1.0}#,'logM1': 13.8 }# 'z':0.0}
 
 # NOTE values are likely wrong, but thats ok if we're integrating HOD too 
-emulation_point = [('logM0', 14.0), ('sigma_logM', 0.2),
-                    ('alpha', 1.083),('logM1', 13.7)]#, ('logMmin', 12.233)]
+emulation_point = [('logM0', 13.5), ('sigma_logM', 0.25),
+                    ('alpha', 0.9),('logM1', 13.5)]#, ('logMmin', 12.233)]
 
 em_params = dict(emulation_point)
 em_params.update(fixed_params)
 
-boxno, realization = 0, 1
+boxno, realization = 3, 0
 
 rpoints = emu_gg.scale_bin_centers
 
