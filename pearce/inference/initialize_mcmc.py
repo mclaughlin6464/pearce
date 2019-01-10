@@ -158,8 +158,8 @@ def _compute_data(cfg):
         assert len(obs) == len(emu_cov_fname), "Emu cov not same length as obs!"
 
         n_bins = len(r_bins)-1
-        data = np.zeros((len(obs), n_bins))
-        cov = np.zeros((len(obs), n_bins, n_bins))
+        data = np.zeros((len(obs)*n_bins))
+        cov = np.zeros((len(obs)*n_bins, len(obs)*n_bins))
 
         for idx, (o, ecf) in enumerate(zip(obs, emu_cov_fname)):
             # TODO need some check that a valid configuration is specified
@@ -188,11 +188,19 @@ def _compute_data(cfg):
             if yjk is None and y_mean is None:
                 raise AssertionError("Invalid data calculation specified.")
             if obs_cfg['mean']:
-                data[idx] = y_mean
+                data[idx*n_bins:(idx+1)*n_bins] = y_mean
             else:
-                data[idx] = yjk
+                data[idx*n_bins:(idx+1)*n_bins] = yjk
 
-            cov[idx] = shot_cov+covjk+emu_cov
+            cov[idx*n_bins:(idx+1)*n_bins, idx*n_bins:(idx+1)*n_bins] = \
+                                            shot_cov+covjk+emu_cov
+
+        if 'cross_cov_fname' in cov_cfg:
+            # TODO should i be adding
+            cross_cov = np.loadtxt(cov_cfg['cross_cov_fname'])
+            assert cross_cov.shape[0] == n_bins, "Cross-cov matrix of wrong size."
+            cov[:n_bins, n_bins:] = cross_cov
+            cov[n_bins:, :n_bins] = cross_cov
 
     else:
         raise NotImplementedError("Non-HOD caclulation not supported")

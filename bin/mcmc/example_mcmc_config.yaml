@@ -26,6 +26,7 @@ data:
     cov:
       jackknife_hps: {'n_sub': 5, 'n_rands':10}
       emu_cov_fname: 'xigg_scov.npy'#, 'xigm_scov.npy']
+      #cross_cov_fname: 'xi_gg_gm_cov.npy'
       # shot as well
 chain:
     nburn: 0

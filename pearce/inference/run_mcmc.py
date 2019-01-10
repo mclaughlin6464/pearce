@@ -36,7 +36,7 @@ def lnprior(theta, param_names, *args):
             return -np.inf
     return 0
 
-def lnlike(theta, param_names, fixed_params, r_bin_centers, ys, combined_inv_covs):
+def lnlike(theta, param_names, fixed_params, r_bin_centers, y, combined_inv_cov):
     """
     :param theta:
         Proposed parameters.
@@ -59,17 +59,18 @@ def lnlike(theta, param_names, fixed_params, r_bin_centers, ys, combined_inv_cov
     param_dict = dict(izip(param_names, theta))
     param_dict.update(fixed_params)
 
-    chi2 = 0
-    for _emu, y , combined_inv_cov in izip(_emus, ys, combined_inv_covs):
+    emu_preds = []
+    for _emu, y , combined_inv_cov in izip(_emus):
         y_bar = _emu.emulate_wrt_r(param_dict, r_bin_centers)[0]
 
-        y_bar = 10**y_bar
+        emu_preds.append(10**y_bar)
+        #delta = y_bar - y
+        #chi2 -= np.dot(delta, np.dot(combined_inv_cov, delta))
 
-        delta = y_bar - y
+    emu_pred = np.hstack(emu_preds)
 
-        chi2 -= np.dot(delta, np.dot(combined_inv_cov, delta))
-
-    return chi2
+    delta = emu_pred - y
+    return - np.dot(delta, np.dot(combined_inv_cov, delta))
 
 def lnprob(theta, *args):
     """
@@ -87,7 +88,7 @@ def lnprob(theta, *args):
 
     return lp + lnlike(theta, *args)
 
-def _run_tests(ys, covs, r_bin_centers, param_names, fixed_params, ncores):
+def _run_tests(y, cov, r_bin_centers, param_names, fixed_params, ncores):
     """
     Run tests to ensure inputs are valid. Params are the same as in run_mcmc.
 
@@ -110,11 +111,9 @@ def _run_tests(ys, covs, r_bin_centers, param_names, fixed_params, ncores):
         # else, we're good!
 
     #make sure all inputs are of consistent shape
-    for y, cov in izip(ys, covs):
-        print y.shape, cov.shape
-        assert y.shape[0] == cov.shape[0] and cov.shape[1] == cov.shape[0]
-        assert y.shape[0] == r_bin_centers.shape[0]
-        # TODO informative error message when the array is jsut of the wrong shape?/
+    assert y.shape[0] == cov.shape[0] and cov.shape[1] == cov.shape[0]
+    assert y.shape[0]%r_bin_centers.shape[0] == len(_emus)
+    # TODO informative error message when the array is jsut of the wrong shape?/
 
     # check we've defined all necessary params
     assert all([ _emu.emulator_ndim <= len(fixed_params) + len(param_names) + 1 for _emu in _emus])  # for r
@@ -169,7 +168,7 @@ def _random_initial_guess(param_names, nwalkers, num_params):
 
     return pos0
 
-def run_mcmc(emus,  param_names, ys, covs, r_bin_centers,fixed_params = {}, \
+def run_mcmc(emus,  param_names, y, cov, r_bin_centers,fixed_params = {}, \
              resume_from_previous=None, nwalkers=1000, nsteps=100, nburn=20, ncores='all', return_lnprob = False):
     """
     Run an MCMC using emcee and the emu. Includes some sanity checks and does some precomputation.
@@ -211,24 +210,13 @@ def run_mcmc(emus,  param_names, ys, covs, r_bin_centers,fixed_params = {}, \
     _emus = emus
     global _emus
 
-    if type(ys) is list:
-        ys = np.array(ys)
-    if type(covs) is list:
-        covs = np.array(covs)
-
-    if len(ys.shape) ==1: # only one measurement
-        ys = ys.reshape((-1, 1))
-        covs = covs.reshape((-1, 1))
-
-    ncores= _run_tests(ys, covs, r_bin_centers,param_names, fixed_params, ncores)
+    ncores= _run_tests(y, cov, r_bin_centers,param_names, fixed_params, ncores)
     num_params = len(param_names)
 
-    combined_inv_covs = np.ones_like(covs)
-    for i, (_emu, cov) in enumerate(zip(_emus, covs)):
-        combined_inv_covs[i] = inv(_emu.ycov + cov)
+    combined_inv_cov = inv(cov)
 
     sampler = mc.EnsembleSampler(nwalkers, num_params, lnprob,
-                                 threads=ncores, args=(param_names, fixed_params, r_bin_centers, ys, combined_inv_covs))
+                                 threads=ncores, args=(param_names, fixed_params, r_bin_centers, y, combined_inv_cov))
 
     if resume_from_previous is not None:
         try:
@@ -250,7 +238,7 @@ def run_mcmc(emus,  param_names, ys, covs, r_bin_centers,fixed_params = {}, \
         return chain, lnprob_chain
     return chain
 
-def run_mcmc_iterator(emus, param_names, ys, covs, r_bin_centers,fixed_params={},
+def run_mcmc_iterator(emus, param_names, y, cov, r_bin_centers,fixed_params={},
                       resume_from_previous=None, nwalkers=1000, nsteps=100, nburn=20, ncores='all', return_lnprob=False):
     """
     Run an MCMC using emcee and the emu. Includes some sanity checks and does some precomputation.
@@ -263,11 +251,11 @@ def run_mcmc_iterator(emus, param_names, ys, covs, r_bin_centers,fixed_params={}
         can be a single emu object
     :param param_names:
         Names of the parameters to constrain
-    :param ys:
-        data to constrain against. either one array of observables, or multiple where each new observable is a column.
+    :param y:
+        data to constrain against. either one array of observables, of size (n_bins*n_obs)
     # TODO figure out whether it should be row or column and assign appropriately
-    :param covs:
-        measured covariance of y for each y. Should have the same iteration properties as ys
+    :param cov:
+        measured covariance of y for each y. Should have the same shape as y, but square
     :param r_bin_centers:
         The scale bins corresponding to all y in ys
     :param resume_from_previous:
@@ -295,24 +283,13 @@ def run_mcmc_iterator(emus, param_names, ys, covs, r_bin_centers,fixed_params={}
     _emus = emus
     global _emus
 
-    if type(ys) is list:
-        ys = np.array(ys)
-    if type(covs) is list:
-        covs = np.array(covs)
-
-    if len(ys.shape) ==1: # only one measurement
-        ys = ys.reshape((-1, 1))
-        covs = covs.reshape((-1, 1))
-
-    ncores = _run_tests(ys, covs, r_bin_centers, param_names, fixed_params, ncores)
+    ncores = _run_tests(y, cov, r_bin_centers, param_names, fixed_params, ncores)
     num_params = len(param_names)
 
-    combined_inv_covs = np.ones_like(covs)
-    for i, (_emu, cov) in enumerate(zip(_emus, covs)):
-        combined_inv_covs[i] = inv(cov)#inv(_emu.ycov + cov)
+    combined_inv_cov = inv(cov)
 
     sampler = mc.EnsembleSampler(nwalkers, num_params, lnprob,
-                                 threads=ncores, args=(param_names, fixed_params, r_bin_centers, ys, combined_inv_covs))
+                                 threads=ncores, args=(param_names, fixed_params, r_bin_centers, y, combined_inv_cov))
 
     # TODO this is currently broken with the config option
     if resume_from_previous is not None:
@@ -381,13 +358,19 @@ def run_mcmc_config(config_fname):
     obs_cfg = literal_eval(f.attrs['obs'])
     rbins = np.array(obs_cfg['rbins'])
     rpoints = (rbins[1:]+rbins[:-1])/2.0
+    orig_n_bins = len(rpoints)
     rpoints = rpoints[-emu.n_bins:]
 
     # un-stack these
     # TODO once i have the covariance terms these will need to be propertly combined
 
-    ys = [d[-e.n_bins:] for d, e in zip(f['data'], emus)]
-    covs = [c[-e.n_bins:, :][:, -e.n_bins:] for c,e in zip(f['cov'], emus)]
+    y = np.hstack([f['data'][(i+1)*orig_n_bins-emu.n_bins:(i+1)*orig_n_bins] \
+                   for i, e in enumerate(emus)])
+    # not sure if they should be flipped
+    _cov = np.hstack([f['cov'][(i+1)*orig_n_bins-emu.n_bins:(i+1)*orig_n_bins, :] for i, e in enumerate(emus)])
+    cov = np.vstack([ _cov[:, (i+1)*orig_n_bins-emu.n_bins:(i+1)*orig_n_bins] for i, e in enumerate(emus)])
+
+    #covs = [f['cov'][-e.n_bins:, :][:, -e.n_bins:] for i,e in enumerate(emus)]
 
     nwalkers, nsteps = f.attrs['nwalkers'], f.attrs['nsteps']
 
@@ -402,7 +385,7 @@ def run_mcmc_config(config_fname):
         assert 'sim' in f.attrs.keys(), "No sim information in config file."
         sim_cfg = literal_eval(f.attrs['sim'])
         if fixed_params == 'HOD':
-            fixed_params = sm_cfg['hod_params']
+            fixed_params = sim_cfg['hod_params']
         else:
             assert 'cosmo_params' in sim_cfg, "Fixed cosmology requested, but the values of the cosmological\"" \
                                                      "params were not specified. Please add them to the sim config."
@@ -419,7 +402,7 @@ def run_mcmc_config(config_fname):
         # TODO anyway to make sure all shpaes are right?
         chain_dset = f['chain']
     else:
-        chain_dset = f.create_dataset('chain', data = chain, chunks = True, compression = 'gzip')
+        chain_dset = f.create_dataset('chain', data = chain)#, chunks = True, compression = 'gzip')
 
     lnprob = np.zeros((nwalkers*nsteps,))
     if 'lnprob' in f.keys():
@@ -430,9 +413,9 @@ def run_mcmc_config(config_fname):
         lnprob_dset = f.create_dataset('lnprob', data = lnprob, chunks = True, compression = 'gzip')
 
     np.random.seed(seed)
-    for step, pos in enumerate(run_mcmc_iterator(emus, param_names, ys, covs, rpoints,\
+    for step, pos in enumerate(run_mcmc_iterator(emus, param_names, y, cov, rpoints,\
                                                  fixed_params=fixed_params, nwalkers=nwalkers,\
-                                                 nsteps=nsteps, nburn=nburn, return_lnprob=True, ncores = 1)):
+                                                 nsteps=nsteps, nburn=nburn, return_lnprob=True, ncores = 16)):
 
         chain_dset[step*nwalkers:(step+1)*nwalkers] = pos[0]
         lnprob_dset[step*nwalkers:(step+1)*nwalkers] = pos[1]
