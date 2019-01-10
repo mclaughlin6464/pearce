@@ -369,6 +369,7 @@ def run_mcmc_config(config_fname):
 
     emus = []
 
+    print 'A'
     np.random.seed(seed)
     for et, tf in zip(emu_type, training_file): # TODO iterate over the others?
         emu = emu_type_dict[et](tf,
@@ -378,6 +379,7 @@ def run_mcmc_config(config_fname):
         # TODO write hps to the file too
 
     assert 'obs' in f.attrs.keys(), "No obs info in config file."
+    print 'B'
     obs_cfg = literal_eval(f.attrs['obs'])
     rbins = np.array(obs_cfg['rbins'])
     rpoints = (rbins[1:]+rbins[:-1])/2.0
@@ -397,6 +399,7 @@ def run_mcmc_config(config_fname):
     seed = int(time()) if seed is None else seed
     fixed_params = {} if fixed_params is None else literal_eval(fixed_params)
 
+    print 'C'
     if fixed_params and type(fixed_params) is str:
         assert fixed_params in {'HOD', 'cosmo'}, "Invalied fixed parameter value."
         assert 'sim' in f.attrs.keys(), "No sim information in config file."
@@ -411,28 +414,28 @@ def run_mcmc_config(config_fname):
     #TODO resume from previous, will need to access the written chain
     param_names = [pname for pname in emu.get_param_names() if pname not in fixed_params]
 
-    chain = np.zeros((nwalkers*nsteps, len(param_names)), dtype={'names':param_names,
-                                                                 'formats':['f8' for _ in param_names]})
+    #chain = np.zeros((nwalkers*nsteps, len(param_names)), dtype={'names':param_names,
+    #                                                             'formats':['f8' for _ in param_names]})
     # TODO warning? Overwrite key?
     if 'chain' in f.keys():
-        f['chain'][:,:] = chain
+        print f.keys()
+        del f['chain']#[:,:] = chain
         # TODO anyway to make sure all shpaes are right?
-        chain_dset = f['chain']
-    else:
-        chain_dset = f.create_dataset('chain', data = chain, chunks = True, compression = 'gzip')
+        #chain_dset = f['chain']
+    print 'D'
+    chain_dset = f.create_dataset('chain', (nwalkers*nsteps, len(param_names)), chunks = True, compression = 'gzip')
 
-    lnprob = np.zeros((nwalkers*nsteps,))
+    #lnprob = np.zeros((nwalkers*nsteps,))
     if 'lnprob' in f.keys():
-        f['lnprob'][:] = lnprob 
+        del f['lnprob']#[:] = lnprob 
         # TODO anyway to make sure all shpaes are right?
-        lnprob_dset = f['lnprob']
-    else:
-        lnprob_dset = f.create_dataset('lnprob', data = lnprob, chunks = True, compression = 'gzip')
+        #lnprob_dset = f['lnprob']
+    lnprob_dset = f.create_dataset('lnprob', (nwalkers*nsteps, ) , chunks = True, compression = 'gzip')
 
     np.random.seed(seed)
     for step, pos in enumerate(run_mcmc_iterator(emus, param_names, ys, covs, rpoints,\
                                                  fixed_params=fixed_params, nwalkers=nwalkers,\
-                                                 nsteps=nsteps, nburn=nburn, return_lnprob=True, ncores = 1)):
+                                                 nsteps=nsteps, nburn=nburn, return_lnprob=True, ncores = 16)):
 
         chain_dset[step*nwalkers:(step+1)*nwalkers] = pos[0]
         lnprob_dset[step*nwalkers:(step+1)*nwalkers] = pos[1]
