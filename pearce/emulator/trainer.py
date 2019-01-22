@@ -165,7 +165,9 @@ class Trainer(object):
                 self._logMmin_bounds = None
 
             self._hod_param_names = ordered_params.keys()
-            self._hod_param_vals = self._make_LHC(ordered_params, hod_cfg['num_hods'])
+
+            seed = hod_cfg.get("seed", None)
+            self._hod_param_vals = self._make_LHC(ordered_params, hod_cfg['num_hods'], seed = seed)
 
             del hod_cfg['ordered_params']
             del hod_cfg['num_hods']
@@ -185,7 +187,7 @@ class Trainer(object):
         self._hod_kwargs = hod_cfg
         # need scale factors too, but just use them from cosmology
 
-    def _make_LHC(self, ordered_params, N):
+    def _make_LHC(self, ordered_params, N, seed = None):
         """Return a vector of points in parameter space that defines a latin hypercube.
             :param ordered_params:
                 OrderedDict that defines the ordering, name, and ranges of parameters
@@ -195,7 +197,9 @@ class Trainer(object):
             :return
                 A latin hyper cube sample in HOD space in a numpy array.
         """
-        np.random.seed(int(time()))
+        if seed is None:
+            seed = int(time())
+        np.random.seed(seed)
 
         points = []
         # by linspacing each parameter and shuffling, I ensure there is only one point in each row, in each dimension.
@@ -247,6 +251,13 @@ class Trainer(object):
 
         if 'log_obs' in obs_cfg:
             del obs_cfg['log_obs']
+
+        # seed to use for galaxy population
+        if 'seed' in obs_cfg:
+            self.pop_seed = obs_cfg['seed']
+            del obs_cfg['seed']
+        else:
+            self.pop_seed = None
 
         # This goes through the motions of getting calc observable.
         # Each cat will have to retrieve their own version though.
@@ -437,6 +448,12 @@ class Trainer(object):
             if self._fixed_nd is not None:
                 self._add_logMmin(hod_params, cat)
             #continue
+            if self.pop_seed is None:
+                seed = int(time())
+            else:
+                seed = self.pop_seed
+
+            np.random.seed(seed)
             if self._n_repops == 1:
                 cat.populate(hod_params, min_ptcl = self._min_ptcl)
                 # TODO this will fail if you don't jackknife when n_repops is 1
