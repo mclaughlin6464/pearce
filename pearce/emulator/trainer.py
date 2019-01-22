@@ -252,6 +252,7 @@ class Trainer(object):
         if 'log_obs' in obs_cfg:
             del obs_cfg['log_obs']
 
+
         # seed to use for galaxy population
         if 'seed' in obs_cfg:
             self.pop_seed = obs_cfg['seed']
