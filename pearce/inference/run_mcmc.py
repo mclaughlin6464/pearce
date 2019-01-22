@@ -60,7 +60,7 @@ def lnlike(theta, param_names, fixed_params, r_bin_centers, y, combined_inv_cov)
     param_dict.update(fixed_params)
 
     emu_preds = []
-    for _emu, y , combined_inv_cov in izip(_emus):
+    for _emu, in izip(_emus):
         y_bar = _emu.emulate_wrt_r(param_dict, r_bin_centers)[0]
 
         emu_preds.append(10**y_bar)
@@ -112,7 +112,8 @@ def _run_tests(y, cov, r_bin_centers, param_names, fixed_params, ncores):
 
     #make sure all inputs are of consistent shape
     assert y.shape[0] == cov.shape[0] and cov.shape[1] == cov.shape[0]
-    assert y.shape[0]%r_bin_centers.shape[0] == len(_emus)
+    #print y.shape[0]/r_bin_centers.shape[0] ,len(_emus) , y.shape[0]/r_bin_centers.shape[0] 
+    assert y.shape[0]/r_bin_centers.shape[0] == len(_emus) and y.shape[0]%r_bin_centers.shape[0] == 0
     # TODO informative error message when the array is jsut of the wrong shape?/
 
     # check we've defined all necessary params
@@ -326,7 +327,6 @@ def run_mcmc_config(config_fname):
                      'ExtraCrispy': ExtraCrispy,
                      'SpicyBuffalo': SpicyBuffalo}
     fixed_params = f.attrs['fixed_params']
-    print 'fp', fixed_params
     fixed_params = {} if fixed_params is None else literal_eval(fixed_params)
     #metric = f.attrs['metric'] if 'metric' in f.attrs else {}
     emu_hps = f.attrs['emu_hps']
@@ -344,9 +344,10 @@ def run_mcmc_config(config_fname):
     if type(emu_type) is str:
         emu_type = [emu_type]
 
+    assert len(emu_type) == len(training_file)
+
     emus = []
 
-    print 'A'
     np.random.seed(seed)
     for et, tf in zip(emu_type, training_file): # TODO iterate over the others?
         emu = emu_type_dict[et](tf,
@@ -356,7 +357,6 @@ def run_mcmc_config(config_fname):
         # TODO write hps to the file too
 
     assert 'obs' in f.attrs.keys(), "No obs info in config file."
-    print 'B'
     obs_cfg = literal_eval(f.attrs['obs'])
     rbins = np.array(obs_cfg['rbins'])
     rpoints = (rbins[1:]+rbins[:-1])/2.0
@@ -374,15 +374,23 @@ def run_mcmc_config(config_fname):
 
     #covs = [f['cov'][-e.n_bins:, :][:, -e.n_bins:] for i,e in enumerate(emus)]
 
+    print y.shape
+    print cov.shape
+
     nwalkers, nsteps = f.attrs['nwalkers'], f.attrs['nsteps']
 
     nburn, seed, fixed_params = f.attrs['nburn'], f.attrs['seed'], f.attrs['chain_fixed_params']
 
     nburn = 0 if nburn is None else nburn
     seed = int(time()) if seed is None else seed
-    fixed_params = {} if fixed_params is None else literal_eval(fixed_params)
+    fixed_params = {} if fixed_params is None else fixed_params
 
-    print 'C'
+    if type(fixed_params) is str:
+        try:
+            fixed_params = literal_eval(fixed_params)
+        except ValueError: #malformed string, can't be eval'd
+            pass
+
     if fixed_params and type(fixed_params) is str:
         assert fixed_params in {'HOD', 'cosmo'}, "Invalied fixed parameter value."
         assert 'sim' in f.attrs.keys(), "No sim information in config file."
@@ -394,14 +402,28 @@ def run_mcmc_config(config_fname):
                                                      "params were not specified. Please add them to the sim config."
             fixed_params = sim_cfg['cosmo_params']
 
+    elif "HOD" in fixed_params:
+        assert 'sim' in f.attrs.keys(), "No sim information in config file."
+        sim_cfg = literal_eval(f.attrs['sim'])
+        del fixed_params['HOD']
+        fixed_params.update(sim_cfg['hod_params'])
+    elif "cosmo" in fixed_params:
+        assert 'sim' in f.attrs.keys(), "No sim information in config file."
+        sim_cfg = literal_eval(f.attrs['sim'])
+        assert 'cosmo_params' in sim_cfg, "Fixed cosmology requested, but the values of the cosmological\"" \
+                                                     "params were not specified. Please add them to the sim config."
+
+        del fixed_params['cosmo']
+        fixed_params.update(sim_cfg['cosmo_params'])
+
     #TODO resume from previous, will need to access the written chain
     param_names = [pname for pname in emu.get_param_names() if pname not in fixed_params]
+    f.attrs['param_names'] = param_names
 
     #chain = np.zeros((nwalkers*nsteps, len(param_names)), dtype={'names':param_names,
     #                                                             'formats':['f8' for _ in param_names]})
     # TODO warning? Overwrite key?
     if 'chain' in f.keys():
-        print f.keys()
         del f['chain']#[:,:] = chain
         # TODO anyway to make sure all shpaes are right?
         #chain_dset = f['chain']
@@ -426,4 +448,20 @@ def run_mcmc_config(config_fname):
 
 if __name__ == "__main__":
     from sys import argv
-    run_mcmc_config(argv[1])
+    fname = argv[1] 
+    suffix = fname.split('.')[-1]
+
+    if suffix == 'hdf5' or suffix == 'h5':
+        pass
+    elif suffix == 'yaml': # parse yaml file
+        import yaml
+        with open(fname, 'r') as ymlfile:
+                cfg = yaml.load(ymlfile)
+                filename = cfg['fname']
+        fname = filename
+
+    else:
+        raise IOError("Invalid input filetype")
+
+    run_mcmc_config(fname)
+

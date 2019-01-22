@@ -80,12 +80,27 @@ class Trainer(object):
                 boxnos = [boxnos] if type(boxnos) is int else boxnos
             del cosmo_cfg['boxno']
             self.cats = []
+
+            if 'realization' in cosmo_cfg:
+                if ':' in cosmo_cfg['realization']:  # shorthand to do ranges, like 0:40
+                    splitstr = cosmo_cfg['realization'].split(':')
+                    realizations = range(int(splitstr[0]), int(splitstr[1]))
+                else:
+                    realizations = cosmo_cfg['realization']
+                    realizations = [realizations] if type(realizations) is int else realizations
+
+                del cosmo_cfg['realization']
+
+                for boxno in boxnos:
+                    for realization in realizations:
+                        self.cats.append(
+                            cat_dict[cosmo_cfg['simname']](boxno=boxno,realization = realization,  **cosmo_cfg))  # construct the specified catalog!
+
             # if there are multiple cosmos, they need to have a boxno kwarg
-            # TODO need to do something similar for realizations, if they exist.
-            for boxno in boxnos:
-                print cosmo_cfg
-                self.cats.append(
-                    cat_dict[cosmo_cfg['simname']](boxno=boxno, **cosmo_cfg))  # construct the specified catalog!
+            else:
+                for boxno in boxnos:
+                    self.cats.append(
+                        cat_dict[cosmo_cfg['simname']](boxno=boxno, **cosmo_cfg))  # construct the specified catalog!
 
         else:  # fixed cosmology
             self.cats = [cat_dict[cosmo_cfg['simname']](**cosmo_cfg)]

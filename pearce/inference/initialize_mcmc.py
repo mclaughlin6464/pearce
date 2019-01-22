@@ -138,7 +138,7 @@ def _compute_data(cfg):
 
     # TODO add shams
     if sim_cfg['gal_type'] == 'HOD':
-        cat.load(sim_cfg['scale_factor'], HOD=sim_cfg['hod_name'])
+        cat.load(sim_cfg['scale_factor'], HOD=sim_cfg['hod_name'], **sim_cfg['sim_hps'])
 
         em_params = sim_cfg['hod_params']
         add_logMmin(em_params, cat, float(sim_cfg['nd']))

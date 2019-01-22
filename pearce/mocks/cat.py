@@ -437,6 +437,8 @@ class Cat(object):
             Boolean whether or not to use the passed in scale_factor blindly. Default is false.
         :return: None
         '''
+        if type(downsample_factor) is not float:
+            downsample_factor = float(downsample_factor) # will occasionally get an errant string input
         if check_sf:
             a = self._return_nearest_sf(scale_factor, tol)
             if a is None:
@@ -833,11 +835,9 @@ class Cat(object):
                                                     num_threads=n_cores, Nsub=n_sub, estimator='Landy-Szalay')
                         xis.append(xi)
                         covs.append(cov)
-                        print cov.shape
 
                     xi_all = np.hstack(xis)
                     xi_cov = block_diag(*covs) # note this appraoch creates block_diag cov mat
-                    print xi_cov, xi_cov.shape
                 else:
                     randoms = np.random.random((pos.shape[0] * n_rands,
                                                 3)) * self.Lbox / self.h  # Solution to NaNs: Just fuck me up with randoms
@@ -930,7 +930,9 @@ class Cat(object):
                 if 'rand_scalecut' in jk_args: # do the jk differently for different scale cuts
                     assert hasattr(n_rands, "__iter__"), "rand_scalecut called but n_rands is not iterable."
                     rand_scalecut = jk_args['rand_scalecut']
-                    rbins_small,rbins_large = rbins[rbins < rand_scalecut], rbins[rbins >= rand_scalecut]
+                    rbins = np.array(rbins)
+                    rbins_small,rbins_large = list(rbins[rbins < rand_scalecut]), list(rbins[rbins >= rand_scalecut])
+
                     rbins_large.insert(0, rbins_small[-1]) # make sure the middle bin is not cut
 
                     xis, covs = [], []
@@ -943,7 +945,7 @@ class Cat(object):
                         covs.append(cov)
 
                     xi_all = np.hstack(xis)
-                    xi_cov = block_diag(covs) # note this appraoch creates block_diag cov mat
+                    xi_cov = block_diag(*covs) # note this appraoch creates block_diag cov mat
                 else:
 
                     randoms = np.random.random((pos_g.shape[0] * n_rands,
