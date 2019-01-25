@@ -991,6 +991,7 @@ class Emu(object):
 
         x, y, _, info = self.get_data(truth_file, self.fixed_params)
 
+        print x.shape
         x, old_idxs  = self._whiten(x)
         #y = (y - self._y_mean)/(self._y_std + 1e-5)
 
@@ -1706,6 +1707,8 @@ class SpicyBuffalo(Emu):
         # make sure we attach metadata to the object
         x, y, ycov = self.get_data(filename, self.fixed_params, attach_params=True)
 
+        print type(x), len(x), x.shape
+
         # store the data loading args, if we wanna reload later
         # useful ofr sampling the training data
 
@@ -1809,6 +1812,8 @@ class SpicyBuffalo(Emu):
         r_idx = self.r_idx
         skip_r_idx = np.ones(self.emulator_ndim+1, dtype = bool)
         skip_r_idx[r_idx] = False
+
+        print type(x), len(x), x.shape
 
         if type(x) is list and len(x) == self.n_bins:
             out = []

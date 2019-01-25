@@ -6,4 +6,4 @@
 #SBATCH --exclusive
 
 #module load openmpi/2.1.1
-srun python ~swmclau2/Git/pearce/pearce/emulator/trainer.py ~swmclau2/Git/pearce/bin/trainer/wt_cosmo_trainer.yaml --rerun
+srun python ~swmclau2/Git/pearce/pearce/emulator/trainer.py ~swmclau2/Git/pearce/bin/trainer/wt_cosmo_trainer.yaml 
