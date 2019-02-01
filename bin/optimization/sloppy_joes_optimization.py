@@ -1,33 +1,30 @@
-from pearce.emulator import OriginalRecipe, ExtraCrispy
+from pearce.emulator import OriginalRecipe, ExtraCrispy, SpicyBuffalo
 from pearce.mocks import cat_dict
 import numpy as np
 from os import path
-training_dir = '/u/ki/swmclau2/des/PearceLHC_wp_z'
-em_method = 'gp'
-fixed_params = {'z':0.0}#, 'r':0.18477483}
-emu = OriginalRecipe(training_dir, method = em_method, fixed_params=fixed_params)
-emulation_point = [('f_c', 0.233), ('logM0', 12.0), ('sigma_logM', 0.533),
-                    ('alpha', 1.083),('logM1', 13.5), ('logMmin', 12.233)]
-em_params = dict(emulation_point)
-em_params.update(fixed_params)
-del em_params['z']
-
-param_names = em_params.keys()
-
-rp_bins =  list(np.logspace(-1,1.5,19) )
-rp_bins.pop(1)
-rp_bins = np.array(rp_bins)
-rpoints =  (rp_bins[1:]+rp_bins[:-1])/2.0
-
 from SloppyJoes import lazy_wrapper
-def resids(p, gp, y):
-    gp.kernel[:] = p
-    gp.recompute()
-    return gp.predict(y, gp._x, mean_only=True)-y
 
-vals = np.ones_like(emu._emulator.kernel.vector)
-args = (emu._emulator, emu.y)
+training_file = '/scratch/users/swmclau2/xi_zheng07_cosmo_lowmsat/PearceRedMagicXiCosmoFixedNd.hdf5'
+em_method = 'gp'
+fixed_params = {'z':0.0}#, 'r':24.06822623}
+emu = SpicyBuffalo(training_file, method = em_method, fixed_params=fixed_params,
+                 custom_mean_function = 'linear', downsample_factor = 0.05)
+
+def resids(p, gps, xs, ys, yerrs):
+    res = []
+    for gp, x, y,yerr, dy in zip(gps, xs, ys,yerrs, emu.downsample_y):
+        gp.set_parameter_vector(p)
+        gp.recompute()
+        r = (gp.predict(dy, x, return_cov=False)-y)/(yerr+1e-5)
+        res.append(r)
+
+    #print res[0].shape
+    return np.hstack(res) 
+
+vals = np.ones_like(emu._emulators[0].get_parameter_vector())
+args = (emu._emulators, emu.x, emu.y, emu.yerr)
+
 result = lazy_wrapper(resids, vals, func_args = args, print_level = 3)\
-             #artol = 1e-6, xrtol = 1e-6, xtol=1e-6, gtol = 1e-6)
+
 print result
-np.savetxt('/u/ki/swmclau2/Git/pearce/bin/result.npy', result)
+np.savetxt('sloppy_joes_result_sb.npy', result)

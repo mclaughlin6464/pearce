@@ -1,14 +1,14 @@
 cosmology:
         boxno: 0:40 
         simname: trainingbox
-        scale_factors: 1.0
+        scale_factors: 0.645161 
         particles: False 
         system: sherlock 
 HOD:
         model: zheng07 
         num_hods: 1000 
         fixed_nd: 1e-4
-        ordered_params: {'logMmin': [13.1, 14.1], 'sigma_logM': [0.05, 0.3], 'logM0': [13.1, 16.1], 'logM1': [13.1, 15.1], 'alpha': [0.8, 1.2]}
+        ordered_params: {'logMmin': [13.1, 14.1], 'sigma_logM': [0.05, 0.3], 'logM0': [13.1, 14.6], 'logM1': [13.1, 14.6], 'alpha': [0.8, 1.2]}
         system: sherlock 
         min_ptcl: 100
 
@@ -18,5 +18,10 @@ observation:
         n_repops: 10 
         log_obs: True
 computation:
-        filename: /home/users/swmclau2/scratch/PearceRedMagicXiCosmoFixedNd.hdf5 
+        filename: /home/users/swmclau2/scratch/xi_gg_zheng07_cosmo_z_0.5/PearceXiggCosmo.hdf5 
         overwrite: True
+        queue_skipper: True
+        system: sherlock
+        n_jobs: 400
+        max_time: 6
+

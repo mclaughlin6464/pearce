@@ -5,7 +5,9 @@ import warnings
 from itertools import izip
 from collections import OrderedDict
 from os import path
+import sys
 from time import time
+import cPickle as pickle
 from abc import ABCMeta, abstractmethod
 
 import numpy as np
@@ -23,6 +25,9 @@ from sklearn.neural_network import MLPRegressor
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.pipeline import make_pipeline
 
+DIR_PATH = path.abspath(path.dirname(__file__)) 
+DEFAULT_METRIC_PICKLE_FNAME= path.join(DIR_PATH, 'default_metrics.pkl')
+
 class Emu(object):
     '''Main Emulator base class. Cannot itself be instatiated; can only be accessed via subclasses.
        controls all loading, manipulation, and emulation of data.
@@ -35,7 +40,7 @@ class Emu(object):
             'svr': SVR, 'krr': KernelRidge, 'linear': LinearRegression, 'nn': MLPRegressor}
 
     def __init__(self, filename, method='gp', hyperparams={}, fixed_params={},\
-                        downsample_factor = 1.0, independent_variable=None, custom_mean_function = None):
+                        downsample_factor = 1.0, custom_mean_function = None):
         '''
         Initialize the Emu
         :param filename:
@@ -62,15 +67,12 @@ class Emu(object):
         '''
 
         assert method in self.valid_methods
-        if method == 'nn':
-            assert type(self) is SpicyBuffalo #only one to do nn
-
-        assert independent_variable in {None, 'r2'}  # no bias for now.
+        #if method == 'nn':
+        #    assert type(self) is SpicyBuffalo #only one to do nn
 
         self.method = method
 
         self.fixed_params = fixed_params
-        self.independent_variable = independent_variable
         self._downsample_factor = downsample_factor
 
         self.load_training_data(filename, custom_mean_function)
@@ -79,7 +81,7 @@ class Emu(object):
     ###Data Loading and Manipulation####################################################################################
     # This function is a little long, but I'm not certain there's a need to break it up
     # it's shorter than it used to be, too.
-    def get_data(self, filename, fixed_params, independent_variable, attach_params = False):
+    def get_data(self, filename, fixed_params, attach_params = False):
         """
         Read data in the format compatible with this object and return it.
 
@@ -91,8 +93,6 @@ class Emu(object):
             of scale (distance in Mpc, angle in degrees, etc) and redshift respectively.
             Cosmo and HOD can only be fixed to an integer number, representing the index of the cosmo/HOD to hold fixed
             across HODs/Cosmologies respectively. Multiple fixed params can be specified.
-        :param independent_variable:
-            Independant variable to emulate. Options are xi, r2xi
         :return: x, y, yerr, ycov, all numpy arrays.
                  x is (n_data_points, n_params)
                  y is (n_data_points, ), yerr is (n_data_points)
@@ -102,7 +102,7 @@ class Emu(object):
         assert path.isfile(filename)
         # fixed params can only fix an hod index, cosmo index, or z or r
         assert len(fixed_params) <= 4
-        assert all(key in {'cosmo', 'HOD', 'z', 'r'} for key in fixed_params)
+        assert all(key in {'cosmo', 'HOD', 'z', 'r', 'rmin'} for key in fixed_params)
 
         for key in ['cosmo', 'HOD']:
             if key in fixed_params:
@@ -130,11 +130,18 @@ class Emu(object):
 
         scale_bins = f.attrs['scale_bins']
         scale_bin_centers = (scale_bins[1:] + scale_bins[:-1])/2.0 if scale_bins is not None else None
+
+        rmin = fixed_params['rmin'] if 'rmin' in fixed_params else 0.0
+            # instead of fixing values, just ensure values are greater than this values
+        gt_rmin = scale_bin_centers > rmin
+        scale_bin_centers = scale_bin_centers[gt_rmin]
+
         if 'r' in fixed_params:
             # this wil also fale if scb is None. but you can't fix when it's none anyway so.
             # may wanna have a friendlier error message htough.
             assert np.any(np.abs(fixed_params['r'] - scale_bin_centers) < 1e-4) # may need to include a fudge factor here
             r_idx = np.argmin(np.abs(fixed_params['r'] -  scale_bin_centers))
+
 
         # construct ordered_params
         # ordered_params is an ordered dict whose keys are the parameters in the
@@ -163,7 +170,7 @@ class Emu(object):
             ordered_params['z'] = (np.min(redshift_bin_centers), np.max(redshift_bin_centers))
 
         if 'r' not in fixed_params:
-            ordered_params['r'] = (np.log10(np.min(scale_bins)), np.log10(np.max(scale_bins)))
+            ordered_params['r'] = (np.log10(np.min(scale_bin_centers)), np.log10(np.max(scale_bin_centers)))
 
         if attach_params: #attach certain parameters to the object
             self.obs = f.attrs['obs']
@@ -187,9 +194,9 @@ class Emu(object):
 
         # book keeping vars.
         # only want to warn the user once.
-        give_warning = False
+        #give_warning = False
         # these can be useful for debugging
-        num_skipped = 0
+        #num_skipped = 0
         num_used = 0
 
         for cosmo_group_name, cosmo_group in f.iteritems():
@@ -202,8 +209,7 @@ class Emu(object):
             for sf_group_name, sf_group in cosmo_group.iteritems():
                 z = 1.0/float(sf_group_name[-5:]) - 1.0
 
-                # TODO fudge factors?
-                if 'z' in fixed_params and z != fixed_params['z']:
+                if 'z' in fixed_params and np.abs(z-fixed_params['z'])> 1e-3:
                     continue
 
                 obs_dset = sf_group['obs']
@@ -213,17 +219,19 @@ class Emu(object):
                 # efficiency note. If I don't iterate over the datasets, just the indicies,
                 # I avoid loading them from disk in fixed HOD scenarios
                 # Those will be rare enough for now that I don't care.
+                counter = 0
                 for HOD_no, (_obs, _cov) in enumerate(izip(obs_dset, cov_dset)):
 
                     if "HOD" in fixed_params and HOD_no != fixed_params['HOD']:
                         continue
-                    if any(np.any(np.isnan(arr)) for arr in [_obs, _cov]):
+                    #if any(np.any(np.isnan(arr)) for arr in [_obs, _cov]):
                         # skip NaN points. May wanna change this behavior.
-                        #print hod_param_vals[HOD_no,:][3]
-                        give_warning = True
-                        num_skipped += 1
-                        #print _obs
-                        continue
+                        #pass
+                        #give_warning = True
+                        #num_skipped += 0#1
+                        #continue
+                        #_obs[np.isnan(_obs)] = -2
+                        #_cov[np.isnan(_cov)] = 1e3 # made up values for now
 
                     HOD = hod_param_vals[HOD_no, :]
 
@@ -244,9 +252,9 @@ class Emu(object):
 
                         #we hve to transform the data (take a log, multiply, etc)
                         # TODO this may not work with things like r2 anymore
-                        _o, _c = self._iv_transform(independent_variable, _obs, _cov)
-                        y.append(np.array([_o[r_idx]]))
-                        ycov.append(np.array(_c[r_idx, r_idx]))
+                        # _o, _c = self._iv_transform(independent_variable, _obs, _cov)
+                        y.append(np.array([_obs[r_idx]]))
+                        ycov.append(np.array(_cov[r_idx, r_idx]))
 
                     else:
                         _params = np.zeros((scale_bin_centers.shape[0], len(params) + 1))
@@ -254,23 +262,47 @@ class Emu(object):
                         _params[:, -1] = np.log10(scale_bin_centers)
                         x.append(_params)
 
-                        _o, _c = self._iv_transform(independent_variable, _obs, _cov)
-                        y.append(_o)
-                        ycov.append(_c)
+                        #_o, _c = self._iv_transform(independent_variable, _obs, _cov)
+                        y.append(_obs[gt_rmin])
+                        ycov.append(_cov[gt_rmin, :][:, gt_rmin])
 
                     num_used += 1
 
-        if give_warning:
+        f.close()
+
+        x, y, _ycov = np.vstack(x), np.hstack(y), np.dstack(ycov)
+
+        if np.any(np.isnan(_ycov))  or np.any(np.isnan(y)):
+            y_nans = np.isnan(y)
+            #print 'y_nans', np.sum(y_nans)
+            #ycov_nans = np.sum(np.isnan(_ycov), axis = 1).astype(bool).reshape((-1,))
+            #print 'ycov_nans', np.sum(ycov_nans)
+            nan_idxs = y_nans#np.logical_or(y_nans ,ycov_nans ) 
+            num_skipped = np.sum(nan_idxs)
+
+            x = x[~nan_idxs]#, :]
+            y = y[~nan_idxs]
+            ycov_list = []
+
+            for i in xrange(_ycov.shape[-1]):
+                mat = _ycov[:,:,i]
+                idxs = nan_idxs[i*mat.shape[0]: (i+1)*mat.shape[0]]
+                ycov_list.append(mat[~idxs,:][:, ~idxs])
+
+            ycov = ycov_list#np.dstack(ycov_list)
+
             warnings.warn('WARNING: NaN detected. Skipped %d points in training data.' % (num_skipped))
 
-        f.close()
+        else:
+            ycov = _ycov.T 
+
         # stack so xs have shape (n points, n params)
         # ys have shape (npoints)
         # and ycov has shape (n_bins, n_bins, n_points/n_bins)
         if attach_params:
-            return np.vstack(x), np.hstack(y), np.dstack(ycov)
+            return x, y, ycov    
         else:
-            return np.vstack(x), np.hstack(y), np.dstack(ycov), info
+            return x,y, ycov, info
 
 
     def load_training_data(self, filename, custom_mean_function = None):
@@ -283,7 +315,7 @@ class Emu(object):
         """
 
         # make sure we attach metadata to the object
-        x, y, ycov = self.get_data(filename, self.fixed_params, self.independent_variable, attach_params=True)
+        x, y, ycov = self.get_data(filename, self.fixed_params, attach_params=True)
 
         # store the data loading args, if we wanna reload later
         # useful ofr sampling the training data
@@ -292,10 +324,12 @@ class Emu(object):
         self._x_mean, self._x_std = x.mean(axis = 0), x.std(axis = 0)
         self._y_mean, self._y_std = 0.0, 1.0#y.mean(axis = 0), y.std(axis = 0)
 
-        ycov/=(np.outer(self._y_std, self._y_std) + 1e-5)
+        ycov_list = []
+        for yc in ycov: 
+            ycov_list.append(yc/(np.outer(self._y_std+1e-5, self._y_std+1e-5)))
 
-        self.x = (x - self._x_mean)/(self._x_std + 1e-5)
-        self.y = (y - self._y_mean)/(self._y_std + 1e-5) # TODO could make getters that do this work for you when you want these.
+        self.x = self._whiten(x)[0]
+        self.y = self._whiten(y, arr ='y')[0]
 
         # TODO differnet hyperparams depending on what this is.
         self.mean_function = self._make_custom_mean_function(custom_mean_function)
@@ -303,17 +337,50 @@ class Emu(object):
 
         # in general, the full cov matrix will be too big, and we won't need it. store the diagonal, and
         # an average
-        split_ycov = np.dsplit(ycov, ycov.shape[-1])
+        #split_ycov = np.dsplit(ycov, ycov.shape[-1])
         #fullcov = block_diag(*[yc[:,:,0] for yc in split_ycov])
-        self.yerr = np.sqrt(np.hstack(np.diag(syc[:,:,0]) for syc in split_ycov))
+
+        if type(ycov) is not list:
+            self.yerr = np.sqrt(np.hstack(np.diag(syc) for syc in ycov))
+        else:
+            self.yerr = np.sqrt(np.hstack(np.diag(np.array(syc)) for syc in ycov))
+
         #self.yerr = np.hstack([yerr for i in xrange(self.x.shape[0] / fullcov.shape[0])])
 
-
         #compute the average covaraince matrix
-        self.ycov = np.mean(split_ycov, axis = 2)
+        self.ycov = np.zeros((self.n_bins, self.n_bins))
+        n_right_shape = 0
+
+        #TODO this bugs out for different implementatiosn
+        for yc in ycov:
+            if yc.shape[0] != self.n_bins:
+                continue
+            elif np.any(np.isnan(yc)):
+                continue
+
+            n_right_shape+=1
+            self.ycov+=yc
+
+        self.ycov/=n_right_shape
 
         ndim = self.x.shape[1]
         self.emulator_ndim = ndim  # The number of params for the emulator is different than those in sampling.
+
+    def _whiten(self, x, arr = 'x'):
+        """
+        Whiten array x according to x_mean, x_std
+        :param x:
+            array to whiten
+        :return:
+            white_x, a whiened version of x, and None
+        """
+        # TODO check for dimensionality, existence of the means, etc
+        if arr == 'x':
+            return (x - self._x_mean)/(self._x_std + 1e-5), None
+        elif arr == 'y':
+            return (x - self._y_mean)/(self._y_std + 1e-5), None
+        else:
+            raise NotImplementedError
 
     def _make_custom_mean_function(self, custom_mean_function =None):
         """
@@ -359,59 +426,6 @@ class Emu(object):
         except KeyError:
             raise KeyError("Parameter %s could not be found." % param)
 
-    def _get_ordered_params(self, dirname, fixed_params, with_fixed_params=False):
-        """
-        Load the ordered params from directory 'dirname.' Remove params that
-        are held fixed by the emulator. Check that there are no violations and,
-        if it is not currently attached to the object, attach it. Optionally return
-        a version that does not have the fixed parameters removed, which is necessary for some functions
-        :param dirname:
-            name of the directory to load ordered_params from
-        :param fixed_params:
-            Iterator of fixed parameters. Will be removed from ordered params
-        :param with_fixed_params:
-            Boolean. Whether to return the ordered params without the fixed_params removed.
-            This is unfrotunately a little hacky, but it is necessary for the training_file_loc
-            feature.
-        :return: if with_fixed_params, ordered_params_with_fixed_params, a version of the attached object with the fixed
-        params left in place.
-        """
-        # get the defined param ordered for the training data, and ensure its ok.
-        ordered_params = params_file_reader(dirname)
-
-        # this will not contain 'z' or 'r'. Add them to the end.
-        # note that the bounds of these parameters will be updated later in get_data, if not here.
-        if hasattr(self, "redshift_bin_centers") and hasattr(self, "scale_bin_centers"):
-            # if we know the actual bounds, attach them
-            ordered_params['z'] = (np.min(self.redshift_bin_centers), np.max(self.redshift_bin_centers))
-            ordered_params['r'] = (np.min(self.scale_bin_centers), np.max(self.scale_bin_centers))
-        else:
-            ordered_params['z'] = (0, 1)
-            ordered_params['r'] = (0, 1)
-
-        # store in case we have to return this
-        op_with_fixed = ordered_params.copy()
-
-        for pname in fixed_params:
-            if pname in ordered_params:
-                del ordered_params[pname]
-            else:
-                raise KeyError('Parameter %s is in fixed_params but not in ordered_params!' % pname)
-
-        attached_or = getattr(self, "_ordered_params", None)
-        # attach the ordered params if its new. Otherwise, ensure that the ordering in this dir is the same as what
-        # we have already.
-        if attached_or is None:
-            self._ordered_params = ordered_params
-        else:
-            try:
-                assert ordered_params == attached_or
-            except AssertionError:
-                raise AssertionError("ordered_params in %s did not match the value attached to this object." % dirname)
-
-        if with_fixed_params:
-            return op_with_fixed
-
     # TODO Should I unify some syntax between this and the one below?
     def check_param_names(self, param_names, ignore=[]):
         """
@@ -425,10 +439,13 @@ class Emu(object):
             True if all param_names are in ordered_params, and vice verse. False otherwise
         """
         op_set = set(self._ordered_params.iterkeys())
-        for ig in ignore:
-            op_set.remove(ig)
-
         ip_set = set(param_names)
+
+        for ig in ignore:
+            if ig in op_set:
+                op_set.remove(ig)
+            if ig in ip_set:
+                ip_set.remove(ig)
 
         return len(op_set ^ ip_set) == 0
 
@@ -481,6 +498,7 @@ class Emu(object):
 
     def _iv_transform(self, independent_variable, obs, cov=None):
         """
+        Depreceated. # TODO remove
         Independent variable tranform. Helper function that consolidates this operation all in one place.
         :param independent_variable:
             Which iv to transform to. Current options are None (just take log) and r2.
@@ -583,82 +601,39 @@ class Emu(object):
     def _build_skl(self, hyperparams):
         pass
 
-    def _get_initial_guess(self, independent_variable):
-        """
-        Return the initial guess of the metric for the emulator, based on what the iv is. Guesses are learned from
-        previous experiments.
-        :param independent_variable:
-            Which variable to return the guesses for.
-        :return: initial_guesses, a dictionary of the guess for each parameter
-        """
-
-        # default
-        ig = {'amp': 1}
-        ig.update({pname: 0.1 for pname in self._ordered_params})
-        if self.obs == 'xi':
-            if independent_variable is None:
-                ig.update({'H0': 0.12537079874409196,
-                 'Neff': 9.682153059967076e-06,
-                  'alpha': 0.5004939102700954,
-                   'amp': 1.2829697978941474,
-                    'ln10As': 0.00031695820887261153,
-                     'logM0': 2.3482346005542763e-05,
-                      'logM1': 1.208270935044776e-05,
-                       'logMmin': 0.00028373036165162114,
-                        'ns': 4398.317466650228,
-                         'ombh2': 895166.4721378284,
-                          'omch2': 78304.65404301183,
-                           'sigma_logM': 10092.715146305698,
-                            'w0': 5.3884384426082236e-05,
-                            'r': 0.40,
-                            'z':1.0})
-            else:
-                # could have other guesses for this case, but don't have any now
-                # leave this structure in case I make more later
-                pass
-        # TODO  change with mean_function
-        elif self.obs == 'wp':
-            if independent_variable is None:
-                ig.update({'logMmin': 2.84216e1, 'Neff': 5.6002e10, 'amp': 3.4007e-2, 'f_c': 1.4535e1, 'logM0': 0.33952477, 'logM1': 2.17317, 'H0': 1.943e1, 'w0': 8.15016e19, 'sigma_logM': 1.678e1, 'r': 0.26096, 'omch2': 3.368e1, 'ln10As': 4.672e1, 'alpha': 2.8585e1, 'ns': 9.7638e10, 'ombh2': 5.339e-1,
-                        'z': 1.0,
-                           'mean_occupation_satellites_assembias_split1': 21.02835102,
-                           'mean_occupation_satellites_assembias_slope1': 225.64738711,
-                           'mean_occupation_satellites_assembias_param1': 89.17850468,
-                           'mean_occupation_satellites_assembias_corr1': 1.15892e3,
-                           'mean_occupation_centrals_assembias_split1': 66.97808312,
-                           'mean_occupation_centrals_assembias_slope1': 179.90950523,
-                           'mean_occupation_centrals_assembias_param1': 80.75541473,
-                           'mean_occupation_centrals_assembias_corr1': 3.9659e6})
-
-        elif self.obs == 'wt':
-            # TODO parameter name has changed, update
-            if independent_variable is None:
-                ig.update({'logMmin': 3.84345171761, 'f_c': 1.80188170556, 'logM0':14.11665461,
-                    'sigma_logM': 17.7239294539, 'alpha': 0.18960822912, 'r': 0.306139450843,
-                    'logM1': 1.0554692015, 'amp': 2.52461085754, 'z': 1.0,
-                    'mean_occupation_satellites_assembias_param1':2.45298658504,
-                    'mean_occupation_centrals_assembias_param1':27.2832783025})
-
-        elif self.obs == 'ds':
-            if independent_variable is None:
-                ig.update({'logMmin': 3.6176310032, 'f_c': 0.574766597478, 'logM0':45.5862423685,
-                    'sigma_logM': 1.3220351031, 'alpha': 2.31333123015, 'r': 0.17221523,
-                    'logM1': 2.16453187021, 'amp': 0.42810696, 'z': 1.0,
-                    'mean_occupation_satellites_assembias_param1': 6.65437027486,
-                    'mean_occupation_centrals_assembias_param1': 3.1539620393})
+    def _get_default_metric(self):
 
 
-        else:
-            pass  # no other guesses saved yet.
+        metric = {}
+        with open(DEFAULT_METRIC_PICKLE_FNAME, 'r') as f:
+            default_metrics = pickle.load(f)
+
+            if self.obs in default_metrics:
+               metric = default_metrics[self.obs]
+
+        for key in self._ordered_params:
+            if key not in metric:
+               metric[key] = 1.0
 
         # remove entries for variables that are being held fixed.
         for key in self.fixed_params.iterkeys():
-            if key in ig:
-                del ig[key]
+            if key in metric:
+                del metric[key]
 
-        return ig
+        return metric
 
-    def _make_kernel(self, metric={}):
+    def _save_as_default_metric(self, metric):
+        # TODO save for other obs?
+        with open(DEFAULT_METRIC_PICKLE_FNAME, 'r') as f:
+            default_metric = pickle.load(f)
+
+        default_metric[self.obs]= metric
+
+        with open(DEFAULT_METRIC_PICKLE_FNAME, 'w') as f:
+            pickle.dump(default_metric, f)
+
+
+    def _make_kernel(self, hyperparams):
         """
         Helper method to build a george kernel for GP's and kernel-based regressions.
         :param metric:
@@ -668,27 +643,58 @@ class Emu(object):
             A george ExpSquredKernel object with this metric
         """
 
-        if not metric:
-            ig = self._get_initial_guess(self.independent_variable)
+        # I'm gonna try having the user build a kernel and pass it in, else defaults passed to default kenrel
+        # lots of ways to take this but i'm just not feeling most of them
+        if 'kernel' in hyperparams:
+            return hyperparams['kernel'] # TODO keep values set here, or overwrite with our defaults?
+        #elif 'kernel_name' in hyperparams:
+            # TODO implement this with a dict
         else:
-            ig = metric  # use the user's initial guesses
+            metric = hyperparams['metric'] if 'metric' in hyperparams else {}
 
-        metric = [ig['amp']]
-        for pname in self._ordered_params:
-            try:
-                metric.append(ig[pname])
-            except KeyError:
-                raise KeyError('Key %s was not in the metric.' % pname)
-                #metric.append(1.0)
+            default = self._get_default_metric()
 
-        metric = np.array(metric)
+            default.update(metric) # overwrite elements in the default with the passed in metric
+
+            metric = default
 
 
-        a = metric[0]
-        # TODO other kernels?
-        return a * ExpSquaredKernel(metric[1:], ndim=self.emulator_ndim)+a*Matern32Kernel(metric[1:], ndim=self.emulator_ndim)+a
-        #return a * ExpSquaredKernel(metric[1:], ndim=self.emulator_ndim)*Matern32Kernel(metric[1:], ndim=self.emulator_ndim)
-        #return a * Matern32Kernel(metric[1:], ndim=self.emulator_ndim) + a
+            assert all([pname in metric for pname in self._ordered_params])
+
+            # default kernel is two kernels added together. so we have to split the metric up
+            # TODO generalize this behavior to other kernels
+
+            if 'amp' in metric:
+                if type(metric['amp']) is not float and len(metric['amp']) == 2:
+                    a1, a2 = metric['amp']
+                    a1, a2 = a1, a2
+                else:
+                    a1 = a2 = metric['amp']
+            else:
+                a1 = a2 = 1.0
+
+            if 'bias' in metric:
+                b = metric['bias']
+                if type(b) is list:
+                    b = b[0]
+            else:
+                b = 0.0
+
+            m1, m2 = [], []
+            for pname in self._ordered_params:
+                if type(metric[pname]) is not float and  len(metric[pname]) == 2:
+                    m1.append(metric[pname][0])
+                    m2.append(metric[pname][1])
+                else:
+                    m1.append(metric[pname])
+                    m2.append(metric[pname])
+
+            m1, m2 = np.array(m1), np.array(m2)
+
+
+            return ConstantKernel(b,  ndim = self.emulator_ndim) +\
+                   ConstantKernel(a1, ndim = self.emulator_ndim)*ExpSquaredKernel(np.exp(m1), ndim=self.emulator_ndim)+\
+                   ConstantKernel(a2, ndim = self.emulator_ndim)*Matern32Kernel(np.exp(m2), ndim=self.emulator_ndim)
 
     ###Emulation and methods that Utilize it############################################################################
     def emulate(self, em_params, gp_errs=False):
@@ -716,9 +722,15 @@ class Emu(object):
 
         # create the dependent variable matrix
         t_list = [input_params[pname] for pname in self._ordered_params if pname in em_params]
+        # cover spicy_buffalo edge case
+        t_dim = self.emulator_ndim
+        if hasattr(self, 'r_idx') and 'r' in input_params:
+            t_list.insert(self.r_idx, input_params['r'])
+            t_dim+=1
+
         t_grid = np.meshgrid(*t_list)
         t = np.stack(t_grid).T
-        t = t.reshape((-1, self.emulator_ndim))
+        t = t.reshape((-1, t_dim))
 
         # TODO george can sort?
         _t = self._sort_params(t)
@@ -728,17 +740,20 @@ class Emu(object):
         if len(t.shape) == 1:
             t = np.array([t])
 
-        # whiten
-        t-=self._x_mean
-        t/=(self._x_std + 1e-5)
+        # whiten, but only non- Spicy Buffalo versions
+        # I'm not psyched about this, but handling it in _emulator_helper is just easier
+        # I need to know what rows corredspond to what rs for later
+        # TODO standardize this
+        #if hasattr(self, 'r_idx'):
+        t, old_idxs = self._whiten(t)
 
-        return self._emulate_helper(t, gp_errs)
+        return self._emulate_helper(t, gp_errs, old_idxs = old_idxs)
 
     @abstractmethod
-    def _emulate_helper(self, t, gp_errs=False):
+    def _emulate_helper(self, t, gp_errs=False, old_idxs = None):
         pass
 
-    def emulate_wrt_r(self, em_params, r_bin_centers, gp_errs=False):
+    def emulate_wrt_r(self, em_params, r_bin_centers=None, gp_errs=False):
         """
         Helper function to emulate over r bins.
         :param em_params:
@@ -753,6 +768,8 @@ class Emu(object):
                 errs, if returned, has the same shape
         """
         # TODO this should have scale bin centers as teh default, duh!
+        if r_bin_centers is None:
+            r_bin_centers = self.scale_bin_centers
         ep = {}
         ep.update(em_params)
         # extract z from the emulator params, if it's there
@@ -929,7 +946,7 @@ class Emu(object):
 
         LHC = np.stack(points).T
 
-        ig = self._get_initial_guess(self.independent_variable)
+        ig = self._get_default_metric()
 
         likelihoods = np.zeros((LHC.shape[0],))
         t0 = time()
@@ -968,13 +985,14 @@ class Emu(object):
             What G.O.F. statistic to calculate. Default is r2. Other options are rmsfd, abs(olute), and rel(ative).
         :return: values, a numpy arrray of the calculated statistics at each of the N training points.
         """
-        assert statistic in {'r2', 'rms', 'rmsfd', 'abs', 'log_abs', 'frac', 'log_frac'}
+        assert statistic in {'r2', 'rms', 'rmsfd', 'abs', 'log_abs', 'frac', 'log_frac', None}
         if N is not None:
             assert N > 0 and int(N) == N
 
-        x, y, _, info = self.get_data(truth_file, self.fixed_params, self.independent_variable)
+        x, y, _, info = self.get_data(truth_file, self.fixed_params)
 
-        x = (x - self._x_mean)/(self._x_std + 1e-5)
+        print x.shape
+        x, old_idxs  = self._whiten(x)
         #y = (y - self._y_mean)/(self._y_std + 1e-5)
 
         scale_bin_centers = info['sbc']
@@ -984,16 +1002,38 @@ class Emu(object):
 
         # TODO this is busted
         if N is not None:  # make a random choice
-            idxs = np.random.choice(y.shape[0], N*scale_nbins, replace=False)
+            if hasattr(self, 'r_idx'):
+                _x, _y = [], []
+                _old_idxs = []
+                 
+                idxs = sorted(np.random.choice(old_idxs[0].shape[0], N*self.n_bins, replace = False))
+                for i in xrange(self.n_bins):
 
-            x, y = x[idxs], y[idxs]
+                    in_bin_idxs = old_idxs[i][idxs]
+                    _old_idxs.append(in_bin_idxs)
+
+                    #sub_idxs = np.zeros((x[i].shape[0],), dtype = bool)
+                    sub_idxs = np.isin(np.where(old_idxs[i])[0], idxs, assume_unique = True)
+                    _x.append(x[i][sub_idxs])
+                    _y.extend(y[old_idxs[i]][sub_idxs])
+                    #_old_idxs[i] = old_idxs[i][idxs]
+
+                x, y = _x, np.array(_y)
+                old_idxs = _old_idxs
+            else:
+                idxs = np.random.choice(y.shape[0], N*scale_nbins, replace=False)
+
+                x, y = x[idxs], y[idxs]
         
 
-        pred_y = self._emulate_helper(x, False)
+        pred_y = self._emulate_helper(x, False, old_idxs = old_idxs)
 
-        if scale_nbins > 1:
-            y = y.reshape((-1, scale_nbins))
-            pred_y = pred_y.reshape((-1, scale_nbins))
+        #if scale_nbins > 1:
+        #    try:
+        #        y = y.reshape((-1, scale_nbins))
+        #        pred_y = pred_y.reshape((-1, scale_nbins))
+        #    except ValueError: #Can't reshpae, ahwell
+        #        pass
 
         # TODO untested
 
@@ -1007,7 +1047,18 @@ class Emu(object):
             pred_y = np.array(new_mu)
             y = y[:, self.scale_bin_centers[0] <= bin_centers <= self.scale_bin_centers[-1]]
 
-        if statistic == 'rmsfd':
+        if statistic is None:
+            if hasattr(self, 'r_idx'): #resshape
+                pred_out, out  = [], []
+                for i in xrange(self.n_bins):
+                    pred_out.append(pred_y[old_idxs[i]])
+                    out.append(y[old_idxs[i]])
+
+                return pred_out, out
+            else:
+                return pred_y, y
+
+        elif statistic == 'rmsfd':
             return np.sqrt(np.mean((((pred_y - y) ** 2) / (y ** 2)), axis=0))
 
         elif statistic == 'rms':
@@ -1027,10 +1078,22 @@ class Emu(object):
             return pred_y - y
             # return np.mean((pred_y - y), axis=0)
         elif statistic == 'log_frac':  # 'rel'
-            return np.abs(pred_y - y) / np.abs(y)
+            out = np.abs(pred_y - y) / np.abs(y)
+            if hasattr(self, 'r_idx'): #resshape
+                _out = []
+                for i in xrange(self.n_bins):
+                    _out.append(out[old_idxs[i]])
+                out = _out
+            return out 
             # return np.mean((pred_y - y) / y, axis=0)
         else:  # 'frac'
-            return np.abs(10 ** pred_y - 10 ** y) / np.abs(10 ** y)
+            out = np.abs(10**pred_y - 10**y) / np.abs(10**y)
+            if hasattr(self, 'r_idx'): #resshape
+                _out = []
+                for i in xrange(self.n_bins):
+                    _out.append(out[old_idxs[i]])
+                out = _out
+            return out 
 
     @abstractmethod
     def _emulator_lnlikelihood(self):
@@ -1138,8 +1201,7 @@ class OriginalRecipe(Emu):
         :return: None
         """
         # TODO could use more of the hyperparams...
-        metric = hyperparams['metric'] if 'metric' in hyperparams else {}
-        kernel = self._make_kernel(metric)
+        kernel = self._make_kernel(hyperparams)
 
         self._emulator = george.GP(kernel)
         # gp = george.GP(kernel, solver=george.HODLRSolver, nleaf=x.shape[0]+1,tol=1e-18)
@@ -1178,7 +1240,7 @@ class OriginalRecipe(Emu):
 
         self._emulator.fit(x, y)
 
-    def _emulate_helper(self, t, gp_errs):
+    def _emulate_helper(self, t, gp_errs, old_idxs = None):
         """
         Helper function that takes a dependent variable matrix and makes a prediction.
         :param t:
@@ -1458,12 +1520,7 @@ class ExtraCrispy(Emu):
             Key word parameters for the emulator
         :return: None
         """
-        if 'metric' in hyperparams:
-            metric = hyperparams['metric']
-            del hyperparams['metric']
-        else:
-            metric = {}
-        kernel = self._make_kernel(metric)
+        kernel = self._make_kernel(hyperparams)
 
         # now, make a list of emulators
         self._emulators = []
@@ -1478,7 +1535,7 @@ class ExtraCrispy(Emu):
         for _x, _yerr in izip(x, yerr):
             emulator = george.GP(kernel)
 
-            emulator.compute(_x, _yerr,**hyperparams)  # NOTE I'm using a modified version of george!
+            emulator.compute(_x, _yerr)#,**hyperparams)  # NOTE I'm using a modified version of george!
 
             self._emulators.append(emulator)
 
@@ -1514,7 +1571,7 @@ class ExtraCrispy(Emu):
         for i, (emulator, _x, _y) in enumerate(izip(self._emulators, x, y)):
             emulator.fit(_x, _y)
 
-    def _emulate_helper(self, t, gp_errs=False):
+    def _emulate_helper(self, t, gp_errs=False, old_idxs = None):
         """
         Helper function that takes a dependent variable matrix and makes a prediction.
         :param t:
@@ -1544,26 +1601,13 @@ class ExtraCrispy(Emu):
                 local_mu = emulator.predict(t)
                 local_err = 1.0  # weight with this instead of the errors.
 
-            #print i
-            #print local_mu
-            #print local_err
-            #print mean_func_at_params
-            #print self._y_mean, self._y_std
-            #print '*'*30
-
             mu[i, :] = self._y_std*(local_mu + mean_func_at_params) + self._y_mean
             err[i, :] = local_err*self._y_std
 
 
-        #print 'Endgame'
-        #print mu
-        #print err
         # now, combine with weighted average
         combined_var = np.reciprocal(np.sum(np.reciprocal(err ** 2), axis=0))
-        #print np.std(combined_var), np.max(combined_var), np.min(combined_var)
         combined_mu = combined_var * np.sum(np.reciprocal(err ** 2) * mu, axis=0)
-        #print combined_mu
-        #print combined_var
 
         # Reshape to be consistent with my other implementation
         if not gp_errs:
@@ -1646,26 +1690,404 @@ class ExtraCrispy(Emu):
 
         return results
 
-class SpicyBuffalo(Emu):
-    def __init__(self, filename, nn_init_func, cost_func, optimizer_init_func, train_dict, **kwargs):
-        self._nn_init_func = nn_init_func
-        super(SpicyBuffalo, self).__init__(filename, method = 'nn', **kwargs)
-        self.train_nn(self, cost_func, optimizer_init_func, train_dict)
 
-    # TODO this could be in Emu since it is copied from OR
+class SpicyBuffalo(Emu):
+    """Emulator that emulates with one emulator per scale bin rather than having it be a parameter.
+       In practice this has better accuracy."""
+
+    def load_training_data(self, filename, custom_mean_function = None):
+        """
+        Read the training data for the emulator and attach it to the object.
+        :param training_dir:
+            Directory where training data from trainginData is stored.
+        :param fixed_params:
+            Parameters to hold fixed. Only available if data in training_dir is a full hypercube, not a latin hypercube.
+        :return: None
+        """
+        # make sure we attach metadata to the object
+        x, y, ycov = self.get_data(filename, self.fixed_params, attach_params=True)
+
+        print type(x), len(x), x.shape
+
+        # store the data loading args, if we wanna reload later
+        # useful ofr sampling the training data
+
+        y_std = 1.0 #y.mean(axis = 0), y.std(axis = 0)
+
+        ycov_list = []
+        for yc in ycov: 
+            ycov_list.append(yc/(np.outer(y_std, y_std) + 1e-5))
+
+        ycov = ycov_list 
+        yerr = np.sqrt(np.hstack(np.diag(np.array(syc)) for syc in ycov))
+
+        # in general, the full cov matrix will be too big, and we won't need it. store the diagonal, and
+        # an average
+        
+        #compute the average covaraince matrix
+        self.ycov = np.zeros((self.n_bins, self.n_bins))
+        n_right_shape = 0
+        #if len(ycov) == 1 and type(ycov) is not list:
+        #    for yc in ycov.T:
+        #        if yc.shape[0] != self.n_bins:
+        #            continue
+        #        elif np.any(np.isnan(yc)):
+        #            continue
+        #        n_right_shape+=1
+        #        self.ycov+=yc
+        for yc in ycov:
+            if yc.shape[0] != self.n_bins:
+                continue
+            elif np.any(np.isnan(yc)):
+                continue
+
+            n_right_shape+=1
+            self.ycov+=yc
+
+        self.ycov/=n_right_shape
+
+        ndim = x.shape[1] -1
+        self.emulator_ndim = ndim  # The number of params for the emulator is different than those in sampling.
+
+        # now, parition the data as specified by the user
+        # note that ppe does not include overlap
+        points_per_expert = int(1.0 * x.shape[0]/self.n_bins)
+
+        try:
+            assert points_per_expert > 0
+        except AssertionError:
+            raise AssertionError("You have too many scale bins!")
+
+        # we have to have lists, since some may have been dropped due to Nans.
+        # There's definetly a better way to do this ...
+        self.x = []
+        self.y = []
+        self.yerr = []
+
+        self._x_mean, self._x_std = [], []
+        self._y_mean, self._y_std = np.zeros((self.n_bins,)), np.ones((self.n_bins,)) # [], []
+
+        # TODO differnet hyperparams depending on what this is.
+
+        r_idx = self.get_param_names().index('r')
+        self.r_idx = r_idx # we'll need this later, too
+        del self._ordered_params['r'] # remove r!
+
+        skip_r_idx = np.ones((x.shape[1]), dtype = bool)
+        skip_r_idx[r_idx] = False
+
+        for bin_no, sbc in enumerate(np.log10(self.scale_bin_centers)):
+            bin_idxs = np.isclose(sbc, x[:, r_idx])
+
+            x_in_bin = x[bin_idxs,:][:, skip_r_idx]
+            x_mean, x_std = x_in_bin.mean(axis = 0), x_in_bin.std(axis = 0)
+
+            if type(self._y_mean) is list: # don't do the calculation if we've decided we don't whiten y
+                y_mean, y_std = y[bin_idxs].mean(), y[bin_idxs].std()
+            else:
+                y_mean, y_std = self._y_mean[bin_no], self._y_std[bin_no]
+
+            self.x.append((x_in_bin - x_mean)/(x_std + 1e-5) )
+            self.y.append((y[bin_idxs] - y_mean)/(y_std+1e-5) )
+            self.yerr.append(yerr[bin_idxs])
+
+            self._x_mean.append(x_mean)
+            self._x_std.append(x_std)
+
+            if type(self._y_mean) is list:
+                self._y_mean.append(y_mean)
+                self._y_std.append(y_std)
+
+        self.mean_function = self._make_custom_mean_function(custom_mean_function)
+        for i, mf in enumerate(self.mean_function(self.x)):
+            self.y[i]-=mf
+
+    def _whiten(self, x, arr = 'x'):
+        """
+        TODO
+        :param x:
+        :param arr:
+        :return:
+        """
+        r_idx = self.r_idx
+        skip_r_idx = np.ones(self.emulator_ndim+1, dtype = bool)
+        skip_r_idx[r_idx] = False
+
+        print type(x), len(x), x.shape
+
+        if type(x) is list and len(x) == self.n_bins:
+            out = []
+            if arr == 'x':
+                for x_in_bin, x_mean, x_std in izip(x, self._x_mean, self._x_std):
+                    out.append(((x_in_bin - x_mean)/(x_std + 1e-5) ) )
+            elif arr == 'y':
+                for x_in_bin, x_mean, x_std in izip(x, self._y_mean, self._y_std):
+                    out.append(((x_in_bin - x_mean)/(x_std + 1e-5) ) )
+            else:
+                raise NotImplementedError
+            out = np.array(out)
+            return out, None
+
+        elif x.shape[1] == self.emulator_ndim+1: #has an r axies
+            assert arr == 'x'
+
+            # Note, reshape so there are n_bins lists, with each in corresponding to the bin
+            # will enable me to iterate over it, and make all preds at the same time
+            out = []
+            all_bin_idxs = []
+            for bin_no, sbc in enumerate(np.log10(self.scale_bin_centers)):
+                bin_idxs = np.isclose(sbc, x[:, r_idx])
+                val = (x[bin_idxs, :][:, skip_r_idx] - self._x_mean[bin_no])/(self._x_std[bin_no]+1e-5)
+                if type(val) is float:
+                    val = np.array([val])
+
+                out.append(val)
+                all_bin_idxs.append(bin_idxs)
+            return out, all_bin_idxs
+        else:
+            raise NotImplementedError
+
+
+    def _make_custom_mean_function(self, custom_mean_function =None):
+        """
+        Generate a custom mean function to make training better behaved (in theory)
+        """
+        # TODO docs
+
+        if custom_mean_function is None:
+            return lambda x: np.zeros((self.n_bins,)) 
+
+        elif custom_mean_function == 'linear' or custom_mean_function == 1:
+            self._mean_func = [LinearRegression() for i in xrange(self.n_bins)]#TODO hyperparams
+            for i, mf in enumerate(self._mean_func):
+                mf.fit(self.x[i], self.y[i])
+
+            return lambda x: np.array([mf.predict(_x) for _x, mf  in izip(x, self._mean_func)])
+
+        elif type(custom_mean_function) is int and custom_mean_function > 0: # TODO would like to take a dict here maybe, for kwargs
+            self._mean_func = [make_pipeline(PolynomialFeatures(custom_mean_function), LinearRegression()) for i in xrange(self.n_bins)]
+            for i, mf in enumerate(self._mean_func):
+                mf.fit(self.x[i], self.y[i])
+
+            return lambda x: np.array([mf.predict(_x) for _x, mf  in izip(x, self._mean_func)])
+
+        else:
+            raise NotImplementedError #TODO add something better! 
+
+    def check_param_names(self, param_names, ignore=[]):
+        #see above, just adding 'r' to ignore by default
+        ig = ['r'] if 'r' not in ignore else []
+        ig.extend(ignore)
+        return super(SpicyBuffalo, self).check_param_names(param_names, ig)
+
     def _downsample_data(self):
 
-        N_points = self.x.shape[0]/self.n_bins #sample full HOD/cosmo points,
-        downsample_N_points = int(self._downsample_factor*N_points)
-        self.downsample_x = np.zeros((downsample_N_points*self.n_bins, self.x.shape[1]))
-        self.downsample_y = np.zeros((downsample_N_points*self.n_bins))
-        self.downsample_yerr = np.zeros((downsample_N_points*self.n_bins))
+        N_points = max([_x.shape[0] for _x in self.x]) # don't sample full HOD/cosmo points. Already broken up in experts
+        downsample_N_points = int(self._downsample_factor * N_points)
+        self.downsample_x = [np.zeros((downsample_N_points, self.x[0].shape[1] )) for i in xrange(self.n_bins)]
+        self.downsample_y = [np.zeros((downsample_N_points, )) for i in xrange(self.n_bins)]
+        self.downsample_yerr = [ np.zeros((downsample_N_points, )) for i in xrange(self.n_bins)]
 
-        downsampled_points = np.random.choice(N_points, downsample_N_points, replace = False)
+        for e in xrange(self.n_bins):
 
-        for i, dp in enumerate(downsampled_points):
-            self.downsample_x[i*self.n_bins:(i+1)*self.n_bins] = self.x[dp*self.n_bins: (dp+1)*self.n_bins]
-            self.downsample_y[i*self.n_bins:(i+1)*self.n_bins] = self.y[dp*self.n_bins: (dp+1)*self.n_bins]
-            self.downsample_yerr[i*self.n_bins:(i+1)*self.n_bins] = self.yerr[dp*self.n_bins: (dp+1)*self.n_bins]
+            downsampled_points = np.random.choice(len(self.x[e]), downsample_N_points, replace=False)
 
-    def _build_nn(self, hyperparams):
+            for i, dp in enumerate(downsampled_points):
+                self.downsample_x[e][i :(i + 1)] = self.x[e][dp : (dp + 1)]
+                self.downsample_y[e][i :(i + 1) ] = self.y[e][dp: (dp + 1)]
+                self.downsample_yerr[e][i:(i + 1)] = self.yerr[e][dp: (dp + 1)]
+
+    def _build_gp(self, hyperparams):
+        """
+        Initialize the GP emulator using an MOE model.
+        :param hyperparams:
+            Key word parameters for the emulator
+        :return: None
+        """
+        kernel = self._make_kernel(hyperparams)
+
+        # now, make a list of emulators
+        self._emulators = []
+
+        if self._downsample_factor == 1.0:
+            x = self.x
+            yerr = self.yerr
+        else:
+            x = self.downsample_x
+            yerr = self.downsample_yerr
+
+
+        for _x, _yerr in izip(x, yerr):
+
+            emulator = george.GP(kernel)
+
+            # TODO remoinv the HPs, may be a mistake
+            emulator.compute(_x, _yerr)#,**hyperparams)  # NOTE I'm using a modified version of george!
+
+            self._emulators.append(emulator)
+
+    def _build_skl(self, hyperparams):
+        """
+        Build a scikit learn emulator using a mixtrue of experts.
+        :param hyperparams:
+            Key word parameters for the emulator
+        :return: None
+        """
+        skl_methods = {'gbdt': GradientBoostingRegressor, 'rf': RandomForestRegressor, \
+                       'svr': SVR, 'krr': KernelRidge}
+
+        # Same kernel concerns as above.
+        if self.method in {'svr', 'krr'}:  # kernel based method
+            metric = hyperparams['metric'] if 'metric' in hyperparams else {}
+            kernel = self._make_kernel(metric)
+            if 'metric' in hyperparams:
+                del hyperparams['metric']
+            if self.method == 'svr':  # slight difference in these, sadly
+                hyperparams['kernel'] = kernel.value
+            else:  # krr
+                hyperparams['kernel'] = lambda x1, x2: kernel.value(np.array([x1]), np.array([x2]))
+
+        self._emulators = [self.skl_methods[self.method](**hyperparams) for i in xrange(self.n_bins)]
+
+        if self._downsample_factor == 1.0:
+            x = self.x
+            y = self.y
+        else:
+            x = self.downsample_x
+            y = self.downsample_y
+        for i, (emulator, _x, _y) in enumerate(izip(self._emulators, x, y)):
+            emulator.fit(_x, _y)
+
+    def _emulate_helper(self, t, gp_errs=False, old_idxs = None):
+        """
+        Helper function that takes a dependent variable matrix and makes a prediction.
+        :param t:
+            Dependent variable matrix. Assumed to be in the order defined by ordered_params
+        :param gp_errs:
+            Whether or not to return errors in the gp case
+        :return:
+            mu, err (if gp_errs True). Predicted value for dependetn variable t.
+            mu and err both have shape (npoints*self.redshift_bin_centers*self.scale_bin_centers)
+        """
+        #
+        t_size = np.sum([_t.shape[0] for _t in t])
+
+        mean_func_at_params = self.mean_function(t)
+
+        if self._downsample_factor == 1.0:
+            y = self.y
+        else:
+            y = self.downsample_y
+
+        mu = []
+        err = []
+
+        for bin_no, (t_in_bin, mfc,_y, emulator) in enumerate(izip(t, mean_func_at_params, y, self._emulators)):
+
+            #print '_y', _y
+
+            if self.method == 'gp':
+                if gp_errs:
+                    local_mu, local_err = emulator.predict(_y, t_in_bin, return_cov = False,return_var=True)
+                else:
+                    #print _y
+                    #print t_in_bin
+                    local_mu = emulator.predict(_y, t_in_bin, return_cov = False,return_var=False)
+                    #print local_mu
+                    local_err = np.ones_like(local_mu)
+
+            else:
+                local_mu = emulator.predict(t_in_bin)
+                local_err = np.ones_like(local_mu)  # weight with this instead of the errors.
+
+            #print 'local_mu, mfc', local_mu, mfc
+            mu.append(self._y_std[bin_no]*(local_mu + mfc) + self._y_mean[bin_no])
+            err.append(local_err*self._y_std[bin_no])
+
+        #now, figure out how to return to the shape of t
+        combined_mu = np.zeros((t_size,))
+        combined_err = np.zeros((t_size,))
+
+        for r_idx, bin_idxs in enumerate(old_idxs):
+            combined_mu[bin_idxs] =  mu[r_idx]
+            combined_err[bin_idxs] =  err[r_idx]
+
+        # Reshape to be consistent with my other implementation
+        if not gp_errs:
+            return combined_mu
+
+        return combined_mu, combined_err
+
+    def _emulator_lnlikelihood(self):
+        """
+        """
+        assert self.method == 'gp'
+
+        ll = 0
+        gll = 0
+        if self._downsample_factor == 1.0:
+            y = self.y
+        else:
+            y = self.downsample_y
+
+        for idx, (emulator, _y) in enumerate(izip(self._emulators, y)):
+            ll += emulator.lnlikelihood(_y, quiet=True)
+            gll += emulator.grad_lnlikelihood(_y, quiet=True)
+
+        # The scipy optimizer doesn't play well with infinities.
+
+        ll = ll if np.isfinite(ll) else -1e25
+
+
+        return ll, gll
+
+
+    # TODO could make this learn the metric for other kernel based emulators...
+    def train_metric(self, p0=None,  **kwargs):
+        """
+        Train the emulator. Has a spotty record of working. Better luck may be had with the NAMEME code.
+        :param kwargs:
+            Kwargs that will be passed into the scipy.optimize.minimize
+        :return: success: True if the training was successful.
+        """
+
+        assert self.method == 'gp'
+
+        # emulators is a list containing refernces to the same object. this should still work!
+        if self._downsample_factor == 1.0:
+            y = self.y
+        else:
+            y = self.downsample_y
+
+        # move these outside? hm.
+        def nll(p):
+            # Update the kernel parameters and compute the likelihood.
+            # params are log(a) and log(m)
+            ll = 0
+            for emulator, _y in izip(self._emulators, y):
+                emulator.set_parameter_vector(p)
+                ll += emulator.lnlikelihood(_y, quiet=True)
+
+            # The scipy optimizer doesn't play well with infinities.
+            return -ll if np.isfinite(ll) else 1e25
+
+        # And the gradient of the objective function.
+        def grad_nll(p):
+            # Update the kernel parameters and compute the likelihood.
+            gll = 0
+            for emulator, _y in izip(self._emulators, y):
+                emulator.set_parameter_vector(p)
+                gll += emulator.grad_lnlikelihood(_y, quiet=True)
+            return -gll
+
+        if p0 is None:
+            p0 = self._emulators[0].get_parameter_vector()
+
+        results = op.minimize(nll, p0, jac=grad_nll, **kwargs)
+
+
+        for emulator in self._emulators:
+            emulator.set_parameter_vector(results.x)
+            emulator.recompute()
+
+        return results

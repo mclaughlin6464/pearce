@@ -21,7 +21,7 @@ HLIST_COLS = {'halo_id': (1, 'i8'), 'halo_upid': (6, 'i8'),
               'halo_vx': (20, 'f4'), 'halo_vy': (21, 'f4'), 'halo_vz': (22, 'f4'),
               'halo_mvir': (10, 'f4'), 'halo_rvir': (11, 'f4'), 'halo_rs': (12, 'f4'),
               'halo_snapnum': (31, 'i8'), 'halo_vpeak': (57, 'f4'), 'halo_halfmass_scale': (58, 'f4'),
-              'halo_rs_klypin': (34, 'f4'), 'halo_vmax': (16, 'f4'), 'halo_macc': (54, 'f4'), 'halo_vacc': (56, 'f4')}
+              'halo_rs_klypin': (34, 'f4'), 'halo_vmax': (16, 'f4'), 'halo_macc': (54, 'f4'), 'halo_vacc': (56, 'f4'), 'halo_m200b':(36, 'f4')}
 
 OUTLIST_COLS = {'halo_id': (0, 'i8'), 'halo_upid': (36, 'i8'),
                 'halo_x': (8, 'f4'), 'halo_y': (9, 'f4'), 'halo_z': (10, 'f4'),
@@ -373,7 +373,7 @@ class TrainingBox(Cat):
         Lbox = 1050.0  # Mpc/h
         self.npart = 1400
         # Need to make a way to combine all the params
-        if system == 'ki-ls':
+        if system == 'ki-ls' or system == 'long':
             param_file = '~swmclau2/des/LH_eigenspace_lnA_np7_n40_s556.dat'
         else: #sherlock
             param_file = '/scratch/users/swmclau2/TrainingBoxes/LH_eigenspace_lnA_np7_n40_s556.dat'
@@ -391,6 +391,7 @@ class TrainingBox(Cat):
                      'sherlock': ['/home/users/swmclau2/scratch/NewTrainingBoxes/Box0%02d/',
                                   '/home/users/swmclau2/scratch/NewTrainingBoxes/Box0%02d/']}
                       #same place on sherlock
+        locations['long'] = locations['ki-ls']
         assert system in locations
         #loc = locations[system][0]
         loc_list = locations[system]
@@ -405,7 +406,7 @@ class TrainingBox(Cat):
         gadget_loc = loc + 'output/'
         loc += 'halos/m200b/'
 
-        tmp_fnames = ['outbgc2_%d.list' % i for i in xrange(10)]
+        tmp_fnames = ['outbgc2_rs_%d.list' % i for i in xrange(10)]
         #tmp_fnames = ['TestBox00%d-000_out_parents_5.list' % boxno]
         tmp_scale_factors = [0.25, 0.333, 0.5, 0.540541, 0.588235, 0.645161, 0.714286, 0.8, 0.909091, 1.0]
         #tmp_scale_factors = [0.645161]
@@ -423,7 +424,8 @@ class TrainingBox(Cat):
 
         cache_locs = {'ki-ls': '/u/ki/swmclau2/des/halocats/hlist_%.2f.list.%s_%02d.hdf5',
                       'sherlock': '/scratch/users/swmclau2/halocats/hlist_%.2f.list.%s_%02d.hdf5'}
-        cache_locs['long'] = cache_locs['ki-ls']
+        cache_locs['long'] = path.dirname(cache_locs['ki-ls'])
+        self.cache_loc = path.dirname(cache_locs[system])#%(a, self.simname, boxno)
         self.cache_filenames = [cache_locs[system] % (a, self.simname, boxno)
                                 for a in self.scale_factors]  # make sure we don't have redunancies.
 
@@ -475,7 +477,7 @@ class TestBox(Cat):
         Lbox = 1050.0  # Mpc/h
         self.npart = 1400
         # Need to make a way to combine all the params
-        if system == 'ki-ls':
+        if system == 'ki-ls' or system == 'long':
             param_file = '~swmclau2/des/hypercube_test_points_np7.dat'
         else:  # sherlock
             param_file = '~swmclau2/scratch/TestBoxes/hypercube_test_points_np7.dat'
@@ -488,12 +490,13 @@ class TestBox(Cat):
 
         self.prim_haloprop_key = 'halo_m200b'
         #locations = {'ki-ls': ['/u/ki/swmclau2/des/testbox_findparents/']}
-        locations = {'ki-ls': ['/nfs/slac/des/fs1/g/sims/beckermr/tinkers_emu/TestBox00%d-00%d/halos/m200b/',
-                                       '/nfs/slac/g/ki/ki22/cosmo/beckermr/tinkers_emu/TestBox00%d-00%d/halos/m200b/',
-                                       '/nfs/slac/g/ki/ki23/des/beckermr/tinkers_emu/TestBox00%d-00%d/halos/m200b/'],
+        locations = {'ki-ls': ['/nfs/slac/des/fs1/g/sims/beckermr/tinkers_emu/TestBox00%d-00%d/',
+                                       '/nfs/slac/g/ki/ki22/cosmo/beckermr/tinkers_emu/TestBox00%d-00%d/',
+                                       '/nfs/slac/g/ki/ki23/des/beckermr/tinkers_emu/TestBox00%d-00%d/'],
                      'sherlock': ['/home/users/swmclau2/scratch/NewTrainingBoxes/TestBox0%02d-00%d/',
                                   '/home/users/swmclau2/scratch/NewTrainingBoxes/TestBox0%02d-00%d/',
                                   '/home/users/swmclau2/scratch/NewTrainingBoxes/TestBox0%02d-00%d/']} #all the same for Sherlock
+        locations['long'] = locations['ki-ls']
         assert system in locations
         #loc = locations[system][0]
         loc_list = locations[system]
@@ -508,7 +511,7 @@ class TestBox(Cat):
         gadget_loc = loc + 'output/'
         loc += 'halos/m200b/'
 
-        tmp_fnames = ['outbgc2_%d.list' % i for i in xrange(10)]
+        tmp_fnames = ['outbgc2_rs_%d.list' % i for i in xrange(10)]
         #tmp_fnames = ['TestBox00%d-000_out_parents_5.list' % boxno]
         tmp_scale_factors = [0.25, 0.333, 0.5, 0.540541, 0.588235, 0.645161, 0.714286, 0.8, 0.909091, 1.0]
         #tmp_scale_factors = [0.645161]
@@ -527,6 +530,7 @@ class TestBox(Cat):
         cache_locs = {'ki-ls': '/u/ki/swmclau2/des/halocats/hlist_%.2f.list.%s_%02d_%d.hdf5',
                       'sherlock': '/scratch/users/swmclau2/halocats/hlist_%.2f.list.%s_%02d_%d.hdf5'}
         cache_locs['long'] = cache_locs['ki-ls']
+        self.cache_loc = path.dirname(cache_locs[system])#%(a, self.simname, boxno)
         self.cache_filenames = [cache_locs[system] % (a, self.simname, boxno, realization )
                                 for a in self.scale_factors]  # make sure we don't have redunancies.
 
@@ -585,7 +589,7 @@ class ResolutionTestBox(Cat):
         assert system in locations
         loc = locations[system]%boxno
 
-        tmp_fnames = ['outbgc2_%d.list' % i for i in xrange(10)]
+        tmp_fnames = ['outbgc2_rs_%d.list' % i for i in xrange(10)]
         #tmp_fnames = ['TestBox00%d-000_out_parents_5.list' % boxno]
         tmp_scale_factors = [0.25, 0.333, 0.5, 0.540541, 0.588235, 0.645161, 0.714286, 0.8, 0.909091, 1.0]
         #tmp_scale_factors = [0.645161]

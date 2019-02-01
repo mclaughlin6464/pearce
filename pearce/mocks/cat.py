@@ -15,6 +15,7 @@ from multiprocessing import Pool
 
 import numpy as np
 from scipy.integrate import quad
+from scipy.linalg import block_diag
 
 from astropy import cosmology
 from astropy import constants as const, units as units
@@ -410,7 +411,7 @@ class Cat(object):
                 reader.halo_table['halo_local_density_%d'%(int(r))] = densities[:, r_idx]/(volume*mean_particle_density)
     # adding **kwargs cuz some invalid things can be passed in, hopefully not a pain
     # TODO some sort of spell check in the input file
-    def load(self, scale_factor, HOD='redMagic', tol=0.05,particles=False,downsample_factor=1e-3, hod_kwargs = {}, **kwargs):
+    def load(self, scale_factor, HOD='redMagic', tol=0.01,particles=False,downsample_factor=1e-3, hod_kwargs = {}, **kwargs):
         '''
         Load both a halocat and a model to prepare for population and calculation.
         :param scale_factor:
@@ -436,6 +437,8 @@ class Cat(object):
             Boolean whether or not to use the passed in scale_factor blindly. Default is false.
         :return: None
         '''
+        if type(downsample_factor) is not float:
+            downsample_factor = float(downsample_factor) # will occasionally get an errant string input
         if check_sf:
             a = self._return_nearest_sf(scale_factor, tol)
             if a is None:
@@ -565,12 +568,15 @@ class Cat(object):
                 self.model = PrebuiltHodModelFactory(HOD, **hod_kwargs)
         else:
             cens_occ = HOD[0](redshift=z, **hod_kwargs)
-            sats_occ = HOD[1](redshift=z, **hod_kwargs)
+            #NOTE don't know if should always modulate, but I always do.
+            sats_occ = HOD[1](redshift=z, cenocc_model=cens_occ, **hod_kwargs)
             self.model = HodModelFactory(
                 centrals_occupation=cens_occ,
                 centrals_profile=TrivialPhaseSpace(redshift=z),
                 satellites_occupation=sats_occ,
                 satellites_profile=NFWPhaseSpace(redshift=z))
+
+        self.populated_once = False #cover for loadign new ones
 
     def get_assembias_key(self, gal_type):
         '''
@@ -734,7 +740,7 @@ class Cat(object):
             self.populated_once = True
 
     # TODO how to handle analytic v observed nd
-    @observable
+    @observable()
     def calc_number_density(self):
         '''
         Return the number density for a populated box.
@@ -745,7 +751,7 @@ class Cat(object):
         return self.model.mock.number_density*self.h**3
 
     # TODO do_jackknife to cov?
-    @observable
+    @observable()
     def calc_xi(self, rbins, n_cores='all', do_jackknife=False, use_corrfunc=False, jk_args={}, halo=False):
         '''
         Calculate a 3-D correlation function on a populated catalog.
@@ -807,13 +813,35 @@ class Cat(object):
                     # TODO customize these?
                     n_rands = 5
                     n_sub = 5
+
+                    if 'rand_scalecut' in jk_args:
+                        n_rands = [25, 5]
                 else:
                     n_rands = jk_args['n_rands']
                     n_sub = jk_args['n_sub']
 
-                randoms = np.random.random((pos.shape[0] * n_rands,
-                                            3)) * self.Lbox / self.h  # Solution to NaNs: Just fuck me up with randoms
-                xi_all, xi_cov = tpcf_jackknife(pos / self.h, randoms, rbins, period=self.Lbox / self.h,
+                if 'rand_scalecut' in jk_args: # do the jk differently for different scale cuts
+                    assert hasattr(n_rands, "__iter__"), "rand_scalecut called but n_rands is not iterable."
+                    rand_scalecut = jk_args['rand_scalecut']
+                    rbins = np.array(rbins)
+                    rbins_small,rbins_large = list(rbins[rbins < rand_scalecut]), list(rbins[rbins >= rand_scalecut])
+                    rbins_large.insert(0, rbins_small[-1]) # make sure the middle bin is not cut
+
+                    xis, covs = [], []
+                    for rb, nr in zip([rbins_small, rbins_large], n_rands): #
+                        randoms = np.random.random((pos.shape[0] * nr,
+                                                    3)) * self.Lbox / self.h  # Solution to NaNs: Just fuck me up with randoms
+                        xi, cov = tpcf_jackknife(pos / self.h, randoms, rb, period=self.Lbox / self.h,
+                                                    num_threads=n_cores, Nsub=n_sub, estimator='Landy-Szalay')
+                        xis.append(xi)
+                        covs.append(cov)
+
+                    xi_all = np.hstack(xis)
+                    xi_cov = block_diag(*covs) # note this appraoch creates block_diag cov mat
+                else:
+                    randoms = np.random.random((pos.shape[0] * n_rands,
+                                                3)) * self.Lbox / self.h  # Solution to NaNs: Just fuck me up with randoms
+                    xi_all, xi_cov = tpcf_jackknife(pos / self.h, randoms, rbins, period=self.Lbox / self.h,
                                                 num_threads=n_cores, Nsub=n_sub, estimator='Landy-Szalay')
             else:
                 xi_all = tpcf(pos / self.h, rbins, period=self.Lbox / self.h, num_threads=n_cores,
@@ -825,7 +853,7 @@ class Cat(object):
             return xi_all, xi_cov
         return xi_all
 
-    @observable
+    @observable()
     def calc_bias(self,rbins, n_cores='all', use_corrfunc=False, **xi_kwargs):
         """
         Calculate the bias in a clustering sample. Computes the clustering and divides by the matter clustering,
@@ -848,7 +876,7 @@ class Cat(object):
         return self.calc_xi(rbins, n_cores, use_corrfunc, **xi_kwargs)/self.calc_xi_mm(rbins, n_cores, use_corrfunc)
 
     @observable(particles=True)
-    def calc_xi_gm(self, rbins, n_cores='all', use_corrfunc=False): #TODO add in halo? may not be worth it.
+    def calc_xi_gm(self, rbins, n_cores='all',do_jackknife = False,  use_corrfunc=False, jk_args = {}): #TODO add in halo? may not be worth it.
 
         n_cores = self._check_cores(n_cores)
 
@@ -885,14 +913,59 @@ class Cat(object):
             xi_all = convert_3d_counts_to_cf(len(x_g), len(x_m), rand_N1, rand_N2,
                                              D1D2, D1R2, D2R1, R1R2)
         else:
-            xi_all = tpcf(pos_g / self.h, rbins, sample2 = pos_m/self.h, period=self.Lbox / self.h, num_threads=n_cores,
-                          estimator='Landy-Szalay', do_auto=False)
 
+            if do_jackknife:
+                np.random.seed(int(time()))
+                if not jk_args:
+                    # TODO customize these?
+                    n_rands = 5
+                    n_sub = 5
+                    
+                    if 'rand_scalecut' in jk_args:
+                        n_rands = [25, 5]
+                else:
+                    n_rands = jk_args['n_rands']
+                    n_sub = jk_args['n_sub']
+
+                if 'rand_scalecut' in jk_args: # do the jk differently for different scale cuts
+                    assert hasattr(n_rands, "__iter__"), "rand_scalecut called but n_rands is not iterable."
+                    rand_scalecut = jk_args['rand_scalecut']
+                    rbins = np.array(rbins)
+                    rbins_small,rbins_large = list(rbins[rbins < rand_scalecut]), list(rbins[rbins >= rand_scalecut])
+
+                    rbins_large.insert(0, rbins_small[-1]) # make sure the middle bin is not cut
+
+                    xis, covs = [], []
+                    for rb, nr in zip([rbins_small, rbins_large], n_rands): #
+                        randoms = np.random.random((pos_g.shape[0] * nr,
+                                                    3)) * self.Lbox / self.h  # Solution to NaNs: Just fuck me up with randoms
+                        _, xi,_, _,  cov, _ = tpcf_jackknife(pos_g / self.h, randoms, rb, sample2 = pos_m/self.h, period=self.Lbox / self.h,
+                                                    num_threads=n_cores, Nsub=n_sub, estimator='Landy-Szalay')
+                        xis.append(xi)
+                        covs.append(cov)
+
+                    xi_all = np.hstack(xis)
+                    xi_cov = block_diag(*covs) # note this appraoch creates block_diag cov mat
+                else:
+
+                    randoms = np.random.random((pos_g.shape[0] * n_rands,
+                                                3)) * self.Lbox / self.h  # Solution to NaNs: Just fuck me up with randoms
+                    _, xi_all,_,_, xi_cov,_ = tpcf_jackknife(pos_g / self.h, randoms, rbins,sample2 = pos_m/self.h, period=self.Lbox / self.h,
+                                                num_threads=n_cores, Nsub=n_sub, estimator='Landy-Szalay')#, do_auto=False)
+            else:
+                xi_all = tpcf(pos_g / self.h, rbins, sample2 = pos_m/self.h, period=self.Lbox / self.h, num_threads=n_cores,
+                              estimator='Landy-Szalay', do_auto=False)
+
+    # TODO 1, 2 halo terms?
+
+        if do_jackknife:
+            return xi_all, xi_cov
         return xi_all
+
 
     # TODO use Joe's code. Remember to add sensible asserts when I do.
     # TODO Jackknife? A way to do it without Joe's code?
-    @observable
+    @observable()
     def calc_wp(self, rp_bins, pi_max=40, do_jackknife=True, use_corrfunc=False, n_cores='all', RSD=False, halo=False):
         '''
         Calculate the projected correlation on a populated catalog
@@ -940,7 +1013,7 @@ class Cat(object):
             wp_all = wp(pos / self.h, rp_bins, pi_max / self.h, period=self.Lbox / self.h, num_threads=n_cores)
         return wp_all
 
-    @observable
+    @observable()
     def calc_wt_projected(self, theta_bins, do_jackknife=True, n_cores='all', halo = False):
         '''
         Calculate the angular correlation function, w(theta), from a populated catalog.
@@ -998,8 +1071,8 @@ class Cat(object):
         return  (2*W/const.c).to("1/Mpc").value
 
 
-    @observable
-    def calc_wt(self, theta_bins, W, n_cores='all', halo = False, xi_kwargs = {}):
+    @observable()
+    def calc_wt(self, theta_bins, W, n_cores='all', xi_kwargs = {}):
         """
         TODO docs
         """
@@ -1011,8 +1084,8 @@ class Cat(object):
 
         n_cores = self._check_cores(n_cores)
         # calculate xi_gg first
-        rbins = np.logspace(-1.1, 1.6, 17) #make my own bins
-        xi = self.calc_xi(rbins,do_jackknife=False,n_cores=n_cores, halo=halo, **xi_kwargs)
+        rbins = np.logspace(-1.1, 1.8, 17) #make my own bins
+        xi = self.calc_xi(rbins,do_jackknife=False,n_cores=n_cores, **xi_kwargs)
 
         if np.any(xi<=0):
             warnings.warn("Some values of xi are less than 0. Setting to a small nonzero value. This may have unexpected behavior, check your HOD")
@@ -1034,42 +1107,43 @@ class Cat(object):
 
         cosmo = ccl.Cosmology(**param_dict)
 
-        big_rbins = np.logspace(1, 2.1, 21)
+        big_rbins = np.logspace(1, 2.3, 21)
         big_rpoints = (big_rbins[1:] + big_rbins[:-1])/2.0
+        big_xi_rmin = big_rpoints[0]
         big_xi_rmax = big_rpoints[-1]
         xi_mm = ccl.correlation_3d(cosmo, self.a, big_rpoints)
+        xi_mm[xi_mm<0] = 1e-6
 
         xi_mm_interp = interp1d(np.log10(big_rpoints), np.log10(xi_mm))
 
         #correction factor
         bias2 = np.power(10, xi_interp(1.2)-xi_mm_interp(1.2))
 
+
+        theta_bins = np.radians(theta_bins)
         tpoints = (theta_bins[1:] + theta_bins[:-1])/2.0
         wt = np.zeros_like(tpoints)
         # need this distance for computation
-        x = self.cosmology.comoving_distance(self.z)/self.h
+        x = self.cosmology.comoving_distance(self.z).to("Mpc").value#/self.h
 
-        assert tpoints[0]*x.to("Mpc").value/self.h >= xi_rmin #TODO explain this check
+        assert tpoints[0]*x/self.h >= xi_rmin #TODO explain this check
 
-        def small_scales_integrand(log_u, x, t, xi_interp):
-            r2 = np.power(10, 2*log_u) + (x*t)**2
-            return np.power(10, xi_interp(0.5*np.log10(r2)))
-
-        def large_scales_integrand(log_u, x, t, bias2, xi_mm_interp):
-            r2 = np.power(10, 2*log_u) + (x*t)**2
-            try:
-                return bias2*np.power(10, xi_mm_interp(0.5*np.log10(r2)))
-            except ValueError: #usually out of bounds interpolation
+        def integrand(u, x, t, bias2, xi_interp, xi_mm_interp):
+            r2 = u**2 + (x*t)**2
+            if r2 < xi_rmin**2:
                 return 0.0
+            elif xi_rmin**2 < r2 < xi_rmax**2:
+                return np.power(10, xi_interp(0.5*np.log10(r2)))
+            elif r2 < big_xi_rmax**2:
+                return bias2*np.power(10, xi_mm_interp(0.5*np.log10(r2)))
+            else:
+                return 0 
 
         for bin_no, t_med in enumerate(tpoints):
-            log_u_ss_max = np.log10(xi_rmax**2 - (t_med*x)**2)/2.0 #max we can integrate to on small scales
-            log_u_ls_max = np.log10(big_xi_rmax**2 - (t_med*x)**2)/2.0 #max we can integrate to on small scales
-            small_scales_contribution = quad(small_scales_integrand, -10, log_u_ss_max, args = (x.value, t_med, xi_interp))[0]
-            large_scales_contribution = quad(large_scales_integrand, log_u_ss_max, log_u_ls_max,\
-                                             args = (x.value, t_med, bias2, xi_mm_interp))[0]
+            u_ls_max = np.sqrt(big_xi_rmax**2 - (t_med*x)**2) #max we can integrate to on small scales
 
-            wt[bin_no] = (small_scales_contribution + large_scales_contribution)/self.h #TODO check little h's
+            wt[bin_no] = quad(integrand, 1e-6, u_ls_max,\
+                                args = (x, t_med, bias2, xi_interp, xi_mm_interp))[0]
 
         return wt*W
 
@@ -1081,7 +1155,7 @@ class Cat(object):
         :return:
             rp_bins, in Mpc
         """
-        return bins/self.cosmology.angular_diameter_distance(self.z).value
+        return np.radians(bins)*self.cosmology.angular_diameter_distance(self.z).value
 
     def _ang_from_rp(self, bins):
         """
@@ -1089,20 +1163,19 @@ class Cat(object):
         :param bins:
             Projected radial bins in Mpc
         :return:
-            ang_bins, in radians
+            ang_bins, in degrees 
         """
-        return bins*self.cosmology.angular_diameter_distance(self.z).value
+        return np.degrees(bins/self.cosmology.angular_diameter_distance(self.z).value)
 
     # TODO may want to enable central/satellite cuts, etc
-    @observable(particle=True)
+    @observable(particles=True)
     def calc_ds(self,bins, angular = False, n_cores='all'):
         """
         Calculate delta sigma, from a given galaxy and particle sample
         Returns in units of h*M_sun/pc^2, so be wary! 
         :param bins:
             If angular is False, the projected radial binning in Mpc
-            # TODO degrees instead of radians? would need to be everywhere
-            If angular is True, the angular bins in radians
+            If angular is True, the angular bins in degrees 
         :param angular:
             Boolean. Whether or not to return the result in angular values in stead of rp.
             Default is False
@@ -1129,7 +1202,7 @@ class Cat(object):
         #Halotools wnats downsampling factor defined oppositley
         #TODO verify little h!
         # TODO maybe split into a few lines for clarity
-        return self.h*delta_sigma(pos_g / self.h,pos_m/self.h, self.pmass/self.h,
+        return delta_sigma(pos_g / self.h,pos_m/self.h, self.pmass/self.h,
                            downsampling_factor = 1./self._downsample_factor, rp_bins = rp_bins,
                            period=self.Lbox / self.h, num_threads=n_cores,cosmology = self.cosmology)[1]/(1e12)
 
@@ -1141,7 +1214,7 @@ class Cat(object):
         Works better for larger scales.
         :param bins:
             If angular is False, the rp_bins to compute delta sigma at.
-            If angular is True, the angular bins in radians to compute delta sigma for.
+            If angular is True, the angular bins in degrees to compute delta sigma for.
          :param angular:
             Boolean. Whether or not to return the result in angular values in stead of rp.
             Default is False
@@ -1182,11 +1255,12 @@ class Cat(object):
 
         cosmo = ccl.Cosmology(**param_dict)
 
-        big_rbins = np.logspace(1, 2.1, 21)
+        big_rbins = np.logspace(1, 2.3, 21)
         big_rpoints = (big_rbins[1:] + big_rbins[:-1])/2.0
         big_xi_rmax = big_rpoints[-1]
         xi_mm = ccl.correlation_3d(cosmo, self.a, big_rpoints)
 
+        xi_mm[xi_mm<0] = 1e-6 #may wanna change this?
         xi_mm_interp = interp1d(np.log10(big_rpoints), np.log10(xi_mm))
 
         #correction factor
@@ -1204,7 +1278,7 @@ class Cat(object):
 
         ### calculate sigma first###
 
-        sigma_rpoints = np.logspace(-1.1, 2.0, 15)
+        sigma_rpoints = np.logspace(-1.1, 2.2, 15)
 
         sigma = np.zeros_like(sigma_rpoints)
         for i, rp in enumerate(sigma_rpoints):
@@ -1213,6 +1287,8 @@ class Cat(object):
 
             if not np.isnan(log_u_ss_max): # rp > xi_rmax
                 small_scales_contribution = quad(sigma_integrand_medium_scales, -10, log_u_ss_max, args=(rp, xi_interp))[0]
+                Rz = np.exp(log_u_ls_max)
+
                 large_scales_contribution = quad(sigma_integrand_large_scales, log_u_ss_max,log_u_ls_max,\
                                              args=(rp, bias, xi_mm_interp))[0]
             elif not np.isnan(log_u_ls_max):
@@ -1222,6 +1298,7 @@ class Cat(object):
             else:
                 small_scales_contribution = large_scales_contribution = 0.0
 
+            assert not any(np.isnan(c) for c in (small_scales_contribution, large_scales_contribution)), "NaN found, aborting calculation"
             sigma[i] = (small_scales_contribution+large_scales_contribution)*rhom*2;
         
         sigma_interp = interp1d(np.log10(sigma_rpoints), sigma)
@@ -1241,7 +1318,7 @@ class Cat(object):
             #print result, rp, sigma_interp(np.log10(rp))
             ds[i] = result * 2 / (rp ** 2) - sigma_interp(np.log10(rp))
 
-        return self.h * ds
+        return ds
 
     def calc_sigma_crit_inv(self, zbins, dNs):
         """
@@ -1270,13 +1347,17 @@ class Cat(object):
         return (Scrit*Dl*4*np.pi*const.G/(const.c**2)).to("(pc^2)/Msun").value
 
     @observable(particles=True)
-    def calc_gt(self, theta_bins, sigma_crit_inv, n_cores='all', ds_kwargs = {}):
+    def calc_gt(self, theta_bins, sigma_crit_inv, use_halotools = True, n_cores=4, ds_kwargs = {}):
         """
         Calculate the tangential shear gamma tvia delta sigma
         :param theta_bins:
             Angular bins (in radians) to compute gamma t
         :param sigma_crit_inv:
             The inverse of sigma_crit for the lensing sample
+        :param use_halotools:
+            How to compute delta_sigma. If we use halotools, small scales will be more accuate, but larger
+            scales will be more accurate with the analytic techinques (scales comparable to the boxsize). 
+            Default is True.
         :param n_cores:
             Number of cores to use in the calculation. Default is 'all'
         :param ds_kwargs:
@@ -1290,18 +1371,18 @@ class Cat(object):
         # TODO my own rp_bins
         rpbc = (rp_bins[1:]+rp_bins[:-1])/2.0
 
-        ds = np.zeros_like(rpbc)
-        small_scales = rp_bins < 1.5 #smaller then an MPC, compute with ht
+        #ds = np.zeros_like(rpbc)
+        #small_scales = rp_bins < 10 #smaller then an MPC, compute with ht
         # compute the small scales using halotools, but integrate xi_mm to larger scales.
-        start_idx = np.sum(small_scales)
-        if np.sum(small_scales) >0:
-            ds_ss = self.calc_ds(rp_bins,n_cores =n_cores, **ds_kwargs)
-            ds[:start_idx-1] = ds_ss[:start_idx-1]
+        #start_idx = np.sum(small_scales)
+        #if np.sum(small_scales) >0:
+        #    ds_ss = self.calc_ds(rp_bins,n_cores =n_cores, **ds_kwargs)
+        #    ds[:start_idx-1] = ds_ss[:start_idx-1]
 
-        if np.sum(~small_scales) > 0:
-            ds_ls = self.calc_ds_analytic(rp_bins, n_cores=n_cores, **ds_kwargs)
-            ds[start_idx-1:] = ds_ls[start_idx-1:]
-
+        #if np.sum(~small_scales) > 0:
+        #    ds_ls = self.calc_ds_analytic(rp_bins, n_cores=n_cores, **ds_kwargs)
+        #    ds[start_idx-1:] = ds_ls[start_idx-1:]
+        ds = self.calc_ds(rp_bins, n_cores = n_cores, **ds_kwargs) if use_halotools else self.calc_ds_analytic(rp_bins, n_cores=n_cores, **ds_kwargs)
         gamma_t = sigma_crit_inv*ds #hope user has converter ds to pc from Mpc
 
         return gamma_t

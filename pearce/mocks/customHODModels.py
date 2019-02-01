@@ -3,16 +3,16 @@
 
 import numpy as np
 from scipy.special import erf
-from scipy.interpolate import interp1d, RectBivariateSpline 
+from scipy.interpolate import interp1d
 import warnings
+
 from halotools.empirical_models import Zheng07Cens, Zheng07Sats, OccupationComponent, model_defaults
-from halotools.empirical_models import HeavisideAssembias, ContinuousAssembias, FreeSplitAssembias, FreeSplitContinuousAssembias
-from halotools.empirical_models import CorrelationAssembias
+from halotools.empirical_models import HeavisideAssembias#, ContinuousAssembias, FreeSplitAssembias, FreeSplitContinuousAssembias
+#from halotools.empirical_models import CorrelationAssembias
 from halotools.custom_exceptions import HalotoolsError
 from halotools.utils.table_utils import compute_conditional_percentiles
 
-
-# from continuousAssembias import ContinuousAssembias
+from pearce.mocks.assembias_models import *
 
 
 # TODO change this to use get_published_parameters and add these params in.
