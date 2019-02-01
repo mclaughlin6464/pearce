@@ -81,7 +81,7 @@ class Emu(object):
     ###Data Loading and Manipulation####################################################################################
     # This function is a little long, but I'm not certain there's a need to break it up
     # it's shorter than it used to be, too.
-    def get_data(self, filename, fixed_params, attach_params = False):
+    def get_data(self, filename, fixed_params, attach_params = False, remove_nans = True):
         """
         Read data in the format compatible with this object and return it.
 
@@ -272,7 +272,7 @@ class Emu(object):
 
         x, y, _ycov = np.vstack(x), np.hstack(y), np.dstack(ycov)
 
-        if np.any(np.isnan(_ycov))  or np.any(np.isnan(y)):
+        if (np.any(np.isnan(_ycov))  or np.any(np.isnan(y)) ) and remove_nans:
             y_nans = np.isnan(y)
             #print 'y_nans', np.sum(y_nans)
             #ycov_nans = np.sum(np.isnan(_ycov), axis = 1).astype(bool).reshape((-1,))
@@ -303,7 +303,6 @@ class Emu(object):
             return x, y, ycov    
         else:
             return x,y, ycov, info
-
 
     def load_training_data(self, filename, custom_mean_function = None):
         """
@@ -1695,7 +1694,7 @@ class SpicyBuffalo(Emu):
     """Emulator that emulates with one emulator per scale bin rather than having it be a parameter.
        In practice this has better accuracy."""
 
-    def load_training_data(self, filename, custom_mean_function = None):
+    def load_training_data(self, filename, custom_mean_function=None):
         """
         Read the training data for the emulator and attach it to the object.
         :param training_dir:
@@ -1705,29 +1704,27 @@ class SpicyBuffalo(Emu):
         :return: None
         """
         # make sure we attach metadata to the object
-        x, y, ycov = self.get_data(filename, self.fixed_params, attach_params=True)
-
-        print type(x), len(x), x.shape
+        x, y, ycov = self.get_data(filename, self.fixed_params, attach_params=True, remove_nans=False)
 
         # store the data loading args, if we wanna reload later
         # useful ofr sampling the training data
 
-        y_std = 1.0 #y.mean(axis = 0), y.std(axis = 0)
+        y_std = 1.0  # y.mean(axis = 0), y.std(axis = 0)
 
         ycov_list = []
-        for yc in ycov: 
-            ycov_list.append(yc/(np.outer(y_std, y_std) + 1e-5))
+        for yc in ycov:
+            ycov_list.append(yc / (np.outer(y_std, y_std) + 1e-5))
 
-        ycov = ycov_list 
+        ycov = ycov_list
         yerr = np.sqrt(np.hstack(np.diag(np.array(syc)) for syc in ycov))
 
         # in general, the full cov matrix will be too big, and we won't need it. store the diagonal, and
         # an average
-        
-        #compute the average covaraince matrix
+
+        # compute the average covaraince matrix
         self.ycov = np.zeros((self.n_bins, self.n_bins))
         n_right_shape = 0
-        #if len(ycov) == 1 and type(ycov) is not list:
+        # if len(ycov) == 1 and type(ycov) is not list:
         #    for yc in ycov.T:
         #        if yc.shape[0] != self.n_bins:
         #            continue
@@ -1741,17 +1738,17 @@ class SpicyBuffalo(Emu):
             elif np.any(np.isnan(yc)):
                 continue
 
-            n_right_shape+=1
-            self.ycov+=yc
+            n_right_shape += 1
+            self.ycov += yc
 
-        self.ycov/=n_right_shape
+        self.ycov /= n_right_shape
 
-        ndim = x.shape[1] -1
+        ndim = x.shape[1] - 1
         self.emulator_ndim = ndim  # The number of params for the emulator is different than those in sampling.
 
         # now, parition the data as specified by the user
         # note that ppe does not include overlap
-        points_per_expert = int(1.0 * x.shape[0]/self.n_bins)
+        points_per_expert = int(1.0 * x.shape[0] / self.n_bins)
 
         try:
             assert points_per_expert > 0
@@ -1765,30 +1762,30 @@ class SpicyBuffalo(Emu):
         self.yerr = []
 
         self._x_mean, self._x_std = [], []
-        self._y_mean, self._y_std = np.zeros((self.n_bins,)), np.ones((self.n_bins,)) # [], []
+        self._y_mean, self._y_std = np.zeros((self.n_bins,)), np.ones((self.n_bins,))  # [], []
 
-        # TODO differnet hyperparams depending on what this is.
+        # TODO different hyperparams depending on what this is.
 
         r_idx = self.get_param_names().index('r')
-        self.r_idx = r_idx # we'll need this later, too
-        del self._ordered_params['r'] # remove r!
+        self.r_idx = r_idx  # we'll need this later, too
+        del self._ordered_params['r']  # remove r!
 
-        skip_r_idx = np.ones((x.shape[1]), dtype = bool)
+        skip_r_idx = np.ones((x.shape[1]), dtype=bool)
         skip_r_idx[r_idx] = False
 
         for bin_no, sbc in enumerate(np.log10(self.scale_bin_centers)):
             bin_idxs = np.isclose(sbc, x[:, r_idx])
 
-            x_in_bin = x[bin_idxs,:][:, skip_r_idx]
-            x_mean, x_std = x_in_bin.mean(axis = 0), x_in_bin.std(axis = 0)
+            x_in_bin = x[bin_idxs, :][:, skip_r_idx]
+            x_mean, x_std = x_in_bin.mean(axis=0), x_in_bin.std(axis=0)
 
-            if type(self._y_mean) is list: # don't do the calculation if we've decided we don't whiten y
+            if type(self._y_mean) is list:  # don't do the calculation if we've decided we don't whiten y
                 y_mean, y_std = y[bin_idxs].mean(), y[bin_idxs].std()
             else:
                 y_mean, y_std = self._y_mean[bin_no], self._y_std[bin_no]
 
-            self.x.append((x_in_bin - x_mean)/(x_std + 1e-5) )
-            self.y.append((y[bin_idxs] - y_mean)/(y_std+1e-5) )
+            self.x.append((x_in_bin - x_mean) / (x_std + 1e-5))
+            self.y.append((y[bin_idxs] - y_mean) / (y_std + 1e-5))
             self.yerr.append(yerr[bin_idxs])
 
             self._x_mean.append(x_mean)
@@ -1800,7 +1797,9 @@ class SpicyBuffalo(Emu):
 
         self.mean_function = self._make_custom_mean_function(custom_mean_function)
         for i, mf in enumerate(self.mean_function(self.x)):
-            self.y[i]-=mf
+            self.y[i] -= mf
+
+
 
     def _whiten(self, x, arr = 'x'):
         """
@@ -1846,7 +1845,6 @@ class SpicyBuffalo(Emu):
             return out, all_bin_idxs
         else:
             raise NotImplementedError
-
 
     def _make_custom_mean_function(self, custom_mean_function =None):
         """
@@ -2091,3 +2089,174 @@ class SpicyBuffalo(Emu):
             emulator.recompute()
 
         return results
+
+class LemonPepperWet(SpicyBuffalo):
+    """
+    A modification of SpicyBuffalo to use one emu across all bins.
+    """
+
+    def load_training_data(self, filename, custom_mean_function=None):
+        """
+        Read the training data for the emulator and attach it to the object.
+        :param training_dir:
+            Directory where training data from trainginData is stored.
+        :param fixed_params:
+            Parameters to hold fixed. Only available if data in training_dir is a full hypercube, not a latin hypercube.
+        :return: None
+        """
+        # make sure we attach metadata to the object
+        x, y, ycov = self.get_data(filename, self.fixed_params, attach_params=True)
+
+        # store the data loading args, if we wanna reload later
+        # useful ofr sampling the training data
+
+        y_std = 1.0  # y.mean(axis = 0), y.std(axis = 0)
+
+        ycov_list = []
+        for yc in ycov:
+            ycov_list.append(yc / (np.outer(y_std, y_std) + 1e-5))
+
+        ycov = ycov_list
+        yerr = np.sqrt(np.hstack(np.diag(np.array(syc)) for syc in ycov))
+
+        # in general, the full cov matrix will be too big, and we won't need it. store the diagonal, and
+        # an average
+
+        # compute the average covaraince matrix
+        self.ycov = np.zeros((self.n_bins, self.n_bins))
+        n_right_shape = 0
+        # if len(ycov) == 1 and type(ycov) is not list:
+        #    for yc in ycov.T:
+        #        if yc.shape[0] != self.n_bins:
+        #            continue
+        #        elif np.any(np.isnan(yc)):
+        #            continue
+        #        n_right_shape+=1
+        #        self.ycov+=yc
+        for yc in ycov:
+            if yc.shape[0] != self.n_bins:
+                continue
+            elif np.any(np.isnan(yc)):
+                continue
+
+            n_right_shape += 1
+            self.ycov += yc
+
+        self.ycov /= n_right_shape
+
+        ndim = x.shape[1] - 1
+        self.emulator_ndim = ndim  # The number of params for the emulator is different than those in sampling.
+
+        # we have to have lists, since some may have been dropped due to Nans.
+        # There's definetly a better way to do this ...
+        self.x = []
+        self.y = []
+        self.yerr = []
+
+        self._x_mean, self._x_std = [], []
+        self._y_mean, self._y_std = np.zeros((self.n_bins,)), np.ones((self.n_bins,))  # [], []
+
+        r_idx = self.get_param_names().index('r')
+        self.r_idx = r_idx  # we'll need this later, too
+        del self._ordered_params['r']  # remove r!
+
+        skip_r_idx = np.ones((x.shape[1]), dtype=bool)
+        skip_r_idx[r_idx] = False
+
+        # select the non-r x's for one bin
+        bin_idxs = np.isclose(self.scale_bin_centers[0], x[:, r_idx])
+
+        # do the x stuff one time, then copy
+        x_in_bin = x[bin_idxs, :][:, skip_r_idx]
+        x_mean, x_std = x_in_bin.mean(axis=0), x_in_bin.std(axis=0)
+        norm_x = (x_in_bin - x_mean) / (x_std + 1e-5)
+
+        # TODO a better yerr strategy for this hack
+        # I do think it's small enough as to no matter
+        yerr_one_bin = yerr[bin_idxs]
+
+        for bin_no, sbc in enumerate(np.log10(self.scale_bin_centers)):
+            bin_idxs = np.isclose(self.scale_bin_centers[0], x[:, r_idx])
+
+            y_in_bin = y[bin_idxs]
+
+            if type(self._y_mean) is list:  # don't do the calculation if we've decided we don't whiten y
+                y_mean, y_std = y_in_bin.nanmean(), y_in_bin.nanstd()
+            else:
+                y_mean, y_std = self._y_mean[bin_no], self._y_std[bin_no]
+
+            # TODO is this the best way to deal with NaNs?
+            y_in_bin[np.isnan(y_in_bin)] = y_mean
+
+            self.x.append(norm_x)
+            self.y.append((y_in_bin - y_mean) / (y_std + 1e-5))
+            self.yerr.append(yerr_one_bin)
+
+            self._x_mean.append(x_mean)
+            self._x_std.append(x_std)
+
+            if type(self._y_mean) is list:
+                self._y_mean.append(y_mean)
+                self._y_std.append(y_std)
+
+        self.mean_function = self._make_custom_mean_function(custom_mean_function)
+        for i, mf in enumerate(self.mean_function(self.x)):
+            self.y[i] -= mf
+
+    def _downsample_data(self):
+
+        N_points = max(
+            [_x.shape[0] for _x in self.x])  # don't sample full HOD/cosmo points. Already broken up in experts
+
+        downsample_N_points = int(self._downsample_factor * N_points)
+        downsampled_points = np.random.choice(len(self.x[0]), downsample_N_points, replace=False)
+
+        downsample_x = np.zeros((downsample_N_points, self.x[0].shape[1]))
+
+        for i, dp in enumerate(downsampled_points):
+            downsample_x[0][i:(i + 1)] = self.x[0][dp: (dp + 1)]
+
+        self.downsample_x = []
+        self.downsample_y = [np.zeros((downsample_N_points,)) for i in xrange(self.n_bins)]
+        self.downsample_yerr = [np.zeros((downsample_N_points,)) for i in xrange(self.n_bins)]
+
+        for e in xrange(self.n_bins):
+            self.downsample_x.append(downsample_x)
+
+            for i, dp in enumerate(downsampled_points):
+                self.downsample_y[e][i:(i + 1)] = self.y[e][dp: (dp + 1)]
+                self.downsample_yerr[e][i:(i + 1)] = self.yerr[e][dp: (dp + 1)]
+
+    def _build_gp(self, hyperparams):
+        """
+        Initialize the GP emulator using an MOE model.
+        :param hyperparams:
+            Key word parameters for the emulator
+        :return: None
+        """
+        kernel = self._make_kernel(hyperparams)
+
+        # now, make a list of emulators
+        self._emulators = []
+
+        if self._downsample_factor == 1.0:
+            x = self.x
+            yerr = self.yerr
+        else:
+            x = self.downsample_x
+            yerr = self.downsample_yerr
+
+        x, yerr = x[0], yerr[0] # only need one bin
+
+        emulator = george.GP(kernel)
+
+        # TODO remoinv the HPs, may be a mistake
+        emulator.compute(x, yerr)  # ,**hyperparams)
+
+        for i in xrange(self.n_bins):
+            self._emulators.append(emulator)
+
+    def _build_skl(self, hyperparams):
+        warnings.warn("LemonPepperWet does not provide advantages for skl mode, so it is not reccomended.")
+        super(LemonPepperWet, self)._build_skl(hyperparams)
+
