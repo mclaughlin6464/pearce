@@ -610,14 +610,27 @@ class Emu(object):
             if self.obs in default_metrics:
                metric = default_metrics[self.obs]
 
-        for key in self._ordered_params:
-            if key not in metric:
-               metric[key] = 1.0
+        # this has problems for xied binning schemees... 
+        if type(metric) is list:
+            # TODO assert is SpicyBuffalo
+            for bin_metric in metric:
+                for key in self._ordered_params:
+                    if key not in bin_metric:
+                       bin_metric[key] = 1.0
 
-        # remove entries for variables that are being held fixed.
-        for key in self.fixed_params.iterkeys():
-            if key in metric:
-                del metric[key]
+                # remove entries for variables that are being held fixed.
+                for key in self.fixed_params.iterkeys():
+                    if key in bin_metric:
+                        del bin_metric[key]
+        else:
+            for key in self._ordered_params:
+                if key not in metric:
+                   metric[key] = 1.0
+
+            # remove entries for variables that are being held fixed.
+            for key in self.fixed_params.iterkeys():
+                if key in metric:
+                        del metric[key]
 
         return metric
 
@@ -653,47 +666,68 @@ class Emu(object):
 
             default = self._get_default_metric()
 
-            default.update(metric) # overwrite elements in the default with the passed in metric
+            if type(default) is list:
+                if type(metric) is list:
+                    for d, m in zip(default, metric):
+                        d.update(m)
+                else:
+                    for d in default:
+                        d.update(metric) 
+            elif type(metric) is list:
+                assert len(metric) == self.n_bins, "Metric of invalid length!"
+                _default = [default for _ in metric]
+                default = _default
+                for d,m in zip(_default, metric):
+                    d.update(m)
+            else:
+                default.update(metric) # overwrite elements in the default with the passed in metric
 
             metric = default
 
-
-            assert all([pname in metric for pname in self._ordered_params])
-
-            # default kernel is two kernels added together. so we have to split the metric up
-            # TODO generalize this behavior to other kernels
-
-            if 'amp' in metric:
-                if type(metric['amp']) is not float and len(metric['amp']) == 2:
-                    a1, a2 = metric['amp']
-                    a1, a2 = a1, a2
-                else:
-                    a1 = a2 = metric['amp']
+            if type(metric) is list:
+                return [self._make_george_kernel(m) for m in metric]
             else:
-                a1 = a2 = 1.0
+                return self._make_george_kernel(metric)
 
-            if 'bias' in metric:
-                b = metric['bias']
-                if type(b) is list:
-                    b = b[0]
+    def _make_george_kernel(self, metric):
+        """
+        Helper function to turn a dictionary into a george kernel
+        """
+        assert all([pname in metric for pname in self._ordered_params])
+
+        # default kernel is two kernels added together. so we have to split the metric up
+        # TODO generalize this behavior to other kernels
+
+        if 'amp' in metric:
+            if type(metric['amp']) is not float and len(metric['amp']) == 2:
+                a1, a2 = metric['amp']
+                a1, a2 = a1, a2
             else:
-                b = 0.0
+                a1 = a2 = metric['amp']
+        else:
+            a1 = a2 = 1.0
 
-            m1, m2 = [], []
-            for pname in self._ordered_params:
-                if type(metric[pname]) is not float and  len(metric[pname]) == 2:
-                    m1.append(metric[pname][0])
-                    m2.append(metric[pname][1])
-                else:
-                    m1.append(metric[pname])
-                    m2.append(metric[pname])
+        if 'bias' in metric:
+            b = metric['bias']
+            if type(b) is list:
+                b = b[0]
+        else:
+            b = 0.0
 
-            m1, m2 = np.array(m1), np.array(m2)
+        m1, m2 = [], []
+        for pname in self._ordered_params:
+            if type(metric[pname]) is not float and  len(metric[pname]) == 2:
+                m1.append(metric[pname][0])
+                m2.append(metric[pname][1])
+            else:
+                m1.append(metric[pname])
+                m2.append(metric[pname])
 
+        m1, m2 = np.array(m1), np.array(m2)
 
-            return ConstantKernel(b,  ndim = self.emulator_ndim) +\
-                   ConstantKernel(a1, ndim = self.emulator_ndim)*ExpSquaredKernel(np.exp(m1), ndim=self.emulator_ndim)+\
-                   ConstantKernel(a2, ndim = self.emulator_ndim)*Matern32Kernel(np.exp(m2), ndim=self.emulator_ndim)
+        return ConstantKernel(b,  ndim = self.emulator_ndim) +\
+               ConstantKernel(a1, ndim = self.emulator_ndim)*ExpSquaredKernel(np.exp(m1), ndim=self.emulator_ndim)+\
+               ConstantKernel(a2, ndim = self.emulator_ndim)*Matern32Kernel(np.exp(m2), ndim=self.emulator_ndim)
 
     ###Emulation and methods that Utilize it############################################################################
     def emulate(self, em_params, gp_errs=False):
@@ -990,7 +1024,6 @@ class Emu(object):
 
         x, y, _, info = self.get_data(truth_file, self.fixed_params)
 
-        print x.shape
         x, old_idxs  = self._whiten(x)
         #y = (y - self._y_mean)/(self._y_std + 1e-5)
 
@@ -1493,7 +1526,6 @@ class ExtraCrispy(Emu):
         # now attach these final versions
         self.x = _x
         self.y = _y
-        self.yerr = _yerr
 
     def _downsample_data(self):
 
@@ -1704,7 +1736,7 @@ class SpicyBuffalo(Emu):
         :return: None
         """
         # make sure we attach metadata to the object
-        x, y, ycov = self.get_data(filename, self.fixed_params, attach_params=True, remove_nans=False)
+        x, y, ycov = self.get_data(filename, self.fixed_params, attach_params=True, remove_nans=True)
 
         # store the data loading args, if we wanna reload later
         # useful ofr sampling the training data
@@ -1795,6 +1827,7 @@ class SpicyBuffalo(Emu):
                 self._y_mean.append(y_mean)
                 self._y_std.append(y_std)
 
+
         self.mean_function = self._make_custom_mean_function(custom_mean_function)
         for i, mf in enumerate(self.mean_function(self.x)):
             self.y[i] -= mf
@@ -1812,7 +1845,6 @@ class SpicyBuffalo(Emu):
         skip_r_idx = np.ones(self.emulator_ndim+1, dtype = bool)
         skip_r_idx[r_idx] = False
 
-        print type(x), len(x), x.shape
 
         if type(x) is list and len(x) == self.n_bins:
             out = []
@@ -1904,6 +1936,9 @@ class SpicyBuffalo(Emu):
         """
         kernel = self._make_kernel(hyperparams)
 
+        if type(kernel) is not list:
+            kernel = [kernel for i in xrange(self.n_bins)]
+
         # now, make a list of emulators
         self._emulators = []
 
@@ -1915,9 +1950,9 @@ class SpicyBuffalo(Emu):
             yerr = self.downsample_yerr
 
 
-        for _x, _yerr in izip(x, yerr):
+        for _x, _yerr, _kernel in izip(x, yerr, kernel):
 
-            emulator = george.GP(kernel)
+            emulator = george.GP(_kernel)
 
             # TODO remoinv the HPs, may be a mistake
             emulator.compute(_x, _yerr)#,**hyperparams)  # NOTE I'm using a modified version of george!
@@ -2105,7 +2140,7 @@ class LemonPepperWet(SpicyBuffalo):
         :return: None
         """
         # make sure we attach metadata to the object
-        x, y, ycov = self.get_data(filename, self.fixed_params, attach_params=True)
+        x, y, ycov = self.get_data(filename, self.fixed_params, attach_params=True, remove_nans = False)
 
         # store the data loading args, if we wanna reload later
         # useful ofr sampling the training data
@@ -2164,19 +2199,21 @@ class LemonPepperWet(SpicyBuffalo):
         skip_r_idx[r_idx] = False
 
         # select the non-r x's for one bin
-        bin_idxs = np.isclose(self.scale_bin_centers[0], x[:, r_idx])
+        bin_idxs = np.isclose(np.log10(self.scale_bin_centers[0]), x[:, r_idx])
 
         # do the x stuff one time, then copy
         x_in_bin = x[bin_idxs, :][:, skip_r_idx]
+
         x_mean, x_std = x_in_bin.mean(axis=0), x_in_bin.std(axis=0)
         norm_x = (x_in_bin - x_mean) / (x_std + 1e-5)
 
         # TODO a better yerr strategy for this hack
         # I do think it's small enough as to no matter
         yerr_one_bin = yerr[bin_idxs]
+        yerr_one_bin[np.isnan(yerr_one_bin)] = np.nanmin(yerr_one_bin)
 
         for bin_no, sbc in enumerate(np.log10(self.scale_bin_centers)):
-            bin_idxs = np.isclose(self.scale_bin_centers[0], x[:, r_idx])
+            bin_idxs = np.isclose(sbc, x[:, r_idx])
 
             y_in_bin = y[bin_idxs]
 
@@ -2190,6 +2227,7 @@ class LemonPepperWet(SpicyBuffalo):
 
             self.x.append(norm_x)
             self.y.append((y_in_bin - y_mean) / (y_std + 1e-5))
+            #self.yerr.append(np.ones_like(yerr_one_bin)*1e-6)
             self.yerr.append(yerr_one_bin)
 
             self._x_mean.append(x_mean)
@@ -2199,9 +2237,11 @@ class LemonPepperWet(SpicyBuffalo):
                 self._y_mean.append(y_mean)
                 self._y_std.append(y_std)
 
+
         self.mean_function = self._make_custom_mean_function(custom_mean_function)
         for i, mf in enumerate(self.mean_function(self.x)):
             self.y[i] -= mf
+
 
     def _downsample_data(self):
 
@@ -2212,20 +2252,22 @@ class LemonPepperWet(SpicyBuffalo):
         downsampled_points = np.random.choice(len(self.x[0]), downsample_N_points, replace=False)
 
         downsample_x = np.zeros((downsample_N_points, self.x[0].shape[1]))
+        downsample_yerr = np.zeros((downsample_N_points,))
 
         for i, dp in enumerate(downsampled_points):
-            downsample_x[0][i:(i + 1)] = self.x[0][dp: (dp + 1)]
+            downsample_x[i:(i + 1)] = self.x[0][dp: (dp + 1)]
+            downsample_yerr[i:(i+1)] = self.yerr[0][dp:(dp+1)] 
 
         self.downsample_x = []
         self.downsample_y = [np.zeros((downsample_N_points,)) for i in xrange(self.n_bins)]
-        self.downsample_yerr = [np.zeros((downsample_N_points,)) for i in xrange(self.n_bins)]
+        self.downsample_yerr = []
 
         for e in xrange(self.n_bins):
             self.downsample_x.append(downsample_x)
+            self.downsample_yerr.append(downsample_yerr)
 
             for i, dp in enumerate(downsampled_points):
                 self.downsample_y[e][i:(i + 1)] = self.y[e][dp: (dp + 1)]
-                self.downsample_yerr[e][i:(i + 1)] = self.yerr[e][dp: (dp + 1)]
 
     def _build_gp(self, hyperparams):
         """
@@ -2251,6 +2293,7 @@ class LemonPepperWet(SpicyBuffalo):
         emulator = george.GP(kernel)
 
         # TODO remoinv the HPs, may be a mistake
+
         emulator.compute(x, yerr)  # ,**hyperparams)
 
         for i in xrange(self.n_bins):

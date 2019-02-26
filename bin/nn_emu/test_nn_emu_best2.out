@@ -1,0 +1,146 @@
+-------------------------------------------------------------------------------
+There are messages associated with the following module(s):
+-------------------------------------------------------------------------------
+
+py-tensorflow/1.6.0_py27:
+   Warning: this module requires a GPU, it won't work on CPU nodes.
+-------------------------------------------------------------------------------
+
+/home/users/swmclau2/.local/lib/python2.7/site-packages/h5py/__init__.py:36: FutureWarning: Conversion of the second argument of issubdtype from `float` to `np.floating` is deprecated. In future, it will be treated as `np.float64 == np.dtype(float).type`.
+  from ._conv import register_converters as _register_converters
+2019-02-14 19:59:20.140520: I tensorflow/core/platform/cpu_feature_guard.cc:140] Your CPU supports instructions that this TensorFlow binary was not compiled to use: AVX2 FMA
+2019-02-14 19:59:20.415774: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1212] Found device 0 with properties: 
+name: Tesla P100-PCIE-16GB major: 6 minor: 0 memoryClockRate(GHz): 1.3285
+pciBusID: 0000:82:00.0
+totalMemory: 15.90GiB freeMemory: 15.61GiB
+2019-02-14 19:59:20.602947: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1212] Found device 1 with properties: 
+name: Tesla P100-PCIE-16GB major: 6 minor: 0 memoryClockRate(GHz): 1.3285
+pciBusID: 0000:83:00.0
+totalMemory: 15.90GiB freeMemory: 15.61GiB
+2019-02-14 19:59:20.604650: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1227] Device peer to peer matrix
+2019-02-14 19:59:20.604691: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1233] DMA: 0 1 
+2019-02-14 19:59:20.604700: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1243] 0:   Y Y 
+2019-02-14 19:59:20.604706: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1243] 1:   Y Y 
+2019-02-14 19:59:20.604722: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1312] Adding visible gpu devices: 0, 1
+2019-02-14 19:59:21.270039: I tensorflow/core/common_runtime/gpu/gpu_device.cc:993] Creating TensorFlow device (/device:GPU:0 with 15139 MB memory) -> physical GPU (device: 0, name: Tesla P100-PCIE-16GB, pci bus id: 0000:82:00.0, compute capability: 6.0)
+2019-02-14 19:59:21.564952: I tensorflow/core/common_runtime/gpu/gpu_device.cc:993] Creating TensorFlow device (/device:GPU:1 with 15139 MB memory) -> physical GPU (device: 1, name: Tesla P100-PCIE-16GB, pci bus id: 0000:83:00.0, compute capability: 6.0)
+/home/users/swmclau2/.local/lib/python2.7/site-packages/sklearn/neural_network/multilayer_perceptron.py:564: ConvergenceWarning: Stochastic Optimizer: Maximum iterations (10) reached and the optimization hasn't converged yet.
+  % self.max_iter, ConvergenceWarning)
+2019-02-14 19:59:57.984956: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1312] Adding visible gpu devices: 0, 1
+2019-02-14 19:59:57.985826: I tensorflow/core/common_runtime/gpu/gpu_device.cc:993] Creating TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 570 MB memory) -> physical GPU (device: 0, name: Tesla P100-PCIE-16GB, pci bus id: 0000:82:00.0, compute capability: 6.0)
+2019-02-14 19:59:57.986080: I tensorflow/core/common_runtime/gpu/gpu_device.cc:993] Creating TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:1 with 570 MB memory) -> physical GPU (device: 1, name: Tesla P100-PCIE-16GB, pci bus id: 0000:83:00.0, compute capability: 6.0)
+[u'/device:GPU:0', u'/device:GPU:1']
+Iteration 1, loss = 0.44518924
+Iteration 2, loss = 0.30022781
+Iteration 3, loss = 0.20197004
+Iteration 4, loss = 0.13775042
+Iteration 5, loss = 0.09753959
+Iteration 6, loss = 0.07276611
+Iteration 7, loss = 0.05716436
+Iteration 8, loss = 0.04682079
+Iteration 9, loss = 0.03954826
+Iteration 10, loss = 0.03414122
+{'r': 24.06822623, 'z': 0.0}
+Sizes [500, 500, 100]
+Batch size 10
+Regularization, Dowsample: 1e-08 0.1
+Epoch 0, loss = 1.285258e+02
+Val score: 0.932337, 4.75 % Loss
+Epoch 10, loss = 4.058419e+01
+Val score: 0.966681, 3.16 % Loss
+Epoch 20, loss = 2.390717e+01
+Val score: 0.956077, 5.65 % Loss
+Epoch 30, loss = 1.763628e+01
+Val score: 0.959349, 2.95 % Loss
+Epoch 40, loss = 1.447371e+01
+Val score: 0.952098, 4.98 % Loss
+Epoch 50, loss = 1.306249e+01
+Val score: 0.964757, 3.73 % Loss
+Epoch 60, loss = 1.188204e+01
+Val score: 0.953663, 3.40 % Loss
+Epoch 70, loss = 1.097801e+01
+Val score: 0.966917, 4.38 % Loss
+Epoch 80, loss = 1.047456e+01
+Val score: 0.965264, 4.07 % Loss
+Epoch 90, loss = 9.787469e+00
+Val score: 0.969333, 3.02 % Loss
+Epoch 100, loss = 9.070305e+00
+Val score: 0.973595, 3.01 % Loss
+Epoch 110, loss = 8.710187e+00
+Val score: 0.971656, 2.72 % Loss
+Epoch 120, loss = 8.393242e+00
+Val score: 0.974019, 3.06 % Loss
+Epoch 130, loss = 8.241107e+00
+Val score: 0.978516, 2.25 % Loss
+Epoch 140, loss = 7.945949e+00
+Val score: 0.978709, 2.69 % Loss
+Epoch 150, loss = 7.222970e+00
+Val score: 0.984722, 1.65 % Loss
+Epoch 160, loss = 7.105433e+00
+Val score: 0.979310, 2.65 % Loss
+Epoch 170, loss = 6.850578e+00
+Val score: 0.980238, 2.91 % Loss
+Epoch 180, loss = 6.637716e+00
+Val score: 0.983807, 2.01 % Loss
+Epoch 190, loss = 6.389226e+00
+Val score: 0.984402, 2.00 % Loss
+Epoch 200, loss = 6.542770e+00
+Val score: 0.982432, 2.02 % Loss
+Epoch 210, loss = 6.224628e+00
+Val score: 0.984205, 1.51 % Loss
+Epoch 220, loss = 6.125448e+00
+Val score: 0.982234, 1.49 % Loss
+Epoch 230, loss = 5.998076e+00
+Val score: 0.981178, 1.69 % Loss
+Epoch 240, loss = 5.928725e+00
+Val score: 0.986060, 1.85 % Loss
+Epoch 250, loss = 5.782280e+00
+Val score: 0.986220, 1.42 % Loss
+Epoch 260, loss = 5.676614e+00
+Val score: 0.986708, 1.08 % Loss
+Epoch 270, loss = 5.488917e+00
+Val score: 0.985610, 1.65 % Loss
+Epoch 280, loss = 5.603438e+00
+Val score: 0.984321, 1.44 % Loss
+Epoch 290, loss = 5.617763e+00
+Val score: 0.983848, 1.56 % Loss
+Epoch 300, loss = 5.296917e+00
+Val score: 0.987237, 1.02 % Loss
+Epoch 310, loss = 5.251858e+00
+Val score: 0.987866, 1.42 % Loss
+Epoch 320, loss = 5.213690e+00
+Val score: 0.984562, 1.49 % Loss
+Epoch 330, loss = 5.295990e+00
+Val score: 0.985239, 1.06 % Loss
+Epoch 340, loss = 5.146258e+00
+Val score: 0.983904, 1.26 % Loss
+Epoch 350, loss = 5.221529e+00
+Val score: 0.984741, 1.06 % Loss
+Epoch 360, loss = 5.063314e+00
+Val score: 0.984474, 1.30 % Loss
+Epoch 370, loss = 5.246973e+00
+Val score: 0.986734, 1.03 % Loss
+Epoch 380, loss = 4.853738e+00
+Val score: 0.984882, 1.56 % Loss
+Epoch 390, loss = 4.922187e+00
+Val score: 0.985152, 1.65 % Loss
+Epoch 400, loss = 4.749412e+00
+Val score: 0.985732, 1.44 % Loss
+Epoch 410, loss = 4.791313e+00
+Val score: 0.985160, 1.66 % Loss
+Epoch 420, loss = 4.758022e+00
+Val score: 0.983009, 1.45 % Loss
+Epoch 430, loss = 4.736039e+00
+Val score: 0.983891, 1.61 % Loss
+Epoch 440, loss = 4.728962e+00
+Val score: 0.982884, 1.14 % Loss
+Epoch 450, loss = 4.853593e+00
+Val score: 0.983324, 1.40 % Loss
+Epoch 460, loss = 4.683331e+00
+Val score: 0.984011, 1.68 % Loss
+Epoch 470, loss = 4.547053e+00
+Val score: 0.982498, 1.86 % Loss
+Epoch 480, loss = 4.792871e+00
+Val score: 0.985373, 1.18 % Loss
+Epoch 490, loss = 4.569566e+00
+Val score: 0.984038, 1.28 % Loss

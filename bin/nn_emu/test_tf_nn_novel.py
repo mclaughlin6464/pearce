@@ -22,12 +22,8 @@ split_method = 'random'
 
 a = 1.0
 z = 1.0/a - 1.0
-#array([  0.09581734,   0.13534558,   0.19118072,   0.27004994,
-#         0.38145568,   0.53882047,   0.76110414,   1.07508818,
-#                  1.51860241,   2.14508292,   3.03001016,   4.28000311,
-#                           6.04566509,   8.53972892,  12.06268772,  17.0389993 ,
-#                                   24.06822623,  33.99727318])
-fixed_params = {'z':z, 'r': 0.09581734}
+
+fixed_params = {'z':z, 'r': 24.06822623}
 
 # This is just me loading the data with my own code, nothing to do with NN
 n_leaves, n_overlap = 50, 1
@@ -211,12 +207,14 @@ def train(model_init_fn, optimizer_init_fn,num_params, train_data, val_data, hid
 
 print fixed_params
 #sizes = [100, 250, 500, 250, 100]#, 2000, 1000]#, 100]
-sizes = [500, 500, 100]#,10]
-bs = 20
-l, p = 1e-8, 0.1
+#sizes = [100, 500, 500, 100]#,10]
+
+sizes = ([100, 100], [500, 500], [500])
+bs = 10
+l, p = (0,0,0), (0.5, 0.2, 0.3)
 print 'Sizes', sizes
 print 'Batch size', bs
 print 'Regularization, Dowsample:', l, p
 
-train(n_layer_fc, optimizer_init_fn, x_train.shape[1], (x_train, y_train, yerr_train), (x_test, y_test), sizes, num_epochs= 500,           batch_size = bs, l = l, p = p, print_every = 10)
+train(novel_fc, optimizer_init_fn, x_train.shape[1], (x_train, y_train, yerr_train), (x_test, y_test), sizes, num_epochs= 500,           batch_size = bs, l = l, p = p, print_every = 10)
 

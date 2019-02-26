@@ -1,7 +1,6 @@
-from pearce.emulator import OriginalRecipe, ExtraCrispy
-from pearce.mocks import cat_dict
 import numpy as np
-from os import path
+from os.path import join 
+from glob import glob
 import tensorflow as tf
 
 from tensorflow.python.client import device_lib
@@ -12,49 +11,102 @@ def get_available_gpus():
 
 print get_available_gpus()
 
-#xi gg
-training_file = '/scratch/users/swmclau2/xi_zheng07_cosmo_lowmsat/PearceRedMagicXiCosmoFixedNd.hdf5'
-#test_file= '/scratch/users/swmclau2/xi_zheng07_cosmo_test_lowmsat2/'
-test_file =  '/scratch/users/swmclau2/xi_zheng07_cosmo_test_lowmsat2/PearceRedMagicXiCosmoFixedNd_Test.hdf5'
 
-em_method = 'nn'
-split_method = 'random'
+data_dir = '/home/users/swmclau2/scratch/wp_data_trainingtest/'
+cosmo_data_fname = 'cosmology_camb_full.dat'
+hod_data_fname = 'HOD_design_np11_n5000.dat'
 
-a = 1.0
-z = 1.0/a - 1.0
-#array([  0.09581734,   0.13534558,   0.19118072,   0.27004994,
-#         0.38145568,   0.53882047,   0.76110414,   1.07508818,
-#                  1.51860241,   2.14508292,   3.03001016,   4.28000311,
-#                           6.04566509,   8.53972892,  12.06268772,  17.0389993 ,
-#                                   24.06822623,  33.99727318])
-fixed_params = {'z':z, 'r': 0.09581734}
+cosmo_colnames = ['Om', 'Ob', 'sigma_8', 'h', 'n_s']
+cosmo_data = np.loadtxt(join(data_dir, cosmo_data_fname))#, delimiter='  ')
 
-# This is just me loading the data with my own code, nothing to do with NN
-n_leaves, n_overlap = 50, 1
+hod_colnames = ['M1', 'alpha', 'Mmin', 'sigma_logM']
+hod_data = np.loadtxt(join(data_dir, hod_data_fname))#, delimiter = ' ')
 
-# TODO ostrich module that just gets the data in the write format.
-emu = OriginalRecipe(training_file, method = em_method, fixed_params=fixed_params,
-                    hyperparams = {'hidden_layer_sizes': (10),
-                                 'activation': 'relu', 'verbose': True, 
-                                    'tol': 1e-8, 'learning_rate_init':1e-4,\
-                                   'max_iter':10, 'alpha':0, 'early_stopping':False, 'validation_fraction':0.3})
+mass_points = hod_data > 1e3 #I think this cut will work
 
-x_train, y_train,yerr_train = emu.x ,emu.y ,emu.yerr
+hod_data[mass_points] = np.log10(hod_data[mass_points])
 
-_x_test, y_test, _, info = emu.get_data(test_file, fixed_params, None, False)
-# whtien the data
-x_test = (_x_test - _x_test.mean(axis = 0))/_x_test.std(axis = 0)
+clustering_dir = 'wp_training_output'
+clustering_files = sorted(glob(join(data_dir, clustering_dir) + '/*.dat') )
 
-y_train_mean, y_train_std = y_train.mean(axis = 0), y_train.std(axis =0)
-#y_test_mean, y_test_std = y_test.mean(axis = 0), y_test.std(axis = 0)
+print len(clustering_files)
 
-y_train = (y_train- y_train_mean)/(y_train_std)
-#y_test = (y_test - y_test_mean)/(y_test_std)
+# TODO i want to do this for individual bins.
+nbins = 9
+bin_idx = 7 # second to last bin
+zx = np.zeros((len(clustering_files), cosmo_data.shape[1]+hod_data.shape[1]))
+zy = np.zeros((len(clustering_files),))
 
-yerr_train[yerr_train==0] = 1
+for i, cf in enumerate(clustering_files):
+    if i%1000==0:
+        print i
+    if 'err' in cf:
+        continue
+    data = np.loadtxt(cf)#, delimiter = ' ')
+    #rs = np.log10(data[:,0])
+    wp = np.log10(data[:,1])
+    fbase = cf.split('/')[-1]
+    split_fbase = fbase.split('_')
+    cosmo, hod = int(split_fbase[3]), int(split_fbase[5])
+        
+    n_cosmo_params = cosmo_data.shape[1]
 
+    zx[i, :n_cosmo_params] = cosmo_data[cosmo]
+    zx[i, n_cosmo_params:] = hod_data[hod]
+    zy[i] = wp[bin_idx]
+
+
+zx_mean, zx_std = zx.mean(axis =0), zx.std(axis = 0)
+zx = (zx-zx_mean)/(zx_std+1e-5)
+
+np.savetxt(join(data_dir,'zx.npy'), zx)
+np.savetxt(join(data_dir,'zy.npy'), zy)
+
+# repeat with test sets
+cosmo_data_fname = 'cosmology_camb_test_box_full.dat'
+hod_data_fname = 'HOD_test_np11_n1000.dat'
+
+cosmo_data_test = np.loadtxt(join(data_dir, cosmo_data_fname))#, delimiter='  ')
+
+hod_data_test = np.loadtxt(join(data_dir, hod_data_fname))#, delimiter = ' ')
+
+mass_points = hod_data_test > 1e3 #I think this cut will work
+hod_data_test[mass_points] = np.log10(hod_data_test[mass_points])
+
+clustering_dir = 'wp_test_output_mean'
+clustering_files = sorted(glob(join(data_dir, clustering_dir) + '/*.dat') )
+
+zx_test = np.zeros((len(clustering_files)*nbins, cosmo_data.shape[1]+hod_data.shape[1]))
+zy_test = np.zeros((len(clustering_files)*nbins,))
+
+y_train_mean, y_train_std = 0.0, 1.0
+
+for i, cf in enumerate(clustering_files):
+    if i%1000==0:
+        print i
+    if 'err' in cf:
+        continue
+    data = np.loadtxt(cf, delimiter = ' ')
+    #rs = np.log10(data[:,0])
+    wp = np.log10(data[:,1])
+    fbase = cf.split('/')[-1]
+    split_fbase = fbase.split('_')
+    cosmo, hod = int(split_fbase[3]), int(split_fbase[5])
+
+    n_cosmo_params = cosmo_data.shape[1]
+        
+    zx_test[i, :n_cosmo_params] = cosmo_data_test[cosmo]
+    zx_test[i, n_cosmo_params:] = hod_data_test[hod]
+    zy_test[i] = wp[bin_idx]
+
+zx_test = (zx_test-zx_mean)/(zx_std+1e-5)
+
+np.savetxt(join(data_dir,'zx_test.npy'), zx_test)
+np.savetxt(join(data_dir,'zy_test.npy'), zy_test)
+
+print 'made the data'
 # function that defines a Fully connected network with N layers
-def n_layer_fc(x, hidden_sizes, training=False, l = 1e-8, p=0.1):
+def n_layer_fc(x, hidden_sizes, training=False, l = 1e-5, p=0.1):
     initializer = tf.variance_scaling_initializer(scale=2.0)
     regularizer = tf.contrib.layers.l2_regularizer(l)
     fc_output = tf.layers.dense(x, hidden_sizes[0], activation=tf.nn.relu,
@@ -67,7 +119,7 @@ def n_layer_fc(x, hidden_sizes, training=False, l = 1e-8, p=0.1):
                                  kernel_regularizer = regularizer)
         bd_out = tf.layers.dropout(fc_output, p, training = training)
         bn_out = tf.layers.batch_normalization(bd_out, axis = -1, training=training)
-        fc_output = tf.nn.relu(bn_out)#tf.nn.leaky_relu(bn_out, alpha=0.01)
+        fc_output = tf.nn.leaky_relu(bn_out)#, alpha=0.01)
         
     pred = tf.layers.dense(fc_output, 1, kernel_initializer=initializer, 
                               kernel_regularizer = regularizer)[:,0]#,
@@ -139,7 +191,7 @@ def novel_fc(x, hidden_sizes, training=False, l = (1e-6, 1e-6, 1e-6), p = (0.5, 
 
 
 # Optimizier function
-def optimizer_init_fn(learning_rate = 1e-4):
+def optimizer_init_fn(learning_rate = 2e-7):
     return tf.train.AdamOptimizer(learning_rate)#, beta1=0.9, beta2=0.999, epsilon=1e-6)
 
 
@@ -163,31 +215,35 @@ def check_accuracy(sess, val_data,batch_size, x, weights, preds, is_training=Non
         
     print 'Val score: %.6f, %.2f %% Loss'%(np.mean(np.array(scores)), 100*np.mean(np.array(perc_acc)))
 
+device = '/device:GPU:0'
 #device = '/cpu:0'
 # main training function
 def train(model_init_fn, optimizer_init_fn,num_params, train_data, val_data, hidden_sizes,               num_epochs=1, batch_size = 200, l = 1e-6, p = 0.5, print_every=10):
     tf.reset_default_graph()    
-    # Construct the computational graph we will use to train the model. We
-    # use the model_init_fn to construct the model, declare placeholders for
-    # the data and labels
-    x = tf.placeholder(tf.float32, [None,num_params])
-    y = tf.placeholder(tf.float32, [None])
-    weights = tf.placeholder(tf.float32, [None])
-    
-    is_training = tf.placeholder(tf.bool, name='is_training')
-    
-    preds = model_init_fn(x, hidden_sizes, is_training, l = l)#, p=p)
-
-    # Compute the loss like we did in Part II
-    #loss = tf.reduce_mean(loss)
+    with tf.device(device):
+        # Construct the computational graph we will use to train the model. We
+        # use the model_init_fn to construct the model, declare placeholders for
+        # the data and labels
+        x = tf.placeholder(tf.float32, [None,num_params])
+        y = tf.placeholder(tf.float32, [None])
+        weights = tf.placeholder(tf.float32, [None])
         
-    loss = tf.losses.mean_squared_error(labels=y, predictions=preds, weights = weights)#weights?
-    #loss = tf.losses.absolute_difference(labels=y, predictions=preds, weights = weights)#weights?
+        is_training = tf.placeholder(tf.bool, name='is_training')
+        
+        preds = model_init_fn(x, hidden_sizes, is_training, l = l)#, p=p)
 
-    optimizer = optimizer_init_fn()
-    update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-    with tf.control_dependencies(update_ops):
-        train_op = optimizer.minimize(loss)
+        # Compute the loss like we did in Part II
+        #loss = tf.reduce_mean(loss)
+        
+    with tf.device('/cpu:0'):
+        loss = tf.losses.mean_squared_error(labels=y,                    predictions=preds, weights = weights)#weights?
+        #loss = tf.losses.absolute_difference(labels=y, predictions=preds, weights = tf.abs(1.0/y))#weights?
+
+    with tf.device(device):
+        optimizer = optimizer_init_fn()
+        update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+        with tf.control_dependencies(update_ops):
+            train_op = optimizer.minimize(loss)
         
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
@@ -209,14 +265,10 @@ def train(model_init_fn, optimizer_init_fn,num_params, train_data, val_data, hid
             #t += 1
 
 
-print fixed_params
 #sizes = [100, 250, 500, 250, 100]#, 2000, 1000]#, 100]
-sizes = [500, 500, 100]#,10]
-bs = 20
-l, p = 1e-8, 0.1
-print 'Sizes', sizes
-print 'Batch size', bs
-print 'Regularization, Dowsample:', l, p
+sizes = [500,500, 500]#,10]
+bs = 100
+l, p = 1e-5, 0.0
 
-train(n_layer_fc, optimizer_init_fn, x_train.shape[1], (x_train, y_train, yerr_train), (x_test, y_test), sizes, num_epochs= 500,           batch_size = bs, l = l, p = p, print_every = 10)
+train(n_layer_fc, optimizer_init_fn, zx.shape[1], (zx, zy, np.ones_like(zy)), (zx_test, zy_test), sizes, num_epochs= int(1e5),           batch_size = bs, l = l, p = p, print_every = 2000)
 

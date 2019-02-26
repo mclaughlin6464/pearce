@@ -1,0 +1,128 @@
+-------------------------------------------------------------------------------
+There are messages associated with the following module(s):
+-------------------------------------------------------------------------------
+
+py-tensorflow/1.6.0_py27:
+   Warning: this module requires a GPU, it won't work on CPU nodes.
+-------------------------------------------------------------------------------
+
+/home/users/swmclau2/.local/lib/python2.7/site-packages/h5py/__init__.py:36: FutureWarning: Conversion of the second argument of issubdtype from `float` to `np.floating` is deprecated. In future, it will be treated as `np.float64 == np.dtype(float).type`.
+  from ._conv import register_converters as _register_converters
+2018-11-09 10:42:35.642564: I tensorflow/core/platform/cpu_feature_guard.cc:140] Your CPU supports instructions that this TensorFlow binary was not compiled to use: AVX2 FMA
+2018-11-09 10:42:35.829986: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1212] Found device 0 with properties: 
+name: GeForce GTX TITAN X major: 5 minor: 2 memoryClockRate(GHz): 1.076
+pciBusID: 0000:8a:00.0
+totalMemory: 11.93GiB freeMemory: 11.81GiB
+2018-11-09 10:42:35.830023: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1312] Adding visible gpu devices: 0
+2018-11-09 10:42:36.153189: I tensorflow/core/common_runtime/gpu/gpu_device.cc:993] Creating TensorFlow device (/device:GPU:0 with 11439 MB memory) -> physical GPU (device: 0, name: GeForce GTX TITAN X, pci bus id: 0000:8a:00.0, compute capability: 5.2)
+2018-11-09 10:44:18.574092: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1312] Adding visible gpu devices: 0
+2018-11-09 10:44:18.574732: I tensorflow/core/common_runtime/gpu/gpu_device.cc:993] Creating TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 377 MB memory) -> physical GPU (device: 0, name: GeForce GTX TITAN X, pci bus id: 0000:8a:00.0, compute capability: 5.2)
+[u'/device:GPU:0']
+4002
+0
+1000
+2000
+3000
+4000
+0
+made the data
+Epoch 0, loss = 1.894866e+00
+Val score: -5.120961, 100.00 % Loss
+Epoch 2000, loss = 2.065575e-01
+Val score: -0.175705, 99.30 % Loss
+Epoch 4000, loss = 1.555657e-01
+Val score: -0.086848, 98.86 % Loss
+Epoch 6000, loss = 1.245400e-01
+Val score: -0.049370, 98.48 % Loss
+Epoch 8000, loss = 1.123874e-01
+Val score: -0.015613, 97.24 % Loss
+Epoch 10000, loss = 9.634722e-02
+Val score: -0.003082, 92.32 % Loss
+Epoch 12000, loss = 8.518939e-02
+Val score: 0.009227, 44.79 % Loss
+Epoch 14000, loss = 8.152005e-02
+Val score: 0.018770, 86.88 % Loss
+Epoch 16000, loss = 7.089808e-02
+Val score: 0.028269, 54.72 % Loss
+Epoch 18000, loss = 7.023155e-02
+Val score: 0.032988, 27.96 % Loss
+Epoch 20000, loss = 6.466692e-02
+Val score: 0.043062, 64.19 % Loss
+Epoch 22000, loss = 6.113568e-02
+Val score: 0.044316, 135.33 % Loss
+Epoch 24000, loss = 6.041251e-02
+Val score: 0.048271, 114.58 % Loss
+Epoch 26000, loss = 5.425997e-02
+Val score: 0.049186, 222.90 % Loss
+Epoch 28000, loss = 5.081630e-02
+Val score: 0.054845, 320.49 % Loss
+Epoch 30000, loss = 4.824777e-02
+Val score: 0.057321, 795.10 % Loss
+Epoch 32000, loss = 4.714525e-02
+Val score: 0.061099, 750.11 % Loss
+Epoch 34000, loss = 4.228075e-02
+Val score: 0.060564, 535.78 % Loss
+Epoch 36000, loss = 4.061748e-02
+Val score: 0.065234, 939.16 % Loss
+Epoch 38000, loss = 3.726315e-02
+Val score: 0.065750, 844.94 % Loss
+Epoch 40000, loss = 3.441355e-02
+Val score: 0.067588, 1142.79 % Loss
+Epoch 42000, loss = 3.418144e-02
+Val score: 0.068428, 971.60 % Loss
+Epoch 44000, loss = 2.978824e-02
+Val score: 0.067269, 1058.87 % Loss
+Epoch 46000, loss = 3.352046e-02
+Val score: 0.073186, 1551.04 % Loss
+Epoch 48000, loss = 2.669792e-02
+Val score: 0.073698, 1300.77 % Loss
+Epoch 50000, loss = 2.599033e-02
+Val score: 0.074055, 901.56 % Loss
+Epoch 52000, loss = 2.659444e-02
+Val score: 0.077221, 1497.51 % Loss
+Epoch 54000, loss = 2.178230e-02
+Val score: 0.076853, 1196.49 % Loss
+Epoch 56000, loss = 2.437495e-02
+Val score: 0.078406, 1197.53 % Loss
+Epoch 58000, loss = 1.936270e-02
+Val score: 0.078316, 1309.24 % Loss
+Epoch 60000, loss = 1.831758e-02
+Val score: 0.077638, 1015.37 % Loss
+Epoch 62000, loss = 1.782259e-02
+Val score: 0.081305, 1134.62 % Loss
+Epoch 64000, loss = 1.730656e-02
+Val score: 0.080746, 1198.36 % Loss
+Epoch 66000, loss = 1.532508e-02
+Val score: 0.081402, 1127.77 % Loss
+Epoch 68000, loss = 1.757056e-02
+Val score: 0.081303, 1227.03 % Loss
+Epoch 70000, loss = 1.551825e-02
+Val score: 0.083371, 1247.71 % Loss
+Epoch 72000, loss = 1.580743e-02
+Val score: 0.083689, 1065.44 % Loss
+Epoch 74000, loss = 1.510902e-02
+Val score: 0.083174, 965.78 % Loss
+Epoch 76000, loss = 1.211808e-02
+Val score: 0.085450, 1040.36 % Loss
+Epoch 78000, loss = 1.276869e-02
+Val score: 0.083321, 842.88 % Loss
+Epoch 80000, loss = 1.353484e-02
+Val score: 0.084290, 959.14 % Loss
+Epoch 82000, loss = 1.824014e-02
+Val score: 0.085829, 774.54 % Loss
+Epoch 84000, loss = 1.050250e-02
+Val score: 0.085217, 661.22 % Loss
+Epoch 86000, loss = 1.041475e-02
+Val score: 0.085052, 757.26 % Loss
+Epoch 88000, loss = 1.251105e-02
+Val score: 0.086244, 580.69 % Loss
+Epoch 90000, loss = 1.141493e-02
+Val score: 0.086051, 693.12 % Loss
+Epoch 92000, loss = 9.720015e-03
+Val score: 0.086243, 690.77 % Loss
+Epoch 94000, loss = 8.461844e-03
+Val score: 0.087728, 673.99 % Loss
+Epoch 96000, loss = 9.250789e-03
+Val score: 0.087212, 727.65 % Loss
+Epoch 98000, loss = 7.726856e-03
+Val score: 0.086548, 579.45 % Loss
