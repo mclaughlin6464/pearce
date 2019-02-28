@@ -674,7 +674,7 @@ class Cat(object):
         """
         mf = self.calc_mf()
         hod = self.calc_hod(params)
-        return np.sum(mf*hod)/((self.Lbox/self.h)**3)
+        return np.sum(mf*hod)/((self.Lbox)**3)#/self.h)**3)
 
     def calc_xi_mm(self, rbins, n_cores='all', use_corrfunc=False):
         """

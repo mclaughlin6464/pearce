@@ -139,7 +139,7 @@ def novel_fc(x, hidden_sizes, training=False, l = (1e-6, 1e-6, 1e-6), p = (0.5, 
 
 
 # Optimizier function
-def optimizer_init_fn(learning_rate = 1e-4):
+def optimizer_init_fn(learning_rate = 1e-6):
     return tf.train.AdamOptimizer(learning_rate)#, beta1=0.9, beta2=0.999, epsilon=1e-6)
 
 
@@ -211,9 +211,9 @@ def train(model_init_fn, optimizer_init_fn,num_params, train_data, val_data, hid
 
 print fixed_params
 #sizes = [100, 250, 500, 250, 100]#, 2000, 1000]#, 100]
-sizes = [500, 500, 100]#,10]
-bs = 20
-l, p = 1e-8, 0.1
+sizes = [100, 100]#, 100]#,10]
+bs = 40
+l, p = 1e-6, 0.1
 print 'Sizes', sizes
 print 'Batch size', bs
 print 'Regularization, Dowsample:', l, p
