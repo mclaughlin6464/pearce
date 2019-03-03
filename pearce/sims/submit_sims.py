@@ -93,7 +93,7 @@ submission_file_template = """#!/bin/bash
 #SBATCH --time={time:d}:00
 #SBATCH --ntasks={ntasks:d}
 
-srun fastpm {boxdir}nbodykit.lua
+srun /home/users/swmclau2/Git/fastpm/src/fastpm {boxdir}nbodykit.lua
 """
 #may need to be an mpirun?
 
