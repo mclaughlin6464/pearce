@@ -1,0 +1,8 @@
+lhc_fname: test_lhc.csv
+output_dir: /scratch/users/swmclau2/pmesh_test/
+powerspectrum: zeldovich
+initial_z: 50
+final_z: 0.55
+npart: 128
+boxsize: 400
+sim_time: 2
