@@ -28,20 +28,31 @@ def submit_sims(lhc_fname, output_dir, powerspectrum, initial_z, final_z,\
 
     initial_a, final_a = 1./(1+initial_z), 1./(1+final_z)
 
-    for idx, row in lhc.iterrow():
+    for idx, row in lhc.iterrows():
         # TODO what to do if already exists? likely will throw some kind of error
         boxdir = path.join(output_dir, "Box_%03d/"%idx)
-        mkdir(boxdir)
+        if not path.isdir(boxdir):
+            mkdir(boxdir)
 
         # TODO parse Jeremy's header, or adjust it to be compliant here
         param_dict = dict([(pn, row[pn]) for pn in param_names] )
+        # TODO it'd be nice if this could be somehow generalized.
+        param_dict['N_ncdm'] = 3.0
+        param_dict['N_ur'] = param_dict['Neff']-3.0
+        del param_dict['Neff']
+                                
+        param_dict['h'] = param_dict['H0']/100
+        del param_dict['H0']
+                                                        
+        param_dict['w0_fld'] = param_dict['w0']
+        del param_dict['w0']
         cosmo = Cosmology(**param_dict)
         # TODO i wanted to do this with fixed amplitudes, not sure how
-        p = power(cosmo, initial_z)
+        p = power(cosmo, initial_z)(k)
 
         np.savetxt(path.join(boxdir,'powerspec.txt'), np.array((k,p)).T)
 
-        with open(path.join(boxdir, 'nbodykit.lua')) as f:
+        with open(path.join(boxdir, 'nbodykit.lua'), 'w') as f:
            f.write(sim_config_template.format(nc = npart, boxsize = boxsize,
                                               initial_a = initial_a,
                                               final_a = final_a,
@@ -53,13 +64,13 @@ def submit_sims(lhc_fname, output_dir, powerspectrum, initial_z, final_z,\
 
         # now, write submission file and submit
 
-        with open(path.join(boxdir, 'submit_sim.sbatch')) as f:
+        with open(path.join(boxdir, 'submit_sim.sbatch'), 'w') as f:
             f.write(submission_file_template.format(jobname = 'Box_%03d'%idx,
                                                     boxdir = boxdir,
                                                     time = sim_time*60, #TODO in config
                                                     ntasks = ncores))
 
-        call("sbatch {boxdir}submit_sim.sbatch".format(boxdir), shell=True)
+        call("sbatch {boxdir}submit_sim.sbatch".format(boxdir=boxdir), shell=True)
 
 sim_config_template = """
 nc = {nc:d}

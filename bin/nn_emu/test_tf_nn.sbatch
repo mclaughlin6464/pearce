@@ -3,7 +3,7 @@
 #SBATCH --time=04:00:00
 #SBATCH --gres gpu:2
 #SBATCH --ntasks 8
-#SBATCH -p gpu 
+#SBATCH -p gpu, iric
 #SBATCH -o test_nn_emu.out 
 
 module load py-tensorflow

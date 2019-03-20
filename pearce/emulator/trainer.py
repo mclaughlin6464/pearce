@@ -528,7 +528,6 @@ class Trainer(object):
 
             # I could compute this, which would be faster, but this is easier to read.
             hod_idxs = np.where(np.all(all_param_idxs[:, :2] == cosmo_sf_pair, axis=1))[0]
-
             grp.create_dataset("obs", data=output[hod_idxs], chunks=True, compression='gzip')
             grp.create_dataset("cov", data=output_cov[hod_idxs], chunks=True, compression='gzip')
 
@@ -610,7 +609,7 @@ class Trainer(object):
             param_filename = path.join(output_directory, jobname + '.npy')
             if not rerun:
                 np.savetxt(param_filename, all_param_idxs[idx])
-            elif path.exists(path.join(output_directory, 'output_%04d.npy'%idx)):\
+            elif path.exists(path.join(output_directory, 'output_%04d.npy'%idx)) and path.exists(path.join(output_directory, 'output_cov_%04d.npy'%idx)):\
                 continue # this one ran successfull
 
             # TODO allow queue changing

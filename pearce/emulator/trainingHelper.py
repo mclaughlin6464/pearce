@@ -5,7 +5,7 @@ import sys
 sys.path.append('..')
 from pearce.emulator.trainer import *
 from itertools import izip
-from os import remove
+from os import remove, getcwd
 from glob import glob
 
 def get_trainer(directory):
@@ -43,12 +43,15 @@ def compute_on_subset(param_fname):
     np.save(path.join(output_directory, 'output_cov_%04d.npy'%job_number), output_cov)
 
 
-def consolidate_outputs(directory):
+def consolidate_outputs(directory=None):
     """
     Take outputs from compute_on_subet and write them to one hdf5 file.
     :param directory:
         The directory with the outputs in them
     """
+    if directory is None:
+        directory = getcwd()
+
     all_output_fnames = sorted(glob(path.join(directory, 'output_*') ))
     output_fnames, output_cov_fnames = [], []
 
@@ -58,8 +61,10 @@ def consolidate_outputs(directory):
         else:
             output_fnames.append(fname)
 
+    assert len(output_cov_fnames) == len(output_fnames), "Nonmatching number of covariance and observable files."
     all_output, all_output_cov = [], []
     # i'd like to find a way to make the numpy arrays a priori but not sure how
+    
     for o_fname, cov_fname in izip(output_fnames, output_cov_fnames):
         all_output.append(np.load(o_fname))
         all_output_cov.append(np.load(cov_fname))

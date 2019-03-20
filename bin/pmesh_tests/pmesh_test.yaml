@@ -5,4 +5,5 @@ initial_z: 50
 final_z: 0.55
 npart: 128
 boxsize: 400
+ncores: 16
 sim_time: 2
