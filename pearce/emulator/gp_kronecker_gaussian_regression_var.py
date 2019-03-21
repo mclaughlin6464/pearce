@@ -13,7 +13,7 @@ class GPKroneckerGaussianRegressionVar(GPKroneckerGaussianRegression):
 
         assert Y_err.shape == Y.shape, "Y_err does not have the same shape as Y. "
 
-        super(self, GPKroneckerGaussianRegressionVar).__init__(self, X1, X2, Y, kern1, kern2, noise_var=noise_var, name=name)
+        super(GPKroneckerGaussianRegressionVar,self).__init__(X1, X2, Y, kern1, kern2, noise_var=noise_var, name=name)
 
         self.Y_err = Y_err
 
@@ -25,7 +25,7 @@ class GPKroneckerGaussianRegressionVar(GPKroneckerGaussianRegression):
         S1, U1 = np.linalg.eigh(K1)
         S2, U2 = np.linalg.eigh(K2)
         # only change ###
-        W = np.kron(S2, S1) + np.diag(self.Y_err.flatten(order = 'F'))+ self.likelihood.variance
+        W = np.kron(S2, S1) + self.Y_err.flatten(order = 'F')+ self.likelihood.variance
         #################
 
         Y_ = U1.T.dot(self.Y).dot(U2)
@@ -64,6 +64,6 @@ class GPKroneckerGaussianRegressionVar(GPKroneckerGaussianRegression):
 
     def predict(self, X1new, X2new):
 
-        mu, var = super(self, GPKroneckerGaussianRegressionVar).predict(X1new, X2new)
+        mu, var = super(GPKroneckerGaussianRegressionVar, self).predict(X1new, X2new)
         # TODO i think the diag should be added to var, not sure how tho
         return mu, var
