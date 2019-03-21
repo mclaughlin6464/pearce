@@ -5,11 +5,11 @@ import numpy as np
 import pandas as pd
 import yaml
 from nbodykit.cosmology import Cosmology
-from nbodykit.cosmology.power import EHPower, ZeldovichPower
+from nbodykit.cosmology.power import LinearPower, ZeldovichPower
 
 # I could have this accept kwargs,
 # and have main
-def submit_sims(lhc_fname, output_dir, powerspectrum, initial_z, final_z,\
+def submit_sims(lhc_fname, output_dir, powerspectrum,cosmic_var, initial_z, final_z,\
                 npart, boxsize, ncores, sim_time):
 
     assert path.isdir(output_dir), "Invalid output directory %s"%output_dir
@@ -19,12 +19,14 @@ def submit_sims(lhc_fname, output_dir, powerspectrum, initial_z, final_z,\
 
     k = np.logspace(-4, 2, 1000)
     # others?
-    assert powerspectrum.lower() in {'linear', 'zeldovich'}, "Invalid initial power specturm"
+    assert powerspectrum.lower() in {'linear', 'zeldovich'}, "Invalid initial power spectrum"
 
     if powerspectrum.lower() == 'linear':
-        power = EHPower
+        power = LinearPower
     else:
         power = ZeldovichPower
+
+    assert cosmic_var.lower() in {'true', 'false'}
 
     initial_a, final_a = 1./(1+initial_z), 1./(1+final_z)
 
@@ -57,6 +59,7 @@ def submit_sims(lhc_fname, output_dir, powerspectrum, initial_z, final_z,\
                                               initial_a = initial_a,
                                               final_a = final_a,
                                               final_z = final_z,
+                                              cosmic_var = cosmic_var,
                                               omega_m = cosmo.Om0,
                                               h = cosmo.h,
                                               seed = int(time())%1000,
@@ -84,6 +87,7 @@ omega_m = {omega_m: f}
 h = {h:f}
 
 read_powerspectrum = "{boxdir}powerspec.txt"
+remove_cosmic_variance = {cosmic_var} 
 random_seed = {seed:d}
 
 pm_nc_factor = 2
