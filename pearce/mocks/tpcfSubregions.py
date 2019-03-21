@@ -15,7 +15,8 @@ from halotools.mock_observables.pair_counters.mesh_helpers import _enforce_maxim
 from halotools.mock_observables.two_point_clustering.tpcf_estimators import _TP_estimator, _TP_estimator_requirements
 from halotools.mock_observables.pair_counters import npairs_jackknife_3d
 
-from halotools.mock_observables.two_point_clustering.tpcf_jackknife import _tpcf_jackknife_process_args,_enclose_in_box, get_subvolume_numbers, jnpair_counts, jrandom_counts 
+from halotools.mock_observables.two_point_clustering.tpcf_jackknife import \
+    _tpcf_jackknife_process_args,_enclose_in_box, get_subvolume_numbers, jrandom_counts
 
 np.seterr(divide='ignore', invalid='ignore')  # ignore divide by zero in e.g. DD/RR
 
@@ -71,7 +72,7 @@ def tpcf_subregions(sample1, randoms, rbins, Nsub=[5, 5, 5],
 # TODO need to modify this function
     D1D1, D1D2, D2D2 = jnpair_counts(
         sample1, sample2, j_index_1, j_index_2, N_sub_vol,
-            rbins, period, num_threads, do_auto, do_cross, _sample1_is_sample2)
+            rbins, period, num_threads, do_auto1, do_cross, do_auto2, _sample1_is_sample2)
 # pull out the full and sub sample results
     print 'E'
     D1D1_full = D1D1[0, :]
@@ -128,3 +129,39 @@ def tpcf_subregions(sample1, randoms, rbins, Nsub=[5, 5, 5],
         outputs.append(xi_22_sub)
     print 'H'
     return outputs[0] if len(outputs) ==1 else tuple(outputs)
+
+# overload to skip the xi_mm calculation
+def jnpair_counts(sample1, sample2, j_index_1, j_index_2, N_sub_vol, rbins,
+        period, num_threads, do_auto1 = True, do_cross=False,do_auto2=False, _sample1_is_sample2=False):
+    """
+    Count jackknife data pairs: DD
+    """
+    if do_auto1 is True:
+        D1D1 = npairs_jackknife_3d(sample1, sample1, rbins, period=period,
+            jtags1=j_index_1, jtags2=j_index_1,  N_samples=N_sub_vol,
+            num_threads=num_threads)
+        D1D1 = np.diff(D1D1, axis=1)
+    else:
+        D1D1 = None
+        D2D2 = None
+
+    if _sample1_is_sample2 and do_auto2:
+        D1D2 = D1D1
+        D2D2 = D1D1
+    if do_cross is True:
+        D1D2 = npairs_jackknife_3d(sample1, sample2, rbins, period=period,
+            jtags1=j_index_1, jtags2=j_index_2,
+            N_samples=N_sub_vol, num_threads=num_threads)
+        D1D2 = np.diff(D1D2, axis=1)
+    else:
+        D1D2 = None
+    if do_auto2 is True:
+        D2D2 = npairs_jackknife_3d(sample2, sample2, rbins, period=period,
+            jtags1=j_index_2, jtags2=j_index_2,
+            N_samples=N_sub_vol, num_threads=num_threads)
+        D2D2 = np.diff(D2D2, axis=1)
+    else:
+        D2D2 = None
+
+    return D1D1, D1D2, D2D2
+
