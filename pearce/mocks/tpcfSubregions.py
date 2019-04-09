@@ -32,7 +32,6 @@ def tpcf_subregions(sample1, randoms, rbins, Nsub=[5, 5, 5],
 # process input parameters
     function_args = (sample1, randoms, rbins, Nsub, sample2, period, do_auto,
         do_cross, estimator, num_threads, seed)
-    print 'A'
     sample1, rbins, Nsub, sample2, randoms, period, do_auto, do_cross, num_threads,\
         _sample1_is_sample2, PBCs = _tpcf_jackknife_process_args(*function_args)
 
@@ -43,7 +42,6 @@ def tpcf_subregions(sample1, randoms, rbins, Nsub=[5, 5, 5],
     else:
         Lbox = period
 
-    print 'B'
 
     do_DD, do_DR, do_RR = _TP_estimator_requirements(estimator)
 
@@ -51,7 +49,6 @@ def tpcf_subregions(sample1, randoms, rbins, Nsub=[5, 5, 5],
     N2 = len(sample2)
     NR = len(randoms)
 
-    print 'C'
 
     j_index_1, N_sub_vol = cuboid_subvolume_labels(sample1, Nsub, Lbox)
     j_index_2, N_sub_vol = cuboid_subvolume_labels(sample2, Nsub, Lbox)
@@ -66,7 +63,6 @@ def tpcf_subregions(sample1, randoms, rbins, Nsub=[5, 5, 5],
     N2_subs = N2 - N2_subs
     NR_subs = NR - NR_subs
 
-    print 'D'
 
 # calculate all the pair counts
 # TODO need to modify this function
@@ -74,21 +70,37 @@ def tpcf_subregions(sample1, randoms, rbins, Nsub=[5, 5, 5],
         sample1, sample2, j_index_1, j_index_2, N_sub_vol,
             rbins, period, num_threads, do_auto1, do_cross, do_auto2, _sample1_is_sample2)
 # pull out the full and sub sample results
-    print 'E'
-    D1D1_full = D1D1[0, :]
-    D1D1_sub = D1D1[1:, :]
-    D1D2_full = D1D2[0, :]
-    D1D2_sub = D1D2[1:, :]
-    D2D2_full = D2D2[0, :]
-    D2D2_sub = D2D2[1:, :]
+
+    if _sample1_is_sample2:
+        D1D1_full = D1D1[0, :]
+        D1D1_sub = D1D1[1:, :]
+        D1D2_full = D1D2[0, :]
+        D1D2_sub = D1D2[1:, :]
+        D2D2_full = D2D2[0, :]
+        D2D2_sub = D2D2[1:, :]
+
+    else:
+        if do_auto1:
+            D1D1_full = D1D1[0, :]
+            D1D1_sub = D1D1[1:, :]
+        if do_cross:
+            D1D2_full = D1D2[0, :]
+            D1D2_sub = D1D2[1:, :]
+        if do_auto2:
+            D2D2_full = D2D2[0, :]
+            D2D2_sub = D2D2[1:, :]
 
 # do random counts
 # TODO figure out what of this i can skip?  
-    print 'F'
+    print do_DR, do_RR
+    print len(sample1), len(randoms)
+    print rbins, period, num_threads
+    print do_DR, do_RR
+    print
 
     D1R, RR = jrandom_counts(sample1, randoms, j_index_1, j_index_random, N_sub_vol,
         rbins, period, num_threads, do_DR, do_RR)
-
+    print 'A'
     if _sample1_is_sample2:
         D2R = D1R
     else:
@@ -97,7 +109,7 @@ def tpcf_subregions(sample1, randoms, rbins, Nsub=[5, 5, 5],
                     N_sub_vol, rbins, period, num_threads, do_DR, do_RR=False)
         else:
             D2R = None
-
+    print 'B'
     if do_DR is True:
         D1R_full = D1R[0, :]
         D1R_sub = D1R[1:, :]
@@ -114,9 +126,9 @@ def tpcf_subregions(sample1, randoms, rbins, Nsub=[5, 5, 5],
     else:
         RR_full = None
         RR_sub = None
-    print 'G'
 # calculate the correlation function for the subsamples
     outputs = []
+    print 'C'
 
     if do_auto1 or _sample1_is_sample2:
         xi_11_sub = _TP_estimator(D1D1_sub, D1R_sub, RR_sub, N1_subs, N1_subs, NR_subs, NR_subs, estimator)
@@ -127,7 +139,6 @@ def tpcf_subregions(sample1, randoms, rbins, Nsub=[5, 5, 5],
     if do_auto2:
         xi_22_sub = _TP_estimator(D2D2_sub, D2R_sub, RR_sub, N2_subs, N2_subs, NR_subs, NR_subs, estimator)
         outputs.append(xi_22_sub)
-    print 'H'
     return outputs[0] if len(outputs) ==1 else tuple(outputs)
 
 # overload to skip the xi_mm calculation
@@ -145,23 +156,24 @@ def jnpair_counts(sample1, sample2, j_index_1, j_index_2, N_sub_vol, rbins,
         D1D1 = None
         D2D2 = None
 
-    if _sample1_is_sample2 and do_auto2:
+    if _sample1_is_sample2:
         D1D2 = D1D1
         D2D2 = D1D1
-    if do_cross is True:
-        D1D2 = npairs_jackknife_3d(sample1, sample2, rbins, period=period,
-            jtags1=j_index_1, jtags2=j_index_2,
-            N_samples=N_sub_vol, num_threads=num_threads)
-        D1D2 = np.diff(D1D2, axis=1)
     else:
-        D1D2 = None
-    if do_auto2 is True:
-        D2D2 = npairs_jackknife_3d(sample2, sample2, rbins, period=period,
-            jtags1=j_index_2, jtags2=j_index_2,
-            N_samples=N_sub_vol, num_threads=num_threads)
-        D2D2 = np.diff(D2D2, axis=1)
-    else:
-        D2D2 = None
+        if do_cross is True:
+            D1D2 = npairs_jackknife_3d(sample1, sample2, rbins, period=period,
+                jtags1=j_index_1, jtags2=j_index_2,
+                N_samples=N_sub_vol, num_threads=num_threads)
+            D1D2 = np.diff(D1D2, axis=1)
+        else:
+            D1D2 = None
+        if do_auto2 is True:
+            D2D2 = npairs_jackknife_3d(sample2, sample2, rbins, period=period,
+                jtags1=j_index_2, jtags2=j_index_2,
+                N_samples=N_sub_vol, num_threads=num_threads)
+            D2D2 = np.diff(D2D2, axis=1)
+        else:
+            D2D2 = None
 
     return D1D1, D1D2, D2D2
 

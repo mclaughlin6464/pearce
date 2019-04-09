@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/home/users/swmclau2/Git/pearce/pearce/sims/submit_sims.py", line 1, in <module>
+    from os import path, mkdir, isdir
+ImportError: cannot import name isdir
+srun: error: sh-30-18: task 0: Exited with exit code 1

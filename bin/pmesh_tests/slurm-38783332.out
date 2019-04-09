@@ -1,0 +1,4 @@
+/home/users/swmclau2/.local/lib/python2.7/site-packages/nbodykit/cosmology/cosmology.py:427: UserWarning: Class did not read input parameter(s): ln10As, ns, ombh2, omch2
+  self.engine = ClassEngine(pars)
+Submitted batch job 38783409
+Submitted batch job 38783412
