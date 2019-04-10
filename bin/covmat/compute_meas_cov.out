@@ -1,23 +1,4 @@
 /home/users/swmclau2/.local/lib/python2.7/site-packages/pearce/mocks/cat.py:284: UserWarning: n_cores invalid. Changing from 100 to maximum 16.
   warnings.warn('n_cores invalid. Changing from %d to maximum %d.' % (n_cores, max_cores))
-0 0
-579147 137198695
-[  0.89125094   1.25892541   1.77827941   2.51188643   3.54813389
-   5.01187234   7.07945784  10.          14.12537545  19.95262315
-  28.18382931  39.81071706] [ 1660.55949785  1660.55949785  1660.55949785] 16
-Traceback (most recent call last):
-  File "/home/users/swmclau2/Git/pearce/bin/covmat/compute_meas_cov.py", line 124, in <module>
-    mat = compute_full_jk(cat, r_bins)
-  File "/home/users/swmclau2/Git/pearce/bin/covmat/compute_meas_cov.py", line 97, in compute_full_jk
-    do_auto1 = True, do_cross = True, do_auto2 = False)
-  File "/home/users/swmclau2/.local/lib/python2.7/site-packages/pearce/mocks/tpcfSubregions.py", line 98, in tpcf_subregions
-    rbins, period, num_threads, do_DR, do_RR)
-  File "/home/users/swmclau2/.local/lib/python2.7/site-packages/halotools/mock_observables/two_point_clustering/tpcf_jackknife.py", line 404, in jrandom_counts
-    N_samples=N_sub_vol, num_threads=num_threads)
-  File "/home/users/swmclau2/.local/lib/python2.7/site-packages/halotools/mock_observables/pair_counters/npairs_jackknife_3d.py", line 188, in npairs_jackknife_3d
-    result = pool.map(engine, cell1_tuples)
-  File "/share/software/user/open/python/2.7.13/lib/python2.7/multiprocessing/pool.py", line 251, in map
-    return self.map_async(func, iterable, chunksize).get()
-  File "/share/software/user/open/python/2.7.13/lib/python2.7/multiprocessing/pool.py", line 567, in get
-    raise self._value
-IOError: bad message length
+/var/spool/slurmd/job40390442/slurm_script: line 15: 74643 Killed                  python /home/users/swmclau2/Git/pearce/bin/covmat/compute_meas_cov.py
+slurmstepd: error: Detected 1 oom-kill event(s) in step 40390442.batch cgroup. Some of your processes may have been killed by the cgroup out-of-memory handler.
