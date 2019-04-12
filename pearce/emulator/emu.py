@@ -1878,7 +1878,312 @@ class SpicyBuffalo(Emu):
             emulator.optimize_restarts(num_restarts = 5, verbose = False)
 
 class NashvilleHot(SpicyBuffalo):
-    pass
+
+    def load_training_data(self, filename, custom_mean_function=None):
+        """
+        Read the training data for the emulator and attach it to the object.
+        :param training_dir:
+            Directory where training data from trainginData is stored.
+        :param fixed_params:
+            Parameters to hold fixed. Only available if data in training_dir is a full hypercube, not a latin hypercube.
+        :return: None
+        """
+        # make sure we attach metadata to the object
+
+        assert path.isfile(filename)
+        # fixed params can only fix an hod index, cosmo index, or z or r
+        assert len(fixed_params) <= 4
+        assert all(key in {'z', 'r', 'rmin'} for key in fixed_params)
+
+        f = h5py.File(filename, 'r')
+
+        # get global attributes from the file
+        cosmo_param_names = f.attrs['cosmo_param_names']
+        hod_param_names = f.attrs['hod_param_names']
+        try:
+            cosmo_param_vals = f.attrs['cosmo_param_vals']
+            hod_param_vals = f.attrs['hod_param_vals']
+        except KeyError:
+            cosmo_param_vals = np.array(f['attrs/cosmo_param_vals'])
+            hod_param_vals = np.array(f['attrs/hod_param_vals'])
+
+        scale_factors = f.attrs['scale_factors']
+        redshift_bin_centers = 1.0/scale_factors - 1 # emulator works in z, sims in a.
+        if 'z' in fixed_params:
+            assert fixed_params['z'] in redshift_bin_centers
+
+        scale_bins = f.attrs['scale_bins']
+        scale_bin_centers = (scale_bins[1:] + scale_bins[:-1])/2.0 if scale_bins is not None else None
+
+        rmin = fixed_params['rmin'] if 'rmin' in fixed_params else 0.0
+            # instead of fixing values, just ensure values are greater than this values
+        gt_rmin = scale_bin_centers > rmin
+        scale_bin_centers = scale_bin_centers[gt_rmin]
+
+        if 'r' in fixed_params:
+            # this wil also fale if scb is None. but you can't fix when it's none anyway so.
+            # may wanna have a friendlier error message htough.
+            assert np.any(np.abs(fixed_params['r'] - scale_bin_centers) < 1e-4) # may need to include a fudge factor here
+            r_idx = np.argmin(np.abs(fixed_params['r'] -  scale_bin_centers))
+
+
+        # construct ordered_params
+        op_names = list(cosmo_param_names[:])
+        op_names.extend(hod_param_names)
+
+        min_max_vals = zip(np.r_[cosmo_param_vals.min(axis=0), hod_param_vals.min(axis=0)], \
+                           np.r_[cosmo_param_vals.max(axis=0), hod_param_vals.max(axis=0)])
+        ordered_params = OrderedDict(izip(op_names, min_max_vals))
+
+        # NOTE if its single_valued, may have to fudge this somehow?
+        if 'z' not in fixed_params:
+            ordered_params['z'] = (np.min(redshift_bin_centers), np.max(redshift_bin_centers))
+
+        if 'r' not in fixed_params:
+            ordered_params['r'] = (np.log10(np.min(scale_bin_centers)), np.log10(np.max(scale_bin_centers)))
+
+        if attach_params: #attach certain parameters to the object
+            self.obs = f.attrs['obs']
+            self.redshift_bin_centers = redshift_bin_centers
+            self.scale_bin_centers = scale_bin_centers
+            self.n_bins = len(scale_bin_centers) if (scale_bin_centers is not None) and ('r' not in fixed_params) else 1
+            self._ordered_params = ordered_params
+        else:
+            # return them
+            info = {'obs': f.attrs['obs'],
+                    'rbc': redshift_bin_centers,
+                    'sbc': scale_bin_centers,
+                    'n_bins': len(scale_bin_centers) if (scale_bin_centers is not None) and ('r' not in fixed_params) else 1,
+                    'ordered_params': ordered_params
+                    }
+
+        # append files to a list, then concatenate at the end
+        y = []
+        ycov = []
+
+        num_used = 0
+
+        for cosmo_group_name, cosmo_group in f.iteritems():
+            # we're fixed to a particular cosmology #
+            if cosmo_group_name == 'attrs':
+                continue
+            cosmo_no = int(cosmo_group_name[-2:])
+            for sf_group_name, sf_group in cosmo_group.iteritems():
+                z = 1.0/float(sf_group_name[-5:]) - 1.0
+
+                if 'z' in fixed_params and np.abs(z-fixed_params['z'])> 1e-3:
+                    continue
+
+                obs_dset = sf_group['obs']
+                cov_dset = sf_group['cov']
+
+                # efficiency note. If I don't iterate over the datasets, just the indicies,
+                # I avoid loading them from disk in fixed HOD scenarios
+                # Those will be rare enough for now that I don't care.
+                counter = 0
+                for HOD_no, (_obs, _cov) in enumerate(izip(obs_dset, cov_dset)):
+
+                    # I wonder if this is annoyingly inefficient. Probably not a huge deal.
+                    # handle fixed r differently than the others
+                    if 'r' in fixed_params:
+
+                        #we hve to transform the data (take a log, multiply, etc)
+                        # TODO this may not work with things like r2 anymore
+                        # _o, _c = self._iv_transform(independent_variable, _obs, _cov)
+                        y.append(np.array([_obs[r_idx]]))
+                        ycov.append(np.array(_cov[r_idx, r_idx]))
+
+                    else:
+                        #_o, _c = self._iv_transform(independent_variable, _obs, _cov)
+                        y.append(_obs[gt_rmin])
+                        ycov.append(_cov[gt_rmin, :][:, gt_rmin])
+
+                    num_used += 1
+
+        f.close()
+
+         y, _ycov =  np.hstack(y), np.dstack(ycov)
+
+        if (np.any(np.isnan(_ycov))  or np.any(np.isnan(y)) ) and remove_nans:
+            y_nans = np.isnan(y)
+            #print 'y_nans', np.sum(y_nans)
+            #ycov_nans = np.sum(np.isnan(_ycov), axis = 1).astype(bool).reshape((-1,))
+            #print 'ycov_nans', np.sum(ycov_nans)
+            nan_idxs = y_nans#np.logical_or(y_nans ,ycov_nans )
+            num_skipped = np.sum(nan_idxs)
+
+            x = x[~nan_idxs]#, :]
+            y = y[~nan_idxs]
+            ycov_list = []
+
+            for i in xrange(_ycov.shape[-1]):
+                mat = _ycov[:,:,i]
+                idxs = nan_idxs[i*mat.shape[0]: (i+1)*mat.shape[0]]
+                ycov_list.append(mat[~idxs,:][:, ~idxs])
+
+            ycov = ycov_list#np.dstack(ycov_list)
+
+            warnings.warn('WARNING: NaN detected. Skipped %d points in training data.' % (num_skipped))
+
+        else:
+            ycov = _ycov.T
+
+        # stack so xs have shape (n points, n params)
+        # ys have shape (npoints)
+        # and ycov has shape (n_bins, n_bins, n_points/n_bins)
+        if attach_params:
+            return x, y, ycov
+        else:
+            return x,y, ycov, info
+
+        x, y, ycov = self.get_data(filename, self.fixed_params, attach_params=True, remove_nans=True)
+
+        # store the data loading args, if we wanna reload later
+        # useful ofr sampling the training data
+
+        y_std = 1.0  # y.mean(axis = 0), y.std(axis = 0)
+
+        ycov_list = []
+        for yc in ycov:
+            ycov_list.append(yc / (np.outer(y_std, y_std) + 1e-5))
+
+        ycov = ycov_list
+        yerr = np.sqrt(np.hstack(np.diag(np.array(syc)) for syc in ycov))
+
+        # in general, the full cov matrix will be too big, and we won't need it. store the diagonal, and
+        # an average
+
+        # compute the average covaraince matrix
+        self.ycov = np.zeros((self.n_bins, self.n_bins))
+        n_right_shape = 0
+        # if len(ycov) == 1 and type(ycov) is not list:
+        #    for yc in ycov.T:
+        #        if yc.shape[0] != self.n_bins:
+        #            continue
+        #        elif np.any(np.isnan(yc)):
+        #            continue
+        #        n_right_shape+=1
+        #        self.ycov+=yc
+        for yc in ycov:
+            if yc.shape[0] != self.n_bins:
+                continue
+            elif np.any(np.isnan(yc)):
+                continue
+
+            n_right_shape += 1
+            self.ycov += yc
+
+        self.ycov /= n_right_shape
+
+        ndim = x.shape[1] - 1
+        self.emulator_ndim = ndim  # The number of params for the emulator is different than those in sampling.
+
+        # now, parition the data as specified by the user
+        # note that ppe does not include overlap
+        points_per_expert = int(1.0 * x.shape[0] / self.n_bins)
+
+        try:
+            assert points_per_expert > 0
+        except AssertionError:
+            raise AssertionError("You have too many scale bins!")
+
+        # we have to have lists, since some may have been dropped due to Nans.
+        # There's definetly a better way to do this ...
+        self.x = []
+        self.y = []
+        self.yerr = []
+
+        self._x_mean, self._x_std = [], []
+        self._y_mean, self._y_std = np.zeros((self.n_bins,)), np.ones((self.n_bins,))  # [], []
+
+        # TODO different hyperparams depending on what this is.
+
+        r_idx = self.get_param_names().index('r')
+        self.r_idx = r_idx  # we'll need this later, too
+        del self._ordered_params['r']  # remove r!
+
+        skip_r_idx = np.ones((x.shape[1]), dtype=bool)
+        skip_r_idx[r_idx] = False
+
+        for bin_no, sbc in enumerate(np.log10(self.scale_bin_centers)):
+            bin_idxs = np.isclose(sbc, x[:, r_idx])
+
+            x_in_bin = x[bin_idxs, :][:, skip_r_idx]
+            x_mean, x_std = x_in_bin.mean(axis=0), x_in_bin.std(axis=0)
+
+            if type(self._y_mean) is list:  # don't do the calculation if we've decided we don't whiten y
+                y_mean, y_std = y[bin_idxs].mean(), y[bin_idxs].std()
+            else:
+                y_mean, y_std = self._y_mean[bin_no], self._y_std[bin_no]
+
+            self.x.append((x_in_bin - x_mean) / (x_std + 1e-5))
+            self.y.append((y[bin_idxs] - y_mean) / (y_std + 1e-5))
+            self.yerr.append(yerr[bin_idxs])
+
+            self._x_mean.append(x_mean)
+            self._x_std.append(x_std)
+
+            if type(self._y_mean) is list:
+                self._y_mean.append(y_mean)
+                self._y_std.append(y_std)
+
+
+        self.mean_function = self._make_custom_mean_function(custom_mean_function)
+        for i, mf in enumerate(self.mean_function(self.x)):
+            self.y[i] -= mf
+
+    def _build_gp(self, hyperparams):
+        """
+        Initialize the GP emulator model.
+        :param hyperparams:
+            Key word parameters for the emulator
+        :return: None
+        """
+        kern1, kern2 = self._make_kernel(hyperparams)
+
+        if type(kern1) is not list:
+            kern1 = [kern1 for i in xrange(self.n_bins)]
+
+        if type(kern2) is not list:
+            kern2 = [kern2 for i in xrange(self.n_bins)]
+
+        # now, make a list of emulators
+        self._emulators = []
+        self._kernels = []
+
+        # yerr taken care of in kernel
+        if self._downsample_factor == 1.0:
+            y = self.y
+            yerr = self.yerr
+        else:
+            y = self.downsample_y
+            yerr = self.downsample_yerr
+
+        for _y,_yerr, _kern1, _kern2 in izip(y,yerr, kern1, kern2):
+            emulator = GPKroneckerGaussianRegressionVar(self.x_cosmo, self.x_hod, _y, _yerr**2, _kern1, _kern2)
+            self._emulators.append(emulator)
+            self._kernels.append((_kern1, _kern2))
+
+    def _build_skl(self, hyperparams):
+        warnings.warn("NashvilleHot does not provide advantages for skl mode, so it is not reccomended.")
+        super(NashvilleHot, self)._build_skl(hyperparams)
+
+# TODO
+# This should be the EMU superclass, to avoid the ABC crap
+# class Ostrich(Emu):
+#     """
+#     Simplified emu that doesnt build an emulator. Useful for data manipulation
+#     """
+#     def __init__(self, filename, method='gp',  fixed_params={}, downsample_factor=1.0, custom_mean_function=None):
+#
+#         assert method in self.valid_methods
+#
+#         self.method = method
+#
+#         self.fixed_params = fixed_params
+#         self._downsample_factor = downsample_factor
+#
+#         self.load_training_data(filename, custom_mean_function)
 
 # This will be retired because A. it didn't work that well and B. it doesn't work with GPy
 # class LemonPepperWet(SpicyBuffalo):
