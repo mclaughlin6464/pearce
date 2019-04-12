@@ -1,6 +1,7 @@
 
 from pearce.mocks.kittens import TestBox
 from pearce.mocks import tpcf_subregions
+from halotools.mock_observables import tpcf_jackknife
 import numpy as np
 from collections import OrderedDict
 from time import time
@@ -71,10 +72,10 @@ hod_dicts = [dict(zip(hod_param_ranges.keys(), vals)) for vals in LHC]
 
 
 from math import ceil
-def compute_full_jk(cat, rbins, rand_scalecut = 1.0 ,  n_rands= [10, 5, 5], n_sub = 3):
+def compute_full_jk(cat, rbins, rand_scalecut = 1.0 ,  n_rands= [5, 5, 5], n_sub = 3):
 #np.random.seed(int(time()))
 
-    n_cores = cat._check_cores(100)
+    n_cores = cat._check_cores(1)
 
     x_g, y_g, z_g = [cat.model.mock.galaxy_table[c] for c in ['x', 'y', 'z']]
 #pos_g = return_xyz_formatted_array(x_g, y_g, z_g, period=cat.Lbox)
@@ -104,9 +105,12 @@ def compute_full_jk(cat, rbins, rand_scalecut = 1.0 ,  n_rands= [10, 5, 5], n_su
 
         randoms = np.random.random((pos_m.shape[0] * nr,
                                     3)) * cat.Lbox / cat.h  # Solution to NaNs: Just fuck me up with randoms
-        out = tpcf_subregions(pos_g / cat.h, randoms, rb, sample2 = pos_m/cat.h, period=cat.Lbox / cat.h,
-                              num_threads=n_cores, Nsub=n_sub, estimator='Landy-Szalay',\
-                              do_auto1 = True, do_cross = True, do_auto2 = False)
+        #out = tpcf_subregions(pos_g / cat.h, randoms, rb, sample2 = pos_m/cat.h, period=cat.Lbox / cat.h,
+        #                      num_threads=n_cores, Nsub=n_sub, estimator='Landy-Szalay',\
+        #                      do_auto1 = True, do_cross = True, do_auto2 = False)
+        a, b, c, cov1, cov2, cov3 = tpcf_jackknife(pos_g / cat.h, randoms, rb, sample2 = pos_m/cat.h, period=cat.Lbox / cat.h,
+                              num_threads=n_cores, Nsub=n_sub, estimator='Landy-Szalay')
+
         
         xi_all = np.hstack(out)
 
