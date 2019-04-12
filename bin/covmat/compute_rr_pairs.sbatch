@@ -1,12 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=compute_meas_cov
-#SBATCH -p bigmem 
+#SBATCH --job-name=compute_rr_pairs
+#SBATCH -p iric 
 #SBATCH --time=04:00:00
-#SBATCH -o compute_meas_cov.out 
-####SBATCH --exclusive
+#SBATCH -o compute_rr_pairs.out 
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=32
-#SBATCH --mem-per-cpu=8G
+#SBATCH --cpus-per-task=16
+#SBATCH --mem-per-cpu=MaxMemPerCPU
 
 module load python/2.7.13
 module load py-scipystack
