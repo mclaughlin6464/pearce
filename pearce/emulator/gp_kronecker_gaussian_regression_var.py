@@ -9,13 +9,14 @@ class GPKroneckerGaussianRegressionVar(GPKroneckerGaussianRegression):
     See GPKroneckerGaussianRegression for documentation
     """
 
-    def __init__(self, X1, X2, Y, Y_err, kern1, kern2, noise_var=1., name='KGPR'):
+    def __init__(self, X1, X2, Y, Y_var, kern1, kern2, noise_var=1., name='KGPR'):
 
-        assert Y_err.shape == Y.shape, "Y_err does not have the same shape as Y. "
+        assert Y_var.shape == Y.shape, "Y_var does not have the same shape as Y. "
 
         super(GPKroneckerGaussianRegressionVar,self).__init__(X1, X2, Y, kern1, kern2, noise_var=noise_var, name=name)
 
-        self.Y_err = Y_err
+        # NOTE this is not optimal, but should roughly work
+        self.Y_var = Y_var
 
     def parameters_changed(self):
         (N1, D1), (N2, D2) = self.X1.shape, self.X2.shape
@@ -25,7 +26,7 @@ class GPKroneckerGaussianRegressionVar(GPKroneckerGaussianRegression):
         S1, U1 = np.linalg.eigh(K1)
         S2, U2 = np.linalg.eigh(K2)
         # only change ###
-        W = np.kron(S2, S1) + self.Y_err.flatten(order = 'F')+ self.likelihood.variance
+        W = np.kron(S2, S1) + self.Y_var.flatten(order = 'F')+ self.likelihood.variance
         #################
 
         Y_ = U1.T.dot(self.Y).dot(U2)
