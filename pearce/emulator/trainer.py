@@ -620,7 +620,7 @@ class Trainer(object):
             call(command, shell=self.system == 'sherlock')
 
 
-def make_kils_command(jobname, max_time, outputdir, queue='medium'):  # 'bulletmpi'):
+def make_kils_command(jobname, max_time, outputdir, queue= 'bulletmpi'):
     '''
     Return a list of strings that comprise a bash command to call trainingHelper.py on the cluster.
     Designed to work on ki-ls's batch system

@@ -8,7 +8,7 @@ from scipy.optimize import minimize_scalar
 import yaml
 
 
-config_fname = '/home/users/swmclau2/Git/pearce/bin/trainer/xi_cosmo_trainer.yaml'
+config_fname = 'xi_cosmo_trainer.yaml'
 
 with open(config_fname, 'r') as ymlfile:
     cfg = yaml.load(ymlfile)
@@ -74,7 +74,7 @@ from math import ceil
 def compute_full_jk(cat, rbins, rand_scalecut = 1.0 ,  n_rands= [10, 5, 5], n_sub = 3):
 #np.random.seed(int(time()))
 
-    n_cores = cat._check_cores(100)
+    n_cores = cat._check_cores(16)
 
     x_g, y_g, z_g = [cat.model.mock.galaxy_table[c] for c in ['x', 'y', 'z']]
 #pos_g = return_xyz_formatted_array(x_g, y_g, z_g, period=cat.Lbox)
@@ -83,6 +83,7 @@ def compute_full_jk(cat, rbins, rand_scalecut = 1.0 ,  n_rands= [10, 5, 5], n_su
     x_m, y_m, z_m = [cat.halocat.ptcl_table[c] for c in ['x', 'y', 'z']]
 #pos_m = return_xyz_formatted_array(x_m, y_m, z_m, period=cat.Lbox)
     pos_m = np.vstack([x_m, y_m, z_m]).T
+    pos_m = pos_m[:10*pos_g.shape[0]]
 
     rbins = np.array(rbins)
 
@@ -97,16 +98,16 @@ def compute_full_jk(cat, rbins, rand_scalecut = 1.0 ,  n_rands= [10, 5, 5], n_su
                                 np.zeros((rbins.shape[0]-1, rbins.shape[0]-1)),\
                                 np.zeros((rbins.shape[0]-1, rbins.shape[0]-1))
 
+    print pos_g.shape, pos_m.shape
     for rb,idxs,  nr in zip([rbins_small,rbins_mid, rbins_large],\
                             [(0, len(rbins_small)), (boundary_idx-mid_size_ov2, boundary_idx+mid_size_ov2), len(rbins_small), len(rbins)],\
                             n_rands): #
 #for rb, nr in zip([rbins_large], n_rands): #
-
-        randoms = np.random.random((pos_m.shape[0] * nr,
-                                    3)) * cat.Lbox / cat.h  # Solution to NaNs: Just fuck me up with randoms
-        out = tpcf_subregions(pos_g / cat.h, randoms, rb, sample2 = pos_m/cat.h, period=cat.Lbox / cat.h,
+        # nr removed
+        randoms = np.random.random((pos_m.shape[0],3)) * cat.Lbox / cat.h  # Solution to NaNs: Just fuck me up with randoms
+        out = tpcf_subregions(pos_m / cat.h, randoms, rb, sample2 = None, period=cat.Lbox / cat.h,
                               num_threads=n_cores, Nsub=n_sub, estimator='Landy-Szalay',\
-                              do_auto1 = True, do_cross = True, do_auto2 = False)
+                              do_auto1 = True, do_cross = False, do_auto2 = False)
         
         xi_all = np.hstack(out)
 
@@ -124,7 +125,7 @@ def compute_full_jk(cat, rbins, rand_scalecut = 1.0 ,  n_rands= [10, 5, 5], n_su
 cov_mats = np.zeros((7,N, 5, 2*len(r_bins)-2, 2*len(r_bins)-2))
 for boxno in xrange(7):
     for realization in xrange(5):
-        cat = TestBox(boxno = boxno, realization = realization, system = 'sherlock')
+        cat = TestBox(boxno = boxno, realization = realization, system = 'ki-ls')
         cat.load(1.0, HOD = str('zheng07'), particles = True, downsample_factor = 1e-2)
         for hod_idx, hod_params in enumerate(hod_dicts):
             add_logMmin(hod_params, cat)
