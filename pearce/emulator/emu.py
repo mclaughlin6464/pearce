@@ -1986,7 +1986,7 @@ class NashvilleHot(SpicyBuffalo):
             yerr = []
         else:
             y = [[] for i in xrange(gt_rmin.shape[0]) if gt_rmin[i]]
-            yerr = []
+            yerr = [[] for i in xrange(gt_rmin.shape[0]) if gt_rmin[i]]
 
         ycov = []
 
@@ -2073,7 +2073,7 @@ class NashvilleHot(SpicyBuffalo):
         """
         assert custom_mean_function is None, "Mean functions not supported for Nashville Hot"
 
-        x1, x2, y, yerr, ycov = self.get_data(filename, self.fixed_params, attach_params=True, remove_nans=True)
+        x1, x2, y, yerr, ycov = self.get_data(filename, self.fixed_params, attach_params=True)#, remove_nans=True)
 
         # store the data loading args, if we wanna reload later
         # useful ofr sampling the training data
@@ -2127,12 +2127,14 @@ class NashvilleHot(SpicyBuffalo):
         #self._x1_mean, self._x1_std = x1.mean(axis = 1), x1.std(axis = 1)
         #self._x2_mean, self._x2_std = x2.mean(axis = 1), x2.std(axis = 1)
         # try not whitening
+        # TODO x1 & x2 or xcosmo and xhod?
         self.x1, self.x2 = x1, x2#(x1-self._x1_mean)/(self._x1_std+1e-9), x2
 
         #todo whiten here as needed
-        self._y_mean, self._y_std = y.mean(), 1.0#y.std()  # [], []
-
-        self.y, self.yerr = y-self._y_mean, yerr
+        self._y_mean = np.stack([_y.mean() for _y in y] )
+        self._y_std = np.stack([1.0 for _ in y])
+        self.y  = np.stack([_y-_ym for _y,_ym in zip(y, self._y_mean)])
+        self.yerr = np.stack(yerr)
 
         self.mean_function = self._make_custom_mean_function(custom_mean_function)
         for i, mf in enumerate(self.mean_function(self.x1)):
@@ -2146,35 +2148,39 @@ class NashvilleHot(SpicyBuffalo):
         :return:
         """
         if custom_mean_function is None:
-            return lambda x: 0.0
+            return lambda x: np.zeros((self.n_bins),) 
         else:
             raise NotImplementedError("Custom mean functions not supported for Nashville Hot.")
 
     def _downsample_data(self):
 
-        self.downsample_y = []
-        self.downsample_yerr = []
+        downsample_y = []
+        downsample_yerr = []
         if self.x1.shape[0] > self.x2.shape[0]:
             #downsample x1
             N_points = self.x1.shape[0]
             downsample_N_points = int(self._downsample_factor*N_points)
-            self.downsample_x1 = self.x1[:downsample_N_points, :]
-            self.downsample_x2 = self.x2
+            downsample_x1 = self.x1[:downsample_N_points, :]
+            downsample_x2 = self.x2
 
             for i in xrange(self.n_bins):
-                self.downsample_y.append(self.y[:downsample_N_points,:])
-                self.downsample_yerr.append(self.yerr[:downsample_N_points,:])
+                downsample_y.append(self.y[i, :downsample_N_points,:])
+                downsample_yerr.append(self.yerr[i, :downsample_N_points,:])
 
         else: #downsample x2
-            # downsample x1
-            N_points = self.x1.shape[0]
+            N_points = self.x2.shape[0]
             downsample_N_points = int(self._downsample_factor * N_points)
-            self.downsample_x2 = self.x2[:downsample_N_points, :]
-            self.downsample_x1 = self.x1
+            downsample_x2 = self.x2[:downsample_N_points, :]
+            downsample_x1 = self.x1
 
             for i in xrange(self.n_bins):
-                self.downsample_y.append(self.y[:, downsample_N_points])
-                self.downsample_yerr.append(self.yerr[:, downsample_N_points])
+                downsample_y.append(self.y[i, :, :downsample_N_points])
+                downsample_yerr.append(self.yerr[i, :, :downsample_N_points])
+
+        self.downsample_x1 = np.stack(downsample_x1)
+        self.downsample_x2 = np.stack(downsample_x2)
+        self.downsample_y = np.stack(downsample_y)
+        self.downsample_yerr = np.stack(downsample_yerr)
 
     def _build_gp(self, hyperparams):
         """
@@ -2197,14 +2203,15 @@ class NashvilleHot(SpicyBuffalo):
 
         # yerr taken care of in kernel
         if self._downsample_factor == 1.0:
+            x1, x2 = self.x1, self.x2
             y = self.y
             yerr = self.yerr
         else:
+            x1, x2 = self.downsample_x1, self.downsample_x2
             y = self.downsample_y
             yerr = self.downsample_yerr
-
         for _y,_yerr, _kern1, _kern2 in izip(y,yerr, kern1, kern2):
-            emulator = GPKroneckerGaussianRegressionVar(self.x_cosmo, self.x_hod, _y, _yerr**2, _kern1, _kern2)
+            emulator = GPKroneckerGaussianRegressionVar(x1, x2, _y, _yerr**2, _kern1, _kern2)
             self._emulators.append(emulator)
             self._kernels.append((_kern1, _kern2))
 
@@ -2252,6 +2259,9 @@ class NashvilleHot(SpicyBuffalo):
         #return kernel
 
     def _kernel_from_dict(self, kernel_dict):
+        # TODO not sure if here or somewhere else, but
+        # would be nice to pass in a kernel type and have object figure out the ndim values.
+        # would probably have to work off a keyword dict
         if type(kernel_dict) is list:
             if type(kernel_dict[0]) in (tuple, list): # 2D
                 return [[Kern.from_dict(kd[0]), Kern.from_dict(kd[1])] for kd in kernel_dict]
@@ -2296,8 +2306,11 @@ class NashvilleHot(SpicyBuffalo):
                     return k, k.copy()
                 elif len(hyperparams['kernel']) == 2: #one for each?
                     k = hyperparams['kernel']
-                    assert type(k[0]) is dict
-                    return self._kernel_from_dict(k[0]), self._kernel_from_dict(k[1])
+                    if type(k[0]) is dict:
+                        return self._kernel_from_dict(k[0]), self._kernel_from_dict(k[1])
+                    else: 
+                        assert isinstance(hyperparams['kernel'][0], Kern)
+                        return hyperparams['kernel']
                 # else, idk hope its right
                 # TODO better checks, corrections here
                 return self._kernel_from_dict(hyperparams['kernel'])

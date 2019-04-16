@@ -9,7 +9,7 @@ ds14a_part = load_ds14('/scratch/users/swmclau2/Darksky/ds14_a_1.0000', 10)
 # TODO should fail gracefully if memory is exceeded or if p is too small.
 downsample_factor = 1e-2
 
-f = h5py.File('/scratch/users/swmclau2/Darksky/ds14_a_1.0000_%.3f_downsample.hdf5'%downsample_factor, 'w')
+f = h5py.File('/scratch/users/swmclau2/Darksky/ds14_a_1.0000_%.3f_downsample.hdf5'%downsample_factor)#, 'w')
 
 try:
     grp = f.create_group("particles")
@@ -29,12 +29,12 @@ subbox_L = L*1.0/n_subboxes
 np.random.seed(int(time())) # TODO pass in seed?
 t0 = time()
 level = 10
-for idx, (subbox_idx, _subbox) in enumerate(ds14a_part.itersubbox(level=10, pad=1.0, fields=['x','y','z'], return_index = True)):
-#start_idx = (2, 217, 640) 
-#for idx in product(xrange(2**level), repeat=3):
-    #if idx[0] < start_idx[0] or (idx[0]== start_idx[0] and idx[1] < start_idx[1]):
-    #    continue # skip these other idxs 
-    #_subbox = ds14a_part.getsubbox(idx, level=level, pad=1.0, fields=['x','y','z'])
+#for idx, (subbox_idx, _subbox) in enumerate(ds14a_part.itersubbox(level=10, pad=1.0, fields=['x','y','z'], return_index = True)):
+start_idx = (1, 123, 472) 
+for idx in product(xrange(2**level), repeat=3):
+    if idx[0] < start_idx[0] or (idx[0]== start_idx[0] and idx[1] < start_idx[1]):
+        continue # skip these other idxs 
+    _subbox = ds14a_part.getsubbox(idx, level=level, pad=1.0, fields=['x','y','z'])
     if len(_subbox) == 0: #empty
         print idx, 'DONE'
         break #done!
