@@ -33,7 +33,10 @@ DIR_PATH = path.abspath(path.dirname(__file__))
 DEFAULT_METRIC_PICKLE_FNAME= path.join(DIR_PATH, 'default_metrics.pkl')
 DEFAULT_METRIC_NH_PICKLE_FNAME= path.join(DIR_PATH, 'default_nh_metrics.pkl')
 
-
+# TODO with the addition of Nashiville Hot, this object doesn't contain as many general features as I'd like.
+# Worth considering how I rebalance some of these features.
+# Also worth considering if I want to have a data management obj and an emulator object, and combine them into Emus.
+# seems like that may actually be awful.
 class Emu(object):
     '''Main Emulator base class. Cannot itself be instatiated; can only be accessed via subclasses.
        controls all loading, manipulation, and emulation of data.
@@ -585,7 +588,10 @@ class Emu(object):
 
         assert 0 < self._downsample_factor <= 1.0
         if self._downsample_factor < 1.0:
-            self._downsample_data()
+            if hasattr(self, "x"):
+                self._downsample_data(self._downsample_factor, self.x, self.y, self.yerr, attach=True)
+            else: # edgecase. Could get around this with a ton of kwargs...
+                self._downsample_data(self._downsample_factor, self.x1, self.x2, self.y, self.yerr, attach=True)
 
         if self.method == 'gp':
             self._build_gp(hyperparams)
@@ -595,7 +601,7 @@ class Emu(object):
             self._build_skl(hyperparams)
 
     @abstractmethod
-    def _downsample_data(self):
+    def _downsample_data(self,downsample_factor, x, y, yerr, attach=False):
         pass
 
     @abstractmethod
@@ -898,6 +904,7 @@ class Emu(object):
         return np.diag(rms_err ** 2)
 
     # only predicts wrt r. don't know if that's an ihmssue.
+    # TODO change N to downsample_factor, overlap those two features
     def goodness_of_fit(self, truth_file, N=None, statistic='r2'):
         """
         Calculate the goodness of fit of an emulator as compared to some validation data.
@@ -925,6 +932,7 @@ class Emu(object):
         np.random.seed(int(time()))
 
         # TODO this is busted
+        # Replace with downsample
         if N is not None:  # make a random choice
             if hasattr(self, 'r_idx'):
                 _x, _y = [], []
@@ -1103,20 +1111,28 @@ class Emu(object):
 class OriginalRecipe(Emu):
     """Emulator that emulates with only one learner that is trained on all training data. The "naive" approach. """
 
-    def _downsample_data(self):
+    def _downsample_data(self, downsample_factor, x, y, yerr, attach=False):
 
-        N_points = self.x.shape[0]/self.n_bins #sample full HOD/cosmo points,
-        downsample_N_points = int(self._downsample_factor*N_points)
-        self.downsample_x = np.zeros((downsample_N_points*self.n_bins, self.x.shape[1]))
-        self.downsample_y = np.zeros((downsample_N_points*self.n_bins))
-        self.downsample_yerr = np.zeros((downsample_N_points*self.n_bins))
+        N_points = x.shape[0]/self.n_bins #sample full HOD/cosmo points,
+        downsample_N_points = int(downsample_factor*N_points)
+
+        downsample_x = np.zeros((downsample_N_points*self.n_bins, x.shape[1]))
+        downsample_y = np.zeros((downsample_N_points*self.n_bins))
+        downsample_yerr = np.zeros((downsample_N_points*self.n_bins))
 
         downsampled_points = np.random.choice(N_points, downsample_N_points, replace = False)
 
         for i, dp in enumerate(downsampled_points):
-            self.downsample_x[i*self.n_bins:(i+1)*self.n_bins] = self.x[dp*self.n_bins: (dp+1)*self.n_bins]
-            self.downsample_y[i*self.n_bins:(i+1)*self.n_bins] = self.y[dp*self.n_bins: (dp+1)*self.n_bins]
-            self.downsample_yerr[i*self.n_bins:(i+1)*self.n_bins] = self.yerr[dp*self.n_bins: (dp+1)*self.n_bins]
+            downsample_x[i*self.n_bins:(i+1)*self.n_bins] = x[dp*self.n_bins: (dp+1)*self.n_bins]
+            downsample_y[i*self.n_bins:(i+1)*self.n_bins] = y[dp*self.n_bins: (dp+1)*self.n_bins]
+            downsample_yerr[i*self.n_bins:(i+1)*self.n_bins] = yerr[dp*self.n_bins: (dp+1)*self.n_bins]
+
+        if attach:
+            self.downsample_x = downsample_x
+            self.downsample_y = downsample_y
+            self.downsample_yerr = downsample_yerr
+        else:
+            return downsample_x, downsample_y, downsample_yerr
 
     def _build_gp(self, hyperparams):
         """
@@ -1237,7 +1253,7 @@ def get_leaves_helper(node, leaves):
         get_leaves_helper(node.less, leaves)
         get_leaves_helper(node.greater, leaves)
 
-
+# Considering depreceating this since it is no longer useful
 class ExtraCrispy(Emu):
     """Emulator that emulates with a mixture of expert learners rather than a single one."""
 
@@ -1372,22 +1388,29 @@ class ExtraCrispy(Emu):
         self.x = _x
         self.y = _y
 
-    def _downsample_data(self):
+    def _downsample_data(self, downsample_factor, x, y, yerr, attach=False):
 
-        N_points = self.x.shape[1]  # don't sample full HOD/cosmo points. Already broken up in experts
-        downsample_N_points = int(self._downsample_factor * N_points)
-        self.downsample_x = np.zeros((self.x.shape[0], downsample_N_points, self.x.shape[2]))
-        self.downsample_y = np.zeros((self.y.shape[0], downsample_N_points))
-        self.downsample_yerr = np.zeros((self.y.shape[0], downsample_N_points))
+        N_points = x.shape[1]  # don't sample full HOD/cosmo points. Already broken up in experts
+        downsample_N_points = int(downsample_factor * N_points)
+        downsample_x = np.zeros((x.shape[0], downsample_N_points, x.shape[2]))
+        downsample_y = np.zeros((y.shape[0], downsample_N_points))
+        downsample_yerr = np.zeros((y.shape[0], downsample_N_points))
 
         for e in xrange(self.experts):
 
             downsampled_points = np.random.choice(N_points, downsample_N_points, replace=False)
 
             for i, dp in enumerate(downsampled_points):
-                self.downsample_x[e,i :(i + 1)] = self.x[e,dp : (dp + 1)]
-                self.downsample_y[e,i :(i + 1) ] = self.y[e,dp: (dp + 1)]
-                self.downsample_yerr[e,i:(i + 1)] = self.yerr[e,dp: (dp + 1)]
+                downsample_x[e,i :(i + 1)] = x[e,dp : (dp + 1)]
+                downsample_y[e,i :(i + 1) ] = y[e,dp: (dp + 1)]
+                downsample_yerr[e,i:(i + 1)] = yerr[e,dp: (dp + 1)]
+
+        if attach:
+            self.downsample_x = downsample_x
+            self.downsample_y = downsample_y
+            self.downsample_yerr = downsample_yerr
+        else:
+            return downsample_x, downsample_y, downsample_yerr
 
     def _build_gp(self, hyperparams):
         """
@@ -1510,7 +1533,6 @@ class ExtraCrispy(Emu):
         ll = ll if np.isfinite(ll) else -1e25
 
         return ll, gll
-
 
     # TODO could make this learn the metric for other kernel based emulators...
     def train_metric(self):#, p0=None,  **kwargs):
@@ -1714,22 +1736,29 @@ class SpicyBuffalo(Emu):
         ig.extend(ignore)
         return super(SpicyBuffalo, self).check_param_names(param_names, ig)
 
-    def _downsample_data(self):
+    def _downsample_data(self, downsample_factor, x, y, yerr, attach=False):
 
-        N_points = max([_x.shape[0] for _x in self.x]) # don't sample full HOD/cosmo points. Already broken up in experts
-        downsample_N_points = int(self._downsample_factor * N_points)
-        self.downsample_x = [np.zeros((downsample_N_points, self.x[0].shape[1] )) for i in xrange(self.n_bins)]
-        self.downsample_y = [np.zeros((downsample_N_points, )) for i in xrange(self.n_bins)]
-        self.downsample_yerr = [ np.zeros((downsample_N_points, )) for i in xrange(self.n_bins)]
+        N_points = max([_x.shape[0] for _x in x]) # don't sample full HOD/cosmo points. Already broken up in experts
+        downsample_N_points = int(downsample_factor * N_points)
+        downsample_x = [np.zeros((downsample_N_points, x[0].shape[1] )) for i in xrange(self.n_bins)]
+        downsample_y = [np.zeros((downsample_N_points, )) for i in xrange(self.n_bins)]
+        downsample_yerr = [ np.zeros((downsample_N_points, )) for i in xrange(self.n_bins)]
 
         for e in xrange(self.n_bins):
 
-            downsampled_points = np.random.choice(len(self.x[e]), downsample_N_points, replace=False)
+            downsampled_points = np.random.choice(len(x[e]), downsample_N_points, replace=False)
 
             for i, dp in enumerate(downsampled_points):
-                self.downsample_x[e][i :(i + 1)] = self.x[e][dp : (dp + 1)]
-                self.downsample_y[e][i :(i + 1) ] = self.y[e][dp: (dp + 1)]
-                self.downsample_yerr[e][i:(i + 1)] = self.yerr[e][dp: (dp + 1)]
+                downsample_x[e][i :(i + 1)] = x[e][dp : (dp + 1)]
+                downsample_y[e][i :(i + 1) ] = y[e][dp: (dp + 1)]
+                downsample_yerr[e][i:(i + 1)] = yerr[e][dp: (dp + 1)]
+
+        if attach:
+            self.downsample_x = downsample_x
+            self.downsample_y = downsample_y
+            self.downsample_yerr = downsample_yerr
+        else:
+            return downsample_x, downsample_y, downsample_yerr
 
     def _build_gp(self, hyperparams):
         """
@@ -1822,7 +1851,7 @@ class SpicyBuffalo(Emu):
                 else:
                     #print _y
                     #print t_in_bin
-                    local_mu = emulator.predict(t_in_bin)
+                    local_mu, _ = emulator.predict(t_in_bin, kern = self_kernels[bin_no].copy())
                     #print local_mu
                     local_err = np.ones_like(local_mu)
 
@@ -1881,7 +1910,7 @@ class SpicyBuffalo(Emu):
         for emulator in self._emulators:
             emulator.optimize_restarts(num_restarts = 5, verbose = False)
 
-class NashvilleHot(SpicyBuffalo):
+class NashvilleHot(Emu):
 
     def get_data(self, filename, fixed_params, attach_params = False):
         """
@@ -2140,6 +2169,15 @@ class NashvilleHot(SpicyBuffalo):
         for i, mf in enumerate(self.mean_function(self.x1)):
             self.y[i] -= mf
 
+    def _whiten(self, x, arr='x'):
+        """
+        This object doesn't use whitening x, so this is very friendly
+        :param x:
+        :param arr:
+        :return:
+        """
+        return x, None
+
     def _make_custom_mean_function(self, custom_mean_function =None):
         """
         Not supported for this class, will throw error if something is tried
@@ -2152,35 +2190,38 @@ class NashvilleHot(SpicyBuffalo):
         else:
             raise NotImplementedError("Custom mean functions not supported for Nashville Hot.")
 
-    def _downsample_data(self):
+    def _downsample_data(self, downsample_factor, x1, x2, y, yerr, attach = True):
 
         downsample_y = []
         downsample_yerr = []
-        if self.x1.shape[0] > self.x2.shape[0]:
+        if x1.shape[0] > x2.shape[0]:
             #downsample x1
-            N_points = self.x1.shape[0]
-            downsample_N_points = int(self._downsample_factor*N_points)
-            downsample_x1 = self.x1[:downsample_N_points, :]
-            downsample_x2 = self.x2
+            N_points = x1.shape[0]
+            downsample_N_points = int(downsample_factor*N_points)
+            downsample_x1 = x1[:downsample_N_points, :]
+            downsample_x2 = x2
 
             for i in xrange(self.n_bins):
-                downsample_y.append(self.y[i, :downsample_N_points,:])
-                downsample_yerr.append(self.yerr[i, :downsample_N_points,:])
+                downsample_y.append(y[i, :downsample_N_points,:])
+                downsample_yerr.append(yerr[i, :downsample_N_points,:])
 
         else: #downsample x2
-            N_points = self.x2.shape[0]
+            N_points = x2.shape[0]
             downsample_N_points = int(self._downsample_factor * N_points)
-            downsample_x2 = self.x2[:downsample_N_points, :]
-            downsample_x1 = self.x1
+            downsample_x2 = x2[:downsample_N_points, :]
+            downsample_x1 = x1
 
             for i in xrange(self.n_bins):
-                downsample_y.append(self.y[i, :, :downsample_N_points])
-                downsample_yerr.append(self.yerr[i, :, :downsample_N_points])
+                downsample_y.append(y[i, :, :downsample_N_points])
+                downsample_yerr.append(yerr[i, :, :downsample_N_points])
 
-        self.downsample_x1 = np.stack(downsample_x1)
-        self.downsample_x2 = np.stack(downsample_x2)
-        self.downsample_y = np.stack(downsample_y)
-        self.downsample_yerr = np.stack(downsample_yerr)
+        if attach:
+            self.downsample_x1 = np.stack(downsample_x1)
+            self.downsample_x2 = np.stack(downsample_x2)
+            self.downsample_y = np.stack(downsample_y)
+            self.downsample_yerr = np.stack(downsample_yerr)
+        else:
+            return downsample_x1, downsample_x2, downsample_y, downsample_yerr
 
     def _build_gp(self, hyperparams):
         """
@@ -2319,7 +2360,168 @@ class NashvilleHot(SpicyBuffalo):
         except AssertionError:
             raise AssertionError("Input kernels incorrectly specified! ")
 
-# TODO
+    def _emulate_helper(self, t, gp_errs=False, old_idxs=None):
+        """
+        Helper function that takes a dependent variable matrix and makes a prediction.
+        :param t:
+            Dependent variable matrix. Assumed to be in the order defined by ordered_params
+        :param gp_errs:
+            Whether or not to return errors in the gp case
+        :return:
+            mu, err (if gp_errs True). Predicted value for dependetn variable t.
+            mu and err both have shape (npoints*self.redshift_bin_centers*self.scale_bin_centers)
+        """
+        assert old_idxs is None, "Old_idxs not supported, not sure how you even got here!"
+        #
+        t_size = np.sum([_t.shape[0] for _t in t])
+
+        mean_func_at_params = self.mean_function(t)
+
+        mu = []
+        err = []
+
+        for bin_no, (t_in_bin, mfc, emulator) in enumerate(izip(t, mean_func_at_params, self._emulators)):
+
+            if self.method == 'gp':
+                # because were using a custom object here, don't have to do the copying stuff
+                # however, have to split up t into the two groups
+                t1, t2 = t_in_bin[:, :self.x1.shape[1]], t_in_bin[:, self.x1.shape[1]:]
+                if gp_errs:
+                    local_mu, local_err = emulator.predict(t1, t2)
+                else:
+                    local_mu, _ = emulator.predict(t1, t2)
+                    # print local_mu
+                    local_err = np.ones_like(local_mu)
+
+            else:
+                local_mu = emulator.predict(t_in_bin)
+                local_err = np.ones_like(local_mu)  # weight with this instead of the errors.
+
+            # print 'local_mu, mfc', local_mu, mfc
+            mu.append(self._y_std[bin_no] * (local_mu + mfc) + self._y_mean[bin_no])
+            err.append(local_err * self._y_std[bin_no])
+
+        # now, figure out how to return to the shape of t
+        combined_mu = np.zeros((t_size,))
+        combined_err = np.zeros((t_size,))
+
+        for r_idx, bin_idxs in enumerate(old_idxs):
+            combined_mu[bin_idxs] = mu[r_idx]
+            combined_err[bin_idxs] = err[r_idx]
+
+        # Reshape to be consistent with my other implementation
+        if not gp_errs:
+            return combined_mu
+
+        return combined_mu, combined_err
+
+    def goodness_of_fit(self, truth_file, downsample_factor=None, statistic='r2'):
+        """
+            Calculate the goodness of fit of an emulator as compared to some validation data.
+            :param truth_dir:
+            Directory structured similarly to the training data, but NOT used for training.
+            :param N:
+            Number of points to use to calculate G.O.F. measures. "None" tests against all values in truth_dir. If N
+            is less than the number of points, N are randomly selected. Default is None.
+            :param statistic:
+            What G.O.F. statistic to calculate. Default is r2. Other options are rmsfd, abs(olute), and rel(ative).
+            :return: values, a numpy arrray of the calculated statistics at each of the N training points.
+            """
+        assert statistic in {'r2', 'rms', 'rmsfd', 'abs', 'log_abs', 'frac', 'log_frac', None}
+        if downsample_factor is not None:
+            assert downsample_factor > 0 and downsample_factor<=1.0
+
+        x1, x2, y, yerr, _, info = self.get_data(truth_file, self.fixed_params)
+
+        scale_bin_centers = info['sbc']
+        scale_nbins = len(scale_bin_centers) if 'r' not in self.fixed_params else 1
+
+        np.random.seed(int(time()))
+
+        if downsample_factor is not None and downsample_factor<1.0:  # make a random choice
+            x1, x2, y, yerr = self._downsample_data(downsample_factor, x1, x2, y, yerr)
+
+        #pred_y = self._emulate_helper(x, False, old_idxs=old_idxs)
+        # emulate helper works better for one at a time
+        # since were doing a big batch, dont' bother builind the big t-matrix
+        pred_y = np.stack([emu.predict(x1, x2)[0] + ym for emu, ym in zip(self._emulators, self._y_mean)])
+        # NOTE think this is the right ordering, should check, though may not matter if i'm consistent...
+        pred_y = pred_y.reshape((pred_y.shape[0], -1))
+        y = y.reshape((y.shape[0], -1))
+
+        # TODO untested!
+        if np.any(scale_bin_centers != self.scale_bin_centers):
+            bin_centers = scale_bin_centers[self.scale_bin_centers[0] <= scale_bin_centers <= self.scale_bin_centers[-1]]
+            new_mu = []
+            for mean in pred_y:
+                xi_interpolator = interp1d(self.scale_bin_centers, mean, kind='slinear')
+                interp_mean = xi_interpolator(bin_centers)
+                new_mu.append(interp_mean)
+            pred_y = np.array(new_mu)
+            y = y[:, self.scale_bin_centers[0] <= bin_centers <= self.scale_bin_centers[-1]]
+
+        if statistic is None:
+            return pred_y, y
+
+        elif statistic == 'rmsfd':
+            return np.sqrt(np.mean((((pred_y - y) ** 2) / (y ** 2)), axis=0))
+
+        elif statistic == 'rms':
+            return np.sqrt(np.mean(((pred_y - y) ** 2), axis=0))
+
+        # TODO sklearn methods can do this themselves. But i've already tone the prediction!
+        elif statistic == 'r2':  # r2
+            SSR = np.sum((pred_y - y) ** 2, axis=0)
+            SST = np.sum((y - y.mean(axis=0)) ** 2, axis=0)
+
+            return 1 - SSR / SST
+
+        elif statistic == 'abs':
+            return 10 ** pred_y - 10 ** y
+            # return np.mean(10 ** pred_y - 10 ** y, axis = 0)
+        elif statistic == 'log_abs':
+            return pred_y - y
+            # return np.mean((pred_y - y), axis=0)
+        elif statistic == 'log_frac':  # 'rel'
+            out = np.abs(pred_y - y) / np.abs(y)
+            return out
+            # return np.mean((pred_y - y) / y, axis=0)
+        else:  # 'frac'
+            out = np.abs(10 ** pred_y - 10 ** y) / np.abs(10 ** y)
+            return out
+
+    def _emulator_lnlikelihood(self):
+        """
+        """
+        assert self.method == 'gp'
+
+        # TODO figure out gradient as well
+        ll = 0
+        gll = 0
+
+        for idx, emulator in enumerate(self._emulators ):
+            ll += emulator.log_likelihood()#
+            gll += emulator.log_likelihood_grad()
+
+        # The scipy optimizer doesn't play well with infinities.
+
+        ll = ll if np.isfinite(ll) else -1e25
+
+        return ll, gll
+
+    def train_metric(self, p0=None,  **kwargs):
+        """
+        Train the emulator. Has a spotty record of working. Better luck may be had with the NAMEME code.
+        :param kwargs:
+            Kwargs that will be passed into the scipy.optimize.minimize
+        :return: success: True if the training was successful.
+        """
+
+        assert self.method == 'gp'
+
+        for emulator in self._emulators:
+            emulator.optimize_restarts(num_restarts = 5, verbose = False)
+    # TODO
 # This should be the EMU superclass, to avoid the ABC crap
 # class Ostrich(Emu):
 #     """
