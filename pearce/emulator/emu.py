@@ -2317,7 +2317,10 @@ class NashvilleHot(Emu):
             raise AssertionError("No emulator loaded, cannot save.")
 
         with open(DEFAULT_METRIC_NH_PICKLE_FNAME, 'r') as f:
-            default_kernel_dict = pickle.load(f)
+            try:
+                default_kernel_dict = pickle.load(f)
+            except EOFError: #blank file
+                default_kernel_dict = {}
 
         default_kernel_dict[self.obs] = kernel_dicts
 
@@ -2521,7 +2524,9 @@ class NashvilleHot(Emu):
 
         for emulator in self._emulators:
             emulator.optimize_restarts(num_restarts = 5, verbose = False)
-    # TODO
+
+
+# TODO
 # This should be the EMU superclass, to avoid the ABC crap
 # class Ostrich(Emu):
 #     """
