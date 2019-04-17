@@ -26,7 +26,7 @@ __all__ = ['tpcf_subregions']
 # all lifted from duncan's code
 def tpcf_subregions(sample1, randoms, rbins, Nsub=[5, 5, 5],
         sample2=None, period=None, do_auto1=True, do_auto2=False, do_cross=True,
-                estimator='Natural', num_threads=1, seed=None):
+                estimator='Natural', num_threads=1, seed=None, RR=None):
 
     do_auto = do_auto1 or do_auto2
 # process input parameters
@@ -92,14 +92,14 @@ def tpcf_subregions(sample1, randoms, rbins, Nsub=[5, 5, 5],
 
 # do random counts
 # TODO figure out what of this i can skip?  
-    print do_DR, do_RR
-    print len(sample1), len(randoms)
-    print rbins, period, num_threads
-    print do_DR, do_RR
-    print
 
-    D1R, RR = jrandom_counts(sample1, randoms, j_index_1, j_index_random, N_sub_vol,
-        rbins, period, 1, do_DR, do_RR)
+    if RR is None:
+        D1R, RR = jrandom_counts(sample1, randoms, j_index_1, j_index_random, N_sub_vol,
+            rbins, period, 1, do_DR, do_RR)
+    else: #use the precomputed RR
+        D1R, RR_dummy= jrandom_counts(sample1, randoms, j_index_1, j_index_random, N_sub_vol,
+            rbins, period, 1, do_DR, do_RR=False)
+
     print 'A'
     if _sample1_is_sample2:
         D2R = D1R
