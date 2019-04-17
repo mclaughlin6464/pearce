@@ -2050,7 +2050,7 @@ class NashvilleHot(Emu):
                         ycov.append(np.array(_cov[r_idx, r_idx]))
 
                     else:
-                            ycov.append(_cov[gt_rmin, :][:, gt_rmin])
+                        ycov.append(_cov[gt_rmin, :][:, gt_rmin])
 
 
         f.close()
@@ -2088,6 +2088,8 @@ class NashvilleHot(Emu):
             # stack so xs have shape (n points, n params)
         # ys have shape (npoints)
         # and ycov has shape (n_bins, n_bins, n_points/n_bins)
+        y = np.stack(y)
+        yerr = np.stack(yerr)
         if attach_params:
             return x1, x2, y, yerr, ycov
         else:
@@ -2221,7 +2223,7 @@ class NashvilleHot(Emu):
             self.downsample_y = np.stack(downsample_y)
             self.downsample_yerr = np.stack(downsample_yerr)
         else:
-            return downsample_x1, downsample_x2, downsample_y, downsample_yerr
+            return downsample_x1, downsample_x2, np.stack(downsample_y), np.stack(downsample_yerr)
 
     def _build_gp(self, hyperparams):
         """
@@ -2447,13 +2449,13 @@ class NashvilleHot(Emu):
         #pred_y = self._emulate_helper(x, False, old_idxs=old_idxs)
         # emulate helper works better for one at a time
         # since were doing a big batch, dont' bother builind the big t-matrix
-        pred_y = np.stack([emu.predict(x1, x2)[0] + ym for emu, ym in zip(self._emulators, self._y_mean)])
+        _py = [emu.predict(x1, x2)[0][:, 0] + ym for emu, ym in zip(self._emulators, self._y_mean)]
+        pred_y = np.stack(_py)
         # NOTE think this is the right ordering, should check, though may not matter if i'm consistent...
-        pred_y = pred_y.reshape((pred_y.shape[0], -1))
-        y = y.reshape((y.shape[0], -1))
 
         # TODO untested!
         if np.any(scale_bin_centers != self.scale_bin_centers):
+            print 'Hi'
             bin_centers = scale_bin_centers[self.scale_bin_centers[0] <= scale_bin_centers <= self.scale_bin_centers[-1]]
             new_mu = []
             for mean in pred_y:
@@ -2464,9 +2466,11 @@ class NashvilleHot(Emu):
             y = y[:, self.scale_bin_centers[0] <= bin_centers <= self.scale_bin_centers[-1]]
 
         if statistic is None:
-            return pred_y, y
+            return pred_y, y.reshape((y.shape[0], -1), order = 'C')
 
-        elif statistic == 'rmsfd':
+        y = y.reshape((y.shape[0], -1), order = 'C')
+
+        if statistic == 'rmsfd':
             return np.sqrt(np.mean((((pred_y - y) ** 2) / (y ** 2)), axis=0))
 
         elif statistic == 'rms':
