@@ -14,7 +14,7 @@ import numpy as np
 import h5py
 #import george
 #from george.kernels import *
-from GPy.models import GPRegression
+from GPy.models import GPRegression, GPKroneckerGaussianRegression
 from .gp_kronecker_gaussian_regression_var import GPKroneckerGaussianRegressionVar
 from GPy.kern import *
 import scipy.optimize as op
@@ -2162,7 +2162,7 @@ class NashvilleHot(Emu):
         self.x1, self.x2 = x1, x2#(x1-self._x1_mean)/(self._x1_std+1e-9), x2
 
         #todo whiten here as needed
-        self._y_mean = np.stack([_y.mean() for _y in y] )
+        self._y_mean = np.stack([0.0 for _ in y])#np.stack([_y.mean() for _y in y] )
         self._y_std = np.stack([1.0 for _ in y])
         self.y  = np.stack([_y-_ym for _y,_ym in zip(y, self._y_mean)])
         self.yerr = np.stack(yerr)
@@ -2224,6 +2224,12 @@ class NashvilleHot(Emu):
             self.downsample_yerr = np.stack(downsample_yerr)
         else:
             return downsample_x1, downsample_x2, np.stack(downsample_y), np.stack(downsample_yerr)
+    def check_param_names(self, param_names, ignore=[]):
+        #see above, just adding 'r' to ignore by default
+        ig = ['r'] if 'r' not in ignore else []
+        ig.extend(ignore)
+        return super(NashvilleHot, self).check_param_names(param_names, ig)
+
 
     def _build_gp(self, hyperparams):
         """
@@ -2235,10 +2241,10 @@ class NashvilleHot(Emu):
         kern1, kern2 = self._make_kernel(hyperparams)
 
         if type(kern1) is not list:
-            kern1 = [kern1 for i in xrange(self.n_bins)]
+            kern1 = [kern1.copy() for i in xrange(self.n_bins)]
 
         if type(kern2) is not list:
-            kern2 = [kern2 for i in xrange(self.n_bins)]
+            kern2 = [kern2.copy() for i in xrange(self.n_bins)]
 
         # now, make a list of emulators
         self._emulators = []
@@ -2254,7 +2260,16 @@ class NashvilleHot(Emu):
             y = self.downsample_y
             yerr = self.downsample_yerr
         for _y,_yerr, _kern1, _kern2 in izip(y,yerr, kern1, kern2):
-            emulator = GPKroneckerGaussianRegressionVar(x1, x2, _y, _yerr**2, _kern1, _kern2)
+            #emulator = GPKroneckerGaussianRegressionVar(x1, x2, _y, _yerr**2, _kern1, _kern2)
+            #print x1.shape, x2.shape
+            #print x1[:2,:], x2[:2,:]
+            #print '*'*10
+            #print _y.shape
+            #print _y[:2,:2]
+            #print '-'*10
+            #print _kern1, _kern2
+            emulator = GPKroneckerGaussianRegression(x1, x2, _y, _kern1, _kern2)
+
             self._emulators.append(emulator)
             self._kernels.append((_kern1, _kern2))
 
@@ -2390,7 +2405,9 @@ class NashvilleHot(Emu):
             if self.method == 'gp':
                 # because were using a custom object here, don't have to do the copying stuff
                 # however, have to split up t into the two groups
-                t1, t2 = t_in_bin[:, :self.x1.shape[1]], t_in_bin[:, self.x1.shape[1]:]
+                #TODO may have weird behavior for larger t's? have to do some resizing
+                t1, t2 = t_in_bin[:self.x1.shape[1]].reshape((1,-1)),\
+                 t_in_bin[self.x1.shape[1]:].reshape((1,-1))
                 if gp_errs:
                     local_mu, local_err = emulator.predict(t1, t2)
                 else:
@@ -2407,12 +2424,13 @@ class NashvilleHot(Emu):
             err.append(local_err * self._y_std[bin_no])
 
         # now, figure out how to return to the shape of t
-        combined_mu = np.zeros((t_size,))
-        combined_err = np.zeros((t_size,))
+        combined_mu = np.vstack(mu)#np.zeros((t_size,))
+        combined_err = np.vstack(mu)#np.zeros((t_size,))
+        
 
-        for r_idx, bin_idxs in enumerate(old_idxs):
-            combined_mu[bin_idxs] = mu[r_idx]
-            combined_err[bin_idxs] = err[r_idx]
+        #for r_idx in xrange(self.n_bins):
+        #    combined_mu[r_idx::self.n_bins] = mu[r_idx]
+        #    combined_err[r_idx::self.n_bins] = err[r_idx]
 
         # Reshape to be consistent with my other implementation
         if not gp_errs:
@@ -2449,6 +2467,7 @@ class NashvilleHot(Emu):
         #pred_y = self._emulate_helper(x, False, old_idxs=old_idxs)
         # emulate helper works better for one at a time
         # since were doing a big batch, dont' bother builind the big t-matrix
+        print x1.shape, x2.shape
         _py = [emu.predict(x1, x2)[0][:, 0] + ym for emu, ym in zip(self._emulators, self._y_mean)]
         pred_y = np.stack(_py)
         # NOTE think this is the right ordering, should check, though may not matter if i'm consistent...
@@ -2466,9 +2485,9 @@ class NashvilleHot(Emu):
             y = y[:, self.scale_bin_centers[0] <= bin_centers <= self.scale_bin_centers[-1]]
 
         if statistic is None:
-            return pred_y, y.reshape((y.shape[0], -1), order = 'C')
+            return pred_y, y.reshape((y.shape[0], -1), order = 'F')
 
-        y = y.reshape((y.shape[0], -1), order = 'C')
+        y = y.reshape((y.shape[0], -1), order = 'F')
 
         if statistic == 'rmsfd':
             return np.sqrt(np.mean((((pred_y - y) ** 2) / (y ** 2)), axis=0))
@@ -2528,6 +2547,8 @@ class NashvilleHot(Emu):
 
         for emulator in self._emulators:
             emulator.optimize_restarts(num_restarts = 5, verbose = False)
+            print emulator.param_array
+            print '*'*20
 
 
 # TODO
