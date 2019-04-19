@@ -81,7 +81,7 @@ boxsize  = {boxsize:.1f}
 
 time_step = linspace({initial_a:.1f}, {final_a:.1f}, 20)
 
-output_redshifts = \{ {final_z:.2f} \} --redshift of output
+output_redshifts = {{{final_z:.2f}}} --redshift of output
 
 omega_m = {omega_m: f}
 h = {h:f}
