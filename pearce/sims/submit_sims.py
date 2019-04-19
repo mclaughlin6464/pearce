@@ -9,7 +9,7 @@ from nbodykit.cosmology.power import LinearPower, ZeldovichPower
 
 # I could have this accept kwargs,
 # and have main
-def submit_sims(lhc_fname, output_dir, powerspectrum,cosmic_var, initial_z, final_z,\
+def submit_sims(lhc_fname, output_dir, powerspectrum, cosmic_var, initial_z, final_z,\
                 npart, boxsize, ncores, sim_time):
 
     assert path.isdir(output_dir), "Invalid output directory %s"%output_dir
@@ -26,6 +26,7 @@ def submit_sims(lhc_fname, output_dir, powerspectrum,cosmic_var, initial_z, fina
     else:
         power = ZeldovichPower
 
+    cosmic_var = str(cosmic_var)
     assert cosmic_var.lower() in {'true', 'false'}
 
     initial_a, final_a = 1./(1+initial_z), 1./(1+final_z)
@@ -49,8 +50,7 @@ def submit_sims(lhc_fname, output_dir, powerspectrum,cosmic_var, initial_z, fina
         param_dict['w0_fld'] = param_dict['w0']
         del param_dict['w0']
         cosmo = Cosmology(**param_dict)
-        # TODO i wanted to do this with fixed amplitudes, not sure how
-        p = power(cosmo, initial_z)(k)
+        p = power(cosmo, final_z)(k)
 
         np.savetxt(path.join(boxdir,'powerspec.txt'), np.array((k,p)).T)
 
@@ -73,15 +73,15 @@ def submit_sims(lhc_fname, output_dir, powerspectrum,cosmic_var, initial_z, fina
                                                     time = sim_time*60, #TODO in config
                                                     ntasks = ncores))
 
-        call("sbatch {boxdir}submit_sim.sbatch".format(boxdir=boxdir), shell=True)
+        #call("sbatch {boxdir}submit_sim.sbatch".format(boxdir=boxdir), shell=True)
 
 sim_config_template = """
 nc = {nc:d}
 boxsize  = {boxsize:.1f}
 
-time_step = linspace({initial_a:.1f}, {final_a:.1f}, 10)
+time_step = linspace({initial_a:.1f}, {final_a:.1f}, 20)
 
-output_redshifts = {{final_z:.2f}} --redshift of output
+output_redshifts = \{ {final_z:.2f} \} --redshift of output
 
 omega_m = {omega_m: f}
 h = {h:f}
@@ -93,22 +93,31 @@ random_seed = {seed:d}
 pm_nc_factor = 2
 np_alloc_factor = 4.0
 
+fof_nmin = 30
+
 write_snapshot = "{boxdir}fastpm"
 write_nonlineark= "{boxdir}fastmpm"
+write_fof = "{boxdir}fastpm"
 
 -- 1d power spectrum (raw), without shotnoise correction
 write_powerspectrum = "{boxdir}powerspec-debug"
 """
 
 submission_file_template = """#!/bin/bash
-#SBATCH --job-name={jobname}
-#SBATCH -p iric
+#SBATCH -p regular
+#SBATCH --time={time:d}:00
+##SBATCH --qos regular
+#SBATCH -A cosmosim
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=swmclau2@stanford.edu
+#SBATCH -N 1
+#SBATCH --ntasks={ntasks:d}
+#SBATCH -J {jobname} 
 #SBATCH --output={boxdir}{jobname}.out
 #SBATCH --error={boxdir}{jobname}.err 
-#SBATCH --time={time:d}:00
-#SBATCH --ntasks={ntasks:d}
 
-srun /home/users/swmclau2/Git/fastpm/src/fastpm {boxdir}nbodykit.lua
+
+srun /global/u2/s/swmclau2/Git/fastpm/src/fastpm {boxdir}nbodykit.lua
 """
 #may need to be an mpirun?
 
