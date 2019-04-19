@@ -79,7 +79,7 @@ sim_config_template = """
 nc = {nc:d}
 boxsize  = {boxsize:.1f}
 
-time_step = linspace({initial_a:.1f}, {final_a:.1f}, 20)
+time_step = linspace({initial_a:.3f}, {final_a:.3f}, 20)
 
 output_redshifts = {{{final_z:.2f}}} --redshift of output
 
@@ -96,7 +96,7 @@ np_alloc_factor = 4.0
 fof_nmin = 30
 
 write_snapshot = "{boxdir}fastpm"
-write_nonlineark= "{boxdir}fastmpm"
+write_nonlineark= "{boxdir}fastpm"
 write_fof = "{boxdir}fastpm"
 
 -- 1d power spectrum (raw), without shotnoise correction
@@ -110,8 +110,10 @@ submission_file_template = """#!/bin/bash
 #SBATCH -A cosmosim
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=swmclau2@stanford.edu
-#SBATCH -N 1
+#SBATCH -N {ntasks:d} 
 #SBATCH --ntasks={ntasks:d}
+#SBATCH --cpus-per-task=16
+#SBATCH --mem-per-cpu=MaxMemPerCPU
 #SBATCH -J {jobname} 
 #SBATCH --output={boxdir}{jobname}.out
 #SBATCH --error={boxdir}{jobname}.err 
