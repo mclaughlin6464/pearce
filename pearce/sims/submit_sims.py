@@ -37,19 +37,8 @@ def submit_sims(lhc_fname, output_dir, powerspectrum, cosmic_var, initial_z, fin
         if not path.isdir(boxdir):
             mkdir(boxdir)
 
-        # TODO parse Jeremy's header, or adjust it to be compliant here
-        param_dict = dict([(pn, row[pn]) for pn in param_names] )
-        # TODO it'd be nice if this could be somehow generalized.
-        param_dict['N_ncdm'] = 3.0
-        param_dict['N_ur'] = param_dict['Neff']-3.0
-        del param_dict['Neff']
-                                
-        param_dict['h'] = param_dict['H0']/100
-        del param_dict['H0']
-                                                        
-        param_dict['w0_fld'] = param_dict['w0']
-        del param_dict['w0']
-        cosmo = Cosmology(**param_dict)
+        cosmo = make_cosmo(param_names, row)
+
         p = power(cosmo, final_z)(k)
 
         np.savetxt(path.join(boxdir,'powerspec.txt'), np.array((k,p)).T)
@@ -73,7 +62,38 @@ def submit_sims(lhc_fname, output_dir, powerspectrum, cosmic_var, initial_z, fin
                                                     time = sim_time*60, #TODO in config
                                                     ntasks = ncores))
 
-        #call("sbatch {boxdir}submit_sim.sbatch".format(boxdir=boxdir), shell=True)
+        call("sbatch {boxdir}submit_sim.sbatch".format(boxdir=boxdir), shell=True)
+
+def make_cosmo(param_names, param_vals):
+    """
+    Frequently, the parameters of our input will not align with what we need.
+    So, we convert them to the appropriate format.
+    :param param_names:
+    :param param_vals:
+    :return:
+    """
+    param_dict = dict([(pn, param_vals[pn]) for pn in param_names] )
+    # TODO it'd be nice if this could be somehow generalized.
+    param_dict['N_ncdm'] = 3.0
+    param_dict['N_ur'] = param_dict['Neff']-3.0
+    del param_dict['Neff']
+
+    #param_dict['h'] = param_dict['H0']/100
+    #del param_dict['H0']
+    param_dict['h'] = param_dict['h0']
+    del param_dict['h0']
+
+    param_dict['w0_fld'] = param_dict['w']
+    del param_dict['w']
+
+    param_dict['Omega0_b'] = param_dict['Omega_b']
+    param_dict['Omega0_cdm'] = param_dict['Omega_m'] - param_dict['Omega_b']
+    del param_dict['Omega_b']
+    del param_dict['Omega_m']
+
+    return Cosmology(**param_dict)
+
+
 
 sim_config_template = """
 nc = {nc:d}
