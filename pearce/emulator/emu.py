@@ -2090,6 +2090,10 @@ class NashvilleHot(Emu):
         # and ycov has shape (n_bins, n_bins, n_points/n_bins)
         y = np.stack(y)
         yerr = np.stack(yerr)
+        if len(y.shape) == 2: 
+            y = np.expand_dims(y, 0)
+            yerr = np.expand_dims(yerr, 0) # make sure they all have the same shape, ain't that nice?
+
         if attach_params:
             return x1, x2, y, yerr, ycov
         else:
@@ -2148,22 +2152,23 @@ class NashvilleHot(Emu):
         ndim = x1.shape[1]+x2.shape[1]
         self.emulator_ndim = ndim  # The number of params for the emulator is different than those in sampling.
 
-        r_idx = self.get_param_names().index('r')
-        self.r_idx = r_idx  # we'll need this later, too
-        del self._ordered_params['r']  # remove r!
+        #r_idx = self.get_param_names().index('r')
+        self.r_idx = -1 # this object doesn't use this, but i think i use this as a marker
+        # TODO be smarter about how i split up the multi bin emus vs the OR
+        if 'r' in self._ordered_params:
+            del self._ordered_params['r']  # remove r!
 
-        skip_r_idx = np.ones((self.n_bins+1), dtype=bool)
-        skip_r_idx[r_idx] = False
 
-        #self._x1_mean, self._x1_std = x1.mean(axis = 1), x1.std(axis = 1)
-        #self._x2_mean, self._x2_std = x2.mean(axis = 1), x2.std(axis = 1)
+        self._x1_mean, self._x1_std = x1.mean(axis = 0), x1.std(axis = 0)
+        self._x2_mean, self._x2_std = x2.mean(axis = 0), x2.std(axis = 0)
+
         # try not whitening
         # TODO x1 & x2 or xcosmo and xhod?
-        self.x1, self.x2 = x1, x2#(x1-self._x1_mean)/(self._x1_std+1e-9), x2
+        self.x1, self.x2 = self._whiten(x1, x2) 
 
         #todo whiten here as needed
-        self._y_mean = np.stack([0.0 for _ in y])#np.stack([_y.mean() for _y in y] )
-        self._y_std = np.stack([1.0 for _ in y])
+        self._y_mean = np.stack([_y.mean() for _y in y] )
+        self._y_std = np.stack([_y.std() for _y in y])
         self.y  = np.stack([_y-_ym for _y,_ym in zip(y, self._y_mean)])
         self.yerr = np.stack(yerr)
 
@@ -2171,14 +2176,17 @@ class NashvilleHot(Emu):
         for i, mf in enumerate(self.mean_function(self.x1)):
             self.y[i] -= mf
 
-    def _whiten(self, x, arr='x'):
+    def _whiten(self, x1, x2=None):
         """
-        This object doesn't use whitening x, so this is very friendly
+
         :param x:
         :param arr:
         :return:
         """
-        return x, None
+        if x2 is None:
+            x1, x2 = x1[:self.x1.shape[-1]], x2[self.x1.shape[-1]:]
+
+        return (x1-self._x1_mean)/(self._x1_std+1e-9), (x2-self._x2_mean)/(self._x2_std+1e-9)
 
     def _make_custom_mean_function(self, custom_mean_function =None):
         """
@@ -2260,15 +2268,8 @@ class NashvilleHot(Emu):
             y = self.downsample_y
             yerr = self.downsample_yerr
         for _y,_yerr, _kern1, _kern2 in izip(y,yerr, kern1, kern2):
-            #emulator = GPKroneckerGaussianRegressionVar(x1, x2, _y, _yerr**2, _kern1, _kern2)
-            #print x1.shape, x2.shape
-            #print x1[:2,:], x2[:2,:]
-            #print '*'*10
-            #print _y.shape
-            #print _y[:2,:2]
-            #print '-'*10
-            #print _kern1, _kern2
-            emulator = GPKroneckerGaussianRegression(x1, x2, _y, _kern1, _kern2)
+            emulator = GPKroneckerGaussianRegressionVar(x1, x2, _y, _yerr**2, _kern1, _kern2)
+            #emulator = GPKroneckerGaussianRegression(x1, x2, _y, _kern1, _kern2)
 
             self._emulators.append(emulator)
             self._kernels.append((_kern1, _kern2))
@@ -2456,6 +2457,8 @@ class NashvilleHot(Emu):
 
         x1, x2, y, yerr, _, info = self.get_data(truth_file, self.fixed_params)
 
+        x1, x2 = self._whiten(x1, x2)
+
         scale_bin_centers = info['sbc']
         scale_nbins = len(scale_bin_centers) if 'r' not in self.fixed_params else 1
 
@@ -2467,14 +2470,12 @@ class NashvilleHot(Emu):
         #pred_y = self._emulate_helper(x, False, old_idxs=old_idxs)
         # emulate helper works better for one at a time
         # since were doing a big batch, dont' bother builind the big t-matrix
-        print x1.shape, x2.shape
         _py = [emu.predict(x1, x2)[0][:, 0] + ym for emu, ym in zip(self._emulators, self._y_mean)]
         pred_y = np.stack(_py)
         # NOTE think this is the right ordering, should check, though may not matter if i'm consistent...
 
         # TODO untested!
         if np.any(scale_bin_centers != self.scale_bin_centers):
-            print 'Hi'
             bin_centers = scale_bin_centers[self.scale_bin_centers[0] <= scale_bin_centers <= self.scale_bin_centers[-1]]
             new_mu = []
             for mean in pred_y:
@@ -2547,8 +2548,6 @@ class NashvilleHot(Emu):
 
         for emulator in self._emulators:
             emulator.optimize_restarts(num_restarts = 5, verbose = False)
-            print emulator.param_array
-            print '*'*20
 
 
 # TODO

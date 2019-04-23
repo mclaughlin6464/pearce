@@ -30,20 +30,26 @@ np.random.seed(int(time())) # TODO pass in seed?
 t0 = time()
 level = 10
 #for idx, (subbox_idx, _subbox) in enumerate(ds14a_part.itersubbox(level=10, pad=1.0, fields=['x','y','z'], return_index = True)):
-start_idx = (1, 123, 472) 
-for idx in product(xrange(2**level), repeat=3):
-    if idx[0] < start_idx[0] or (idx[0]== start_idx[0] and idx[1] < start_idx[1]):
+#start_subbox_idx = (3, 306, 928)#(1, 123, 472) 
+start_subbox_idx = (5, 490, 360)
+start_idx = 0
+all_particles = np.array([], dtype='float32')
+
+for idx, subbox_idx in enumerate(product(xrange(2**level), repeat=3)):
+    if subbox_idx[0] < start_subbox_idx[0] or (subbox_idx[0]== start_subbox_idx[0] and subbox_idx[1] < start_subbox_idx[1]):
+        start_idx+=1
         continue # skip these other idxs 
-    _subbox = ds14a_part.getsubbox(idx, level=level, pad=1.0, fields=['x','y','z'])
+    _subbox = ds14a_part._loadsubbox(subbox_idx, level=level, pad=np.ones((3,)),\
+                                    fields=['x','y','z'], cut=None, cut_fields=None)
+
     if len(_subbox) == 0: #empty
-        print idx, 'DONE'
+        print idx, subbox_idx, 'DONE'
         break #done!
     subbox_unmod = _subbox.view(np.float64).reshape(_subbox.shape+(-1,)) 
     subbox = (subbox_unmod + R0)*h/1000
-
     if idx%5000 == 0:
         print idx,subbox_idx, (time()-t0)/3600.0
-        if idx!=0:
+        if idx!=0 and idx!=start_idx+1:
             f = h5py.File('/scratch/users/swmclau2/Darksky/ds14_a_1.0000_%.3f_downsample.hdf5'%downsample_factor)
 
 #            all_particles[all_particles<0] = 0.0 # numerical errors
@@ -81,7 +87,6 @@ for idx in product(xrange(2**level), repeat=3):
 
     all_particles = np.resize(all_particles, (all_particles.shape[0] + particles.shape[0], 3 ))
     all_particles[-particles.shape[0]:, ] = particles
-    idx+=1
 
 
 print 'Done'

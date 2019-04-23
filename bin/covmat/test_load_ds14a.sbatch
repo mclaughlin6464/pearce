@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=test_load_ds14a
 #SBATCH -p iric 
-#SBATCH --time=24:00:00
+#SBATCH --time=48:00:00
 #SBATCH -o test_load_ds14a.out
 #SBATCH --exclusive
 
