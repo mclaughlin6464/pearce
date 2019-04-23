@@ -62,7 +62,7 @@ def submit_sims(lhc_fname, output_dir, powerspectrum, cosmic_var, initial_z, fin
                                                     time = sim_time*60, #TODO in config
                                                     ntasks = ncores))
 
-        call("sbatch {boxdir}submit_sim.sbatch".format(boxdir=boxdir), shell=True)
+        #call("sbatch {boxdir}submit_sim.sbatch".format(boxdir=boxdir), shell=True)
 
 def make_cosmo(param_names, param_vals):
     """
@@ -90,6 +90,12 @@ def make_cosmo(param_names, param_vals):
     param_dict['Omega0_cdm'] = param_dict['Omega_m'] - param_dict['Omega_b']
     del param_dict['Omega_b']
     del param_dict['Omega_m']
+
+    param_dict['ln_1e10_A_s'] = param_dict['ln(10^{10}A_s)']
+    del param_dict['ln(10^{10}A_s)']
+
+    param_dict['Omega0_ncdm_tot'] = param_dict['Omeganuh2']/(param_dict['h']**2)
+    del param_dict['Omeganuh2']
 
     return Cosmology(**param_dict)
 
