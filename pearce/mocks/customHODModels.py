@@ -7,8 +7,9 @@ from scipy.interpolate import interp1d
 import warnings
 
 from halotools.empirical_models import Zheng07Cens, Zheng07Sats, OccupationComponent, model_defaults
-from halotools.empirical_models import HeavisideAssembias#, ContinuousAssembias, FreeSplitAssembias, FreeSplitContinuousAssembias
-#from halotools.empirical_models import CorrelationAssembias
+from halotools.empirical_models import \
+    HeavisideAssembias  # , ContinuousAssembias, FreeSplitAssembias, FreeSplitContinuousAssembias
+# from halotools.empirical_models import CorrelationAssembias
 from halotools.custom_exceptions import HalotoolsError
 from halotools.utils.table_utils import compute_conditional_percentiles
 
@@ -69,6 +70,7 @@ class HSAssembiasRedMagicCens(RedMagicCens, HeavisideAssembias):
                                     method_name_to_decorate='mean_occupation',
                                     **kwargs)
 
+
 class FSAssembiasRedMagicCens(RedMagicCens, FreeSplitAssembias):
     '''RedMagic Cens with Heaviside Assembly bias'''
 
@@ -86,6 +88,7 @@ class FSAssembiasRedMagicCens(RedMagicCens, FreeSplitAssembias):
                                     method_name_to_decorate='mean_occupation',
                                     **kwargs)
 
+
 class FSCAssembiasRedMagicCens(RedMagicCens, FreeSplitContinuousAssembias):
     '''RedMagic Cens with Heaviside Assembly bias'''
 
@@ -98,11 +101,10 @@ class FSCAssembiasRedMagicCens(RedMagicCens, FreeSplitContinuousAssembias):
             kwargs['sec_haloprop_key'] = sec_haloprop_key
 
         FreeSplitContinuousAssembias.__init__(self,
-                                    lower_assembias_bound=self._lower_occupation_bound,
-                                    upper_assembias_bound=self._upper_occupation_bound,
-                                    method_name_to_decorate='mean_occupation',
-                                    **kwargs)
-
+                                              lower_assembias_bound=self._lower_occupation_bound,
+                                              upper_assembias_bound=self._upper_occupation_bound,
+                                              method_name_to_decorate='mean_occupation',
+                                              **kwargs)
 
 
 class CorrAssembiasRedMagicCens(RedMagicCens, CorrelationAssembias):
@@ -117,10 +119,11 @@ class CorrAssembiasRedMagicCens(RedMagicCens, CorrelationAssembias):
             kwargs['sec_haloprop_key'] = sec_haloprop_key
 
         CorrelationAssembias.__init__(self,
-                                    lower_assembias_bound=self._lower_occupation_bound,
-                                    upper_assembias_bound=self._upper_occupation_bound,
-                                    method_name_to_decorate='mean_occupation',
-                                    **kwargs)
+                                      lower_assembias_bound=self._lower_occupation_bound,
+                                      upper_assembias_bound=self._upper_occupation_bound,
+                                      method_name_to_decorate='mean_occupation',
+                                      **kwargs)
+
 
 class RedMagicSats(Zheng07Sats):
     '''Tweak of Zheng model to add a new parameter, f_c, denoting a modified central fraction.'''
@@ -179,6 +182,7 @@ class HSAssembiasRedMagicSats(RedMagicSats, HeavisideAssembias):
                                     method_name_to_decorate='mean_occupation',
                                     **kwargs)
 
+
 class FSAssembiasRedMagicSats(RedMagicSats, FreeSplitAssembias):
     '''RedMagic Cens with Assembly bias'''
 
@@ -195,6 +199,7 @@ class FSAssembiasRedMagicSats(RedMagicSats, FreeSplitAssembias):
                                     method_name_to_decorate='mean_occupation',
                                     **kwargs)
 
+
 class FSCAssembiasRedMagicSats(RedMagicSats, FreeSplitContinuousAssembias):
     '''RedMagic Cens with Assembly bias'''
 
@@ -206,10 +211,10 @@ class FSCAssembiasRedMagicSats(RedMagicSats, FreeSplitContinuousAssembias):
             kwargs['sec_haloprop_key'] = sec_haloprop_key
 
         FreeSplitContinuousAssembias.__init__(self,
-                                    lower_assembias_bound=self._lower_occupation_bound,
-                                    upper_assembias_bound=self._upper_occupation_bound,
-                                    method_name_to_decorate='mean_occupation',
-                                    **kwargs)
+                                              lower_assembias_bound=self._lower_occupation_bound,
+                                              upper_assembias_bound=self._upper_occupation_bound,
+                                              method_name_to_decorate='mean_occupation',
+                                              **kwargs)
 
 
 class CorrAssembiasRedMagicSats(RedMagicSats, CorrelationAssembias):
@@ -223,11 +228,190 @@ class CorrAssembiasRedMagicSats(RedMagicSats, CorrelationAssembias):
             kwargs['sec_haloprop_key'] = sec_haloprop_key
 
         CorrelationAssembias.__init__(self,
+                                      lower_assembias_bound=self._lower_occupation_bound,
+                                      upper_assembias_bound=self._upper_occupation_bound,
+                                      method_name_to_decorate='mean_occupation',
+                                      **kwargs)
+
+
+class AssembiasZheng07Cens(Zheng07Cens, ContinuousAssembias):
+    '''RedMagic Cens with Continuous Assembly bias'''
+
+    def __init__(self, **kwargs):
+        '''See halotools docs for more info. '''
+        super(AssembiasZheng07Cens, self).__init__(**kwargs)
+
+        fkwargs = kwargs.copy()
+        if 'sec_haloprop_key' not in fkwargs:
+            fkwargs['sec_haloprop_key'] = 'halo_nfw_conc'
+
+        if 'method_name_to_decorate' not in fkwargs:
+            fkwargs['method_name_to_decorate'] = 'mean_occupation'
+
+        ContinuousAssembias.__init__(self,
+                                     lower_assembias_bound=self._lower_occupation_bound,
+                                     upper_assembias_bound=self._upper_occupation_bound,
+                                     **fkwargs)
+
+
+class HSAssembiasZheng07Cens(Zheng07Cens, HeavisideAssembias):
+    '''RedMagic Cens with Heaviside Assembly bias'''
+
+    def __init__(self, **kwargs):
+        '''See halotools docs for more info. '''
+        super(HSAssembiasZheng07Cens, self).__init__(**kwargs)
+
+        sec_haloprop_key = 'halo_nfw_conc'
+        if 'sec_haloprop_key' not in kwargs:
+            kwargs['sec_haloprop_key'] = sec_haloprop_key
+
+        HeavisideAssembias.__init__(self,
                                     lower_assembias_bound=self._lower_occupation_bound,
                                     upper_assembias_bound=self._upper_occupation_bound,
                                     method_name_to_decorate='mean_occupation',
                                     **kwargs)
 
+
+class FSAssembiasZheng07Cens(Zheng07Cens, FreeSplitAssembias):
+    '''RedMagic Cens with Heaviside Assembly bias'''
+
+    def __init__(self, **kwargs):
+        '''See halotools docs for more info. '''
+        super(FSAssembiasZheng07Cens, self).__init__(**kwargs)
+
+        sec_haloprop_key = 'halo_nfw_conc'
+        if 'sec_haloprop_key' not in kwargs:
+            kwargs['sec_haloprop_key'] = sec_haloprop_key
+
+        FreeSplitAssembias.__init__(self,
+                                    lower_assembias_bound=self._lower_occupation_bound,
+                                    upper_assembias_bound=self._upper_occupation_bound,
+                                    method_name_to_decorate='mean_occupation',
+                                    **kwargs)
+
+
+class FSCAssembiasZheng07Cens(Zheng07Cens, FreeSplitContinuousAssembias):
+    '''RedMagic Cens with Heaviside Assembly bias'''
+
+    def __init__(self, **kwargs):
+        '''See halotools docs for more info. '''
+        super(FSCAssembiasZheng07Cens, self).__init__(**kwargs)
+
+        sec_haloprop_key = 'halo_nfw_conc'
+        if 'sec_haloprop_key' not in kwargs:
+            kwargs['sec_haloprop_key'] = sec_haloprop_key
+
+        FreeSplitContinuousAssembias.__init__(self,
+                                              lower_assembias_bound=self._lower_occupation_bound,
+                                              upper_assembias_bound=self._upper_occupation_bound,
+                                              method_name_to_decorate='mean_occupation',
+                                              **kwargs)
+
+
+class CorrAssembiasZheng07Cens(Zheng07Cens, CorrelationAssembias):
+    '''RedMagic Cens with Heaviside Assembly bias'''
+
+    def __init__(self, **kwargs):
+        '''See halotools docs for more info. '''
+        super(CorrAssembiasZheng07Cens, self).__init__(**kwargs)
+
+        sec_haloprop_key = 'halo_nfw_conc'
+        if 'sec_haloprop_key' not in kwargs:
+            kwargs['sec_haloprop_key'] = sec_haloprop_key
+
+        CorrelationAssembias.__init__(self,
+                                      lower_assembias_bound=self._lower_occupation_bound,
+                                      upper_assembias_bound=self._upper_occupation_bound,
+                                      method_name_to_decorate='mean_occupation',
+                                      **kwargs)
+
+
+class AssembiasZheng07Sats(Zheng07Sats, ContinuousAssembias):
+    '''RedMagic Cens with Assembly bias'''
+
+    def __init__(self, cenocc_model, **kwargs):
+        '''See halotools docs for more info. '''
+        super(AssembiasZheng07Sats, self).__init__(cenocc_model, **kwargs)
+
+        fkwargs = kwargs.copy()
+        if 'sec_haloprop_key' not in fkwargs:
+            fkwargs['sec_haloprop_key'] = 'halo_nfw_conc'
+
+        if 'method_name_to_decorate' not in fkwargs:
+            fkwargs['method_name_to_decorate'] = 'mean_occupation'
+
+        ContinuousAssembias.__init__(self,
+                                     lower_assembias_bound=self._lower_occupation_bound,
+                                     upper_assembias_bound=self._upper_occupation_bound,
+                                     **fkwargs)
+
+
+class HSAssembiasZheng07Sats(Zheng07Sats, HeavisideAssembias):
+    '''RedMagic Cens with Assembly bias'''
+
+    def __init__(self, cenocc_model, **kwargs):
+        '''See halotools docs for more info. '''
+        super(HSAssembiasZheng07Sats, self).__init__(cenocc_model, **kwargs)
+        sec_haloprop_key = 'halo_nfw_conc'
+        if 'sec_haloprop_key' not in kwargs:
+            kwargs['sec_haloprop_key'] = sec_haloprop_key
+
+        HeavisideAssembias.__init__(self,
+                                    lower_assembias_bound=self._lower_occupation_bound,
+                                    upper_assembias_bound=self._upper_occupation_bound,
+                                    method_name_to_decorate='mean_occupation',
+                                    **kwargs)
+
+
+class FSAssembiasZheng07Sats(Zheng07Sats, FreeSplitAssembias):
+    '''RedMagic Cens with Assembly bias'''
+
+    def __init__(self, cenocc_model, **kwargs):
+        '''See halotools docs for more info. '''
+        super(FSAssembiasZheng07Sats, self).__init__(cenocc_model, **kwargs)
+        sec_haloprop_key = 'halo_nfw_conc'
+        if 'sec_haloprop_key' not in kwargs:
+            kwargs['sec_haloprop_key'] = sec_haloprop_key
+
+        FreeSplitAssembias.__init__(self,
+                                    lower_assembias_bound=self._lower_occupation_bound,
+                                    upper_assembias_bound=self._upper_occupation_bound,
+                                    method_name_to_decorate='mean_occupation',
+                                    **kwargs)
+
+
+class FSCAssembiasZheng07Sats(Zheng07Sats, FreeSplitContinuousAssembias):
+    '''RedMagic Cens with Assembly bias'''
+
+    def __init__(self, cenocc_model, **kwargs):
+        '''See halotools docs for more info. '''
+        super(FSCAssembiasZheng07Sats, self).__init__(cenocc_model, **kwargs)
+        sec_haloprop_key = 'halo_nfw_conc'
+        if 'sec_haloprop_key' not in kwargs:
+            kwargs['sec_haloprop_key'] = sec_haloprop_key
+
+        FreeSplitContinuousAssembias.__init__(self,
+                                              lower_assembias_bound=self._lower_occupation_bound,
+                                              upper_assembias_bound=self._upper_occupation_bound,
+                                              method_name_to_decorate='mean_occupation',
+                                              **kwargs)
+
+
+class CorrAssembiasZheng07Sats(Zheng07Sats, CorrelationAssembias):
+    '''RedMagic Cens with Assembly bias'''
+
+    def __init__(self, cenocc_model, **kwargs):
+        '''See halotools docs for more info. '''
+        super(CorrAssembiasZheng07Sats, self).__init__(cenocc_model, **kwargs)
+        sec_haloprop_key = 'halo_nfw_conc'
+        if 'sec_haloprop_key' not in kwargs:
+            kwargs['sec_haloprop_key'] = sec_haloprop_key
+
+        CorrelationAssembias.__init__(self,
+                                      lower_assembias_bound=self._lower_occupation_bound,
+                                      upper_assembias_bound=self._upper_occupation_bound,
+                                      method_name_to_decorate='mean_occupation',
+                                      **kwargs)
 
 
 class Reddick14Cens(OccupationComponent):
@@ -401,6 +585,7 @@ class HSAssembiasReddick14Cens(Reddick14Cens, HeavisideAssembias):
                                     method_name_to_decorate='mean_occupation',
                                     **kwargs)
 
+
 class FSAssembiasReddick14Cens(Reddick14Cens, FreeSplitAssembias):
     '''Reddick14 Cens with Heaviside Assembly bias'''
 
@@ -418,6 +603,7 @@ class FSAssembiasReddick14Cens(Reddick14Cens, FreeSplitAssembias):
                                     method_name_to_decorate='mean_occupation',
                                     **kwargs)
 
+
 class CorrAssembiasReddick14Cens(Reddick14Cens, CorrelationAssembias):
     '''Reddick14 Cens with Heaviside Assembly bias'''
 
@@ -430,11 +616,10 @@ class CorrAssembiasReddick14Cens(Reddick14Cens, CorrelationAssembias):
             kwargs['sec_haloprop_key'] = sec_haloprop_key
 
         CorrelationAssembias.__init__(self,
-                                    lower_assembias_bound=self._lower_occupation_bound,
-                                    upper_assembias_bound=self._upper_occupation_bound,
-                                    method_name_to_decorate='mean_occupation',
-                                    **kwargs)
-
+                                      lower_assembias_bound=self._lower_occupation_bound,
+                                      upper_assembias_bound=self._upper_occupation_bound,
+                                      method_name_to_decorate='mean_occupation',
+                                      **kwargs)
 
 
 class Reddick14Sats(OccupationComponent):
@@ -673,7 +858,7 @@ class AssembiasReddick14Sats(Reddick14Sats, ContinuousAssembias):
         super(AssembiasReddick14Sats, self).__init__(cenocc_model=cenocc_model, **kwargs)
         sec_haloprop_key = 'halo_nfw_conc'
         if 'sec_haloprop_key' not in kwargs:
-                kwargs['sec_haloprop_key'] = sec_haloprop_key
+            kwargs['sec_haloprop_key'] = sec_haloprop_key
 
         ContinuousAssembias.__init__(self,
                                      lower_assembias_bound=self._lower_occupation_bound,
@@ -698,6 +883,7 @@ class HSAssembiasReddick14Sats(Reddick14Sats, HeavisideAssembias):
                                     method_name_to_decorate='mean_occupation',
                                     **kwargs)
 
+
 class FSAssembiasReddick14Sats(Reddick14Sats, FreeSplitAssembias):
     '''Reddick14 Cens with Assembly bias'''
 
@@ -714,6 +900,7 @@ class FSAssembiasReddick14Sats(Reddick14Sats, FreeSplitAssembias):
                                     method_name_to_decorate='mean_occupation',
                                     **kwargs)
 
+
 class CorrAssembiasReddick14Sats(Reddick14Sats, CorrelationAssembias):
     '''Reddick14 Cens with Assembly bias'''
 
@@ -725,10 +912,10 @@ class CorrAssembiasReddick14Sats(Reddick14Sats, CorrelationAssembias):
             kwargs['sec_haloprop_key'] = sec_haloprop_key
 
         CorrelationAssembias.__init__(self,
-                                    lower_assembias_bound=self._lower_occupation_bound,
-                                    upper_assembias_bound=self._upper_occupation_bound,
-                                    method_name_to_decorate='mean_occupation',
-                                    **kwargs)
+                                      lower_assembias_bound=self._lower_occupation_bound,
+                                      upper_assembias_bound=self._upper_occupation_bound,
+                                      method_name_to_decorate='mean_occupation',
+                                      **kwargs)
 
 
 class StepFuncCens(Zheng07Cens):
@@ -812,9 +999,9 @@ class TabulatedCens(OccupationComponent):
 
         upper_occupation_bound = 1.0
 
-        assert np.all(cen_hod_vals >=0) and np.all(upper_occupation_bound>=cen_hod_vals)
+        assert np.all(cen_hod_vals >= 0) and np.all(upper_occupation_bound >= cen_hod_vals)
         assert cen_hod_vals.shape == prim_haloprop_vals.shape
-        assert np.all(prim_haloprop_vals>=0)
+        assert np.all(prim_haloprop_vals >= 0)
 
         self._prim_haloprop_vals = prim_haloprop_vals
         self._cen_hod_vals = cen_hod_vals
@@ -885,16 +1072,15 @@ class TabulatedCens(OccupationComponent):
             msg = ("\nYou must pass either a ``table`` or ``prim_haloprop`` argument \n"
                    "to the ``mean_occupation`` function of the ``Zheng07Sats`` class.\n")
             raise HalotoolsError(msg)
-        over_idxs = mass >np.max(self._prim_haloprop_vals)
-        under_idxs = mass< np.min(self._prim_haloprop_vals)
-        contained_indices = ~np.logical_or(under_idxs, over_idxs) #indexs contained by the interpolator
+        over_idxs = mass > np.max(self._prim_haloprop_vals)
+        under_idxs = mass < np.min(self._prim_haloprop_vals)
+        contained_indices = ~np.logical_or(under_idxs, over_idxs)  # indexs contained by the interpolator
         mean_ncen = np.zeros_like(mass)
         mean_ncen[over_idxs] = self._upper_occupation_bound
         mean_ncen[under_idxs] = self._lower_occupation_bound
-        mean_ncen[contained_indices] = self._mean_occupation(np.log10(mass[contained_indices]) )
+        mean_ncen[contained_indices] = self._mean_occupation(np.log10(mass[contained_indices]))
 
         return mean_ncen
-
 
     def get_published_parameters(self):
         r"""
@@ -916,12 +1102,13 @@ class TabulatedCens(OccupationComponent):
 
         return dict()
 
+
 class AssembiasTabulatedCens(TabulatedCens, ContinuousAssembias):
     '''Tabulated Cens with Continuous Assembly bias'''
 
-    def __init__(self,prim_haloprop_vals, cen_hod_vals, **kwargs):
+    def __init__(self, prim_haloprop_vals, cen_hod_vals, **kwargs):
         '''See halotools docs for more info. '''
-        super(AssembiasTabulatedCens, self).__init__(prim_haloprop_vals, cen_hod_vals,**kwargs)
+        super(AssembiasTabulatedCens, self).__init__(prim_haloprop_vals, cen_hod_vals, **kwargs)
 
         sec_haloprop_key = 'halo_nfw_conc'
         if 'sec_haloprop_key' not in kwargs:
@@ -937,9 +1124,9 @@ class AssembiasTabulatedCens(TabulatedCens, ContinuousAssembias):
 class HSAssembiasTabulatedCens(TabulatedCens, HeavisideAssembias):
     '''Reddick14 Cens with Heaviside Assembly bias'''
 
-    def __init__(self,prim_haloprop_vals, cen_hod_vals, **kwargs):
+    def __init__(self, prim_haloprop_vals, cen_hod_vals, **kwargs):
         '''See halotools docs for more info. '''
-        super(HSAssembiasTabulatedCens, self).__init__(prim_haloprop_vals, cen_hod_vals,**kwargs)
+        super(HSAssembiasTabulatedCens, self).__init__(prim_haloprop_vals, cen_hod_vals, **kwargs)
 
         sec_haloprop_key = 'halo_nfw_conc'
         if 'sec_haloprop_key' not in kwargs:
@@ -951,12 +1138,13 @@ class HSAssembiasTabulatedCens(TabulatedCens, HeavisideAssembias):
                                     method_name_to_decorate='mean_occupation',
                                     **kwargs)
 
+
 class FSAssembiasTabulatedCens(TabulatedCens, FreeSplitAssembias):
     '''Reddick14 Cens with Heaviside Assembly bias'''
 
-    def __init__(self,prim_haloprop_vals, cen_hod_vals, **kwargs):
+    def __init__(self, prim_haloprop_vals, cen_hod_vals, **kwargs):
         '''See halotools docs for more info. '''
-        super(FSAssembiasTabulatedCens, self).__init__(prim_haloprop_vals, cen_hod_vals,**kwargs)
+        super(FSAssembiasTabulatedCens, self).__init__(prim_haloprop_vals, cen_hod_vals, **kwargs)
 
         sec_haloprop_key = 'halo_nfw_conc'
         if 'sec_haloprop_key' not in kwargs:
@@ -968,41 +1156,41 @@ class FSAssembiasTabulatedCens(TabulatedCens, FreeSplitAssembias):
                                     method_name_to_decorate='mean_occupation',
                                     **kwargs)
 
+
 class FSCAssembiasTabulatedCens(TabulatedCens, FreeSplitContinuousAssembias):
     '''Reddick14 Cens with Heaviside Assembly bias'''
 
-    def __init__(self,prim_haloprop_vals, cen_hod_vals, **kwargs):
+    def __init__(self, prim_haloprop_vals, cen_hod_vals, **kwargs):
         '''See halotools docs for more info. '''
-        super(FSCAssembiasTabulatedCens, self).__init__(prim_haloprop_vals, cen_hod_vals,**kwargs)
+        super(FSCAssembiasTabulatedCens, self).__init__(prim_haloprop_vals, cen_hod_vals, **kwargs)
 
         sec_haloprop_key = 'halo_nfw_conc'
         if 'sec_haloprop_key' not in kwargs:
             kwargs['sec_haloprop_key'] = sec_haloprop_key
 
         FreeSplitContinuousAssembias.__init__(self,
-                                    lower_assembias_bound=self._lower_occupation_bound,
-                                    upper_assembias_bound=self._upper_occupation_bound,
-                                    method_name_to_decorate='mean_occupation',
-                                    **kwargs)
+                                              lower_assembias_bound=self._lower_occupation_bound,
+                                              upper_assembias_bound=self._upper_occupation_bound,
+                                              method_name_to_decorate='mean_occupation',
+                                              **kwargs)
 
 
 class CorrAssembiasTabulatedCens(TabulatedCens, CorrelationAssembias):
     '''Reddick14 Cens with Heaviside Assembly bias'''
 
-    def __init__(self,prim_haloprop_vals, cen_hod_vals, **kwargs):
+    def __init__(self, prim_haloprop_vals, cen_hod_vals, **kwargs):
         '''See halotools docs for more info. '''
-        super(CorrAssembiasTabulatedCens, self).__init__(prim_haloprop_vals, cen_hod_vals,**kwargs)
+        super(CorrAssembiasTabulatedCens, self).__init__(prim_haloprop_vals, cen_hod_vals, **kwargs)
 
         sec_haloprop_key = 'halo_nfw_conc'
         if 'sec_haloprop_key' not in kwargs:
             kwargs['sec_haloprop_key'] = sec_haloprop_key
 
         CorrelationAssembias.__init__(self,
-                                    lower_assembias_bound=self._lower_occupation_bound,
-                                    upper_assembias_bound=self._upper_occupation_bound,
-                                    method_name_to_decorate='mean_occupation',
-                                    **kwargs)
-
+                                      lower_assembias_bound=self._lower_occupation_bound,
+                                      upper_assembias_bound=self._upper_occupation_bound,
+                                      method_name_to_decorate='mean_occupation',
+                                      **kwargs)
 
 
 class TabulatedSats(OccupationComponent):
@@ -1052,7 +1240,7 @@ class TabulatedSats(OccupationComponent):
         super(TabulatedSats, self).__init__(
             gal_type='satellites', threshold=threshold,
             upper_occupation_bound=upper_occupation_bound,
-            prim_haloprop_key=prim_haloprop_key,modulated_with_cenocc=False,
+            prim_haloprop_key=prim_haloprop_key, modulated_with_cenocc=False,
             **kwargs)
 
         self.param_dict = self.get_published_parameters()
@@ -1115,9 +1303,9 @@ class TabulatedSats(OccupationComponent):
         under_idxs = mass < np.min(self._prim_haloprop_vals)
         contained_indices = ~np.logical_or(under_idxs, over_idxs)  # indexs contained by the interpolator
         mean_nsat = np.zeros_like(mass)
-        mean_nsat[over_idxs] = self._sat_hod_vals[-1] #not happy abotu this, no better guess
+        mean_nsat[over_idxs] = self._sat_hod_vals[-1]  # not happy abotu this, no better guess
         mean_nsat[under_idxs] = self._lower_occupation_bound
-        mean_nsat[contained_indices] = self._mean_occupation(np.log10(mass[contained_indices]) )
+        mean_nsat[contained_indices] = self._mean_occupation(np.log10(mass[contained_indices]))
 
         return mean_nsat
 
@@ -1144,9 +1332,9 @@ class TabulatedSats(OccupationComponent):
 class AssembiasTabulatedSats(TabulatedSats, ContinuousAssembias):
     '''Tabulated Sats with Assembly bias'''
 
-    def __init__(self,prim_haloprop_vals, sat_hod_vals, **kwargs):
+    def __init__(self, prim_haloprop_vals, sat_hod_vals, **kwargs):
         '''See halotools docs for more info. '''
-        super(AssembiasTabulatedSats, self).__init__(prim_haloprop_vals, sat_hod_vals,cenocc_model=None, **kwargs)
+        super(AssembiasTabulatedSats, self).__init__(prim_haloprop_vals, sat_hod_vals, cenocc_model=None, **kwargs)
         sec_haloprop_key = 'halo_nfw_conc'
         if 'sec_haloprop_key' not in kwargs:
             kwargs['sec_haloprop_key'] = sec_haloprop_key
@@ -1161,9 +1349,9 @@ class AssembiasTabulatedSats(TabulatedSats, ContinuousAssembias):
 class HSAssembiasTabulatedSats(TabulatedSats, HeavisideAssembias):
     '''Tabulated Sats with Assembly bias'''
 
-    def __init__(self,prim_haloprop_vals, sat_hod_vals, **kwargs):
+    def __init__(self, prim_haloprop_vals, sat_hod_vals, **kwargs):
         '''See halotools docs for more info. '''
-        super(HSAssembiasTabulatedSats, self).__init__(prim_haloprop_vals, sat_hod_vals,cenocc_model=None, **kwargs)
+        super(HSAssembiasTabulatedSats, self).__init__(prim_haloprop_vals, sat_hod_vals, cenocc_model=None, **kwargs)
         sec_haloprop_key = 'halo_nfw_conc'
         if 'sec_haloprop_key' not in kwargs:
             kwargs['sec_haloprop_key'] = sec_haloprop_key
@@ -1174,12 +1362,13 @@ class HSAssembiasTabulatedSats(TabulatedSats, HeavisideAssembias):
                                     method_name_to_decorate='mean_occupation',
                                     **kwargs)
 
+
 class FSAssembiasTabulatedSats(TabulatedSats, FreeSplitAssembias):
     '''Tabulated Sats with Assembly bias'''
 
-    def __init__(self,prim_haloprop_vals, sat_hod_vals, **kwargs):
+    def __init__(self, prim_haloprop_vals, sat_hod_vals, **kwargs):
         '''See halotools docs for more info. '''
-        super(FSAssembiasTabulatedSats, self).__init__(prim_haloprop_vals, sat_hod_vals,cenocc_model=None, **kwargs)
+        super(FSAssembiasTabulatedSats, self).__init__(prim_haloprop_vals, sat_hod_vals, cenocc_model=None, **kwargs)
         sec_haloprop_key = 'halo_nfw_conc'
         if 'sec_haloprop_key' not in kwargs:
             kwargs['sec_haloprop_key'] = sec_haloprop_key
@@ -1190,44 +1379,48 @@ class FSAssembiasTabulatedSats(TabulatedSats, FreeSplitAssembias):
                                     method_name_to_decorate='mean_occupation',
                                     **kwargs)
 
+
 class CorrAssembiasTabulatedSats(TabulatedSats, CorrelationAssembias):
     '''Tabulated Sats with Assembly bias'''
 
-    def __init__(self,prim_haloprop_vals, sat_hod_vals, **kwargs):
+    def __init__(self, prim_haloprop_vals, sat_hod_vals, **kwargs):
         '''See halotools docs for more info. '''
-        super(CorrAssembiasTabulatedSats, self).__init__(prim_haloprop_vals, sat_hod_vals,cenocc_model=None, **kwargs)
+        super(CorrAssembiasTabulatedSats, self).__init__(prim_haloprop_vals, sat_hod_vals, cenocc_model=None, **kwargs)
         sec_haloprop_key = 'halo_nfw_conc'
         if 'sec_haloprop_key' not in kwargs:
             kwargs['sec_haloprop_key'] = sec_haloprop_key
 
         CorrelationAssembias.__init__(self,
-                                    lower_assembias_bound=self._lower_occupation_bound,
-                                    upper_assembias_bound=self._upper_occupation_bound,
-                                    method_name_to_decorate='mean_occupation',
-                                    **kwargs)
+                                      lower_assembias_bound=self._lower_occupation_bound,
+                                      upper_assembias_bound=self._upper_occupation_bound,
+                                      method_name_to_decorate='mean_occupation',
+                                      **kwargs)
+
 
 class FSCAssembiasTabulatedSats(TabulatedSats, FreeSplitContinuousAssembias):
     '''Tabulated Sats with Assembly bias'''
 
-    def __init__(self,prim_haloprop_vals, sat_hod_vals, **kwargs):
+    def __init__(self, prim_haloprop_vals, sat_hod_vals, **kwargs):
         '''See halotools docs for more info. '''
-        super(FSCAssembiasTabulatedSats, self).__init__(prim_haloprop_vals, sat_hod_vals,cenocc_model=None, **kwargs)
+        super(FSCAssembiasTabulatedSats, self).__init__(prim_haloprop_vals, sat_hod_vals, cenocc_model=None, **kwargs)
         sec_haloprop_key = 'halo_nfw_conc'
         if 'sec_haloprop_key' not in kwargs:
             kwargs['sec_haloprop_key'] = sec_haloprop_key
 
         FreeSplitContinuousAssembias.__init__(self,
-                                    lower_assembias_bound=self._lower_occupation_bound,
-                                    upper_assembias_bound=self._upper_occupation_bound,
-                                    method_name_to_decorate='mean_occupation',
-                                    **kwargs)
+                                              lower_assembias_bound=self._lower_occupation_bound,
+                                              upper_assembias_bound=self._upper_occupation_bound,
+                                              method_name_to_decorate='mean_occupation',
+                                              **kwargs)
 
-#considered subclassing but doesn't seem like i actually want that?
+
+# considered subclassing but doesn't seem like i actually want that?
 # TODO TabulatedHODComponent should be a class and Cens and Sats should be subclassed. 
 class Tabulated2DCens(OccupationComponent):
     r""" Central occupation that is fixed at observed values. Rather than being parameterized, populate with an HOD
     with a fixed, observed relationship.
     """
+
     def __init__(self, prim_haloprop_bins, sec_haloprop_perc_bins, cen_hod_vals,
                  threshold=model_defaults.default_luminosity_threshold,
                  prim_haloprop_key=model_defaults.prim_haloprop_key,
@@ -1268,14 +1461,14 @@ class Tabulated2DCens(OccupationComponent):
 
         upper_occupation_bound = 1.0
 
-        assert np.all(cen_hod_vals >=0) and np.all(upper_occupation_bound>=cen_hod_vals)
-        assert cen_hod_vals.shape[0] == prim_haloprop_bins.shape[0]-1
-        assert cen_hod_vals.shape[1] == sec_haloprop_perc_bins.shape[0]-1
-        assert np.all(prim_haloprop_bins>=0)
+        assert np.all(cen_hod_vals >= 0) and np.all(upper_occupation_bound >= cen_hod_vals)
+        assert cen_hod_vals.shape[0] == prim_haloprop_bins.shape[0] - 1
+        assert cen_hod_vals.shape[1] == sec_haloprop_perc_bins.shape[0] - 1
+        assert np.all(prim_haloprop_bins >= 0)
         try:
-            assert np.all(sec_haloprop_perc_bins >=0) and np.all(sec_haloprop_perc_bins <=1)
+            assert np.all(sec_haloprop_perc_bins >= 0) and np.all(sec_haloprop_perc_bins <= 1)
         except AssertionError:
-            raise("sec_haloprop_perc_bins are not between 0 and 1. Maybe you passed in sec_haloprop_bins instead?")
+            raise ("sec_haloprop_perc_bins are not between 0 and 1. Maybe you passed in sec_haloprop_bins instead?")
 
         self._prim_haloprop_bins = prim_haloprop_bins
         self._sec_haloprop_perc_bins = sec_haloprop_perc_bins
@@ -1287,15 +1480,14 @@ class Tabulated2DCens(OccupationComponent):
             gal_type='centrals', threshold=threshold,
             upper_occupation_bound=upper_occupation_bound,
             prim_haloprop_key=prim_haloprop_key,
-            sec_haloprop_key = sec_haloprop_key,
+            sec_haloprop_key=sec_haloprop_key,
             **kwargs)
 
         self.param_dict = self.get_published_parameters()
 
         self.publications = []
 
-        self.sec_haloprop_key = sec_haloprop_key #wont be added automatically
-
+        self.sec_haloprop_key = sec_haloprop_key  # wont be added automatically
 
     def mean_occupation(self, **kwargs):
         r"""Expected number of satellite galaxies in a halo of mass logM.
@@ -1349,8 +1541,8 @@ class Tabulated2DCens(OccupationComponent):
             else:
                 # the value of sec_haloprop_percentile will be computed from scratch
                 sec_perc = compute_conditional_percentiles(
-                              prim_haloprop=mass,
-                              sec_haloprop=table[self.sec_haloprop_key])
+                    prim_haloprop=mass,
+                    sec_haloprop=table[self.sec_haloprop_key])
         else:
             try:
                 mass = np.atleast_1d(kwargs['prim_haloprop'])
@@ -1369,41 +1561,40 @@ class Tabulated2DCens(OccupationComponent):
                            "``sec_haloprop_percentile`` argument.\n")
                     raise HalotoolsError(msg)
                 else:
-                        sec_perc = compute_conditional_percentiles(
-                              prim_haloprop=mass,
-                              sec_haloprop=kwargs['sec_haloprop'])
+                    sec_perc = compute_conditional_percentiles(
+                        prim_haloprop=mass,
+                        sec_haloprop=kwargs['sec_haloprop'])
 
-        prim_over_idxs = mass >np.max(self._prim_haloprop_bins)
-        prim_under_idxs = mass< np.min(self._prim_haloprop_bins)
-        #prim_contained_indices = ~np.logical_or(prim_under_idxs, prim_over_idxs) #indexs contained by the interpolator
-        contained_idxs = ~np.logical_or(prim_under_idxs, prim_over_idxs) #indexs contained by the interpolator
+        prim_over_idxs = mass > np.max(self._prim_haloprop_bins)
+        prim_under_idxs = mass < np.min(self._prim_haloprop_bins)
+        # prim_contained_indices = ~np.logical_or(prim_under_idxs, prim_over_idxs) #indexs contained by the interpolator
+        contained_idxs = ~np.logical_or(prim_under_idxs, prim_over_idxs)  # indexs contained by the interpolator
 
-        #sec_over_idxs = sec > np.max(self._sec_haloprop_vals)
-        #sec_under_idxs = sec < np.min(self._sec_haloprop_vals)
-        #sec_contained_indices = ~np.logical_or(sec_under_idxs, sec_over_idxs)  # indexs contained by the interpolator
+        # sec_over_idxs = sec > np.max(self._sec_haloprop_vals)
+        # sec_under_idxs = sec < np.min(self._sec_haloprop_vals)
+        # sec_contained_indices = ~np.logical_or(sec_under_idxs, sec_over_idxs)  # indexs contained by the interpolator
 
-        #over_idxs = np.logical_or(prim_over_idxs, sec_over_idxs)
-        #under_idxs = np.logical_or(prim_under_idxs, sec_under_idxs)
+        # over_idxs = np.logical_or(prim_over_idxs, sec_over_idxs)
+        # under_idxs = np.logical_or(prim_under_idxs, sec_under_idxs)
 
-        #contained_indices = ~np.logical_or(under_idxs, over_idxs)
+        # contained_indices = ~np.logical_or(under_idxs, over_idxs)
 
         mean_ncen = np.zeros_like(mass)
         mean_ncen[prim_over_idxs] = self._upper_occupation_bound
         mean_ncen[prim_under_idxs] = self._lower_occupation_bound
 
-        prim_haloprop_idxs = np.digitize(mass, self._prim_haloprop_bins, right=True)-1
-        sec_haloprop_idxs = np.digitize(sec_perc, self._sec_haloprop_perc_bins, right = True) -1
+        prim_haloprop_idxs = np.digitize(mass, self._prim_haloprop_bins, right=True) - 1
+        sec_haloprop_idxs = np.digitize(sec_perc, self._sec_haloprop_perc_bins, right=True) - 1
 
-        mean_ncen[contained_idxs] = self._cen_hod_vals[prim_haloprop_idxs[contained_idxs], sec_haloprop_idxs[contained_idxs]]
+        mean_ncen[contained_idxs] = self._cen_hod_vals[
+            prim_haloprop_idxs[contained_idxs], sec_haloprop_idxs[contained_idxs]]
 
-        #TODO dunno how i feel about this..
-        #mean_sec = np.mean(sec[contained_indices])
-        #mean_ncen[sec_over_idxs] = self._mean_occupation(np.log10(mass[sec_over_idxs]), mean_sec*np.ones_like(sec_over_idxs) )
-        #mean_ncen[sec_under_idxs] = self._mean_occupation(np.log10(mass[sec_under_idxs]), mean_sec*np.ones_like(sec_under_idxs) )
-
+        # TODO dunno how i feel about this..
+        # mean_sec = np.mean(sec[contained_indices])
+        # mean_ncen[sec_over_idxs] = self._mean_occupation(np.log10(mass[sec_over_idxs]), mean_sec*np.ones_like(sec_over_idxs) )
+        # mean_ncen[sec_under_idxs] = self._mean_occupation(np.log10(mass[sec_under_idxs]), mean_sec*np.ones_like(sec_under_idxs) )
 
         return mean_ncen
-
 
     def get_published_parameters(self):
         r"""
@@ -1434,7 +1625,7 @@ class Tabulated2DSats(OccupationComponent):
     def __init__(self, prim_haloprop_bins, sec_haloprop_perc_bins, sat_hod_vals,
                  threshold=model_defaults.default_luminosity_threshold,
                  prim_haloprop_key=model_defaults.prim_haloprop_key,
-                 sec_haloprop_key = model_defaults.sec_haloprop_key, **kwargs):
+                 sec_haloprop_key=model_defaults.sec_haloprop_key, **kwargs):
         r"""
         Parameters
         ----------
@@ -1464,13 +1655,13 @@ class Tabulated2DSats(OccupationComponent):
         upper_occupation_bound = float("inf")
 
         assert np.all(sat_hod_vals >= 0) and np.all(upper_occupation_bound >= sat_hod_vals)
-        assert sat_hod_vals.shape[0] == prim_haloprop_bins.shape[0]-1
-        assert sat_hod_vals.shape[1] == sec_haloprop_perc_bins.shape[0] -1
+        assert sat_hod_vals.shape[0] == prim_haloprop_bins.shape[0] - 1
+        assert sat_hod_vals.shape[1] == sec_haloprop_perc_bins.shape[0] - 1
         assert np.all(prim_haloprop_bins >= 0)
         try:
-            assert np.all(sec_haloprop_perc_bins >=0) and np.all(sec_haloprop_perc_bins <=1)
+            assert np.all(sec_haloprop_perc_bins >= 0) and np.all(sec_haloprop_perc_bins <= 1)
         except AssertionError:
-            raise("sec_haloprop_perc_bins are not between 0 and 1. Maybe you passed in sec_haloprop_bins instead?")
+            raise ("sec_haloprop_perc_bins are not between 0 and 1. Maybe you passed in sec_haloprop_bins instead?")
 
         self._prim_haloprop_bins = prim_haloprop_bins
         self._sec_haloprop_perc_bins = sec_haloprop_perc_bins
@@ -1483,13 +1674,13 @@ class Tabulated2DSats(OccupationComponent):
             upper_occupation_bound=upper_occupation_bound,
             prim_haloprop_key=prim_haloprop_key,
             sec_haloprop_key=sec_haloprop_key,
-                             ** kwargs)
+            **kwargs)
 
         self.param_dict = self.get_published_parameters()
 
         self.publications = []
 
-        self.sec_haloprop_key = sec_haloprop_key #wont be added automatically
+        self.sec_haloprop_key = sec_haloprop_key  # wont be added automatically
 
     def mean_occupation(self, **kwargs):
         r"""Expected number of satellite galaxies in a halo of mass logM.
@@ -1541,8 +1732,8 @@ class Tabulated2DSats(OccupationComponent):
             else:
                 # the value of sec_haloprop_percentile will be computed from scratch
                 sec_perc = compute_conditional_percentiles(
-                              prim_haloprop=mass,
-                              sec_haloprop=table[self.sec_haloprop_key])
+                    prim_haloprop=mass,
+                    sec_haloprop=table[self.sec_haloprop_key])
         else:
             try:
                 mass = np.atleast_1d(kwargs['prim_haloprop'])
@@ -1561,37 +1752,37 @@ class Tabulated2DSats(OccupationComponent):
                            "``sec_haloprop_percentile`` argument.\n")
                     raise HalotoolsError(msg)
                 else:
-                        sec_perc = compute_conditional_percentiles(
-                              prim_haloprop=mass,
-                              sec_haloprop=kwargs['sec_haloprop'])
+                    sec_perc = compute_conditional_percentiles(
+                        prim_haloprop=mass,
+                        sec_haloprop=kwargs['sec_haloprop'])
 
-        prim_over_idxs = mass >np.max(self._prim_haloprop_bins)
-        prim_under_idxs = mass< np.min(self._prim_haloprop_bins)
-        #prim_contained_indices = ~np.logical_or(prim_under_idxs, prim_over_idxs) #indexs contained by the interpolator
-        contained_idxs = ~np.logical_or(prim_under_idxs, prim_over_idxs) #indexs contained by the interpolator
+        prim_over_idxs = mass > np.max(self._prim_haloprop_bins)
+        prim_under_idxs = mass < np.min(self._prim_haloprop_bins)
+        # prim_contained_indices = ~np.logical_or(prim_under_idxs, prim_over_idxs) #indexs contained by the interpolator
+        contained_idxs = ~np.logical_or(prim_under_idxs, prim_over_idxs)  # indexs contained by the interpolator
 
-        #sec_over_idxs = sec > np.max(self._sec_haloprop_vals)
-        #sec_under_idxs = sec < np.min(self._sec_haloprop_vals)
-        #sec_contained_indices = ~np.logical_or(sec_under_idxs, sec_over_idxs)  # indexs contained by the interpolator
+        # sec_over_idxs = sec > np.max(self._sec_haloprop_vals)
+        # sec_under_idxs = sec < np.min(self._sec_haloprop_vals)
+        # sec_contained_indices = ~np.logical_or(sec_under_idxs, sec_over_idxs)  # indexs contained by the interpolator
 
-        #over_idxs = np.logical_or(prim_over_idxs, sec_over_idxs)
-        #under_idxs = np.logical_or(prim_under_idxs, sec_under_idxs)
+        # over_idxs = np.logical_or(prim_over_idxs, sec_over_idxs)
+        # under_idxs = np.logical_or(prim_under_idxs, sec_under_idxs)
 
-        #contained_indices = ~np.logical_or(under_idxs, over_idxs)
+        # contained_indices = ~np.logical_or(under_idxs, over_idxs)
 
         mean_nsat = np.zeros_like(mass)
-        mean_nsat[prim_over_idxs] = self._sat_hod_vals[-1,:].mean() #not happy abotu this, no better guess
+        mean_nsat[prim_over_idxs] = self._sat_hod_vals[-1, :].mean()  # not happy abotu this, no better guess
         mean_nsat[prim_under_idxs] = self._lower_occupation_bound
 
-        prim_haloprop_idxs = np.digitize(mass, self._prim_haloprop_bins,right = True) -1
-        sec_haloprop_idxs = np.digitize(sec_perc, self._sec_haloprop_perc_bins,right = True) -1
-        mean_nsat[contained_idxs] = self._sat_hod_vals[prim_haloprop_idxs[contained_idxs], sec_haloprop_idxs[contained_idxs]]
+        prim_haloprop_idxs = np.digitize(mass, self._prim_haloprop_bins, right=True) - 1
+        sec_haloprop_idxs = np.digitize(sec_perc, self._sec_haloprop_perc_bins, right=True) - 1
+        mean_nsat[contained_idxs] = self._sat_hod_vals[
+            prim_haloprop_idxs[contained_idxs], sec_haloprop_idxs[contained_idxs]]
 
-        #TODO dunno how i feel about this..
-        #mean_sec = np.mean(sec[contained_indices])
-        #mean_ncen[sec_over_idxs] = self._mean_occupation(np.log10(mass[sec_over_idxs]), mean_sec*np.ones_like(sec_over_idxs) )
-        #mean_ncen[sec_under_idxs] = self._mean_occupation(np.log10(mass[sec_under_idxs]), mean_sec*np.ones_like(sec_under_idxs) )
-
+        # TODO dunno how i feel about this..
+        # mean_sec = np.mean(sec[contained_indices])
+        # mean_ncen[sec_over_idxs] = self._mean_occupation(np.log10(mass[sec_over_idxs]), mean_sec*np.ones_like(sec_over_idxs) )
+        # mean_ncen[sec_under_idxs] = self._mean_occupation(np.log10(mass[sec_under_idxs]), mean_sec*np.ones_like(sec_under_idxs) )
 
         return mean_nsat
 
