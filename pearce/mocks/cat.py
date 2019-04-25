@@ -23,6 +23,7 @@ from halotools.sim_manager import RockstarHlistReader, CachedHaloCatalog, UserSu
 from halotools.empirical_models import PrebuiltHodModelFactory
 from halotools.empirical_models import HodModelFactory, TrivialPhaseSpace, NFWPhaseSpace
 from halotools.mock_observables import *  # i'm importing so much this is just easier
+from halotools.custom_exceptions import InvalidCacheLogEntry
 
 from .customHODModels import *
 
@@ -77,7 +78,7 @@ def observable(particles = False):
             if particles:
                 try:
                     assert self.halocat.ptcl_table is not None
-                except AssertionError:
+                except AssertionError, InvalidCacheLogEntry:
                     raise AssertionError("The function you called requires the loading of particles, but the catalog loaded\
                      doesn't have a particle table. Please try a different catalog")
             return func(self, *args, **kwargs)
