@@ -4,6 +4,7 @@ Create the initial state for the sampler from a config. Since there are a lot of
 keeps everything together cleanly.
 '''
 from os import path
+from time import time
 import warnings
 import numpy as np
 from scipy.optimize import minimize_scalar
@@ -62,7 +63,11 @@ def emu_config(f, cfg):
 
     for key in optional_keys:
         attr = cfg[key] if key in cfg else None
-        attr = str(attr) if type(attr) is dict else attr 
+        if key == 'seed' and  attr is None:
+            attr = int(time()) 
+        else:
+            attr = str(attr) if type(attr) is dict else attr 
+
         f.attrs[key] = attr 
 
 def data_config(f, cfg):
