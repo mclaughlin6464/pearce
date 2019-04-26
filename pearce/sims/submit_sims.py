@@ -38,8 +38,7 @@ def submit_sims(lhc_fname, output_dir, powerspectrum, cosmic_var, initial_z, fin
             mkdir(boxdir)
 
         cosmo = make_cosmo(param_names, row)
-
-        p = power(cosmo, final_z)(k)
+	p = power(cosmo, 0.0)(k) #only works for z=0
 
         np.savetxt(path.join(boxdir,'powerspec.txt'), np.array((k,p)).T)
 
@@ -83,21 +82,28 @@ def make_cosmo(param_names, param_vals):
     param_dict['h'] = param_dict['h0']
     del param_dict['h0']
 
-    param_dict['w0_fld'] = param_dict['w']
-    del param_dict['w']
+    #param_dict['w0_fld'] = param_dict['w']
+    #del param_dict['w']
 
-    param_dict['Omega0_b'] = param_dict['Omega_b']
-    param_dict['Omega0_cdm'] = param_dict['Omega_m'] - param_dict['Omega_b']
+    param_dict['Omega_cdm'] = param_dict['Omega_m'] - param_dict['Omega_b']
     del param_dict['Omega_b']
     del param_dict['Omega_m']
 
-    param_dict['ln_1e10_A_s'] = param_dict['ln(10^{10}A_s)']
-    del param_dict['ln(10^{10}A_s)']
-
-    param_dict['Omega0_ncdm_tot'] = param_dict['Omeganuh2']/(param_dict['h']**2)
+    param_dict['Omega_ncdm'] = [param_dict['Omeganuh2']/(param_dict['h']**2), 0.0, 0.0]
+    #param_dict['m_ncdm']=None
+    #param_dict['omch2'] = (param_dict['Omega_m'] - param_dict['Omega_b'] - param_dict['Omega0_ncdm_tot'])*(param_dict['h']**2)
     del param_dict['Omeganuh2']
 
-    return Cosmology(**param_dict)
+    #param_dict['A_s'] = 10**(np.log10(np.exp(param_dict['ln_1e10_A_s']))-10.0)
+    param_dict['A_s'] = 10**(-10)*np.exp(param_dict['ln(10^{10}A_s)'])
+    del param_dict['ln(10^10{10}A_s']
+
+    #print param_dict
+    # this is seriously what i have to do here.
+    C= Cosmology()
+    C2 = C.from_dict(param_dict)
+    C3 = C2.clone(w0_fld = param_dict['w'])
+    return C3#Cosmology(**param_dict)
 
 
 
@@ -105,9 +111,9 @@ sim_config_template = """
 nc = {nc:d}
 boxsize  = {boxsize:.1f}
 
-time_step = linspace({initial_a:.3f}, {final_a:.3f}, 20)
+time_step = linspace({initial_a:.3f}, 1.0, 20)
 
-output_redshifts = {{{final_z:.2f}}} --redshift of output
+output_redshifts = {{{final_z:.2f}, 0.0}} --redshift of output
 
 omega_m = {omega_m: f}
 h = {h:f}
