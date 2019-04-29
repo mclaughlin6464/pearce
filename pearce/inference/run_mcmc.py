@@ -3,7 +3,7 @@
     and MCMC analysis with a predefined number of steps and walkers."""
 
 from time import time
-from multiprocessing import cpu_count
+from multiprocessing import cpu_count, Pool
 import warnings
 from itertools import izip
 from os import path
@@ -14,7 +14,7 @@ import emcee as mc
 from scipy.linalg import inv
 import h5py
 
-from pearce.emulator import OriginalRecipe, ExtraCrispy, SpicyBuffalo
+from pearce.emulator import OriginalRecipe, ExtraCrispy, SpicyBuffalo, NashvilleHot
 
 # liklihood functions need to be defined here because the emulator will be made global
 
@@ -121,6 +121,7 @@ def _run_tests(y, cov, r_bin_centers, param_names, fixed_params, ncores):
     tmp = param_names[:]
     assert not any([key in param_names for key in fixed_params])  # param names can't include the
     tmp.extend(fixed_params.keys())
+    print tmp
     assert _emus[0].check_param_names(tmp, ignore=['r'])
 
     return ncores
@@ -285,12 +286,13 @@ def run_mcmc_iterator(emus, param_names, y, cov, r_bin_centers,fixed_params={},
     global _emus
 
     ncores = _run_tests(y, cov, r_bin_centers, param_names, fixed_params, ncores)
-    num_params = len(param_names)
+    pool = Pool(processes=ncores)
 
+    num_params = len(param_names)
     combined_inv_cov = inv(cov)
 
-    sampler = mc.EnsembleSampler(nwalkers, num_params, lnprob,
-                                 threads=ncores, args=(param_names, fixed_params, r_bin_centers, y, combined_inv_cov))
+    sampler = mc.EnsembleSampler(nwalkers, num_params, lnprob, pool=pool,
+                                 args=(param_names, fixed_params, r_bin_centers, y, combined_inv_cov))
 
     # TODO this is currently broken with the config option
     if resume_from_previous is not None:
@@ -322,10 +324,12 @@ def run_mcmc_config(config_fname):
 
     assert path.isfile(config_fname), "Invalid config fname for chain"
 
+    print config_fname
     f = h5py.File(config_fname, 'r+')
     emu_type_dict = {'OriginalRecipe':OriginalRecipe,
                      'ExtraCrispy': ExtraCrispy,
-                     'SpicyBuffalo': SpicyBuffalo}
+                     'SpicyBuffalo': SpicyBuffalo,
+                     'NashvilleHot': NashvilleHot}
     fixed_params = f.attrs['fixed_params']
     fixed_params = {} if fixed_params is None else literal_eval(fixed_params)
     #metric = f.attrs['metric'] if 'metric' in f.attrs else {}
@@ -374,9 +378,6 @@ def run_mcmc_config(config_fname):
 
     #covs = [f['cov'][-e.n_bins:, :][:, -e.n_bins:] for i,e in enumerate(emus)]
 
-    print y.shape
-    print cov.shape
-
     nwalkers, nsteps = f.attrs['nwalkers'], f.attrs['nsteps']
 
     nburn, seed, fixed_params = f.attrs['nburn'], f.attrs['seed'], f.attrs['chain_fixed_params']
@@ -407,6 +408,8 @@ def run_mcmc_config(config_fname):
         sim_cfg = literal_eval(f.attrs['sim'])
         del fixed_params['HOD']
         fixed_params.update(sim_cfg['hod_params'])
+        if 'logMmin' in fixed_params:
+            del fixed_params['logMmin']
     elif "cosmo" in fixed_params:
         assert 'sim' in f.attrs.keys(), "No sim information in config file."
         sim_cfg = literal_eval(f.attrs['sim'])
@@ -428,22 +431,26 @@ def run_mcmc_config(config_fname):
         # TODO anyway to make sure all shpaes are right?
         #chain_dset = f['chain']
 
-    chain_dset = f.create_dataset('chain', (nwalkers*nsteps, len(param_names)), chunks = True, compression = 'gzip')
+    f.create_dataset('chain', (nwalkers*nsteps, len(param_names)), chunks = True, compression = 'gzip')
 
     #lnprob = np.zeros((nwalkers*nsteps,))
     if 'lnprob' in f.keys():
         del f['lnprob']#[:] = lnprob 
         # TODO anyway to make sure all shpaes are right?
         #lnprob_dset = f['lnprob']
-    lnprob_dset = f.create_dataset('lnprob', (nwalkers*nsteps, ) , chunks = True, compression = 'gzip')
-
+    f.create_dataset('lnprob', (nwalkers*nsteps, ) , chunks = True, compression = 'gzip')
+    f.close()
     np.random.seed(seed)
+    print nwalkers
+    print nsteps
     for step, pos in enumerate(run_mcmc_iterator(emus, param_names, y, cov, rpoints,\
                                                  fixed_params=fixed_params, nwalkers=nwalkers,\
                                                  nsteps=nsteps, nburn=nburn, return_lnprob=True, ncores = 16)):
 
-        chain_dset[step*nwalkers:(step+1)*nwalkers] = pos[0]
-        lnprob_dset[step*nwalkers:(step+1)*nwalkers] = pos[1]
+        f = h5py.File(config_fname, 'r+')
+        f['chain'][step*nwalkers:(step+1)*nwalkers] = pos[0]
+        f['lnprob'][step*nwalkers:(step+1)*nwalkers] = pos[1]
+        f.close()
 
 
 if __name__ == "__main__":

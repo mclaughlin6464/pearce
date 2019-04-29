@@ -31,7 +31,7 @@ t0 = time()
 level = 10
 #for idx, (subbox_idx, _subbox) in enumerate(ds14a_part.itersubbox(level=10, pad=1.0, fields=['x','y','z'], return_index = True)):
 #start_subbox_idx = (3, 306, 928)#(1, 123, 472) 
-start_subbox_idx = (5, 490, 360)
+start_subbox_idx = (10, 897, 712) 
 start_idx = 0
 all_particles = np.array([], dtype='float32')
 

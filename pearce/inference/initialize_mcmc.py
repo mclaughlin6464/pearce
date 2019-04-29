@@ -188,7 +188,10 @@ def _compute_data(cfg):
                 yjk, covjk = calc_observable(r_bins, do_jackknife=True, jk_args=cov_cfg['jackknife_hps'])
 
             assert path.isfile(ecf), "Invalid emu covariance specified."
-            emu_cov = np.loadtxt(ecf)
+            try:
+                emu_cov = np.loadtxt(ecf)
+            except ValueError:
+                emu_cov = np.load(ecf)
 
             if yjk is None and y_mean is None:
                 raise AssertionError("Invalid data calculation specified.")

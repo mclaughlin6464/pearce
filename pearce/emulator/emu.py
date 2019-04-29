@@ -2164,7 +2164,7 @@ class NashvilleHot(Emu):
 
         # try not whitening
         # TODO x1 & x2 or xcosmo and xhod?
-        self.x1, self.x2 = self._whiten(x1, x2) 
+        self.x1, self.x2 = self._whiten(x1, x2)[0] 
 
         #todo whiten here as needed
         self._y_mean = np.stack([_y.mean() for _y in y] )
@@ -2184,9 +2184,12 @@ class NashvilleHot(Emu):
         :return:
         """
         if x2 is None:
-            x1, x2 = x1[:self.x1.shape[-1]], x2[self.x1.shape[-1]:]
+            if len(x1.shape) == 1:
+                x1, x2 = x1[:self.x1.shape[-1]], x1[self.x1.shape[-1]:-1]
+            else:
+                x1, x2 = x1[:, :self.x1.shape[-1]], x1[:, self.x1.shape[-1]:-1]
 
-        return (x1-self._x1_mean)/(self._x1_std+1e-9), (x2-self._x2_mean)/(self._x2_std+1e-9)
+        return ((x1-self._x1_mean)/(self._x1_std+1e-9), (x2-self._x2_mean)/(self._x2_std+1e-9)), None
 
     def _make_custom_mean_function(self, custom_mean_function =None):
         """
@@ -2246,7 +2249,16 @@ class NashvilleHot(Emu):
             Key word parameters for the emulator
         :return: None
         """
-        kern1, kern2 = self._make_kernel(hyperparams)
+        output = self._make_kernel(hyperparams)
+
+        if len(output) == 2:
+            kern1, kern2 = output
+
+        else:
+            kern1, kern2 = [],[]
+            for k1, k2 in output:
+                kern1.append(k1)
+                kern2.append(k2)
 
         if type(kern1) is not list:
             kern1 = [kern1.copy() for i in xrange(self.n_bins)]
@@ -2394,25 +2406,23 @@ class NashvilleHot(Emu):
         """
         assert old_idxs is None, "Old_idxs not supported, not sure how you even got here!"
         #
-        t_size = np.sum([_t.shape[0] for _t in t])
-
+        t1, t2 = t
         mean_func_at_params = self.mean_function(t)
 
         mu = []
         err = []
 
-        for bin_no, (t_in_bin, mfc, emulator) in enumerate(izip(t, mean_func_at_params, self._emulators)):
+        # TOOD these are all the same now, any way to simplify?
+        for bin_no, (t1_in_bin, t2_in_bin,  mfc, emulator) in enumerate(izip(t1, t2, mean_func_at_params, self._emulators)):
 
             if self.method == 'gp':
                 # because were using a custom object here, don't have to do the copying stuff
                 # however, have to split up t into the two groups
                 #TODO may have weird behavior for larger t's? have to do some resizing
-                t1, t2 = t_in_bin[:self.x1.shape[1]].reshape((1,-1)),\
-                 t_in_bin[self.x1.shape[1]:].reshape((1,-1))
                 if gp_errs:
-                    local_mu, local_err = emulator.predict(t1, t2)
+                    local_mu, local_err = emulator.predict(t1_in_bin.reshape((1,-1)), t2_in_bin.reshape((1,-1)))
                 else:
-                    local_mu, _ = emulator.predict(t1, t2)
+                    local_mu, _ = emulator.predict(t1_in_bin.reshape((1,-1)), t2_in_bin.reshape((1,-1)))
                     # print local_mu
                     local_err = np.ones_like(local_mu)
 
@@ -2457,7 +2467,7 @@ class NashvilleHot(Emu):
 
         x1, x2, y, yerr, _, info = self.get_data(truth_file, self.fixed_params)
 
-        x1, x2 = self._whiten(x1, x2)
+        x1, x2 = self._whiten(x1, x2)[0]
 
         scale_bin_centers = info['sbc']
         scale_nbins = len(scale_bin_centers) if 'r' not in self.fixed_params else 1
