@@ -44,13 +44,13 @@ except ImportError:
     CCL_AVAILABLE = False
 
 
-VALID_HODS = {'redMagic', 'hsabRedMagic','abRedMagic','fsabRedMagic', 'fscabRedMagic','corrRedMagic',\
-              'reddick14','hsabReddick14','abReddick14','fsabReddick14', 'fscabReddick14','corrReddick14','stepFunc',\
-              'zheng07', 'leauthaud11', 'tinker13', 'hearin15', 'reddick14+redMagic', 'tabulated',\
-              'hsabTabulated', 'abTabulated','fsabTabulated','fscabTabulated','corrTabulated', 'tabulated2D'}
+#VALID_HODS = {'redMagic', 'hsabRedMagic','abRedMagic','fsabRedMagic', 'fscabRedMagic','corrRedMagic',\
+#              'reddick14','hsabReddick14','abReddick14','fsabReddick14', 'fscabReddick14','corrReddick14','stepFunc',\
+#              'zheng07', 'leauthaud11', 'tinker13', 'hearin15', 'reddick14+redMagic', 'tabulated',\
+#              'hsabTabulated', 'abTabulated','fsabTabulated','fscabTabulated','corrTabulated', 'tabulated2D'}
 
 DEFAULT_HODS = {'zheng07', 'leauthaud11', 'tinker13', 'hearin15'}
-
+VALID_HODS = set(HOD_DICT.keys()).union(DEFAULT_HODS)
 
 def observable(particles = False):
     '''
@@ -488,14 +488,16 @@ class Cat(object):
         z = 1.0 / a - 1
         if type(HOD) is str:
             assert HOD in VALID_HODS
-
+            print HOD
             if HOD in  VALID_HODS-DEFAULT_HODS: # my custom ones
                 cens_occ = HOD_DICT[HOD][0](redshift=z, **hod_kwargs)
                 # TODO  this is a hack, something better would be better
                 try: #hack for central modulation
+                    print 'A'
                     # the ab ones need to modulated with the baseline model
                     sats_occ = HOD_DICT[HOD][1](redshift=z, cenocc_model=cens_occ, **hod_kwargs)
                 except: #assume the error is a cenocc issue
+                    print 'B'
                     sats_occ = HOD_DICT[HOD][1](redshift=z,  **hod_kwargs)
 
                 self.model = HodModelFactory(
@@ -507,9 +509,9 @@ class Cat(object):
             else:
                 self.model = PrebuiltHodModelFactory(HOD, **hod_kwargs)
         else:
-            cens_occ = HOD[0](redshift=z, **hod_kwargs)
+            cens_occ = HOD_DICT[HOD][0](redshift=z, **hod_kwargs)
             #NOTE don't know if should always modulate, but I always do.
-            sats_occ = HOD[1](redshift=z, cenocc_model=cens_occ, **hod_kwargs)
+            sats_occ = HOD_DICT[HOD][1](redshift=z, cenocc_model=cens_occ, **hod_kwargs)
             self.model = HodModelFactory(
                 centrals_occupation=cens_occ,
                 centrals_profile=TrivialPhaseSpace(redshift=z),

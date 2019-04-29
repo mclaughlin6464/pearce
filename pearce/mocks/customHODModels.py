@@ -1414,32 +1414,6 @@ class FSCAssembiasTabulatedSats(TabulatedSats, FreeSplitContinuousAssembias):
                                               **kwargs)
 
 
-HOD_DICT = {'abZheng07': (AssembiasZheng07Cens, AssembiasZheng07Sats), 
-            'hsabZheng07': (HSAssembiasZheng07Cens, HSAssembiasZheng07Sats), 
-            'fsabZheng07': (FSAssembiasZheng07Cens, FSAssembiasZheng07Sats),
-            'fscabZheng07': (FSCAssembiasZheng07Cens, FSCAssembiasZheng07Sats),
-            'corrZheng07': (CorrAssembiasZheng07Cens, CorrAssembiasZheng07Sats),
-            'redMagic': (RedMagicCens, RedMagicSats), 
-            'abRedMagic': (AssembiasRedMagicCens, AssembiasRedMagicSats),
-            'hsabRedMagic': (HSAssembiasRedMagicCens, HSAssembiasRedMagicSats),
-             'fsabRedMagic': (FSAssembiasRedMagicCens, FSAssembiasRedMagicSats ),
-             'fscabRedMagic': (FSCAssembiasRedMagicCens, FSCAssembiasRedMagicSats ),
-             'corrRedMagic': (CorrAssembiasRedMagicCens, CorrAssembiasRedMagicSats ),
-             'reddick14': (Reddick14Cens, Reddick14Sats), # no modulation
-             'hsabReddick14': (HSAssembiasReddick14Cens, HSAssembiasReddick14Sats), # no modulation
-             'fsabReddick14': (FSAssembiasReddick14Cens, FSAssembiasReddick14Sats), # no modulation
-             #'fscabReddick14': (FSCAssembiasReddick14Cens, FSCAssembiasReddick14Sats), # no modulation
-             'corrReddick14': (CorrAssembiasReddick14Cens, CorrAssembiasReddick14Sats) , # no modulation
-             'abReddick14': (AssembiasReddick14Cens, AssembiasReddick14Sats), # no modulation
-             'tabulated': (TabulatedCens, TabulatedSats), # no modulation
-             'hsabTabulated': (HSAssembiasTabulatedCens, HSAssembiasTabulatedSats),  # no modulation
-             'abTabulated': (AssembiasTabulatedCens, AssembiasTabulatedSats), # no modulation
-             'fsabTabulated': (FSAssembiasTabulatedCens, FSAssembiasTabulatedSats ), # no modulation
-             'fscabTabulated': (FSCAssembiasTabulatedCens, FSCAssembiasTabulatedSats ), # no modulation
-             'corrTabulated': (CorrAssembiasTabulatedCens, CorrAssembiasTabulatedSats ), # no modulation
-             'tabulated2D': (Tabulated2DCens, Tabulated2DSats),  # no modulation
-             'stepFunc': (StepFuncCens, StepFuncSats),
-             'reddick14+redMagic': (Reddick14Cens, RedMagicSats)}
 
 # considered subclassing but doesn't seem like i actually want that?
 # TODO TabulatedHODComponent should be a class and Cens and Sats should be subclassed. 
@@ -1831,3 +1805,31 @@ class Tabulated2DSats(OccupationComponent):
         """
 
         return dict()
+
+HOD_DICT = {'abZheng07': (AssembiasZheng07Cens, AssembiasZheng07Sats), 
+            'hsabZheng07': (HSAssembiasZheng07Cens, HSAssembiasZheng07Sats), 
+            'fsabZheng07': (FSAssembiasZheng07Cens, FSAssembiasZheng07Sats),
+            'fscabZheng07': (FSCAssembiasZheng07Cens, FSCAssembiasZheng07Sats),
+            'corrZheng07': (CorrAssembiasZheng07Cens, CorrAssembiasZheng07Sats),
+            'redMagic': (RedMagicCens, RedMagicSats), 
+            'abRedMagic': (AssembiasRedMagicCens, AssembiasRedMagicSats),
+            'hsabRedMagic': (HSAssembiasRedMagicCens, HSAssembiasRedMagicSats),
+             'fsabRedMagic': (FSAssembiasRedMagicCens, FSAssembiasRedMagicSats ),
+             'fscabRedMagic': (FSCAssembiasRedMagicCens, FSCAssembiasRedMagicSats ),
+             'corrRedMagic': (CorrAssembiasRedMagicCens, CorrAssembiasRedMagicSats ),
+             'reddick14': (Reddick14Cens, Reddick14Sats), # no modulation
+             'hsabReddick14': (HSAssembiasReddick14Cens, HSAssembiasReddick14Sats), # no modulation
+             'fsabReddick14': (FSAssembiasReddick14Cens, FSAssembiasReddick14Sats), # no modulation
+             #'fscabReddick14': (FSCAssembiasReddick14Cens, FSCAssembiasReddick14Sats), # no modulation
+             'corrReddick14': (CorrAssembiasReddick14Cens, CorrAssembiasReddick14Sats) , # no modulation
+             'abReddick14': (AssembiasReddick14Cens, AssembiasReddick14Sats), # no modulation
+             'tabulated': (TabulatedCens, TabulatedSats), # no modulation
+             'hsabTabulated': (HSAssembiasTabulatedCens, HSAssembiasTabulatedSats),  # no modulation
+             'abTabulated': (AssembiasTabulatedCens, AssembiasTabulatedSats), # no modulation
+             'fsabTabulated': (FSAssembiasTabulatedCens, FSAssembiasTabulatedSats ), # no modulation
+             'fscabTabulated': (FSCAssembiasTabulatedCens, FSCAssembiasTabulatedSats ), # no modulation
+             'corrTabulated': (CorrAssembiasTabulatedCens, CorrAssembiasTabulatedSats ), # no modulation
+             'tabulated2D': (Tabulated2DCens, Tabulated2DSats),  # no modulation
+             'stepFunc': (StepFuncCens, StepFuncSats),
+             'reddick14+redMagic': (Reddick14Cens, RedMagicSats)}
+
