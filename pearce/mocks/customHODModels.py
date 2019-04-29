@@ -331,7 +331,7 @@ class AssembiasZheng07Sats(Zheng07Sats, ContinuousAssembias):
 
     def __init__(self, cenocc_model, **kwargs):
         '''See halotools docs for more info. '''
-        super(AssembiasZheng07Sats, self).__init__(cenocc_model, **kwargs)
+        super(AssembiasZheng07Sats, self).__init__(modulate_with_cenocc=True, cenocc_model=cenocc_model, **kwargs)
 
         fkwargs = kwargs.copy()
         if 'sec_haloprop_key' not in fkwargs:
@@ -351,7 +351,7 @@ class HSAssembiasZheng07Sats(Zheng07Sats, HeavisideAssembias):
 
     def __init__(self, cenocc_model, **kwargs):
         '''See halotools docs for more info. '''
-        super(HSAssembiasZheng07Sats, self).__init__(cenocc_model, **kwargs)
+        super(HSAssembiasZheng07Sats, self).__init__(modulate_with_cenocc=True, cenocc_model=cenocc_model, **kwargs)
         sec_haloprop_key = 'halo_nfw_conc'
         if 'sec_haloprop_key' not in kwargs:
             kwargs['sec_haloprop_key'] = sec_haloprop_key
@@ -368,7 +368,7 @@ class FSAssembiasZheng07Sats(Zheng07Sats, FreeSplitAssembias):
 
     def __init__(self, cenocc_model, **kwargs):
         '''See halotools docs for more info. '''
-        super(FSAssembiasZheng07Sats, self).__init__(cenocc_model, **kwargs)
+        super(FSAssembiasZheng07Sats, self).__init__(modulate_with_cenocc=True, cenocc_model=cenocc_model, **kwargs)
         sec_haloprop_key = 'halo_nfw_conc'
         if 'sec_haloprop_key' not in kwargs:
             kwargs['sec_haloprop_key'] = sec_haloprop_key
@@ -385,7 +385,7 @@ class FSCAssembiasZheng07Sats(Zheng07Sats, FreeSplitContinuousAssembias):
 
     def __init__(self, cenocc_model, **kwargs):
         '''See halotools docs for more info. '''
-        super(FSCAssembiasZheng07Sats, self).__init__(cenocc_model, **kwargs)
+        super(FSCAssembiasZheng07Sats, self).__init__(modulate_with_cenocc=True, cenocc_model=cenocc_model, **kwargs)
         sec_haloprop_key = 'halo_nfw_conc'
         if 'sec_haloprop_key' not in kwargs:
             kwargs['sec_haloprop_key'] = sec_haloprop_key
@@ -402,7 +402,7 @@ class CorrAssembiasZheng07Sats(Zheng07Sats, CorrelationAssembias):
 
     def __init__(self, cenocc_model, **kwargs):
         '''See halotools docs for more info. '''
-        super(CorrAssembiasZheng07Sats, self).__init__(cenocc_model, **kwargs)
+        super(CorrAssembiasZheng07Sats, self).__init__(modulate_with_cenocc=True, cenocc_model=cenocc_model, **kwargs)
         sec_haloprop_key = 'halo_nfw_conc'
         if 'sec_haloprop_key' not in kwargs:
             kwargs['sec_haloprop_key'] = sec_haloprop_key
@@ -1412,7 +1412,6 @@ class FSCAssembiasTabulatedSats(TabulatedSats, FreeSplitContinuousAssembias):
                                               upper_assembias_bound=self._upper_occupation_bound,
                                               method_name_to_decorate='mean_occupation',
                                               **kwargs)
-
 
 
 # considered subclassing but doesn't seem like i actually want that?
