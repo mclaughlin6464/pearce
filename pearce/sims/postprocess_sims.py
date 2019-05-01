@@ -71,6 +71,7 @@ def make_hdf5_file(config_fname, fname):
     f.close()
 
 def cache_halotools(hdf5_fname):
+    pass
 
 
 if __name__ == "__main__":
