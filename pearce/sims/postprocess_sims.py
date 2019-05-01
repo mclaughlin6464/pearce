@@ -1,13 +1,15 @@
 # take the BigFile format data from FastPM and convert it into one nice HDF5 file
 from os import path
 from glob import glob
+from ast import literal_eval
 import pandas as pd
 import numpy as np
 import yaml
 import h5py
 from nbodykit.source.catalog.file import BigFileCatalog
+from halotools.sim_manager import UserSuppliedHaloCatalog
 
-HALO_COLUMNS=['ID', 'Mass', 'Position', 'RVdisp', 'Rdisp', 'Vdisp']
+HALO_COLUMNS=['ID', 'Mass', 'Position']#, 'RVdisp', 'Rdisp', 'Vdisp']
 PARTICLE_COLUMNS=[]
 MASS_UNIT = 1e10 # can get this from file
 
@@ -30,7 +32,9 @@ def create_halo_dset(grp, dirname, columns=HALO_COLUMNS):
 
         if col == 'Mass':
            cat[:, idx+1] = halocat['Length']*pmass
-        else:
+        elif col == 'Position':
+            cat[:idx+1:idx+1+3] = halocat[col]
+        else: #TODO this is gonna break for position
             cat[:,idx+1] = halocat[col]
 
     grp.create_dataset("halos", data = cat, compression="gzip")
@@ -64,14 +68,50 @@ def make_hdf5_file(config_fname, fname):
     pmasses = []
     for box_no, box_dir in enumerate(boxdirs):
         grp = f.create_group("Box_%03d"%box_no)
-        pmass = create_halo_dset(grp, box_dir)
+        scale_factors = glob(path.join(box_dir, 'fastpm_*'))
+        for sfdir in scale_factors:
+            a = float(sfdir.split('_')[1])
+            z = 1.0/a -1.0
+            grp2 = grp.create_group("z=%0.3f"%z)
+            pmass = create_halo_dset(grp2, sfdir)
+            #create_particle_dset(grp, box_dir)
+
         pmasses.append(pmass)
-        #create_particle_dset(grp, box_dir)
+
     f.attrs['pmasses'] = pmasses
     f.close()
 
-def cache_halotools(hdf5_fname):
-    pass
+def cache_halotools(hdf5_fname, output_dir):
+
+    assert path.exists(hdf5_fname)
+    assert path.exists(output_dir)
+
+    f = h5py.File(hdf5_fname, 'r')
+    pmasses = np.array(f.attrs['pmasses'])
+    cfg = literal_eval(f.attrs['cfg_info'])
+    Lbox = cfg['boxsize']
+
+    for pm, box_key in zip(pmasses, f.keys()):
+        for z_key in f[box_key].keys():
+            z = float(z_key.split('_')[1])
+            print box_key, z_key
+
+            data = f[box_key][z_key]['halos'].value
+            # assuming halo_columns
+            # TODO do this better
+            halo_id = data[:,0]
+            halo_mass = data[:,1]
+            halo_x, halo_y, halo_z = data[:,2], data[:,3], data[:,4]
+
+            halocat = UserSuppliedHaloCatalog(redshift = z, Lbox=Lbox, pmass = pm,
+                                              halo_id = halo_id, halo_mass = halo_mass,
+                                              halo_x = halo_x, halo_y = halo_y, halo_z=halo_z)
+
+            version_name = box_key+'_'+z_key
+            halocat.add_halocat_to_cache(fname = path.join(output_dir, version_name, '.hdf5'),
+                                         simname = 'FastPM', halo_finder = 'FOF',
+                                         version_name=version_name, overwrite=True)
+
 
 
 if __name__ == "__main__":
