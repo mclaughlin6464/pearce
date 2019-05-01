@@ -34,6 +34,7 @@ def create_halo_dset(grp, dirname, columns=HALO_COLUMNS):
             cat[:,idx+1] = halocat[col]
 
     grp.create_dataset("halos", data = cat, compression="gzip")
+    return pmass
 
 def create_particle_dset(grp, dirname, columsn=PARTICLE_COLUMNS):
     raise NotImplementedError
@@ -60,12 +61,17 @@ def make_hdf5_file(config_fname, fname):
 
     boxdirs = sorted(glob(path.join(dirname, "Box_*/")))
 
+    pmasses = []
     for box_no, box_dir in enumerate(boxdirs):
         grp = f.create_group("Box_%03d"%box_no)
-        create_halo_dset(grp, box_dir)
+        pmass = create_halo_dset(grp, box_dir)
+        pmasses.append(pmass)
         #create_particle_dset(grp, box_dir)
-
+    f.attrs['pmasses'] = pmasses
     f.close()
+
+def cache_halotools(hdf5_fname):
+
 
 if __name__ == "__main__":
     import argparse
