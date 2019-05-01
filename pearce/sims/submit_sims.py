@@ -33,6 +33,7 @@ def submit_sims(lhc_fname, output_dir, powerspectrum, cosmic_var, initial_z, fin
 
     for idx, row in lhc.iterrows():
         # TODO what to do if already exists? likely will throw some kind of error
+	print idx
         boxdir = path.join(output_dir, "Box_%03d/"%idx)
         if not path.isdir(boxdir):
             mkdir(boxdir)
@@ -61,7 +62,7 @@ def submit_sims(lhc_fname, output_dir, powerspectrum, cosmic_var, initial_z, fin
                                                     time = sim_time*60, #TODO in config
                                                     ntasks = ncores))
 
-        #call("sbatch {boxdir}submit_sim.sbatch".format(boxdir=boxdir), shell=True)
+        call("sbatch {boxdir}submit_sim.sbatch".format(boxdir=boxdir), shell=True)
 
 def make_cosmo(param_names, param_vals):
     """
@@ -83,7 +84,8 @@ def make_cosmo(param_names, param_vals):
     del param_dict['h0']
 
     #param_dict['w0_fld'] = param_dict['w']
-    #del param_dict['w']
+    w = param_dict['w']
+    del param_dict['w']
 
     param_dict['Omega_cdm'] = param_dict['Omega_m'] - param_dict['Omega_b']
     del param_dict['Omega_b']
@@ -96,13 +98,13 @@ def make_cosmo(param_names, param_vals):
 
     #param_dict['A_s'] = 10**(np.log10(np.exp(param_dict['ln_1e10_A_s']))-10.0)
     param_dict['A_s'] = 10**(-10)*np.exp(param_dict['ln(10^{10}A_s)'])
-    del param_dict['ln(10^10{10}A_s']
+    del param_dict['ln(10^{10}A_s)']
 
     #print param_dict
     # this is seriously what i have to do here.
     C= Cosmology()
     C2 = C.from_dict(param_dict)
-    C3 = C2.clone(w0_fld = param_dict['w'])
+    C3 = C2.clone(w0_fld = w)
     return C3#Cosmology(**param_dict)
 
 
@@ -111,7 +113,7 @@ sim_config_template = """
 nc = {nc:d}
 boxsize  = {boxsize:.1f}
 
-time_step = linspace({initial_a:.3f}, 1.0, 20)
+time_step = linspace({initial_a:.3f}, 1.0, 30)
 
 output_redshifts = {{{final_z:.2f}, 0.0}} --redshift of output
 
