@@ -23,5 +23,5 @@ computation:
         queue_skipper: True
         system: sherlock
         n_jobs: 800
-        max_time: 6
+        max_time: 8
 
