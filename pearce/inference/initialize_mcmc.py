@@ -156,6 +156,7 @@ def _compute_data(cfg):
         if type(obs) is str:
             obs = [obs]
 
+        meas_cov_fname = cov_cfg['meas_cov_fname']
         emu_cov_fname = cov_cfg['emu_cov_fname']
         if type(emu_cov_fname) is str:
             emu_cov_fname = [emu_cov_fname]
@@ -164,7 +165,19 @@ def _compute_data(cfg):
 
         n_bins = len(r_bins)-1
         data = np.zeros((len(obs)*n_bins))
-        cov = np.zeros((len(obs)*n_bins, len(obs)*n_bins))
+
+        #TODO could add features to make this block diagonal
+        # iterating over multiple
+
+        assert path.isfile(meas_cov_fname), "Invalid meas cov file specified"
+        try:
+            cov = np.loadtxt(meas_cov_fname)
+        except ValueError:
+            cov = np.load(meas_cov_fname)
+
+        assert cov.shape == (len(obs)*n_bins, len(obs)*n_bins), "Invalid meas cov shape."
+
+        #cov = np.zeros((len(obs)*n_bins, len(obs)*n_bins))
 
         for idx, (o, ecf) in enumerate(zip(obs, emu_cov_fname)):
             # TODO need some check that a valid configuration is specified
@@ -172,20 +185,28 @@ def _compute_data(cfg):
             shot_cov = covjk = np.zeros((n_bins, n_bins))
 
             calc_observable = getattr(cat, 'calc_%s' % o)
-            if obs_cfg['mean'] or 'shot' in cov_cfg: #TODO add number of pop
-                xi_vals = []
-                for i in xrange(50):
-                    cat.populate(em_params)
-                    xi_vals.append(calc_observable(r_bins))
+            N = 1
+            if obs_cfg['mean'] or ('shot' in cov_cfg and cov_cfg['shot']):#TODO add number of pop
+                N=20
 
-                shot_xi_vals = np.array(xi_vals)
-                y_mean = np.mean(shot_xi_vals, axis = 0)
-                shot_cov = np.cov(xi_vals, rowvar=False)
-
-            if 'jackknife_hps' in cov_cfg:
+            xi_vals = []
+            for i in xrange(N):
                 cat.populate(em_params)
-                # TODO need to fix jackknife
-                yjk, covjk = calc_observable(r_bins, do_jackknife=True, jk_args=cov_cfg['jackknife_hps'])
+                xi_vals.append(calc_observable(r_bins))
+
+            shot_xi_vals = np.array(xi_vals)
+            y_mean = np.mean(shot_xi_vals, axis = 0)
+
+            if 'shot' in cov_cfg and cov_cfg['shot']:
+                shot_cov = np.cov(xi_vals, rowvar=False)
+            else:
+                shot_cov = np.zeros((r_bins.shape[0]-1, r_bins.shape[0]-1))
+
+            # remove jackknife calculation.
+            # instead, user passes in a meas_cov above
+            #if 'jackknife_hps' in cov_cfg:
+            #    cat.populate(em_params)
+            #    yjk, covjk = calc_observable(r_bins, do_jackknife=True, jk_args=cov_cfg['jackknife_hps'])
 
             assert path.isfile(ecf), "Invalid emu covariance specified."
             try:
@@ -193,22 +214,14 @@ def _compute_data(cfg):
             except ValueError:
                 emu_cov = np.load(ecf)
 
-            if yjk is None and y_mean is None:
-                raise AssertionError("Invalid data calculation specified.")
             if obs_cfg['mean']:
                 data[idx*n_bins:(idx+1)*n_bins] = y_mean
             else:
-                data[idx*n_bins:(idx+1)*n_bins] = yjk
+                data[idx*n_bins:(idx+1)*n_bins] = shot_xi_vals[0]
 
-            cov[idx*n_bins:(idx+1)*n_bins, idx*n_bins:(idx+1)*n_bins] = \
-                                            shot_cov+covjk+emu_cov
 
-        if 'cross_cov_fname' in cov_cfg:
-            # TODO should i be adding
-            cross_cov = np.loadtxt(cov_cfg['cross_cov_fname'])
-            assert cross_cov.shape[0] == n_bins, "Cross-cov matrix of wrong size."
-            cov[:n_bins, n_bins:] = cross_cov
-            cov[n_bins:, :n_bins] = cross_cov
+            cov[idx*n_bins:(idx+1)*n_bins, idx*n_bins:(idx+1)*n_bins] += \
+                                            shot_cov+emu_cov
 
     else:
         raise NotImplementedError("Non-HOD caclulation not supported")
