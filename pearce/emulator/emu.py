@@ -723,6 +723,7 @@ class Emu(object):
         t_list = [input_params[pname] for pname in self._ordered_params if pname in em_params]
         # cover spicy_buffalo edge case
         t_dim = self.emulator_ndim
+# TODO this does a lot of extra uncecessary work for NH
         if hasattr(self, 'r_idx') and 'r' in input_params:
             t_list.insert(self.r_idx, input_params['r'])
             t_dim+=1
@@ -2152,23 +2153,28 @@ class NashvilleHot(Emu):
         ndim = x1.shape[1]+x2.shape[1]
         self.emulator_ndim = ndim  # The number of params for the emulator is different than those in sampling.
 
-        #r_idx = self.get_param_names().index('r')
-        self.r_idx = -1 # this object doesn't use this, but i think i use this as a marker
+        self.r_idx = self.get_param_names().index('r')
         # TODO be smarter about how i split up the multi bin emus vs the OR
         if 'r' in self._ordered_params:
             del self._ordered_params['r']  # remove r!
 
 
+        #self._x1_mean, self._x1_std = np.zeros((x1.shape[1],)), np.ones((x1.shape[1],))#x1.mean(axis = 0), x1.std(axis = 0)
         self._x1_mean, self._x1_std = x1.mean(axis = 0), x1.std(axis = 0)
+
+        #self._x2_mean, self._x2_std = np.zeros((x2.shape[1],)), np.ones((x2.shape[1],))#x2.mean(axis = 0), x2.std(axis = 0)
         self._x2_mean, self._x2_std = x2.mean(axis = 0), x2.std(axis = 0)
 
-        # try not whitening
+
         # TODO x1 & x2 or xcosmo and xhod?
         self.x1, self.x2 = self._whiten(x1, x2)[0] 
 
         #todo whiten here as needed
         self._y_mean = np.stack([_y.mean() for _y in y] )
-        self._y_std = np.stack([_y.std() for _y in y])
+        #self._y_mean = np.stack([ 0.0 for _y in y] ) #np.stack([_y.mean() for _y in y] )
+        #self._y_std = np.stack([_y.std() for _y in y])
+        self._y_std = np.stack([ 1.0 for _y in y]) #np.stack([_y.std() for _y in y])
+
         self.y  = np.stack([_y-_ym for _y,_ym in zip(y, self._y_mean)])
         self.yerr = np.stack(yerr)
 
@@ -2185,9 +2191,15 @@ class NashvilleHot(Emu):
         """
         if x2 is None:
             if len(x1.shape) == 1:
-                x1, x2 = x1[:self.x1.shape[-1]], x1[self.x1.shape[-1]:-1]
+                x1, x2 = x1[:self.x1.shape[-1]], x1[self.x1.shape[-1]:]
+                if x2.shape[0] -1 == self._x2_mean.shape[0]:
+                    x2 = x2[:-1]
+
             else:
-                x1, x2 = x1[:, :self.x1.shape[-1]], x1[:, self.x1.shape[-1]:-1]
+                x1, x2 = x1[:, :self.x1.shape[-1]], x1[:, self.x1.shape[-1]:]
+
+                if x2.shape[1] -1 == self._x2_mean.shape[0]:
+                    x2 = x2[:, :-1]
 
         return ((x1-self._x1_mean)/(self._x1_std+1e-9), (x2-self._x2_mean)/(self._x2_std+1e-9)), None
 
@@ -2438,7 +2450,6 @@ class NashvilleHot(Emu):
         combined_mu = np.vstack(mu)#np.zeros((t_size,))
         combined_err = np.vstack(mu)#np.zeros((t_size,))
         
-
         #for r_idx in xrange(self.n_bins):
         #    combined_mu[r_idx::self.n_bins] = mu[r_idx]
         #    combined_err[r_idx::self.n_bins] = err[r_idx]
@@ -2556,8 +2567,9 @@ class NashvilleHot(Emu):
 
         assert self.method == 'gp'
 
-        for emulator in self._emulators:
-            emulator.optimize_restarts(num_restarts = 5, verbose = False)
+        for idx, emulator in enumerate(self._emulators):
+            print idx, '*'*15
+            emulator.optimize_restarts(num_restarts = 5, verbose = True)
 
 
 # TODO

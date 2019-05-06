@@ -1,4 +1,6 @@
 Traceback (most recent call last):
-  File "/home/users/swmclau2/Git/pearce/bin/covmat/compute_rr_pairs_gg.py", line 33, in <module>
-    cat = TestBox(boxno = 0, realization = 0, system = 'sherlock')
-NameError: name 'TestBox' is not defined
+  File "/home/users/swmclau2/Git/pearce/bin/covmat/compute_rr_pairs_gg.py", line 37, in <module>
+    RR = compute_RR(cat, r_bins, n_rands = 1)
+  File "/home/users/swmclau2/Git/pearce/bin/covmat/compute_rr_pairs_gg.py", line 21, in compute_RR
+    randoms = np.random.random((cat.model.galaxy_table['x'].shape[0] * nr, 3)) * cat.Lbox / cat.h  # Solution to NaNs: Just fuck me up with randoms
+AttributeError: 'PrebuiltHodModelFactory' object has no attribute 'galaxy_table'
