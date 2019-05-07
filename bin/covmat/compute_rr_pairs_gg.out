@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "/home/users/swmclau2/Git/pearce/bin/covmat/compute_rr_pairs_gg.py", line 33, in <module>
+    cat = TestBox(boxno = 0, realization = 0, system = 'sherlock')
+NameError: name 'TestBox' is not defined

@@ -12,20 +12,27 @@ def get_available_gpus():
 
 print get_available_gpus()
 
-training_file = 'PearceRedMagicXiCosmoFixedNd.hdf5'
-test_file = 'PearceRedMagicXiCosmoFixedNd_test.hdf5'
+#xi gg
+training_file = '/scratch/users/swmclau2/xi_zheng07_cosmo_lowmsat/PearceRedMagicXiCosmoFixedNd.hdf5'
+#test_file= '/scratch/users/swmclau2/xi_zheng07_cosmo_test_lowmsat2/'
+test_file =  '/scratch/users/swmclau2/xi_zheng07_cosmo_test_lowmsat2/PearceRedMagicXiCosmoFixedNd_Test.hdf5'
 
 em_method = 'nn'
 split_method = 'random'
 
 a = 1.0
 z = 1.0/a - 1.0
-
-fixed_params = {'z':z}#, 'r': 24.06822623}
+#array([  0.09581734,   0.13534558,   0.19118072,   0.27004994,
+#         0.38145568,   0.53882047,   0.76110414,   1.07508818,
+#                  1.51860241,   2.14508292,   3.03001016,   4.28000311,
+#                           6.04566509,   8.53972892,  12.06268772,  17.0389993 ,
+#                                   24.06822623,  33.99727318])
+fixed_params = {'z':z, 'r': 0.09581734}
 
 # This is just me loading the data with my own code, nothing to do with NN
 n_leaves, n_overlap = 50, 1
 
+# TODO ostrich module that just gets the data in the write format.
 emu = OriginalRecipe(training_file, method = em_method, fixed_params=fixed_params,
                     hyperparams = {'hidden_layer_sizes': (10),
                                  'activation': 'relu', 'verbose': True, 
@@ -132,7 +139,7 @@ def novel_fc(x, hidden_sizes, training=False, l = (1e-6, 1e-6, 1e-6), p = (0.5, 
 
 
 # Optimizier function
-def optimizer_init_fn(learning_rate = 1e-4):
+def optimizer_init_fn(learning_rate = 1e-6):
     return tf.train.AdamOptimizer(learning_rate)#, beta1=0.9, beta2=0.999, epsilon=1e-6)
 
 
@@ -156,35 +163,31 @@ def check_accuracy(sess, val_data,batch_size, x, weights, preds, is_training=Non
         
     print 'Val score: %.6f, %.2f %% Loss'%(np.mean(np.array(scores)), 100*np.mean(np.array(perc_acc)))
 
-device = '/device:GPU:0'
 #device = '/cpu:0'
 # main training function
 def train(model_init_fn, optimizer_init_fn,num_params, train_data, val_data, hidden_sizes,               num_epochs=1, batch_size = 200, l = 1e-6, p = 0.5, print_every=10):
     tf.reset_default_graph()    
-    with tf.device(device):
-        # Construct the computational graph we will use to train the model. We
-        # use the model_init_fn to construct the model, declare placeholders for
-        # the data and labels
-        x = tf.placeholder(tf.float32, [None,num_params])
-        y = tf.placeholder(tf.float32, [None])
-        weights = tf.placeholder(tf.float32, [None])
-        
-        is_training = tf.placeholder(tf.bool, name='is_training')
-        
-        preds = model_init_fn(x, hidden_sizes, is_training, l = l)#, p=p)
+    # Construct the computational graph we will use to train the model. We
+    # use the model_init_fn to construct the model, declare placeholders for
+    # the data and labels
+    x = tf.placeholder(tf.float32, [None,num_params])
+    y = tf.placeholder(tf.float32, [None])
+    weights = tf.placeholder(tf.float32, [None])
+    
+    is_training = tf.placeholder(tf.bool, name='is_training')
+    
+    preds = model_init_fn(x, hidden_sizes, is_training, l = l)#, p=p)
 
-        # Compute the loss like we did in Part II
-        #loss = tf.reduce_mean(loss)
+    # Compute the loss like we did in Part II
+    #loss = tf.reduce_mean(loss)
         
-    with tf.device('/cpu:0'):
-        loss = tf.losses.mean_squared_error(labels=y,                    predictions=preds, weights = weights)#weights?
-        #loss = tf.losses.absolute_difference(labels=y, predictions=preds, weights = tf.abs(1.0/y))#weights?
+    loss = tf.losses.mean_squared_error(labels=y, predictions=preds, weights = weights)#weights?
+    #loss = tf.losses.absolute_difference(labels=y, predictions=preds, weights = weights)#weights?
 
-    with tf.device(device):
-        optimizer = optimizer_init_fn()
-        update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-        with tf.control_dependencies(update_ops):
-            train_op = optimizer.minimize(loss)
+    optimizer = optimizer_init_fn()
+    update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+    with tf.control_dependencies(update_ops):
+        train_op = optimizer.minimize(loss)
         
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
@@ -207,12 +210,13 @@ def train(model_init_fn, optimizer_init_fn,num_params, train_data, val_data, hid
 
 
 print fixed_params
-sizes = [1000]#, 2000, 2000, 1000]#, 100]
-bs = 1000
-l, p = 1e-7, 0.1
-print sizes
-print bs
-print l, p
+#sizes = [100, 250, 500, 250, 100]#, 2000, 1000]#, 100]
+sizes = [100, 100]#, 100]#,10]
+bs = 40
+l, p = 1e-6, 0.1
+print 'Sizes', sizes
+print 'Batch size', bs
+print 'Regularization, Dowsample:', l, p
 
-train(n_layer_fc, optimizer_init_fn, x_train.shape[1], (x_train, y_train, yerr_train), (x_test, y_test), sizes, num_epochs= int(1e5),           batch_size = bs, l = l, p = p, print_every = 10)
+train(n_layer_fc, optimizer_init_fn, x_train.shape[1], (x_train, y_train, yerr_train), (x_test, y_test), sizes, num_epochs= 500,           batch_size = bs, l = l, p = p, print_every = 10)
 

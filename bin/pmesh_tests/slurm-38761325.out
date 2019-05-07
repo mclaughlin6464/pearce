@@ -1,0 +1,9 @@
+/home/users/swmclau2/.local/lib/python2.7/site-packages/nbodykit/cosmology/cosmology.py:427: UserWarning: Class did not read input parameter(s): ln10As, ns, ombh2, omch2
+  self.engine = ClassEngine(pars)
+Traceback (most recent call last):
+  File "/home/users/swmclau2/Git/pearce/pearce/sims/submit_sims.py", line 131, in <module>
+    submit_sims(**cfg)
+  File "/home/users/swmclau2/Git/pearce/pearce/sims/submit_sims.py", line 73, in submit_sims
+    call("sbatch {boxdir}submit_sim.sbatch".format(boxdir), shell=True)
+KeyError: 'boxdir'
+srun: error: sh-25-33: task 0: Exited with exit code 1

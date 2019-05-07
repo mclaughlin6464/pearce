@@ -1,5 +1,7 @@
 from pearce.emulator import OriginalRecipe, ExtraCrispy
 training_file = '/u/ki/swmclau2/des/PearceRedMagicWpCosmo.hdf5'
+import numpy as np
+
 
 em_method = 'gp'
 split_method = 'random'
@@ -7,14 +9,14 @@ split_method = 'random'
 a = 1.0
 z = 1.0/a - 1.0
 
-fixed_params = {'z':z}#, 'r':0.18477483}
+fixed_params = {'z':z,'r':24.06822623}
 
-n_leaves, n_overlap = 500, 1
-emu = ExtraCrispy(training_file, n_leaves, n_overlap, split_method, method = em_method, fixed_params=fixed_params)
+#n_leaves, n_overlap = 500, 1
+emu = OriginalRecipe(training_file, method = em_method, fixed_params=fixed_params,\
+                    custom_mean_function =None, downsample_factor = 0.2)
 
 
-liklihoods, points = emu.hyperparam_random_grid_search(200)
+liklihoods, points = emu.hyperparam_random_grid_search(500)
 
-import numpy as np
-np.savetxt('lilklihoods.npy', liklihoods)
-np.savetxt('points.npy', points)
+np.savetxt('cosmo_liklihoods.npy', liklihoods)
+np.savetxt('cosmo_points.npy', points)

@@ -1,1 +1,1 @@
-from .runMCMC import *
+from .run_mcmc import *

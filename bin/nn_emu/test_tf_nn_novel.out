@@ -1,0 +1,53 @@
+-------------------------------------------------------------------------------
+There are messages associated with the following module(s):
+-------------------------------------------------------------------------------
+
+py-tensorflow/1.6.0_py27:
+   Warning: this module requires a GPU, it won't work on CPU nodes.
+-------------------------------------------------------------------------------
+
+/home/users/swmclau2/.local/lib/python2.7/site-packages/h5py/__init__.py:36: FutureWarning: Conversion of the second argument of issubdtype from `float` to `np.floating` is deprecated. In future, it will be treated as `np.float64 == np.dtype(float).type`.
+  from ._conv import register_converters as _register_converters
+2019-02-20 14:08:12.812455: I tensorflow/core/platform/cpu_feature_guard.cc:140] Your CPU supports instructions that this TensorFlow binary was not compiled to use: AVX2 FMA
+2019-02-20 14:08:13.108845: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1212] Found device 0 with properties: 
+name: Tesla P100-PCIE-16GB major: 6 minor: 0 memoryClockRate(GHz): 1.3285
+pciBusID: 0000:04:00.0
+totalMemory: 15.90GiB freeMemory: 15.61GiB
+2019-02-20 14:08:13.300954: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1212] Found device 1 with properties: 
+name: Tesla P100-PCIE-16GB major: 6 minor: 0 memoryClockRate(GHz): 1.3285
+pciBusID: 0000:82:00.0
+totalMemory: 15.90GiB freeMemory: 15.61GiB
+2019-02-20 14:08:13.301041: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1227] Device peer to peer matrix
+2019-02-20 14:08:13.301074: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1233] DMA: 0 1 
+2019-02-20 14:08:13.301083: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1243] 0:   Y N 
+2019-02-20 14:08:13.301089: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1243] 1:   N Y 
+2019-02-20 14:08:13.301106: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1312] Adding visible gpu devices: 0, 1
+2019-02-20 14:08:13.960943: I tensorflow/core/common_runtime/gpu/gpu_device.cc:993] Creating TensorFlow device (/device:GPU:0 with 15139 MB memory) -> physical GPU (device: 0, name: Tesla P100-PCIE-16GB, pci bus id: 0000:04:00.0, compute capability: 6.0)
+2019-02-20 14:08:14.268832: I tensorflow/core/common_runtime/gpu/gpu_device.cc:993] Creating TensorFlow device (/device:GPU:1 with 15139 MB memory) -> physical GPU (device: 1, name: Tesla P100-PCIE-16GB, pci bus id: 0000:82:00.0, compute capability: 6.0)
+/home/users/swmclau2/.local/lib/python2.7/site-packages/sklearn/neural_network/multilayer_perceptron.py:564: ConvergenceWarning: Stochastic Optimizer: Maximum iterations (10) reached and the optimization hasn't converged yet.
+  % self.max_iter, ConvergenceWarning)
+[u'/device:GPU:0', u'/device:GPU:1']
+Iteration 1, loss = 0.61683483
+Iteration 2, loss = 0.41524816
+Iteration 3, loss = 0.28342689
+Iteration 4, loss = 0.19690133
+Iteration 5, loss = 0.14011713
+Iteration 6, loss = 0.10255086
+Iteration 7, loss = 0.07741501
+Iteration 8, loss = 0.06030247
+Iteration 9, loss = 0.04831152
+Iteration 10, loss = 0.03965387
+{'r': 24.06822623, 'z': 0.0}
+Sizes ([100, 100], [500, 500], [500])
+Batch size 10
+Regularization, Dowsample: (0, 0, 0) (0.5, 0.2, 0.3)
+Traceback (most recent call last):
+  File "test_tf_nn_novel.py", line 219, in <module>
+    train(novel_fc, optimizer_init_fn, x_train.shape[1], (x_train, y_train, yerr_train), (x_test, y_test), sizes, num_epochs= 500,           batch_size = bs, l = l, p = p, print_every = 10)
+  File "test_tf_nn_novel.py", line 175, in train
+    preds = model_init_fn(x, hidden_sizes, is_training, l = l)#, p=p)
+  File "test_tf_nn_novel.py", line 98, in novel_fc
+    cosmo_regularizer = tf.contrib.layers.l1_regularizer(cosmo_l)
+  File "/share/software/user/open/py-tensorflow/1.6.0_py27/lib/python2.7/site-packages/tensorflow/contrib/layers/python/layers/regularizers.py", line 53, in l1_regularizer
+    raise ValueError('scale cannot be an integer: %s' % scale)
+ValueError: scale cannot be an integer: 0

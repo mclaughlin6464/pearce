@@ -80,11 +80,27 @@ class Trainer(object):
                 boxnos = [boxnos] if type(boxnos) is int else boxnos
             del cosmo_cfg['boxno']
             self.cats = []
+
+            if 'realization' in cosmo_cfg:
+                if ':' in cosmo_cfg['realization']:  # shorthand to do ranges, like 0:40
+                    splitstr = cosmo_cfg['realization'].split(':')
+                    realizations = range(int(splitstr[0]), int(splitstr[1]))
+                else:
+                    realizations = cosmo_cfg['realization']
+                    realizations = [realizations] if type(realizations) is int else realizations
+
+                del cosmo_cfg['realization']
+
+                for boxno in boxnos:
+                    for realization in realizations:
+                        self.cats.append(
+                            cat_dict[cosmo_cfg['simname']](boxno=boxno,realization = realization,  **cosmo_cfg))  # construct the specified catalog!
+
             # if there are multiple cosmos, they need to have a boxno kwarg
-            # TODO need to do something similar for realizations, if they exist.
-            for boxno in boxnos:
-                self.cats.append(
-                    cat_dict[cosmo_cfg['simname']](boxno=boxno, **cosmo_cfg))  # construct the specified catalog!
+            else:
+                for boxno in boxnos:
+                    self.cats.append(
+                        cat_dict[cosmo_cfg['simname']](boxno=boxno, **cosmo_cfg))  # construct the specified catalog!
 
         else:  # fixed cosmology
             self.cats = [cat_dict[cosmo_cfg['simname']](**cosmo_cfg)]
@@ -149,7 +165,9 @@ class Trainer(object):
                 self._logMmin_bounds = None
 
             self._hod_param_names = ordered_params.keys()
-            self._hod_param_vals = self._make_LHC(ordered_params, hod_cfg['num_hods'])
+
+            seed = hod_cfg.get("seed", None)
+            self._hod_param_vals = self._make_LHC(ordered_params, hod_cfg['num_hods'], seed = seed)
 
             del hod_cfg['ordered_params']
             del hod_cfg['num_hods']
@@ -169,7 +187,7 @@ class Trainer(object):
         self._hod_kwargs = hod_cfg
         # need scale factors too, but just use them from cosmology
 
-    def _make_LHC(self, ordered_params, N):
+    def _make_LHC(self, ordered_params, N, seed = None):
         """Return a vector of points in parameter space that defines a latin hypercube.
             :param ordered_params:
                 OrderedDict that defines the ordering, name, and ranges of parameters
@@ -179,7 +197,9 @@ class Trainer(object):
             :return
                 A latin hyper cube sample in HOD space in a numpy array.
         """
-        np.random.seed(int(time()))
+        if seed is None:
+            seed = int(time())
+        np.random.seed(seed)
 
         points = []
         # by linspacing each parameter and shuffling, I ensure there is only one point in each row, in each dimension.
@@ -231,6 +251,14 @@ class Trainer(object):
 
         if 'log_obs' in obs_cfg:
             del obs_cfg['log_obs']
+
+
+        # seed to use for galaxy population
+        if 'seed' in obs_cfg:
+            self.pop_seed = obs_cfg['seed']
+            del obs_cfg['seed']
+        else:
+            self.pop_seed = None
 
         # This goes through the motions of getting calc observable.
         # Each cat will have to retrieve their own version though.
@@ -328,9 +356,10 @@ class Trainer(object):
             hod_params.update({'logMmin':logMmin}) 
             return (cat.calc_analytic_nd(hod_params) - self._fixed_nd)**2
 
-        res = minimize_scalar(func, bounds = self._logMmin_bounds, args = (hod_params,), options = {'maxiter':100})
+        res = minimize_scalar(func, bounds = self._logMmin_bounds, args = (hod_params,), options = {'maxiter':100}, method = 'Bounded')
 
         # assuming this doens't fail
+        print 'logMmin', res.x
         hod_params['logMmin'] = res.x
 
     def _divide_tasks(self, size):
@@ -420,6 +449,12 @@ class Trainer(object):
             if self._fixed_nd is not None:
                 self._add_logMmin(hod_params, cat)
             #continue
+            if self.pop_seed is None:
+                seed = int(time())
+            else:
+                seed = self.pop_seed
+
+            np.random.seed(seed)
             if self._n_repops == 1:
                 cat.populate(hod_params, min_ptcl = self._min_ptcl)
                 # TODO this will fail if you don't jackknife when n_repops is 1
@@ -441,6 +476,7 @@ class Trainer(object):
 
                 obs_val = np.mean(obs_repops, axis=0)
                 obs_cov = np.cov(obs_repops, rowvar=False)
+
             output[output_idx] = obs_val
             output_cov[output_idx] = obs_cov
 
@@ -492,7 +528,6 @@ class Trainer(object):
 
             # I could compute this, which would be faster, but this is easier to read.
             hod_idxs = np.where(np.all(all_param_idxs[:, :2] == cosmo_sf_pair, axis=1))[0]
-
             grp.create_dataset("obs", data=output[hod_idxs], chunks=True, compression='gzip')
             grp.create_dataset("cov", data=output_cov[hod_idxs], chunks=True, compression='gzip')
 
@@ -574,7 +609,7 @@ class Trainer(object):
             param_filename = path.join(output_directory, jobname + '.npy')
             if not rerun:
                 np.savetxt(param_filename, all_param_idxs[idx])
-            elif path.exists(path.join(output_directory, 'output_%04d.npy'%idx)):\
+            elif path.exists(path.join(output_directory, 'output_%04d.npy'%idx)) and path.exists(path.join(output_directory, 'output_cov_%04d.npy'%idx)):\
                 continue # this one ran successfull
 
             # TODO allow queue changing
@@ -584,7 +619,7 @@ class Trainer(object):
             call(command, shell=self.system == 'sherlock')
 
 
-def make_kils_command(jobname, max_time, outputdir, queue='medium'):  # 'bulletmpi'):
+def make_kils_command(jobname, max_time, outputdir, queue= 'bulletmpi'):
     '''
     Return a list of strings that comprise a bash command to call trainingHelper.py on the cluster.
     Designed to work on ki-ls's batch system

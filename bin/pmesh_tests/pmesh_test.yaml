@@ -1,0 +1,10 @@
+lhc_fname: test_lhc.csv
+output_dir: /scratch1/scratchdirs/swmclau2/pmesh_test/
+powerspectrum: linear
+cosmic_var: true
+initial_z: 50
+final_z: 0.55
+npart: 128
+boxsize: 400
+ncores: 16
+sim_time: 2

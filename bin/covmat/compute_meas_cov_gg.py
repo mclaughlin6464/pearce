@@ -1,4 +1,3 @@
-
 from pearce.mocks.kittens import TestBox
 from pearce.mocks import tpcf_subregions
 import numpy as np
@@ -139,3 +138,15 @@ for boxno in xrange(7):
 
 
 
+=======
+            print boxno, realization, hod_idx
+            mat = compute_full_jk(cat, r_bins)
+            cov_mats[boxno, hod_idx, realization] = mat
+            break
+        break
+    break
+ 
+
+# TODO do the reduction here
+np.save('/scratch/users/swmclau2/testbox_covmats_gg.npy', cov_mats)
+# In[ ]:
