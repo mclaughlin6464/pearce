@@ -501,17 +501,14 @@ class Cat(object):
         z = 1.0 / a - 1
         if type(HOD) is str:
             assert HOD in VALID_HODS
-            print HOD
-            if HOD in VALID_HODS - DEFAULT_HODS:  # my custom ones
+            if HOD in  VALID_HODS-DEFAULT_HODS: # my custom ones
                 cens_occ = HOD_DICT[HOD][0](redshift=z, **hod_kwargs)
                 # TODO  this is a hack, something better would be better
-                try:  # hack for central modulation
-                    print 'A'
+                try: #hack for central modulation
                     # the ab ones need to modulated with the baseline model
                     sats_occ = HOD_DICT[HOD][1](redshift=z, cenocc_model=cens_occ, **hod_kwargs)
-                except:  # assume the error is a cenocc issue
-                    print 'B'
-                    sats_occ = HOD_DICT[HOD][1](redshift=z, **hod_kwargs)
+                except: #assume the error is a cenocc issue
+                    sats_occ = HOD_DICT[HOD][1](redshift=z,  **hod_kwargs)
 
                 self.model = HodModelFactory(
                     centrals_occupation=cens_occ,
