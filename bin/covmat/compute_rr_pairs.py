@@ -18,7 +18,7 @@ def compute_RR(cat, rbins, n_rands= 5, n_sub = 5, n_cores = 16):
 #pos_m = return_xyz_formatted_array(x_m, y_m, z_m, period=cat.Lbox)
     rbins = np.array(rbins)
 
-    randoms = np.random.random((cat.halocat.ptcl_table['x'].shape[0] * nr, 3)) * cat.Lbox / cat.h  # Solution to NaNs: Just fuck me up with randoms
+    randoms = np.random.random((cat.halocat.ptcl_table['x'].shape[0] * n_rands, 3)) * cat.Lbox / cat.h  # Solution to NaNs: Just fuck me up with randoms
     print randoms.shape
     j_index_randoms, N_sub_vol = cuboid_subvolume_labels(randoms, n_sub, cat.Lbox/cat.h)
     print j_index_randoms.shape 

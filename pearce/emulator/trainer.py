@@ -541,12 +541,14 @@ class Trainer(object):
 
         rank = comm.Get_rank()
         size = comm.Get_size()
+        print rank, size
 
         n_combos = len(self.cats)*len(self._scale_factors)*len(self._hod_param_vals)
         n_per_node = np.ceil(float(n_combos) / size)
 
         if rank == 0:
             all_param_idxs_send = self._divide_tasks(size)
+            print all_param_idxs_send.shape
         else:
             all_param_idxs_send = None
 
