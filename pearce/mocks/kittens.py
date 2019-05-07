@@ -7,10 +7,13 @@ Each takes two kwargs: "filenames" and "scale_factors", both lists which allow t
 which particular files are cached/loaded/etc. '''
 
 from glob import glob
+from itertools import izip
 from os import path
 import numpy as np
 from astropy import cosmology
 import pandas as pd
+import h5py from ast import literal_eval
+from halotools.sim_manager import UserSuppliedHaloCatalog
 from .cat import Cat
 
 __all__ = ['Bolshoi', 'Multidark', 'Emu', 'Fox', 'MDHR', 'Chinchilla', 'Aardvark', 'Guppy', 'cat_dict']
@@ -441,7 +444,8 @@ class TrainingBox(Cat):
         params = self.cosmo_params.iloc[self.boxno]
         h = params['H0']/100.0
         Om0 = (params['ombh2'] + params['omch2'])/(h**2)
-        return cosmology.core.FlatwCDM(H0= params['H0'], Om0 = Om0, Neff=params['Neff'], Ob0=params['ombh2']/(h**2))
+        return cosmology.core.FlatwCDM(H0= params['H0'], Om0 = Om0, Neff=params['Neff'], Ob0=params['ombh2']/(h**2),
+                                       w0 = params['w0'])
 
     def _get_cosmo_param_names_vals(self):
         # TODO docs
@@ -554,7 +558,107 @@ class TestBox(Cat):
         vals = np.array(list(self.cosmo_params.iloc[self.boxno].values))
         return names, vals
 
+class FastPM(Cat):
+
+    def __init__(self, boxno, system='ki-ls', **kwargs):
+
+        assert 0<=boxno<=121
+        assert int(boxno) == boxno
+
+        self.boxno = boxno
+
+        simname = 'fastpm'
+        colums_to_keep = {'halo_id': (0,'i8'), 'halo_mvir': (1,'f4'),
+                           'halo_x':(2,'f4'), 'halo_y':(3,'f4'), 'halo_z':(4,'f4')}
+        #Lbox = 1000.0
+        self.npart = 1024 #can generalize these from the file
+
+        if system=='ki-ls':
+            raise NotImplementedError("File not on ki-ls")
+        else: #sherlock
+            fname = "/scratch/users/swmclau2/DES_emu.hdf5"
+
+        self.fname = fname
+
+        f = h5py.File(fname, 'r')
+        pmasses = np.array(f.attrs['pmasses'])
+        pmass = pmasses[boxno]
+        cfg = literal_eval(f.attrs['cfg_info'])
+        Lbox = cfg['boxsize']
+
+        self.cosmo_params = pd.read_csv(cfg['lhc_fname'], sep=' ', index_col=None)
+        f.close()
+        cosmo = self._get_cosmo()
+
+        tmp_scale_factors = [ 0.645, 1.0]
+        tmp_fnames = ['tmpA','tmpB']
+
+        self._update_lists(kwargs, tmp_fnames, tmp_scale_factors)
+        self.prim_haloprop_key='halo_mvir'
+
+        version_name = 'most_recent_%02d'%boxno
+
+        super(FastPM, self).__init__(simname=simname,Lbox=Lbox,pmass=pmass,
+                                     version_name=version_name, cosmo=cosmo, **kwargs)
+
+        cache_locs = {'ki-ls': '/u/ki/swmclau2/des/halocats/hlist_%.2f.list.%s_%03d.hdf5',
+                      'sherlock': '/scratch/users/swmclau2/halocats/hlist_%.2f.list.%s_%03d.hdf5'}
+        cache_locs['long'] = path.dirname(cache_locs['ki-ls'])
+        self.cache_loc = path.dirname(cache_locs[system])  # %(a, self.simname, boxno)
+        self.cache_filenames = [cache_locs[system] % (a, self.simname, boxno)
+                                for a in self.scale_factors]  # make sure we don't have redunancies.
+
+
+    def _get_cosmo(self):
+
+        params = self.cosmo_params.iloc[self.boxno]
+        return cosmology.core.FlatwCDMH0(H0=params['h0']*100, Om0 = params['Omega_m'],\
+                                         Neff=params['Neff'], Ob0=params['Omega_b'], w0 = params['w'])
+
+    def _get_cosmo_param_names_vals(self):
+        names = list(self.cosmo_params.values)
+        vals = np.array(list(self.cosmo_params.iloc[self.boxno].values))
+        return names, vals
+
+    def cache(self, scale_factors = 'all', overwrite=False, **kwargs):
+
+        for bad_kwarg in ['add_local_density', 'add_particles', 'downsample_factor']:
+            if bad_kwarg in kwargs:
+                raise NotImplementedError("Particles not allowed with FastPM")
+
+        f = h5py.File(self.fname, 'r')
+        grp = f['Box_%03d'%self.boxno]
+
+        for z_key, cache_fnames in izip(grp.keys(), self.cache_filenames):
+            z = float(z_key.split('_')[1])
+            a = 1.0/(1+z)
+            if scale_factors != 'all' and a not in scale_factors:
+                continue
+
+            data = grp[z_key]['halos'].value
+            # assuming halo_columns
+            # TODO do this better
+            halo_id = data[:, 0]
+            halo_mass = data[:, 1]
+            halo_x, halo_y, halo_z = data[:, 2], data[:, 3], data[:, 4]
+
+            halocat = UserSuppliedHaloCatalog(redshift=z, Lbox=self.Lbox, pmass=self.pmass,
+                                              halo_id=halo_id, halo_mass=halo_mass,
+                                              halo_x=halo_x, halo_y=halo_y, halo_z=halo_z)
+
+            halocat.add_halocat_to_cache(fname=cache_fnames,
+                                         simname=self.simname, halo_finder='FOF',
+                                         version_name=self.version_name, overwrite=overwrite)
+
+    def _read_particles(self, snapdir, downsample_factor):
+        raise NotImplementedError
+
+    def cache_particles(self, particles, scale_factor, downsample_factor):
+        raise NotImplementedError
+
+
 class ResolutionTestBox(Cat):
+
 
     def __init__(self, boxno, system='ki-ls', **kwargs):
 
