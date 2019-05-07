@@ -2153,7 +2153,7 @@ class NashvilleHot(Emu):
         self.emulator_ndim = ndim  # The number of params for the emulator is different than those in sampling.
 
         #r_idx = self.get_param_names().index('r')
-        self.r_idx = -1 # this object doesn't use this, but i think i use this as a marker
+        self.r_idx = ndim # this object doesn't use this, but i think i use this as a marker
         # TODO be smarter about how i split up the multi bin emus vs the OR
         if 'r' in self._ordered_params:
             del self._ordered_params['r']  # remove r!
@@ -2166,9 +2166,10 @@ class NashvilleHot(Emu):
         # TODO x1 & x2 or xcosmo and xhod?
         self.x1, self.x2 = self._whiten(x1, x2)[0] 
 
-        #todo whiten here as needed
         self._y_mean = np.stack([_y.mean() for _y in y] )
-        self._y_std = np.stack([_y.std() for _y in y])
+        #self._y_std = np.stack([_y.std() for _y in y])
+        self._y_std = np.stack([1.0 for _y in y])
+
         self.y  = np.stack([_y-_ym for _y,_ym in zip(y, self._y_mean)])
         self.yerr = np.stack(yerr)
 
@@ -2253,18 +2254,33 @@ class NashvilleHot(Emu):
 
         if len(output) == 2:
             kern1, kern2 = output
+            noise_var = 1.0
+
+        elif len(output) == 3:
+            kern1, kern2, noise_var = output
 
         else:
-            kern1, kern2 = [],[]
-            for k1, k2 in output:
-                kern1.append(k1)
-                kern2.append(k2)
+            kern1, kern2, noise_var = [],[], []
+            if len(output[0]) == 2:
+                for k1, k2 in output:
+                    kern1.append(k1)
+                    kern2.append(k2)
+                    noise_var.append(1.0)
+
+            else:
+                for k1, k2, nv in output:
+                    kern1.append(k1)
+                    kern2.append(k2)
+                    noise_var.append(nv)
 
         if type(kern1) is not list:
             kern1 = [kern1.copy() for i in xrange(self.n_bins)]
 
         if type(kern2) is not list:
             kern2 = [kern2.copy() for i in xrange(self.n_bins)]
+
+        if type(noise_var) is not list:
+            noise_var = [noise_var for i in xrange(self.n_bins)]
 
         # now, make a list of emulators
         self._emulators = []
@@ -2279,8 +2295,8 @@ class NashvilleHot(Emu):
             x1, x2 = self.downsample_x1, self.downsample_x2
             y = self.downsample_y
             yerr = self.downsample_yerr
-        for _y,_yerr, _kern1, _kern2 in izip(y,yerr, kern1, kern2):
-            emulator = GPKroneckerGaussianRegressionVar(x1, x2, _y, _yerr**2, _kern1, _kern2)
+        for _y,_yerr, _kern1, _kern2, nv in izip(y,yerr, kern1, kern2, noise_var):
+            emulator = GPKroneckerGaussianRegressionVar(x1, x2, _y, _yerr**2, _kern1, _kern2, noise_var = nv)
             #emulator = GPKroneckerGaussianRegression(x1, x2, _y, _kern1, _kern2)
 
             self._emulators.append(emulator)
@@ -2335,26 +2351,32 @@ class NashvilleHot(Emu):
         # would probably have to work off a keyword dict
         if type(kernel_dict) is list:
             if type(kernel_dict[0]) in (tuple, list): # 2D
-                return [[Kern.from_dict(kd[0]), Kern.from_dict(kd[1])] for kd in kernel_dict]
+                if len(kernel_dict[0]) == 2:
+                    return [[Kern.from_dict(kd[0]), Kern.from_dict(kd[1])] for kd in kernel_dict]
+                else: #3?
+                    return [[Kern.from_dict(kd[0]), Kern.from_dict(kd[1]), float(kd[2])] for kd in kernel_dict]
             return [Kern.from_dict(kd) for kd in kernel_dict]
         return Kern.from_dict(kernel_dict)
 
     def _save_as_default_kernel(self):
 
         if hasattr(self, "_kernels"):
-            kernel_dicts = [[_k[0].to_dict(), _k[1].to_dict()] for _k in self._kernels]
+            kernel_dicts = [[_k[0].to_dict(), _k[1].to_dict(), _e.likelihood.variance[0]] for (_k, _e) in zip(self._kernels, self._emulators)]
         else:
             raise AssertionError("No emulator loaded, cannot save.")
 
-        with open(DEFAULT_METRIC_NH_PICKLE_FNAME, 'r') as f:
-            try:
-                default_kernel_dict = pickle.load(f)
-            except EOFError: #blank file
-                default_kernel_dict = {}
+        if path.isfile(DEFAULT_METRIC_NH_PICKLE_FNAME):
+            with open(DEFAULT_METRIC_NH_PICKLE_FNAME) as f:
+                try:
+                    default_kernel_dict = pickle.load(f)
+                except:# EOFError, AttributeError: #blank file
+                    default_kernel_dict = {}
+        else:
+            default_kernel_dict = {} 
 
         default_kernel_dict[self.obs] = kernel_dicts
 
-        with open(DEFAULT_METRIC_NH_PICKLE_FNAME, 'w') as f:
+        with open(DEFAULT_METRIC_NH_PICKLE_FNAME, 'a') as f:
             pickle.dump(default_kernel_dict, f)
 
     def _make_kernel(self, hyperparams):
@@ -2385,6 +2407,14 @@ class NashvilleHot(Emu):
                     else: 
                         assert isinstance(hyperparams['kernel'][0], Kern)
                         return hyperparams['kernel']
+                elif len(hyperparams['kernel']) == 3: #one for each+ a var?
+                    k = hyperparams['kernel']
+                    if type(k[0]) is dict:
+                        return self._kernel_from_dict(k[0]), self._kernel_from_dict(k[1]), float(k[2])
+                    else: 
+                        assert isinstance(hyperparams['kernel'][0], Kern)
+                        return hyperparams['kernel']
+
                 # else, idk hope its right
                 # TODO better checks, corrections here
                 return self._kernel_from_dict(hyperparams['kernel'])
@@ -2415,6 +2445,8 @@ class NashvilleHot(Emu):
         # TOOD these are all the same now, any way to simplify?
         for bin_no, (t1_in_bin, t2_in_bin,  mfc, emulator) in enumerate(izip(t1, t2, mean_func_at_params, self._emulators)):
 
+            #print t1_in_bin
+            #print t2_in_bin
             if self.method == 'gp':
                 # because were using a custom object here, don't have to do the copying stuff
                 # however, have to split up t into the two groups

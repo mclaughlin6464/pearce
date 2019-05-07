@@ -12,7 +12,8 @@ from os import path
 import numpy as np
 from astropy import cosmology
 import pandas as pd
-import h5py from ast import literal_eval
+import h5py 
+from ast import literal_eval
 from halotools.sim_manager import UserSuppliedHaloCatalog
 from .cat import Cat
 
@@ -612,7 +613,7 @@ class FastPM(Cat):
     def _get_cosmo(self):
 
         params = self.cosmo_params.iloc[self.boxno]
-        return cosmology.core.FlatwCDMH0(H0=params['h0']*100, Om0 = params['Omega_m'],\
+        return cosmology.core.FlatwCDM(H0=params['h0']*100, Om0 = params['Omega_m'],\
                                          Neff=params['Neff'], Ob0=params['Omega_b'], w0 = params['w'])
 
     def _get_cosmo_param_names_vals(self):
@@ -725,4 +726,4 @@ class ResolutionTestBox(Cat):
 # TODO kitten_dict
 cat_dict = {'bolshoi': Bolshoi, 'multidark': Multidark, 'emu': Emu, 'fox': Fox, 'multidark_highres': MDHR,
             'chinchilla': Chinchilla, 'aardvark': Aardvark, 'guppy': Guppy,
-            'trainingbox': TrainingBox, 'testbox': TestBox, 'resolution': ResolutionTestBox}
+            'trainingbox': TrainingBox, 'testbox': TestBox, 'fastpm':FastPM, 'resolution': ResolutionTestBox}
