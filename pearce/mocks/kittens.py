@@ -631,7 +631,7 @@ class FastPM(Cat):
         grp = f['Box_%03d'%self.boxno]
 
         for z_key, cache_fnames in izip(grp.keys(), self.cache_filenames):
-            z = float(z_key.split('_')[1])
+            z = float(z_key.split('=')[1])
             a = 1.0/(1+z)
             if scale_factors != 'all' and a not in scale_factors:
                 continue
@@ -643,7 +643,7 @@ class FastPM(Cat):
             halo_mass = data[:, 1]
             halo_x, halo_y, halo_z = data[:, 2], data[:, 3], data[:, 4]
 
-            halocat = UserSuppliedHaloCatalog(redshift=z, Lbox=self.Lbox, pmass=self.pmass,
+            halocat = UserSuppliedHaloCatalog(redshift=z, Lbox=self.Lbox, particle_mass=self.pmass,
                                               halo_id=halo_id, halo_mass=halo_mass,
                                               halo_x=halo_x, halo_y=halo_y, halo_z=halo_z)
 
