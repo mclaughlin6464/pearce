@@ -575,7 +575,8 @@ class FastPM(Cat):
         self.npart = 1024 #can generalize these from the file
 
         if system=='ki-ls':
-            raise NotImplementedError("File not on ki-ls")
+            fname = "/nfs/slac/g/ki/ki18/des/swmclau2/DES_emu.hdf5"
+            #raise NotImplementedError("File not on ki-ls")
         else: #sherlock
             fname = "/scratch/users/swmclau2/DES_emu.hdf5"
 
