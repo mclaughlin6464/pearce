@@ -643,6 +643,10 @@ class FastPM(Cat):
             halo_mass = data[:, 1]
             halo_x, halo_y, halo_z = data[:, 2], data[:, 3], data[:, 4]
 
+            for halo_pos in [halo_x, halo_y, halo_z]:
+                halo_pos[halo_pos<0] = self.Lbox - halo_pos[halo_pos<0]
+                halo_pos[halo_pos>self.Lbox] = halo_pos[halo_pos>self.Lbox] - self.Lbox
+
             halocat = UserSuppliedHaloCatalog(redshift=z, Lbox=self.Lbox, particle_mass=self.pmass,
                                               halo_id=halo_id, halo_mass=halo_mass,
                                               halo_x=halo_x, halo_y=halo_y, halo_z=halo_z)
