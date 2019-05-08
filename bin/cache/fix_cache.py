@@ -3,7 +3,7 @@ from glob import glob
 
 cache = HaloTableCache()
 
-all_tboxes = glob('/scratch/users/swmclau2/halocats/hlist_*.list.testbox_??.hdf5')
+all_tboxes = glob('/u/ki/swmclau2/des/halocats/*testbox*.hdf5')
 
 for boxno, t in enumerate(sorted(all_tboxes)):
     print t,

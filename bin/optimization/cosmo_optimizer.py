@@ -1,6 +1,7 @@
 from pearce.emulator import OriginalRecipe, ExtraCrispy
+import numpy as np
 
-training_file = '/home/users/swmclau2/scratch/PearceRedMagicXiCosmo.hdf5'
+training_file = '/u/ki/swmclau2/des/xi_cosmo_trainer/PearceRedMagicXiCosmoFixedNd.hdf5'
 
 em_method = 'gp'
 split_method = 'random'
@@ -28,4 +29,3 @@ results = emu.train_metric()
 print emu.get_param_names()
 print np.exp(results.x)
 print results
-

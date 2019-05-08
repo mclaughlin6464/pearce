@@ -1,7 +1,7 @@
 from pearce.emulator import OriginalRecipe, ExtraCrispy
+training_file = '/u/ki/swmclau2/des/PearceRedMagicWpCosmo.hdf5'
 import numpy as np
 
-training_file = '/home/users/swmclau2/scratch/PearceRedMagicXiCosmo.hdf5'
 
 em_method = 'gp'
 split_method = 'random'
