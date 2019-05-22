@@ -9,6 +9,7 @@ import sys
 from time import time
 import cPickle as pickle
 from abc import ABCMeta, abstractmethod
+from ast import literal_eval
 
 import numpy as np
 import h5py
@@ -28,10 +29,10 @@ from sklearn.neural_network import MLPRegressor
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.pipeline import make_pipeline
 
-DIR_PATH = path.abspath(path.dirname(__file__))
+#DIR_PATH = path.abspath(path.dirname(__file__))
 # TODO these are kernels now
-DEFAULT_METRIC_PICKLE_FNAME= path.join(DIR_PATH, 'default_metrics.pkl')
-DEFAULT_METRIC_NH_PICKLE_FNAME= path.join(DIR_PATH, 'default_nh_metrics.pkl')
+#DEFAULT_METRIC_PICKLE_FNAME= path.join(DIR_PATH, 'default_metrics.pkl')
+#DEFAULT_METRIC_NH_PICKLE_FNAME= path.join(DIR_PATH, 'default_nh_metrics.pkl')
 
 # TODO with the addition of Nashiville Hot, this object doesn't contain as many general features as I'd like.
 # Worth considering how I rebalance some of these features.
@@ -79,6 +80,7 @@ class Emu(object):
 
 
         self.method = method
+        self.filename = filename
 
         self.fixed_params = fixed_params
         self._downsample_factor = downsample_factor
@@ -614,13 +616,15 @@ class Emu(object):
 
     def _get_default_kernel(self):
 
-        with open(DEFAULT_METRIC_PICKLE_FNAME, 'r') as f:
-            default_kernels = pickle.load(f)
-
-            if self.obs in default_kernels:
-               kernel_dict = default_kernels[self.obs]
-            else:
-                raise KeyError("No default saved for this observable!")
+        #with open(DEFAULT_METRIC_PICKLE_FNAME, 'r') as f:
+        #    default_kernels = pickle.load(f)
+        # TODO I should save these under the emu name, so different kernels don't overlap
+        f = h5py.File(self.filename, 'r')
+        if 'kernel' in f.attrs: 
+           kernel_dict =f.attrs['kernel']
+        else:
+            raise KeyError("No default saved for this observable!")
+        f.close()
 
         return self._kernel_from_dict(kernel_dict)
 
@@ -655,7 +659,7 @@ class Emu(object):
             return [Kern.from_dict(kd) for kd in kernel_dict]
         return Kern.from_dict(kernel_dict)
 
-    def _save_as_default_kernel(self):
+    def save_as_default_kernel(self):
         # TODO how to clip of tye Yvar portion
         if hasattr(self, '_kernel'):
             kernel_dict = self._kernel.to_dict()
@@ -664,14 +668,16 @@ class Emu(object):
         else:
             raise AssertionError("No emulator loaded, cannot save.")
 
+        f = h5py.File(self.filename)
+        f.attrs['kernel'] = kernel_dict
+        f.close()
+        #with open(DEFAULT_METRIC_PICKLE_FNAME, 'r') as f:
+        #    default_kernel_dict = pickle.load(f)
 
-        with open(DEFAULT_METRIC_PICKLE_FNAME, 'r') as f:
-            default_kernel_dict = pickle.load(f)
+        #default_kernel_dict[self.obs]= kernel_dict
 
-        default_kernel_dict[self.obs]= kernel_dict
-
-        with open(DEFAULT_METRIC_PICKLE_FNAME, 'w') as f:
-            pickle.dump(default_kernel_dict, f)
+        #with open(DEFAULT_METRIC_PICKLE_FNAME, 'w') as f:
+        #    pickle.dump(default_kernel_dict, f)
 
     def _make_kernel(self, hyperparams):
         """
@@ -1958,7 +1964,7 @@ class NashvilleHot(Emu):
         scale_factors = f.attrs['scale_factors']
         redshift_bin_centers = 1.0 / scale_factors - 1  # emulator works in z, sims in a.
         if 'z' in fixed_params:
-            assert fixed_params['z'] in redshift_bin_centers
+            assert np.any(np.isclose(fixed_params['z'], redshift_bin_centers))
 
         scale_bins = f.attrs['scale_bins']
         scale_bin_centers = (scale_bins[1:] + scale_bins[:-1]) / 2.0 if scale_bins is not None else None
@@ -2070,14 +2076,24 @@ class NashvilleHot(Emu):
 
             nan_idxs = y_nans  # np.logical_or(y_nans ,ycov_nans )
             num_skipped = np.sum(nan_idxs)
+            for yy, ni in zip(y, nan_idxs): 
+                yy[ni] = np.nanmean(yy)
+            y_nans = np.isnan(yerr)
 
-            y[nan_idxs] = np.nanmean(y)
+            nan_idxs = y_nans  # np.logical_or(y_nans ,ycov_nans )
+            num_skipped = np.sum(nan_idxs)
+            for yy, ni in zip(yerr, nan_idxs): 
+                yy[ni] = np.nanmean(yy)
+
+            
             ycov_list = []
 
+            mean_mat = np.nanmean(_ycov, axis = 2)
             for i in xrange(_ycov.shape[-1]):
                 mat = _ycov[:, :, i]
-                idxs = nan_idxs[i * mat.shape[0]: (i + 1) * mat.shape[0]]
-                ycov_list.append(mat[~idxs, :][:, ~idxs])
+                if np.any(np.isnan(mat)):
+                    mat = mean_mat
+                ycov_list.append(mat)#[~idxs, :][:, ~idxs])
 
             ycov = ycov_list  # np.dstack(ycov_list)
 
@@ -2110,7 +2126,6 @@ class NashvilleHot(Emu):
         assert custom_mean_function is None, "Mean functions not supported for Nashville Hot"
 
         x1, x2, y, yerr, ycov = self.get_data(filename, self.fixed_params, attach_params=True)#, remove_nans=True)
-
         # store the data loading args, if we wanna reload later
         # useful ofr sampling the training data
 
@@ -2306,6 +2321,7 @@ class NashvilleHot(Emu):
             x1, x2 = self.downsample_x1, self.downsample_x2
             y = self.downsample_y
             yerr = self.downsample_yerr
+
         for _y,_yerr, _kern1, _kern2, nv in izip(y,yerr, kern1, kern2, noise_var):
             emulator = GPKroneckerGaussianRegressionVar(x1, x2, _y, _yerr**2, _kern1, _kern2, noise_var = nv)
             #emulator = GPKroneckerGaussianRegression(x1, x2, _y, _kern1, _kern2)
@@ -2318,17 +2334,15 @@ class NashvilleHot(Emu):
         super(NashvilleHot, self)._build_skl(hyperparams)
 
     def _get_default_kernel(self):
+        # TODO I should save these under the emu name, so different kernels don't overlap
+        f = h5py.File(self.filename, 'r')
+        if 'nh_kernel' in f.attrs: 
+           kernel_dict =f.attrs['nh_kernel']
+        else:
+            raise KeyError("No default saved for this observable!")
+        f.close()
 
-        # have to save somewhere else, since we'll be saving two.
-        with open(DEFAULT_METRIC_NH_PICKLE_FNAME, 'r') as f:
-            default_kernels = pickle.load(f)
-
-            if self.obs in default_kernels:
-               kernel_dicts = default_kernels[self.obs]
-            else:
-                raise KeyError("No default saved for this observable!")
-
-        return self._kernel_from_dict(kernel_dicts)
+        return self._kernel_from_dict(kernel_dict)
 
         # this has problems for xied binning schemees...
         # Don't know how to make this work with the new kernel schemes, or cosmology.
@@ -2360,6 +2374,9 @@ class NashvilleHot(Emu):
         # TODO not sure if here or somewhere else, but
         # would be nice to pass in a kernel type and have object figure out the ndim values.
         # would probably have to work off a keyword dict
+        if type(kernel_dict) is str:
+            kernel_dict = literal_eval(kernel_dict)
+
         if type(kernel_dict) is list:
             if type(kernel_dict[0]) in (tuple, list): # 2D
                 if len(kernel_dict[0]) == 2:
@@ -2369,26 +2386,24 @@ class NashvilleHot(Emu):
             return [Kern.from_dict(kd) for kd in kernel_dict]
         return Kern.from_dict(kernel_dict)
 
-    def _save_as_default_kernel(self):
-
-        if hasattr(self, "_kernels"):
-            kernel_dicts = [[_k[0].to_dict(), _k[1].to_dict(), _e.likelihood.variance[0]] for (_k, _e) in zip(self._kernels, self._emulators)]
+    def save_as_default_kernel(self):
+        # TODO how to clip of tye Yvar portion
+        if hasattr(self, '_kernel'):
+            kernel_dict = self._kernel.to_dict()
+        elif hasattr(self, '_kernels'):
+            if type(self._kernels[0]) in (tuple, list): #2D
+                if len(self._kernels[0]) == 2:
+                    kernel_dict = [[_k[0].to_dict(), _k[1].to_dict()] for _k in self._kernels]
+                else: #d
+                    kernel_dict = [[_k[0].to_dict(), _k[1].to_dict(), _k[2]] for _k in self._kernels]
+            else:
+                kernel_dict = [_k.to_dict() for _k in self._kernels]
         else:
             raise AssertionError("No emulator loaded, cannot save.")
 
-        if path.isfile(DEFAULT_METRIC_NH_PICKLE_FNAME):
-            with open(DEFAULT_METRIC_NH_PICKLE_FNAME) as f:
-                try:
-                    default_kernel_dict = pickle.load(f)
-                except:# EOFError, AttributeError: #blank file
-                    default_kernel_dict = {}
-        else:
-            default_kernel_dict = {} 
-
-        default_kernel_dict[self.obs] = kernel_dicts
-
-        with open(DEFAULT_METRIC_NH_PICKLE_FNAME, 'a') as f:
-            pickle.dump(default_kernel_dict, f)
+        f = h5py.File(self.filename)
+        f.attrs['nh_kernel'] = str(kernel_dict)
+        f.close()
 
     def _make_kernel(self, hyperparams):
         """
@@ -2600,7 +2615,10 @@ class NashvilleHot(Emu):
 
         for idx, emulator in enumerate(self._emulators):
             print idx, '*'*15
-            emulator.optimize_restarts(num_restarts = 5, verbose = True)
+            try:
+                emulator.optimize_restarts(parallel=True, num_restarts = 5, verbose = True)#, robust=True)
+            except:
+                emulator.optimize_restarts(parallel=True, num_restarts = 5, verbose = True, robust=True)
 
 
 # TODO
