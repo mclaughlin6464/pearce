@@ -474,12 +474,13 @@ class HeavisideAssembias(object):
 
             # type1_mask has now been computed for all possible branchings
             #################################################################################
-
+            print 'hi'
             perturbation = self._galprop_perturbation(
                     prim_haloprop=prim_haloprop[no_edge_mask],
                     baseline_result=no_edge_result,
                     splitting_result=no_edge_split)
-
+            print perturbation.shape
+            print np.mean(perturbation), np.max(perturbation), np.min(perturbation)
             frac_type1 = 1 - no_edge_split
             frac_type2 = 1 - frac_type1
             perturbation[~type1_mask] *= (-frac_type1[~type1_mask] /
