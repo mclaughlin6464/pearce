@@ -110,7 +110,6 @@ class Trainer(object):
 
         for idx, cat in enumerate(self.cats):
             _, vals = cat._get_cosmo_param_names_vals() 
-
             self._cosmo_param_vals[idx,:] = vals
 
         # In the future if there are more annoying params i'll turn this into a loop or something.
@@ -140,6 +139,7 @@ class Trainer(object):
         """
         # TODO possibly better error messaging
         self.hod = hod_cfg['model']  # string defining which model
+        print 'Self.hod', self.hod
         # TODO confirm is valid?
         del hod_cfg['model']
         # A little unnerved by the assymetry between this and cosmology
@@ -440,6 +440,7 @@ class Trainer(object):
                 scale_factor = self._scale_factors[scale_factor_idx]
 
                 #print self._scale_factors, scale_factor_idx, scale_factor
+                print self.hod, type(self.hod)
                 cat.load(scale_factor, HOD= self.hod, particles = self._particles,
                          downsample_factor=self._downsample_factor, hod_kwargs= self._hod_kwargs  )
 
@@ -619,6 +620,7 @@ class Trainer(object):
             # the odd shell call is to deal with minute differences in the systems.
             # TODO make this more general
             call(command, shell=self.system == 'sherlock')
+            break
 
 
 def make_kils_command(jobname, max_time, outputdir, queue= 'bulletmpi'):
