@@ -8,6 +8,7 @@ is a free parameter.  It subclasses `HeavisideAssembias` and extends its feature
 import numpy as np
 
 from halotools.empirical_models.assembias_models import HeavisideAssembias
+#from . import HeavisideAssembias
 from halotools.empirical_models import model_helpers
 from halotools.custom_exceptions import HalotoolsError
 from halotools.utils.array_utils import custom_len

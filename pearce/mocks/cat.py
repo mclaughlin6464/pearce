@@ -500,9 +500,7 @@ class Cat(object):
         else:
             a = scale_factor  # YOLO
         z = 1.0 / a - 1
-        print HOD
         if type(HOD) is str:
-            print 'HOD:', HOD
             assert HOD in VALID_HODS
             if HOD in  VALID_HODS-DEFAULT_HODS: # my custom ones
                 cens_occ = HOD_DICT[HOD][0](redshift=z, **hod_kwargs)

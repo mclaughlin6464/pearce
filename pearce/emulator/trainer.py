@@ -404,6 +404,16 @@ class Trainer(object):
             #print sendbuf[i]
         return sendbuf
 
+    def _check_params(cat):
+        cat_pnames = set(cat.model.param_dict.keys())
+        cfg_pnames = set(self._hod_param_names)
+        try:
+            assert len(cat_pnames - cfg_pnames)==1 #logMmin
+        except AssertionError:
+            print "Cat params", cat_pnames
+            print "Cfg params", cfg_pnames
+            raise AssertionError("Incorrect  parameters specified. Compare the outputs above to resovle the issue.")
+
     def compute_measurement(self, param_idxs, rank = None):
 
         param_idxs = param_idxs.astype(int)
@@ -440,10 +450,9 @@ class Trainer(object):
                 scale_factor = self._scale_factors[scale_factor_idx]
 
                 #print self._scale_factors, scale_factor_idx, scale_factor
-                print self.hod, type(self.hod)
                 cat.load(scale_factor, HOD= self.hod, particles = self._particles,
                          downsample_factor=self._downsample_factor, hod_kwargs= self._hod_kwargs  )
-
+                self._check_params(cat) 
                 calc_observable = self._get_calc_observable(cat)
 
             hod_params = dict(zip(self._hod_param_names, self._hod_param_vals[hod_idx, :]))
