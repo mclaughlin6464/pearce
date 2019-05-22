@@ -11,6 +11,7 @@ from scipy.optimize import minimize_scalar
 import h5py
 import yaml
 from pearce.mocks import cat_dict
+from AbundanceMatching import *
 
 # I don't know if I need an object for this a la trainer
 # for now, make a main function, until there is clear need to do otherwise
@@ -141,43 +142,37 @@ def _compute_data(cfg):
 
     cat = cat_dict[sim_cfg['simname']](**sim_cfg['sim_hps'])  # construct the specified catalog!
 
+    # TODO logspace
+    r_bins = obs_cfg['rbins']
+
+    obs = obs_cfg['obs']
+
+    if type(obs) is str:
+        obs = [obs]
+
+    meas_cov_fname = cov_cfg['meas_cov_fname']
+    emu_cov_fname = cov_cfg['emu_cov_fname']
+    if type(emu_cov_fname) is str:
+        emu_cov_fname = [emu_cov_fname]
+
+    assert len(obs) == len(emu_cov_fname), "Emu cov not same length as obs!"
+
+    n_bins = len(r_bins)-1
+    data = np.zeros((len(obs)*n_bins))
+    assert path.isfile(meas_cov_fname), "Invalid meas cov file specified"
+    try:
+        cov = np.loadtxt(meas_cov_fname)
+    except ValueError:
+        cov = np.load(meas_cov_fname)
+
+    assert cov.shape == (len(obs)*n_bins, len(obs)*n_bins), "Invalid meas cov shape."
+
     # TODO add shams
     if sim_cfg['gal_type'] == 'HOD':
         cat.load(sim_cfg['scale_factor'], HOD=sim_cfg['hod_name'], **sim_cfg['sim_hps'])
 
         em_params = sim_cfg['hod_params']
         add_logMmin(em_params, cat, float(sim_cfg['nd']))
-
-        # TODO logspace
-        r_bins = obs_cfg['rbins']
-
-        obs = obs_cfg['obs']
-
-        if type(obs) is str:
-            obs = [obs]
-
-        meas_cov_fname = cov_cfg['meas_cov_fname']
-        emu_cov_fname = cov_cfg['emu_cov_fname']
-        if type(emu_cov_fname) is str:
-            emu_cov_fname = [emu_cov_fname]
-
-        assert len(obs) == len(emu_cov_fname), "Emu cov not same length as obs!"
-
-        n_bins = len(r_bins)-1
-        data = np.zeros((len(obs)*n_bins))
-
-        #TODO could add features to make this block diagonal
-        # iterating over multiple
-
-        assert path.isfile(meas_cov_fname), "Invalid meas cov file specified"
-        try:
-            cov = np.loadtxt(meas_cov_fname)
-        except ValueError:
-            cov = np.load(meas_cov_fname)
-
-        assert cov.shape == (len(obs)*n_bins, len(obs)*n_bins), "Invalid meas cov shape."
-
-        #cov = np.zeros((len(obs)*n_bins, len(obs)*n_bins))
 
         for idx, (o, ecf) in enumerate(zip(obs, emu_cov_fname)):
             # TODO need some check that a valid configuration is specified
@@ -222,6 +217,48 @@ def _compute_data(cfg):
 
             cov[idx*n_bins:(idx+1)*n_bins, idx*n_bins:(idx+1)*n_bins] += \
                                             shot_cov+emu_cov
+
+    elif sim_cfg['gal_type']== 'SHAM':
+        cat.load(sim_cfg['scale_factor'], **sim_cfg['sim_hps'])
+        cat.populate()# will generate a mock for us to overwrite
+        gal_property = np.loadtxt(sim_cfg['gal_property_fname'])
+        halo_property_name = sim_cfg['halo_property']
+        nd = float(sim_cfg['nd'])
+        scatter = float(sim_cfg['scatter'])
+
+        af =  AbundanceFunction(gal_property[:,0], gal_property[:,1], sim_cfg['af_hyps'])
+        remainder = af.deconvolute(scatter, 20)
+        nd_halos = calc_number_densities(cat.halocat.halo_table[halo_property_name], cat.Lbox) #don't think this matters which one i choose here
+        catalog_w_nan = af.match(nd_halos, scatter)
+        n_obj_needed = int(nd*(cat.Lbox**3))
+        catalog = cat.halocat.halo_table[~np.isnan(catalog_w_nan)]
+        sort_idxs = np.argsort(catalog)
+        if 'reverse' in sim_cfg and sim_cfg['reverse']: #SMF
+            final_catalog = catalog[sort_idxs[-n_obj_needed:]]
+        else: #Lum Func
+            final_catalog = catalog[sort_idxs[:n_obj_needed]]
+
+        final_catalog['x'] = final_catalog['halo_x']
+        final_catalog['y'] = final_catalog['halo_y']
+        final_catalog['z'] = final_catalog['halo_z']
+        # FYI cursed.
+        cat.model.mock.galaxy_table = final_catalog
+        # TODO save sham hod "truth"
+
+        for idx, (o, ecf) in enumerate(zip(obs, emu_cov_fname)):
+
+            calc_observable = getattr(cat, 'calc_%s' % o)
+
+            y = calc_observable(r_bins)
+            data[idx*n_bins:(idx+1)*n_bins] = y
+
+            assert path.isfile(ecf), "Invalid emu covariance specified."
+            try:
+                emu_cov = np.loadtxt(ecf)
+            except ValueError:
+                emu_cov = np.load(ecf)
+
+            cov[idx*n_bins:(idx+1)*n_bins, idx*n_bins:(idx+1)*n_bins] += emu_cov
 
     else:
         raise NotImplementedError("Non-HOD caclulation not supported")

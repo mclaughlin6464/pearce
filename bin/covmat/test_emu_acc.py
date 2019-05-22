@@ -3,18 +3,21 @@ from GPy.kern import *
 import numpy as np
 from os import path
 
-training_file = '/home/users/swmclau2/scratch/xi_gg_zheng07_cosmo_v3/PearceXiggCosmo.hdf5'
-test_file = '/home/users/swmclau2/scratch/xi_gg_zheng07_cosmo_test_v3/PearceXiggCosmoTest.hdf5'
+#training_file = '/home/users/swmclau2/scratch/xi_gg_zheng07_cosmo_v3/PearceXiggCosmo.hdf5'
+#test_file = '/home/users/swmclau2/scratch/xi_gg_zheng07_cosmo_test_v3/PearceXiggCosmoTest.hdf5'
+
+training_file = '/home/users/swmclau2/scratch/xi_gg_fastpm/PearceXiggFastPM.hdf5'
 
 em_method = 'gp'
-fixed_params = {'z':0.0}
-#hyperparams = {'kernel': (Matern32(input_dim=7, ARD=True) + RBF(input_dim=7, ARD=True)+Bias(input_dim=7),
-#                           Matern32(input_dim=4, ARD=True) + RBF(input_dim=4, ARD=True)+Bias(input_dim=4) ), \
-#               'optimize': True}
-hyperparams = {}
+fixed_params = {'z': 0.5503876}
+hyperparams = {'kernel': (Matern32(input_dim=8, ARD=True) + RBF(input_dim=8, ARD=True)+Bias(input_dim=8),
+                           Matern32(input_dim=4, ARD=True) + RBF(input_dim=4, ARD=True)+Bias(input_dim=4) ), \
+               'optimize': True}
 
 emu = NashvilleHot(training_file, hyperparams=hyperparams,fixed_params = fixed_params, downsample_factor = 1.0)
-#emu._save_as_default_kernel()
+emu._save_as_default_kernel()
+from sys import exit
+exit(0)
 for idx, (k1, k2) in enumerate(emu._kernels):
     print idx, "*"*20
     print k1

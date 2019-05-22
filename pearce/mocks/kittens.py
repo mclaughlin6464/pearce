@@ -344,8 +344,12 @@ class MDHR(Cat):
             if key in new_kwargs:
                 del new_kwargs[key]
 
+        if system == 'sherlock':
+            cache_loc = '/scratch/users/swmclau2/halocats/'
+        else:
+            cache_loc = '/u/ki/swmclau2/des/halocats/'
         super(MDHR, self).__init__(simname, loc=loc, columns_to_keep=columns_to_keep, Lbox=Lbox,
-                                   pmass=pmass ** new_kwargs)
+                                   pmass=pmass, cache_loc = cache_loc, **new_kwargs)
 
 
 class TrainingBox(Cat):

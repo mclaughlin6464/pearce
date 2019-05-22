@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=test_emu_acc
 #SBATCH -p iric 
-#SBATCH --time=01:00:00
+#SBATCH --time=04:00:00
 #SBATCH -o test_emu_acc.out 
 ####SBATCH --exclusive
 #SBATCH --cpus-per-task=8

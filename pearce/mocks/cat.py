@@ -256,7 +256,7 @@ class Cat(object):
             Tolerance within which "near" is defined. Default is 0.05
         :return: If a nearest scale factor is found, returns it. Else, returns None.
         '''
-        assert 0 < a <= 1  # assert a valid scale factor
+        assert 0 < a <= 1.1  # assert a valid scale factor
         if a in self.scale_factors:  # try for an exact match.
             return a
         idx = np.argmin(np.abs(np.array(self.scale_factors) - a))
