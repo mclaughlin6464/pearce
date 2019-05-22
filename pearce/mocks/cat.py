@@ -433,6 +433,7 @@ class Cat(object):
             HOD model to load. Currently available options are redMagic, stepFunc, and the halotools defatuls.
         :return: None
         '''
+        assert 'model' not in kwargs, 'model has been depreceated, use HOD'
         a = self._return_nearest_sf(scale_factor, tol)
         if a is None:
             raise ValueError('Scale factor %.3f not within given tolerance.' % scale_factor)
@@ -499,7 +500,9 @@ class Cat(object):
         else:
             a = scale_factor  # YOLO
         z = 1.0 / a - 1
+        print HOD
         if type(HOD) is str:
+            print 'HOD:', HOD
             assert HOD in VALID_HODS
             if HOD in  VALID_HODS-DEFAULT_HODS: # my custom ones
                 cens_occ = HOD_DICT[HOD][0](redshift=z, **hod_kwargs)
@@ -517,7 +520,7 @@ class Cat(object):
                     satellites_profile=NFWPhaseSpace(redshift=z))
 
             else:
-                self.model = PrebuiltHodModelFactory(HOD, **hod_kwargs)
+                self.model = PrebuiltHodModelFactory(HOD,redshift=z, **hod_kwargs)
         else:
             cens_occ = HOD_DICT[HOD][0](redshift=z, **hod_kwargs)
             # NOTE don't know if should always modulate, but I always do.

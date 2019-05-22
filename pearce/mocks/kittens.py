@@ -11,6 +11,7 @@ from itertools import izip
 from os import path
 import numpy as np
 from astropy import cosmology
+from astropy import units as u
 import pandas as pd
 import h5py 
 from ast import literal_eval
@@ -390,7 +391,9 @@ class TrainingBox(Cat):
 
         self.prim_haloprop_key = 'halo_m200b'
         #locations = {'ki-ls': ['/u/ki/swmclau2/des/testbox_findparents/']}
-        locations = {'ki-ls': ['/nfs/slac/g/ki/ki22/cosmo/beckermr/tinkers_emu/Box0%02d/',
+        locations = {#'ki-ls': ['/u/ki/swmclau2/des/NewAemulusBoxes/Box0%02d/',
+                     #           '/u/ki/swmclau2/des/NewAemulusBoxes/Box0%02d/'],
+                     'ki-ls': ['/nfs/slac/g/ki/ki22/cosmo/beckermr/tinkers_emu/Box0%02d/',
                                '/nfs/slac/g/ki/ki23/des/beckermr/tinkers_emu/Box0%02d/'],
                      'sherlock': ['/home/users/swmclau2/scratch/NewTrainingBoxes/Box0%02d/',
                                   '/home/users/swmclau2/scratch/NewTrainingBoxes/Box0%02d/']}
@@ -600,7 +603,10 @@ class FastPM(Cat):
 
         version_name = 'most_recent_%02d'%boxno
 
-        super(FastPM, self).__init__(simname=simname,Lbox=Lbox,pmass=pmass,
+        if 'simname' in kwargs:
+            del kwargs['simname']
+
+        super(FastPM, self).__init__(simname=simname,Lbox=Lbox,pmass=pmass,halo_finder='FOF',
                                      version_name=version_name, cosmo=cosmo, **kwargs)
 
         cache_locs = {'ki-ls': '/u/ki/swmclau2/des/halocats/hlist_%.2f.list.%s_%03d.hdf5',
@@ -618,9 +624,14 @@ class FastPM(Cat):
                                          Neff=params['Neff'], Ob0=params['Omega_b'], w0 = params['w'])
 
     def _get_cosmo_param_names_vals(self):
-        names = list(self.cosmo_params.values)
+        names = list(self.cosmo_params)#.values)
         vals = np.array(list(self.cosmo_params.iloc[self.boxno].values))
         return names, vals
+
+    def _rvir_from_mvir(self, halo_mvir, z):
+        rho_c = self.cosmology.critical_density(z)
+        halo_mvir = halo_mvir*u.solMass
+        return np.cbrt(halo_mvir*3/(4*np.pi*200*rho_c)).to('Mpc').value/self.h
 
     def cache(self, scale_factors = 'all', overwrite=False, **kwargs):
 
@@ -630,29 +641,33 @@ class FastPM(Cat):
 
         f = h5py.File(self.fname, 'r')
         grp = f['Box_%03d'%self.boxno]
-
-        for z_key, cache_fnames in izip(grp.keys(), self.cache_filenames):
-            z = float(z_key.split('=')[1])
-            a = 1.0/(1+z)
+        for a, cache_fnames in izip(self.scale_factors, self.cache_filenames):
             if scale_factors != 'all' and a not in scale_factors:
                 continue
-
+            z = 1./a -1.0
+            z_key = 'z=%0.3f'%z
             data = grp[z_key]['halos'].value
             # assuming halo_columns
             # TODO do this better
-            halo_id = data[:, 0]
+            # problem with the ids, not uinique? don't understand.
+            halo_id = np.array(range(len(data)))#data[:, 0]
+            halo_upid = np.ones_like(halo_id)*-1
             halo_mass = data[:, 1]
+            halo_rvir = self._rvir_from_mvir(halo_mass, z)
+            halo_nfw_conc = np.ones_like(halo_mass)
             halo_x, halo_y, halo_z = data[:, 2], data[:, 3], data[:, 4]
-
+            halo_vx= halo_vy= halo_vz = np.zeros_like(halo_x)
             for halo_pos in [halo_x, halo_y, halo_z]:
                 halo_pos[halo_pos<0] = self.Lbox - halo_pos[halo_pos<0]
                 halo_pos[halo_pos>self.Lbox] = halo_pos[halo_pos>self.Lbox] - self.Lbox
 
             halocat = UserSuppliedHaloCatalog(redshift=z, Lbox=self.Lbox, particle_mass=self.pmass,
-                                              halo_id=halo_id, halo_mass=halo_mass,
-                                              halo_x=halo_x, halo_y=halo_y, halo_z=halo_z)
+                                              halo_id=halo_id,halo_upid=halo_upid, halo_mvir=halo_mass,halo_nfw_conc=halo_nfw_conc,
+                                              halo_rvir=halo_rvir,
+                                              halo_x=halo_x, halo_y=halo_y, halo_z=halo_z,
+                                              halo_vx=halo_vx, halo_vy=halo_vy, halo_vz=halo_vz)
 
-            halocat.add_halocat_to_cache(fname=cache_fnames,
+            halocat.add_halocat_to_cache(fname=cache_fnames, processing_notes = "FastPM with FOF halos",
                                          simname=self.simname, halo_finder='FOF',
                                          version_name=self.version_name, overwrite=overwrite)
 
