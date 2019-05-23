@@ -559,9 +559,9 @@ class Cat(object):
             assert self.halocat is not None
         except AssertionError:
             raise AssertionError("Please load a halocat before calling calc_mf.")
-        if hasattr(self, '_last_halocat_id'):
-            if self._last_halocat_id == id(self.halocat):
-                return self._last_mf
+        #if hasattr(self, '_last_halocat_id'):
+        #    if self._last_halocat_id == id(self.halocat):
+        #        return self._last_mf
         masses = self.halocat.halo_table[self.halocat.halo_table['halo_upid'] == -1]['halo_mvir']
         masses = masses[masses > min_ptcl * self.pmass]
 
@@ -569,8 +569,8 @@ class Cat(object):
                                 int((mass_bin_range[1] - mass_bin_range[0]) / mass_bin_size) + 1)
 
         mf = np.histogram(masses, mass_bins)[0]
-        self._last_mf = mf
-        self._last_halocat_id = id(self.halocat)
+        #self._last_mf = mf
+        #self._last_halocat_id = id(self.halocat)
 
         return mf
 
@@ -621,14 +621,14 @@ class Cat(object):
 
         return cen_hod + sat_hod
 
-    def calc_analytic_nd(self, params={}):
+    def calc_analytic_nd(self, params={}, min_ptcl = 200):
         """
         Calculate the number density from the HOD and Mass function, rather than recovering from a populatedd catalog.
         :param params:
             HOD parameters. Only those that are changed from the original are required; the rest will remain the default.
         :return: nd, a float that represents the analytic number density
         """
-        mf = self.calc_mf()
+        mf = self.calc_mf(min_ptcl=min_ptcl)
         hod = self.calc_hod(params)
         return np.sum(mf * hod) / ((self.Lbox) ** 3)  # /self.h)**3)
 

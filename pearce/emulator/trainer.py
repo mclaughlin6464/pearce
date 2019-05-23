@@ -354,7 +354,7 @@ class Trainer(object):
         #cat.populate(hod_params) #may be overkill, but will ensure params are written everywhere
         def func(logMmin, hod_params):
             hod_params.update({'logMmin':logMmin}) 
-            return (cat.calc_analytic_nd(hod_params) - self._fixed_nd)**2
+            return (cat.calc_analytic_nd(hod_params, min_ptcl=self._min_ptcl) - self._fixed_nd)**2
 
         res = minimize_scalar(func, bounds = self._logMmin_bounds, args = (hod_params,), options = {'maxiter':100}, method = 'Bounded')
 
@@ -404,7 +404,7 @@ class Trainer(object):
             #print sendbuf[i]
         return sendbuf
 
-    def _check_params(cat):
+    def _check_params(self, cat):
         cat_pnames = set(cat.model.param_dict.keys())
         cfg_pnames = set(self._hod_param_names)
         try:
@@ -457,6 +457,7 @@ class Trainer(object):
 
             hod_params = dict(zip(self._hod_param_names, self._hod_param_vals[hod_idx, :]))
             if self._fixed_nd is not None:
+            # TODO this does not respect min_ptcl
                 self._add_logMmin(hod_params, cat)
             #continue
             if self.pop_seed is None:
@@ -629,7 +630,6 @@ class Trainer(object):
             # the odd shell call is to deal with minute differences in the systems.
             # TODO make this more general
             call(command, shell=self.system == 'sherlock')
-            break
 
 
 def make_kils_command(jobname, max_time, outputdir, queue= 'bulletmpi'):

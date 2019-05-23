@@ -228,10 +228,10 @@ def _compute_data(cfg):
 
         af =  AbundanceFunction(gal_property[:,0], gal_property[:,1], sim_cfg['af_hyps'])
         remainder = af.deconvolute(scatter, 20)
-        nd_halos = calc_number_densities(cat.halocat.halo_table[halo_property_name], cat.Lbox) #don't think this matters which one i choose here
+        nd_halos = calc_number_densities(cat.model.mock.halo_table[halo_property_name], cat.Lbox) #don't think this matters which one i choose here
         catalog_w_nan = af.match(nd_halos, scatter)
         n_obj_needed = int(nd*(cat.Lbox**3))
-        catalog = cat.halocat.halo_table[~np.isnan(catalog_w_nan)]
+        catalog = cat.model.mock.halo_table[~np.isnan(catalog_w_nan)]
         sort_idxs = np.argsort(catalog)
         if 'reverse' in sim_cfg and sim_cfg['reverse']: #SMF
             final_catalog = catalog[sort_idxs[-n_obj_needed:]]
