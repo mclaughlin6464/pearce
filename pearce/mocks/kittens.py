@@ -7,7 +7,7 @@ Each takes two kwargs: "filenames" and "scale_factors", both lists which allow t
 which particular files are cached/loaded/etc. '''
 
 from glob import glob
-from itertools import izip
+from itertools import izip, product
 from os import path
 import numpy as np
 from astropy import cosmology
@@ -599,7 +599,7 @@ class FastPM(Cat):
         f.close()
         cosmo = self._get_cosmo()
 
-        tmp_scale_factors = [ 0.645, 1.0]
+        tmp_scale_factors = [ 0.645161, 1.0]
         tmp_fnames = ['tmpA','tmpB']
 
         self._update_lists(kwargs, tmp_fnames, tmp_scale_factors)
@@ -681,6 +681,131 @@ class FastPM(Cat):
     def cache_particles(self, particles, scale_factor, downsample_factor):
         raise NotImplementedError
 
+class DarkSky(Cat):
+    def __init__(self, boxno, system = 'sherlock', **kwargs):
+        allowed_boxnos = set([''.join(j) for j in product(''.join([str(i) for i in xrange(8)]), repeat = 3)])
+        assert int(boxno) == boxno
+        assert str(boxno) in allowed_boxnos
+        self.boxno = int(boxno)
+
+        simname = 'ds14'
+        colums_to_keep = {'halo_id': (6, 'i8'),'halo_upid':(7, 'i8'), 'halo_mvir': (3, 'f4'),
+                          'halo_x': (0, 'f4'), 'halo_y': (1, 'f4'), 'halo_z': (2, 'f4'),
+                          'halo_vmax': (5, 'f4'), 'halo_rvir':(4, 'f4')}
+        Lbox = 1000.0
+        #self.npart = 1024  # can generalize these from the file
+
+        if system == 'sherlock':
+            # TODO update
+            fname = '/scratch/users/swmclau2/Darksky/ds14_a_halos_1.0000.hdf5'
+        else:  # ki-ls, etc
+            raise NotImplementedError("File not on ki-ls")
+        self.fname = fname
+
+        pmass = 5.6749434e10 #Msun  (/h?)
+
+        self.cosmo_params = {'Omega0_m' : 0.295037918703847,
+                             'Omega0_cdm' : 0.2482735987535057,
+                            'Omega0_b' : 0.04676431995034128,
+                            'w0' : -1,
+                            'h' : 0.07036893781978598}
+
+        cosmo = self._get_cosmo()
+
+        tmp_scale_factors = [1.0]
+        tmp_fnames = ['tmpA']
+
+        self._update_lists(kwargs, tmp_fnames, tmp_scale_factors)
+        self.prim_haloprop_key = 'halo_mvir'
+
+        version_name = 'most_recent_%02d' % boxno
+
+        if 'simname' in kwargs:
+            del kwargs['simname']
+
+        super(DarkSky, self).__init__(simname=simname, Lbox=Lbox, pmass=pmass,colums_to_keep=colums_to_keep, halo_finder='rockstar',
+                                     version_name=version_name, cosmo=cosmo, **kwargs)
+
+        cache_locs = {'sherlock': '/scratch/users/swmclau2/halocats/hlist_%.2f.list.%s_%03d.hdf5'}
+        self.cache_loc = path.dirname(cache_locs[system])  # %(a, self.simname, boxno)
+        self.cache_filenames = [cache_locs[system] % (a, self.simname, boxno)
+                                for a in self.scale_factors]  # make sure we don't have redunancies.
+
+    def _get_cosmo(self):
+        return cosmology.core.FlatLambdaCDM(H0=self.cosmo_params['h'] * 100, Om0=self.cosmo_params['Omega0_m'], \
+                                       Ob0=self.cosmo_params['Omega0_b'])#, w0=params['w'])
+
+    def cache(self, scale_factors = 'all', overwrite=False, **kwargs):
+
+        # TODO particles
+        for bad_kwarg in ['add_local_density', 'add_particles', 'downsample_factor']:
+            if bad_kwarg in kwargs:
+                raise NotImplementedError("Particles not allowed with Darksky")
+
+        f = h5py.File(self.fname, 'r')
+        dset = f['halos']['subbox_%03d'%self.boxno]
+        for a, cache_fnames in izip(self.scale_factors, self.cache_filenames):
+            if scale_factors != 'all' and a not in scale_factors:
+                continue
+            z = 1./a -1.0
+            data = dset.value
+            # assuming halo_columns
+            # TODO do this better
+            # problem with the ids, not uinique? don't understand.
+            halo_id = data[:,self.columns_to_keep['halo_id'][0]]
+            halo_upid = data[:,self.columns_to_keep['halo_upid'][0]]
+            halo_mass = data[:,self.columns_to_keep['halo_mvir'][0]]
+            halo_rvir = data[:, self.columns_to_keep['halo_rvir'][0]]
+            halo_vmax = data[:,self.columns_to_keep['halo_vmax'][0]]
+            halo_x, halo_y, halo_z = data[:, :3]%self.Lbox
+
+            halocat = UserSuppliedHaloCatalog(redshift=z, Lbox=self.Lbox, particle_mass=self.pmass,
+                                              halo_id=halo_id,halo_upid=halo_upid, halo_mvir=halo_mass,
+                                              halo_rvir=halo_rvir, halo_vmax = halo_vmax,
+                                              halo_x=halo_x, halo_y=halo_y, halo_z=halo_z)
+
+            halocat.add_halocat_to_cache(fname=cache_fnames, processing_notes = "DS14a subbox",
+                                         simname=self.simname, halo_finder='rockstar',
+                                         version_name=self.version_name, overwrite=overwrite)
+        f.close()
+
+    def load_catalog_no_cache(self, scale_factor, tol=0.05, check_sf=True):
+            '''
+            Load a catalog without caching. I *think* thins will work...
+            :param a:
+                The scale factor of the catalog of interest
+            :param check_sf:
+                Boolean whether or not to use the passed in scale_factor blindly. Default is false.
+            :return: None
+            '''
+            if check_sf:
+                a = self._return_nearest_sf(scale_factor, tol)
+                if a is None:
+                    raise ValueError('Scale factor %.3f not within given tolerance.' % scale_factor)
+            else:
+                a = scale_factor  # YOLO
+            z = 1.0 / a - 1
+            f = h5py.File(self.fname, 'r')
+            dset = f['halos']['subbox_%03d'%self.boxno]
+            # only one sf so skipping some of this
+            # this copies a lot from cache, could make this one function...
+            data = dset.value
+            halo_id = data[:,self.columns_to_keep['halo_id'][0]]
+            halo_upid = data[:,self.columns_to_keep['halo_upid'][0]]
+            halo_mass = data[:,self.columns_to_keep['halo_mvir'][0]]
+            halo_rvir = data[:, self.columns_to_keep['halo_rvir'][0]]
+            halo_vmax = data[:,self.columns_to_keep['halo_vmax'][0]]
+            halo_x, halo_y, halo_z = data[:, :3]%self.Lbox
+
+            self.halocat = UserSuppliedHaloCatalog(redshift=z, Lbox=self.Lbox, particle_mass=self.pmass,
+                                              halo_id=halo_id,halo_upid=halo_upid, halo_mvir=halo_mass,
+                                              halo_rvir=halo_rvir, halo_vmax = halo_vmax,
+                                              halo_x=halo_x, halo_y=halo_y, halo_z=halo_z)
+
+            # refelct the current catalog
+            self.z = z
+            self.a = a
+            self.populated_once = False  # no way this one's been populated!
 
 class ResolutionTestBox(Cat):
 

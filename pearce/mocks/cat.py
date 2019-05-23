@@ -16,6 +16,7 @@ from multiprocessing import Pool
 import numpy as np
 from scipy.integrate import quad
 from scipy.linalg import block_diag
+from scipy.optimize import minimize_scalar
 
 from astropy import cosmology
 from astropy import constants as const, units as units
@@ -575,6 +576,29 @@ class Cat(object):
         return mf
 
     # TODO same concerns as above
+
+    def _add_logMmin(self, nd):
+        """
+        In the fixed number density case, find the logMmin value that will match the nd given hod_params
+        :param: hod_params:
+            The other parameters besides logMmin
+        :param cat:
+            the catalog in question
+        :return:
+            None. hod_params will have logMmin added to it.
+        """
+        # cat.populate(hod_params) #may be overkill, but will ensure params are written everywhere
+        hod_params = self.model.param_dict.copy()
+        def func(logMmin, hod_params):
+            hod_params.update({'logMmin': logMmin})
+            return (self.calc_analytic_nd(hod_params) - nd) ** 2
+
+        res = minimize_scalar(func, bounds=self._logMmin_bounds, args=(hod_params,), options={'maxiter': 100},
+                              method='Bounded')
+
+        # assuming this doens't fail
+        #print 'logMmin', res.x
+        self.model.param_dict['logMmin'] = res.x
 
     def calc_hod(self, params={}, mass_bin_range=(9, 16), mass_bin_size=0.01, component='all'):
         """
