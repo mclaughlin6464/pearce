@@ -13,6 +13,7 @@ from halotools.empirical_models.assembias_models import HeavisideAssembias
 from halotools.custom_exceptions import HalotoolsError
 from halotools.utils.array_utils import custom_len
 from .table_utils import compute_conditional_percentiles, compute_conditional_decorator
+#from .noisy_percentile import noisy_percentile
 from halotools.empirical_models.abunmatch.noisy_percentile import noisy_percentile
 
 __all__ = ('CorrelationAssembias',)
@@ -39,8 +40,7 @@ def compute_conditional_shuffled_ranks(indices_of_prim_haloprop_bin, sec_halopro
     num_in_bin = len(indices_of_prim_haloprop_bin)
     original_ranks = rankdata(sec_haloprop[indices_of_prim_haloprop_bin], 'ordinal') - 0.5
     original_ranks /= num_in_bin
-
-    return noisy_percentile(original_ranks, correlation_coeff=correlation_coeff)
+    return noisy_percentile(original_ranks, correlation_coeff=correlation_coeff[indices_of_prim_haloprop_bin])
 
 
 class CorrelationAssembias(HeavisideAssembias):
@@ -170,12 +170,14 @@ class CorrelationAssembias(HeavisideAssembias):
 
             #  NOTE I've removed the type 1 mask as it is not well-defined in this implementation
             strength = self.assembias_strength(prim_haloprop[no_edge_mask])
-
             shuffled_ranks = compute_conditional_shuffled_ranks(prim_haloprop = prim_haloprop[no_edge_mask], sec_haloprop=sec_haloprop[no_edge_mask], correlation_coeff=strength)
 
             dist = bernoulli if baseline_upper_bound == 1 else poisson 
+            shuffled_ranks[strength>0] = 1 - shuffled_ranks[strength>0]
+            no_edge_result = dist.isf(shuffled_ranks, no_edge_result)
 
-            return dist.isf(1-shuffled_ranks, mu=result)
+            result[no_edge_mask] = no_edge_result
+            return result
 
         return wrapper
 

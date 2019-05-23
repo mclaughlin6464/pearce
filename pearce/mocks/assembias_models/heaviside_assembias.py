@@ -429,6 +429,7 @@ class HeavisideAssembias(object):
                 (split > 0) & (split < 1) &
                 (result > baseline_lower_bound) & (result < baseline_upper_bound)
                 )
+
             # Now create convenient references to the non-edge-case sub-arrays
             no_edge_result = result[no_edge_mask]
             no_edge_split = split[no_edge_mask]

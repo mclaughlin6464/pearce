@@ -7,8 +7,8 @@ is a free parameter.  It subclasses `HeavisideAssembias` and extends its feature
 
 import numpy as np
 
-from halotools.empirical_models.assembias_models import HeavisideAssembias
-#from . import HeavisideAssembias
+#from halotools.empirical_models.assembias_models import HeavisideAssembias
+from . import HeavisideAssembias
 from halotools.empirical_models import model_helpers
 from halotools.custom_exceptions import HalotoolsError
 from halotools.utils.array_utils import custom_len
@@ -79,7 +79,6 @@ class FreeSplitAssembias(HeavisideAssembias):
         split : float
             Fraction of ``type2`` halos at the input primary halo property.
         """
-
         #retrieve ordinates from our dictionary
         split_ordinates = np.array([self.param_dict[self._get_free_split_assembias_param_dict_key(ipar)]
                            for ipar in xrange(len(self._split_abscissa))])
@@ -94,5 +93,5 @@ class FreeSplitAssembias(HeavisideAssembias):
             result = spline_function(prim_haloprop)
 
         result[result<0] = 0
-        result[result>0] = 1
+        result[result>1] = 1
         return result
