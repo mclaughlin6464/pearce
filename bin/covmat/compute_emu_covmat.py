@@ -17,7 +17,7 @@ hyperparams = {'kernel': (Matern32(input_dim=7, ARD=True) + RBF(input_dim=7, ARD
                'optimize': True}
 
 emu = NashvilleHot(training_file, hyperparams=hyperparams,fixed_params = fixed_params, downsample_factor = 1.0)
-emu._save_as_default_kernel()
+emu.save_as_default_kernel()
 
 #pred_y, data_y = emu.goodness_of_fit(test_file, statistic = None)
 #R = (10**pred_y - 10**data_y)

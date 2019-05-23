@@ -577,7 +577,7 @@ class Cat(object):
 
     # TODO same concerns as above
 
-    def _add_logMmin(self, nd):
+    def _add_logMmin(self, nd, min_ptcl=200):
         """
         In the fixed number density case, find the logMmin value that will match the nd given hod_params
         :param: hod_params:
@@ -588,12 +588,13 @@ class Cat(object):
             None. hod_params will have logMmin added to it.
         """
         # cat.populate(hod_params) #may be overkill, but will ensure params are written everywhere
+        logMmin_bounds = (12.0, 15.0)
         hod_params = self.model.param_dict.copy()
         def func(logMmin, hod_params):
             hod_params.update({'logMmin': logMmin})
-            return (self.calc_analytic_nd(hod_params) - nd) ** 2
+            return (self.calc_analytic_nd(hod_params, min_ptcl = min_ptcl) - nd) ** 2
 
-        res = minimize_scalar(func, bounds=self._logMmin_bounds, args=(hod_params,), options={'maxiter': 100},
+        res = minimize_scalar(func, bounds=logMmin_bounds, args=(hod_params,), options={'maxiter': 100},
                               method='Bounded')
 
         # assuming this doens't fail

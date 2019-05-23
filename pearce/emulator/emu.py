@@ -1233,7 +1233,7 @@ class OriginalRecipe(Emu):
         # TODO kernel based methods may want to use this...
         # TODO may wanna make some of these hyperparams
         assert self.method == 'gp'
-        self._emulator.optimize_restarts(num_restarts = 5, verbose = False)
+        self._emulator.optimize_restarts(num_restarts = 3, verbose = False)
 
 
 def get_leaves(kdtree):
@@ -1554,7 +1554,7 @@ class ExtraCrispy(Emu):
 
         # TODO should pmap this
         for emulator in self._emulators:
-            emulator.optimize_restarts(num_restarts = 5, verbose = False)
+            emulator.optimize_restarts(num_restarts = 3, verbose = False)
 
 
 class SpicyBuffalo(Emu):
@@ -1915,7 +1915,7 @@ class SpicyBuffalo(Emu):
         assert self.method == 'gp'
 
         for emulator in self._emulators:
-            emulator.optimize_restarts(num_restarts = 5, verbose = False)
+            emulator.optimize_restarts(num_restarts = 3, verbose = False)
 
 class NashvilleHot(Emu):
 
@@ -2616,9 +2616,10 @@ class NashvilleHot(Emu):
         for idx, emulator in enumerate(self._emulators):
             print idx, '*'*15
             try:
-                emulator.optimize_restarts(parallel=True, num_restarts = 5, verbose = True)#, robust=True)
+                emulator.optimize_restarts(parallel=False, num_restarts = 3, verbose = True)#, robust=True)
             except:
-                emulator.optimize_restarts(parallel=True, num_restarts = 5, verbose = True, robust=True)
+                emulator.optimize_restarts(parallel=False, num_restarts = 3, verbose = True, robust=True)
+            sys.stdout.flush()
 
 
 # TODO
