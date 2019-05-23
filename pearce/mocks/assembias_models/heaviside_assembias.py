@@ -474,7 +474,6 @@ class HeavisideAssembias(object):
 
             # type1_mask has now been computed for all possible branchings
             #################################################################################
-
             perturbation = self._galprop_perturbation(
                     prim_haloprop=prim_haloprop[no_edge_mask],
                     baseline_result=no_edge_result,
