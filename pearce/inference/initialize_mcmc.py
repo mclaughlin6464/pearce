@@ -223,20 +223,19 @@ def _compute_data(cfg):
         cat.populate()# will generate a mock for us to overwrite
         gal_property = np.loadtxt(sim_cfg['gal_property_fname'])
         halo_property_name = sim_cfg['halo_property']
+        min_ptcl = sim_cfg.get('min_ptcl', 200)
         nd = float(sim_cfg['nd'])
         scatter = float(sim_cfg['scatter'])
 
-        af =  AbundanceFunction(gal_property[:,0], gal_property[:,1], sim_cfg['af_hyps'])
+        af =  AbundanceFunction(gal_property[:,0], gal_property[:,1], sim_cfg['af_hyps'], faint_end_first = sim_cfg['reverse'])
         remainder = af.deconvolute(scatter, 20)
-        nd_halos = calc_number_densities(cat.model.mock.halo_table[halo_property_name], cat.Lbox) #don't think this matters which one i choose here
+        # apply min mass
+        halo_table = cat.halocat.halo_table[cat.halocat.halo_table['halo_mvir']>min_ptcl*cat.pmass] 
+        nd_halos = calc_number_densities(halo_table[halo_property_name], cat.Lbox) #don't think this matters which one i choose here
         catalog_w_nan = af.match(nd_halos, scatter)
         n_obj_needed = int(nd*(cat.Lbox**3))
-        catalog = cat.model.mock.halo_table[~np.isnan(catalog_w_nan)]
+        catalog = halo_table[~np.isnan(catalog_w_nan)]
         sort_idxs = np.argsort(catalog)
-        if 'reverse' in sim_cfg and sim_cfg['reverse']: #SMF
-            final_catalog = catalog[sort_idxs[-n_obj_needed:]]
-        else: #Lum Func
-            final_catalog = catalog[sort_idxs[:n_obj_needed]]
 
         final_catalog['x'] = final_catalog['halo_x']
         final_catalog['y'] = final_catalog['halo_y']

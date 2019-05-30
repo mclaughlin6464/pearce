@@ -685,11 +685,11 @@ class DarkSky(Cat):
     def __init__(self, boxno, system = 'sherlock', **kwargs):
         allowed_boxnos = set([''.join(j) for j in product(''.join([str(i) for i in xrange(8)]), repeat = 3)])
         assert int(boxno) == boxno
-        assert str(boxno) in allowed_boxnos
+        assert '%03d'%boxno in allowed_boxnos
         self.boxno = int(boxno)
 
         simname = 'ds14'
-        colums_to_keep = {'halo_id': (6, 'i8'),'halo_upid':(7, 'i8'), 'halo_mvir': (3, 'f4'),
+        columns_to_keep = {'halo_id': (6, 'i8'),'halo_upid':(7, 'i8'), 'halo_mvir': (3, 'f4'),
                           'halo_x': (0, 'f4'), 'halo_y': (1, 'f4'), 'halo_z': (2, 'f4'),
                           'halo_vmax': (5, 'f4'), 'halo_rvir':(4, 'f4')}
         Lbox = 1000.0
@@ -723,7 +723,7 @@ class DarkSky(Cat):
         if 'simname' in kwargs:
             del kwargs['simname']
 
-        super(DarkSky, self).__init__(simname=simname, Lbox=Lbox, pmass=pmass,colums_to_keep=colums_to_keep, halo_finder='rockstar',
+        super(DarkSky, self).__init__(simname=simname, Lbox=Lbox, pmass=pmass,columns_to_keep=columns_to_keep, halo_finder='rockstar',
                                      version_name=version_name, cosmo=cosmo, **kwargs)
 
         cache_locs = {'sherlock': '/scratch/users/swmclau2/halocats/hlist_%.2f.list.%s_%03d.hdf5'}
@@ -753,7 +753,7 @@ class DarkSky(Cat):
             # TODO do this better
             # problem with the ids, not uinique? don't understand.
             halo_id = data[:,self.columns_to_keep['halo_id'][0]]
-            halo_upid = data[:,self.columns_to_keep['halo_upid'][0]]
+            #halo_upid = data[:,self.columns_to_keep['halo_upid'][0]]
             halo_mass = data[:,self.columns_to_keep['halo_mvir'][0]]
             halo_rvir = data[:, self.columns_to_keep['halo_rvir'][0]]
             halo_vmax = data[:,self.columns_to_keep['halo_vmax'][0]]
@@ -791,11 +791,12 @@ class DarkSky(Cat):
             # this copies a lot from cache, could make this one function...
             data = dset.value
             halo_id = data[:,self.columns_to_keep['halo_id'][0]]
-            halo_upid = data[:,self.columns_to_keep['halo_upid'][0]]
+            #halo_upid = data[:,self.columns_to_keep['halo_upid'][0]]
+            halo_upid = np.ones_like(halo_id)*-1
             halo_mass = data[:,self.columns_to_keep['halo_mvir'][0]]
             halo_rvir = data[:, self.columns_to_keep['halo_rvir'][0]]
             halo_vmax = data[:,self.columns_to_keep['halo_vmax'][0]]
-            halo_x, halo_y, halo_z = data[:, :3]%self.Lbox
+            halo_x, halo_y, halo_z = data[:,0]%self.Lbox, data[:,1]%self.Lbox, data[:,2]%self.Lbox
 
             self.halocat = UserSuppliedHaloCatalog(redshift=z, Lbox=self.Lbox, particle_mass=self.pmass,
                                               halo_id=halo_id,halo_upid=halo_upid, halo_mvir=halo_mass,
