@@ -237,6 +237,8 @@ def _compute_data(cfg):
         catalog = halo_table[~np.isnan(catalog_w_nan)]
         sort_idxs = np.argsort(catalog)
 
+        final_catalog = halo_table[:n_obj_needed]
+
         final_catalog['x'] = final_catalog['halo_x']
         final_catalog['y'] = final_catalog['halo_y']
         final_catalog['z'] = final_catalog['halo_z']
