@@ -699,7 +699,7 @@ class DarkSky(Cat):
 
         if system == 'sherlock':
             # TODO update
-            fname = '/scratch/users/swmclau2/Darksky/ds14_a_halos_1.0000.hdf5'
+            fname = '/scratch/users/swmclau2/Darksky/ds14_a_halos_1.0000_fixed_boundaries.hdf5'
         else:  # ki-ls, etc
             raise NotImplementedError("File not on ki-ls")
         self.fname = fname
