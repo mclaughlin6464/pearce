@@ -12,6 +12,8 @@ from os import path
 import numpy as np
 from astropy import cosmology
 from astropy import units as u
+from colossus.halo import concentration
+from colossus.cosmology import cosmology
 import pandas as pd
 import h5py 
 from ast import literal_eval
@@ -769,6 +771,13 @@ class DarkSky(Cat):
                                          version_name=self.version_name, overwrite=overwrite)
         f.close()
 
+    def _conc_from_mass(self, halo_mass):
+        params = {'flat':True, 'H0': self.cosmo_params['h'] * 100, 'Om0': self.cosmo_params['Omega0_m'],\
+                  'Ob0':self.cosmo_params['Omega0_b'],'sigma8': 0.8355, 'ns': 0.9688}
+        cosmology.setCosmology('DarkSky', params)
+        return concentration.concentration(halo_mass, 'vir', 0.0)
+
+
     def load_catalog_no_cache(self, scale_factor, tol=0.05, check_sf=True):
             '''
             Load a catalog without caching. I *think* thins will work...
@@ -791,15 +800,17 @@ class DarkSky(Cat):
             # this copies a lot from cache, could make this one function...
             data = dset.value
             halo_id = data[:,self.columns_to_keep['halo_id'][0]]
-            #halo_upid = data[:,self.columns_to_keep['halo_upid'][0]]
-            halo_upid = np.ones_like(halo_id)*-1
+            halo_upid = data[:,self.columns_to_keep['halo_upid'][0]]
+            #halo_upid = np.ones_like(halo_id)*-1
             halo_mass = data[:,self.columns_to_keep['halo_mvir'][0]]
+            halo_nfw_conc = self._conc_from_mass(halo_mass)
             halo_rvir = data[:, self.columns_to_keep['halo_rvir'][0]]
             halo_vmax = data[:,self.columns_to_keep['halo_vmax'][0]]
             halo_x, halo_y, halo_z = data[:,0]%self.Lbox, data[:,1]%self.Lbox, data[:,2]%self.Lbox
 
             self.halocat = UserSuppliedHaloCatalog(redshift=z, Lbox=self.Lbox, particle_mass=self.pmass,
                                               halo_id=halo_id,halo_upid=halo_upid, halo_mvir=halo_mass,
+                                              halo_nfw_conc = halo_nfw_conc,
                                               halo_rvir=halo_rvir, halo_vmax = halo_vmax,
                                               halo_x=halo_x, halo_y=halo_y, halo_z=halo_z)
 
