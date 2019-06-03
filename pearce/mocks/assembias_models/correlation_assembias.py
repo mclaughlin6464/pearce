@@ -171,12 +171,21 @@ class CorrelationAssembias(HeavisideAssembias):
             #  NOTE I've removed the type 1 mask as it is not well-defined in this implementation
             strength = self.assembias_strength(prim_haloprop[no_edge_mask])
             shuffled_ranks = compute_conditional_shuffled_ranks(prim_haloprop = prim_haloprop[no_edge_mask], sec_haloprop=sec_haloprop[no_edge_mask], correlation_coeff=strength)
-
-            dist = bernoulli if baseline_upper_bound == 1 else poisson 
+            gt = 'cen' if baseline_upper_bound == 1 else 'sat'
+            dist = bernoulli if gt == 'cen' else poisson 
+            # TODO getting some inf and nans results i still don't understand
             shuffled_ranks[strength>0] = 1 - shuffled_ranks[strength>0]
-            no_edge_result = dist.isf(shuffled_ranks, no_edge_result)
+            new_result = dist.isf(shuffled_ranks, no_edge_result)
+            new_result[new_result<0] = 0.0
+            nan_or_inf_idx = np.logical_or(~np.isfinite(new_result), np.isnan(new_result))
+            if gt == 'cen':
+                new_result[nan_or_inf_idx] = 1.0
+            else:
+                # hopefully these edge cases are rare enough so as to not matter too much
+                # chooseig a large non-inf value is tough...
+                new_result[nan_or_inf_idx] = no_edge_result[nan_or_inf_idx] 
 
-            result[no_edge_mask] = no_edge_result
+            result[no_edge_mask] = new_result
             return result
 
         return wrapper

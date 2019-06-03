@@ -601,7 +601,7 @@ class FastPM(Cat):
         f.close()
         cosmo = self._get_cosmo()
 
-        tmp_scale_factors = [ 0.645161, 1.0]
+        tmp_scale_factors = [ 0.645, 1.0]
         tmp_fnames = ['tmpA','tmpB']
 
         self._update_lists(kwargs, tmp_fnames, tmp_scale_factors)
