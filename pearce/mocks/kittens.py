@@ -12,13 +12,14 @@ from os import path
 import numpy as np
 from astropy import cosmology
 from astropy import units as u
-from colossus.halo import concentration
-from colossus.cosmology import cosmology as colossus_cosmo
 import pandas as pd
 import h5py 
 from ast import literal_eval
 from halotools.sim_manager import UserSuppliedHaloCatalog
-from .cat import Cat
+from halotools.empirical_models import HodModelFactory, TrivialPhaseSpace, NFWPhaseSpace, PrebuiltHodModelFactory
+from .cat import Cat, HOD_DICT
+import sys
+from time import time
 
 __all__ = ['Bolshoi', 'Multidark', 'Emu', 'Fox', 'MDHR', 'Chinchilla', 'Aardvark', 'Guppy', 'cat_dict']
 
@@ -699,7 +700,7 @@ class DarkSky(Cat):
 
         if system == 'sherlock':
             # TODO update
-            fname = '/scratch/users/swmclau2/Darksky/ds14_a_halos_1.0000_fixed_boundaries.hdf5'
+            fname = '/scratch/users/swmclau2/Darksky/ds14_a_halos_1.0000_fixed_boundaries_v2.hdf5'
         else:  # ki-ls, etc
             raise NotImplementedError("File not on ki-ls")
         self.fname = fname
@@ -772,13 +773,14 @@ class DarkSky(Cat):
         f.close()
 
     def _conc_from_mass(self, halo_mass):
-        params = {'flat':True, 'H0': self.cosmo_params['h'] * 100, 'Om0': self.cosmo_params['Omega0_m'],\
-                  'Ob0':self.cosmo_params['Omega0_b'],'sigma8': 0.8355, 'ns': 0.9688}
-        colossus_cosmo.setCosmology('DarkSky', params)
-        return concentration.concentration(halo_mass, 'vir', 0.0)
+        raise NotImplementedError
+        # Tis is too slow to be useful.
+        #params = {'flat':True, 'H0': self.cosmo_params['h'] * 100, 'Om0': self.cosmo_params['Omega0_m'],\
+        #          'Ob0':self.cosmo_params['Omega0_b'],'sigma8': 0.8355, 'ns': 0.9688}
+        #colossus_cosmo.setCosmology('DarkSky', params)
+        #return concentration.concentration(halo_mass, 'vir', 0.0)
 
-
-    def load_catalog_no_cache(self, scale_factor, tol=0.05, check_sf=True):
+    def load_catalog_no_cache(self, scale_factor, min_ptcl = 50, tol=0.05, check_sf=True):
             '''
             Load a catalog without caching. I *think* thins will work...
             :param a:
@@ -787,6 +789,7 @@ class DarkSky(Cat):
                 Boolean whether or not to use the passed in scale_factor blindly. Default is false.
             :return: None
             '''
+            print 'A'
             if check_sf:
                 a = self._return_nearest_sf(scale_factor, tol)
                 if a is None:
@@ -795,29 +798,93 @@ class DarkSky(Cat):
                 a = scale_factor  # YOLO
             z = 1.0 / a - 1
             f = h5py.File(self.fname, 'r')
+            print 'B'
+            sys.stdout.flush()
             dset = f['halos']['subbox_%03d'%self.boxno]
             # only one sf so skipping some of this
             # this copies a lot from cache, could make this one function...
             data = dset.value
-            halo_id = data[:,self.columns_to_keep['halo_id'][0]]
-            halo_upid = data[:,self.columns_to_keep['halo_upid'][0]]
-            #halo_upid = np.ones_like(halo_id)*-1
             halo_mass = data[:,self.columns_to_keep['halo_mvir'][0]]
+            mass_cut = halo_mass > min_ptcl*self.pmass
+            halo_mass = halo_mass[mass_cut]
+            halo_id = data[mass_cut, self.columns_to_keep['halo_id'][0]]
+            halo_upid = data[mass_cut,self.columns_to_keep['halo_upid'][0]]
+            #halo_upid = np.ones_like(halo_id)*-1
+            print 'C'
+            t0 = time()
             halo_nfw_conc = self._conc_from_mass(halo_mass)
-            halo_rvir = data[:, self.columns_to_keep['halo_rvir'][0]]
-            halo_vmax = data[:,self.columns_to_keep['halo_vmax'][0]]
-            halo_x, halo_y, halo_z = data[:,0]%self.Lbox, data[:,1]%self.Lbox, data[:,2]%self.Lbox
-
+            halo_rvir = data[mass_cut, self.columns_to_keep['halo_rvir'][0]]
+            halo_vmax = data[mass_cut,self.columns_to_keep['halo_vmax'][0]]
+            halo_x, halo_y, halo_z = data[mass_cut,0]%self.Lbox, data[mass_cut,1]%self.Lbox, data[mass_cut,2]%self.Lbox
+            print 'D'
             self.halocat = UserSuppliedHaloCatalog(redshift=z, Lbox=self.Lbox, particle_mass=self.pmass,
                                               halo_id=halo_id,halo_upid=halo_upid, halo_mvir=halo_mass,
                                               halo_nfw_conc = halo_nfw_conc,
                                               halo_rvir=halo_rvir, halo_vmax = halo_vmax,
                                               halo_x=halo_x, halo_y=halo_y, halo_z=halo_z)
 
+            print 'E'
             # refelct the current catalog
             self.z = z
             self.a = a
             self.populated_once = False  # no way this one's been populated!
+
+    def load_model(self, scale_factor, HOD='redMagic', check_sf=True, hod_kwargs={}):
+        '''
+        Load an HOD model. Not reccomended to be used separately from the load function. It
+        is possible for the scale_factor of the model and catalog to be different.
+
+        Copied from the cat form, to implement mass_conc relation
+        would be nice to do this in a cleaner way. if i have to more than once..
+        :param scale_factor:
+            Scale factor for the model
+        :param HOD:
+            HOD model to load. Currently available options are redMagic, stepFunc, and the halotools defatuls.
+            Also may pass in a tuple of cens and sats classes, which will be instantiated here.
+        :param check_sf:
+            Boolean whether or not to use the passed in scale_factor blindly. Default is false.
+        :param hod_kwargs:
+            Kwargs to pass into the HOD model being loaded. Default is none.
+        :return: None
+        '''
+
+        if check_sf:
+            a = self._return_nearest_sf(scale_factor)
+            if a is None:
+                raise ValueError('Scale factor %.3f not within given tolerance.' % scale_factor)
+        else:
+            a = scale_factor  # YOLO
+        z = 1.0 / a - 1
+        if type(HOD) is str:
+            assert HOD in VALID_HODS
+            if HOD in VALID_HODS - DEFAULT_HODS:  # my custom ones
+                cens_occ = HOD_DICT[HOD][0](redshift=z, **hod_kwargs)
+                # TODO  this is a hack, something better would be better
+                try:  # hack for central modulation
+                    # the ab ones need to modulated with the baseline model
+                    sats_occ = HOD_DICT[HOD][1](redshift=z, cenocc_model=cens_occ, **hod_kwargs)
+                except:  # assume the error is a cenocc issue
+                    sats_occ = HOD_DICT[HOD][1](redshift=z, **hod_kwargs)
+
+                self.model = HodModelFactory(
+                    centrals_occupation=cens_occ,
+                    centrals_profile=TrivialPhaseSpace(redshift=z),
+                    satellites_occupation=sats_occ,
+                    satellites_profile=NFWPhaseSpace(redshift=z, conc_mass_model = 'dutton_maccio14'))
+
+            else:
+                self.model = PrebuiltHodModelFactory(HOD, redshift=z, **hod_kwargs)
+        else:
+            cens_occ = HOD_DICT[HOD][0](redshift=z, **hod_kwargs)
+            # NOTE don't know if should always modulate, but I always do.
+            sats_occ = HOD_DICT[HOD][1](redshift=z, cenocc_model=cens_occ, **hod_kwargs)
+            self.model = HodModelFactory(
+                centrals_occupation=cens_occ,
+                centrals_profile=TrivialPhaseSpace(redshift=z),
+                satellites_occupation=sats_occ,
+                satellites_profile=NFWPhaseSpace(redshift=z, conc_mass_model = 'dutton_maccio14'))
+
+        self.populated_once = False  # cover for loadign new ones
 
 class ResolutionTestBox(Cat):
 

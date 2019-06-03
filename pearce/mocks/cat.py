@@ -22,7 +22,8 @@ from astropy import cosmology
 from astropy import constants as const, units as units
 from halotools.sim_manager import RockstarHlistReader, CachedHaloCatalog, UserSuppliedPtclCatalog
 from halotools.empirical_models import PrebuiltHodModelFactory
-from halotools.empirical_models import HodModelFactory, TrivialPhaseSpace, NFWPhaseSpace
+from halotools.empirical_models import HodModelFactory, TrivialPhaseSpace
+from halotools.empirical_models import NFWPhaseSpace, BiasedNFWPhaseSpace
 from halotools.mock_observables import *  # i'm importing so much this is just easier
 from halotools.custom_exceptions import InvalidCacheLogEntry
 
@@ -478,7 +479,7 @@ class Cat(object):
         self.populated_once = False  # no way this one's been populated!
 
     # TODO not sure if assembias should be boolean, or keep it as separate HODs?
-    def load_model(self, scale_factor, HOD='redMagic', check_sf=True, hod_kwargs={}):
+    def load_model(self, scale_factor, HOD='redMagic', biased_satellites=False, check_sf=True, hod_kwargs={}):
         '''
         Load an HOD model. Not reccomended to be used separately from the load function. It
         is possible for the scale_factor of the model and catalog to be different.
@@ -487,6 +488,9 @@ class Cat(object):
         :param HOD:
             HOD model to load. Currently available options are redMagic, stepFunc, and the halotools defatuls.
             Also may pass in a tuple of cens and sats classes, which will be instantiated here.
+        :param biased_satellites:
+            Whether or not add a parameter to the HOD to allow the satellite population to be biased relative
+            to the NFW fit to the halo. Default is false.
         :param check_sf:
             Boolean whether or not to use the passed in scale_factor blindly. Default is false.
         :param hod_kwargs:
@@ -501,6 +505,10 @@ class Cat(object):
         else:
             a = scale_factor  # YOLO
         z = 1.0 / a - 1
+        if biased_satellites:
+            sat_phase_space = BiasedNFWPhaseSpace(redshift=z)
+        else:
+            sat_phase_space = NFWPhaseSpace(redshift=z)
         if type(HOD) is str:
             assert HOD in VALID_HODS
             if HOD in  VALID_HODS-DEFAULT_HODS: # my custom ones
@@ -516,7 +524,7 @@ class Cat(object):
                     centrals_occupation=cens_occ,
                     centrals_profile=TrivialPhaseSpace(redshift=z),
                     satellites_occupation=sats_occ,
-                    satellites_profile=NFWPhaseSpace(redshift=z))
+                    satellites_profile= sat_phase_space)
 
             else:
                 self.model = PrebuiltHodModelFactory(HOD,redshift=z, **hod_kwargs)
@@ -528,7 +536,7 @@ class Cat(object):
                 centrals_occupation=cens_occ,
                 centrals_profile=TrivialPhaseSpace(redshift=z),
                 satellites_occupation=sats_occ,
-                satellites_profile=NFWPhaseSpace(redshift=z))
+                satellites_profile=sat_phase_space)
 
         self.populated_once = False  # cover for loadign new ones
 
