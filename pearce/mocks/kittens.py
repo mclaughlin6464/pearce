@@ -19,6 +19,8 @@ import h5py
 from ast import literal_eval
 from halotools.sim_manager import UserSuppliedHaloCatalog
 from .cat import Cat
+import sys
+from time import time
 
 __all__ = ['Bolshoi', 'Multidark', 'Emu', 'Fox', 'MDHR', 'Chinchilla', 'Aardvark', 'Guppy', 'cat_dict']
 
@@ -699,7 +701,7 @@ class DarkSky(Cat):
 
         if system == 'sherlock':
             # TODO update
-            fname = '/scratch/users/swmclau2/Darksky/ds14_a_halos_1.0000_fixed_boundaries.hdf5'
+            fname = '/scratch/users/swmclau2/Darksky/ds14_a_halos_1.0000_fixed_boundaries_v2.hdf5'
         else:  # ki-ls, etc
             raise NotImplementedError("File not on ki-ls")
         self.fname = fname
@@ -778,7 +780,7 @@ class DarkSky(Cat):
         return concentration.concentration(halo_mass, 'vir', 0.0)
 
 
-    def load_catalog_no_cache(self, scale_factor, tol=0.05, check_sf=True):
+    def load_catalog_no_cache(self, scale_factor, min_ptcl = 50, tol=0.05, check_sf=True):
             '''
             Load a catalog without caching. I *think* thins will work...
             :param a:
@@ -787,6 +789,7 @@ class DarkSky(Cat):
                 Boolean whether or not to use the passed in scale_factor blindly. Default is false.
             :return: None
             '''
+            print 'A'
             if check_sf:
                 a = self._return_nearest_sf(scale_factor, tol)
                 if a is None:
@@ -795,25 +798,32 @@ class DarkSky(Cat):
                 a = scale_factor  # YOLO
             z = 1.0 / a - 1
             f = h5py.File(self.fname, 'r')
+            print 'B'
+            sys.stdout.flush()
             dset = f['halos']['subbox_%03d'%self.boxno]
             # only one sf so skipping some of this
             # this copies a lot from cache, could make this one function...
             data = dset.value
-            halo_id = data[:,self.columns_to_keep['halo_id'][0]]
-            halo_upid = data[:,self.columns_to_keep['halo_upid'][0]]
-            #halo_upid = np.ones_like(halo_id)*-1
             halo_mass = data[:,self.columns_to_keep['halo_mvir'][0]]
+            mass_cut = halo_mass > min_ptcl*self.pmass
+            halo_mass = halo_mass[mass_cut]
+            halo_id = data[mass_cut, self.columns_to_keep['halo_id'][0]]
+            halo_upid = data[mass_cut,self.columns_to_keep['halo_upid'][0]]
+            #halo_upid = np.ones_like(halo_id)*-1
+            print 'C'
+            t0 = time()
             halo_nfw_conc = self._conc_from_mass(halo_mass)
-            halo_rvir = data[:, self.columns_to_keep['halo_rvir'][0]]
-            halo_vmax = data[:,self.columns_to_keep['halo_vmax'][0]]
-            halo_x, halo_y, halo_z = data[:,0]%self.Lbox, data[:,1]%self.Lbox, data[:,2]%self.Lbox
-
+            halo_rvir = data[mass_cut, self.columns_to_keep['halo_rvir'][0]]
+            halo_vmax = data[mass_cut,self.columns_to_keep['halo_vmax'][0]]
+            halo_x, halo_y, halo_z = data[mass_cut,0]%self.Lbox, data[mass_cut,1]%self.Lbox, data[mass_cut,2]%self.Lbox
+            print 'D'
             self.halocat = UserSuppliedHaloCatalog(redshift=z, Lbox=self.Lbox, particle_mass=self.pmass,
                                               halo_id=halo_id,halo_upid=halo_upid, halo_mvir=halo_mass,
                                               halo_nfw_conc = halo_nfw_conc,
                                               halo_rvir=halo_rvir, halo_vmax = halo_vmax,
                                               halo_x=halo_x, halo_y=halo_y, halo_z=halo_z)
 
+            print 'E'
             # refelct the current catalog
             self.z = z
             self.a = a
