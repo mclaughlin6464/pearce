@@ -26,7 +26,7 @@ from halotools.utils import *
 Lbox = 1000.0
 
 ab_property = 'halo_mpeak'
-catalog = astropy.table.Table.read('/scratch/users/swmclau2/catalog_ab_%s_large.hdf5'%ab_property, format = 'hdf5')
+catalog = astropy.table.Table.read('/scratch/users/swmclau2/catalog_ab_%s_large_fixed.hdf5'%ab_property, format = 'hdf5')
 
 
 PMASS = 7.62293e+07
@@ -232,7 +232,7 @@ del catalog['halo_nfw_conc_host_halo']
 # In[ ]:
 
 
-sort_idxs = np.argsort(catalog[~np.isnan(catalog['gal_smass'])]['gal_smass'])
+sort_idxs = np.argsort(catalog[~np.isnan(catalog['gal_smass'])]['gal_smass'])[::-1]
 #catalog = catalog[~np.isnan(catalog['gal_smass'])][sort_idxs[-1*n_obj_needed:]]
 catalog = catalog[~np.isnan(catalog['gal_smass'])][sort_idxs[:n_obj_needed]]
 
@@ -294,7 +294,7 @@ print xi
 # In[ ]:
 
 
-catalog.write('/scratch/users/swmclau2/catalog_ab_%s_shuffled.hdf5'%ab_property,
+catalog.write('/scratch/users/swmclau2/catalog_ab_%s_shuffled_fixed.hdf5'%ab_property,
               format = 'hdf5', path = '%s_shuffled'%ab_property, overwrite=True)
 
 

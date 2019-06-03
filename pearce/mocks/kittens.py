@@ -13,7 +13,7 @@ import numpy as np
 from astropy import cosmology
 from astropy import units as u
 from colossus.halo import concentration
-from colossus.cosmology import cosmology
+from colossus.cosmology import cosmology as colossus_cosmo
 import pandas as pd
 import h5py 
 from ast import literal_eval
@@ -774,7 +774,7 @@ class DarkSky(Cat):
     def _conc_from_mass(self, halo_mass):
         params = {'flat':True, 'H0': self.cosmo_params['h'] * 100, 'Om0': self.cosmo_params['Omega0_m'],\
                   'Ob0':self.cosmo_params['Omega0_b'],'sigma8': 0.8355, 'ns': 0.9688}
-        cosmology.setCosmology('DarkSky', params)
+        colossus_cosmo.setCosmology('DarkSky', params)
         return concentration.concentration(halo_mass, 'vir', 0.0)
 
 

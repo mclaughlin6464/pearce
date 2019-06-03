@@ -90,7 +90,7 @@ def data_config(f, cfg):
         data, cov = _compute_data(cfg)
 
     for key in ['sim', 'obs', 'cov']:
-        f.attrs[key] = str(cfg[key]) if key in cfg else None
+        f.attrs[key] = str(cfg[key]) if key in cfg else str(None)
         if key not in cfg:
             warnings.warn("Not all data attributes were specified. This is not reccomended, since the chain may not be well described in the future!")
 
@@ -125,7 +125,7 @@ def _load_data(true_data_fname, true_cov_fname):
         cov.append(np.loadtxt(fname))
 
     # NOTE stacking could be wrong here, double check
-    return np.vstack(data), np.vstack(cov)
+    return np.vstack(data).squeeze(), np.vstack(cov).squeeze()
 
 def _compute_data(cfg):
     """
@@ -230,18 +230,19 @@ def _compute_data(cfg):
         af =  AbundanceFunction(gal_property[:,0], gal_property[:,1], sim_cfg['af_hyps'], faint_end_first = sim_cfg['reverse'])
         remainder = af.deconvolute(scatter, 20)
         # apply min mass
-        halo_table = cat.halocat.halo_table[cat.halocat.halo_table['halo_mvir']>min_ptcl*cat.pmass] 
+        halo_table = cat.halocat.halo_table#[cat.halocat.halo_table['halo_mvir']>min_ptcl*cat.pmass] 
         nd_halos = calc_number_densities(halo_table[halo_property_name], cat.Lbox) #don't think this matters which one i choose here
         catalog_w_nan = af.match(nd_halos, scatter)
         n_obj_needed = int(nd*(cat.Lbox**3))
         catalog = halo_table[~np.isnan(catalog_w_nan)]
         sort_idxs = np.argsort(catalog)
 
-        final_catalog = halo_table[:n_obj_needed]
+        final_catalog = halo_table[~np.isnan(catalog_w_nan)][sort_idxs[:n_obj_needed]]
 
         final_catalog['x'] = final_catalog['halo_x']
         final_catalog['y'] = final_catalog['halo_y']
         final_catalog['z'] = final_catalog['halo_z']
+        final_catalog['halo_upid'] = -1
         # FYI cursed.
         cat.model.mock.galaxy_table = final_catalog
         # TODO save sham hod "truth"

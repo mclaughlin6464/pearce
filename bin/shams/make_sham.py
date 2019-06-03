@@ -67,7 +67,7 @@ print halocat.halo_table.colnames
 # In[18]:
 
 
-smf = np.genfromtxt('/scratch/users/swmclau2/DR10_cBOSS_WISE_SMF_z0.45_0.60_M7.dat', skip_header=True)[:,0:2]
+smf = np.genfromtxt('/scratch/users/swmclau2/smf_dr72bright34_m7_lowm.dat', skip_header=True)[:,0:2]
 
 
 # In[19]:
@@ -82,12 +82,13 @@ nd = 4.2e-4 #nd of final cat
 # In[21]:
 
 
-ab_property = 'halo_mpeak'
+#ab_property = 'halo_mpeak'
+ab_property = 'halo_vmax@mpeak'
 
 
 # In[22]:
 
-af = AbundanceFunction(smf[:,0], smf[:,1], (10.0, 12.9), faint_end_first = True)
+af = AbundanceFunction(smf[:,0], smf[:,1], (9.0, 12.9), faint_end_first = True)
 
 scatter = 0.18
 remainder = af.deconvolute(scatter, 20)
@@ -121,7 +122,7 @@ n_obj_needed = int(nd*(1000.0**3))
 # In[ ]:
 
 non_nan_idxs = ~np.isnan(catalog)
-sort_idxs = np.argsort(catalog[non_nan_idxs])
+sort_idxs = np.argsort(catalog[non_nan_idxs])[::-1]
 final_catalog = catalog[non_nan_idxs][sort_idxs[:n_obj_needed]]
 
 

@@ -111,6 +111,7 @@ def _run_tests(y, cov, r_bin_centers, param_names, fixed_params, ncores):
         # else, we're good!
 
     #make sure all inputs are of consistent shape
+    print y.shape, cov.shape
     assert y.shape[0] == cov.shape[0] and cov.shape[1] == cov.shape[0]
     #print y.shape[0]/r_bin_centers.shape[0] ,len(_emus) , y.shape[0]/r_bin_centers.shape[0] 
     assert y.shape[0]/r_bin_centers.shape[0] == len(_emus) and y.shape[0]%r_bin_centers.shape[0] == 0
