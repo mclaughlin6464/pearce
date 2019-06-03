@@ -450,6 +450,7 @@ class Trainer(object):
                 scale_factor = self._scale_factors[scale_factor_idx]
 
                 #print self._scale_factors, scale_factor_idx, scale_factor
+                
                 cat.load(scale_factor, HOD= self.hod, particles = self._particles,
                          downsample_factor=self._downsample_factor, hod_kwargs= self._hod_kwargs  )
                 self._check_params(cat) 
@@ -478,7 +479,13 @@ class Trainer(object):
 
                 for repop in xrange(self._n_repops):
                     #print repop
-                    cat.populate(hod_params, min_ptcl= self._min_ptcl)
+                    try:
+                        cat.populate(hod_params, min_ptcl= self._min_ptcl)
+                    except ValueError:
+                        # try again, sometimes things are tempermental?
+                        print repop, cat.model.mock.Ngals, cat.model.mock._total_abundance
+                        cat.populate(hod_params, min_ptcl= self._min_ptcl)
+
                     try:
                         obs_repops[repop] = self._transform_func(calc_observable())
                     except ValueError: #likely an issue with population. If it comes up again, send it up

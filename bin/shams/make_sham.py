@@ -24,8 +24,8 @@ from halotools.sim_manager import RockstarHlistReader, CachedHaloCatalog
 # In[11]:
 
 
-#halo_dir = '/nfs/slac/des/fs1/g/sims/yymao/ds14_b_sub/hlists/'
-halo_dir = '/scratch/users/swmclau2/hlists/ds_14_b_sub/hlists/'
+halo_dir = '/nfs/slac/des/fs1/g/sims/yymao/ds14_b_sub/hlists/'
+#halo_dir = '/scratch/users/swmclau2/hlists/ds_14_b_sub/hlists/'
 a = 0.65
 z = 1.0/a - 1 # ~ 0.55
 fname = path.join(halo_dir,  'hlist_%.5f.list'%a)
@@ -68,7 +68,7 @@ print halocat.halo_table.colnames
 # In[18]:
 
 
-smf = np.genfromtxt('/scratch/users/swmclau2/DR10_cBOSS_WISE_SMF_z0.45_0.60_M7.dat', skip_header=True)[:,0:2]
+smf = np.genfromtxt('DR10_cBOSS_WISE_SMF_z0.45_0.60_M7.dat', skip_header=True)[:,0:2]
 
 
 # In[19]:
@@ -140,7 +140,7 @@ output['gal_smass'] = final_catalog
 # In[ ]:
 
 
-output.write('/scratch/users/swmclau2/catalog_ab_%s_large.hdf5'%ab_property, format = 'hdf5', path = '%s_catalog'%ab_property, overwrite=True)
+output.write('/nfs/slac/g/ki/ki18/des/swmclau2/catalog_ab_%s_large.hdf5'%ab_property, format = 'hdf5', path = '%s_catalog'%ab_property, overwrite=True)
 # In[ ]:
 
 
