@@ -29,7 +29,6 @@ halo_dir = '/nfs/slac/des/fs1/g/sims/yymao/ds14_b_sub/hlists/'
 a = 0.65
 z = 1.0/a - 1 # ~ 0.55
 fname = path.join(halo_dir,  'hlist_%.5f.list'%a)
-print fname
 
 
 # In[12]:
@@ -88,8 +87,7 @@ ab_property = 'halo_mpeak'
 
 # In[22]:
 
-
-af = AbundanceFunction(smf[:,0], smf[:,1], (10, 12.9))
+af = AbundanceFunction(smf[:,0], smf[:,1], (10.0, 12.9), faint_end_first = True)
 
 scatter = 0.18
 remainder = af.deconvolute(scatter, 20)
@@ -122,13 +120,13 @@ n_obj_needed = int(nd*(1000.0**3))
 
 # In[ ]:
 
+non_nan_idxs = ~np.isnan(catalog)
+sort_idxs = np.argsort(catalog[non_nan_idxs])
+final_catalog = catalog[non_nan_idxs][sort_idxs[:n_obj_needed]]
 
-sort_idxs = np.argsort(catalog)
-final_catalog = catalog#[sort_idxs[:n_obj_needed]]
 
 
-
-output = halocat.halo_table#[sort_idxs[:n_obj_needed]]
+output = halocat.halo_table[non_nan_idxs][sort_idxs[:n_obj_needed]]
 
 
 # In[ ]:
@@ -140,7 +138,8 @@ output['gal_smass'] = final_catalog
 # In[ ]:
 
 
-output.write('/nfs/slac/g/ki/ki18/des/swmclau2/catalog_ab_%s_large.hdf5'%ab_property, format = 'hdf5', path = '%s_catalog'%ab_property, overwrite=True)
+#output.write('/nfs/slac/g/ki/ki18/des/swmclau2/catalog_ab_%s_large.hdf5'%ab_property, format = 'hdf5', path = '%s_catalog'%ab_property, overwrite=True)
+output.write('/scratch/users/swmclau2/catalog_ab_%s_fixed.hdf5'%ab_property, format = 'hdf5', path = '%s_catalog'%ab_property, overwrite=True)
 # In[ ]:
 
 
