@@ -38,9 +38,15 @@ def compute_conditional_shuffled_ranks(indices_of_prim_haloprop_bin, sec_halopro
 
 
     num_in_bin = len(indices_of_prim_haloprop_bin)
-    original_ranks = rankdata(sec_haloprop[indices_of_prim_haloprop_bin], 'ordinal') - 0.5
+    original_ranks = rankdata(sec_haloprop[indices_of_prim_haloprop_bin], 'ordinal')*1.0# - 0.5
     original_ranks /= num_in_bin
-    return noisy_percentile(original_ranks, correlation_coeff=correlation_coeff[indices_of_prim_haloprop_bin])
+    # there's a bug in noisy percentile for -1
+    if np.all(correlation_coeff[indices_of_prim_haloprop_bin] == -1):
+        output = noisy_percentile(original_ranks, correlation_coeff=-0.999999*np.ones_like(indices_of_prim_haloprop_bin))
+        return output
+    else:
+        output = noisy_percentile(original_ranks, correlation_coeff=correlation_coeff[indices_of_prim_haloprop_bin])
+        return output
 
 
 class CorrelationAssembias(HeavisideAssembias):
@@ -174,8 +180,8 @@ class CorrelationAssembias(HeavisideAssembias):
             gt = 'cen' if baseline_upper_bound == 1 else 'sat'
             dist = bernoulli if gt == 'cen' else poisson 
             # TODO getting some inf and nans results i still don't understand
-            shuffled_ranks[strength>0] = 1 - shuffled_ranks[strength>0]
-            new_result = dist.isf(shuffled_ranks, no_edge_result)
+            #shuffled_ranks[strength>0] = 1 - shuffled_ranks[strength>0]
+            new_result = dist.isf(1-shuffled_ranks, no_edge_result)
             new_result[new_result<0] = 0.0
             nan_or_inf_idx = np.logical_or(~np.isfinite(new_result), np.isnan(new_result))
             if gt == 'cen':
