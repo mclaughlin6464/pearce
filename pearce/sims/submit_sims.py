@@ -33,13 +33,13 @@ def submit_sims(lhc_fname, output_dir, powerspectrum, cosmic_var, initial_z, fin
 
     for idx, row in lhc.iterrows():
         # TODO what to do if already exists? likely will throw some kind of error
-	print idx
+	    print idx
         boxdir = path.join(output_dir, "Box_%03d/"%idx)
         if not path.isdir(boxdir):
             mkdir(boxdir)
 
         cosmo = make_cosmo(param_names, row)
-	p = power(cosmo, 0.0)(k) #only works for z=0
+	    p = power(cosmo, 0.0)(k) #only works for z=0
 
         np.savetxt(path.join(boxdir,'powerspec.txt'), np.array((k,p)).T)
 
@@ -86,6 +86,7 @@ def make_cosmo(param_names, param_vals):
     #param_dict['w0_fld'] = param_dict['w']
     w = param_dict['w']
     del param_dict['w']
+    # TODO subtract neutrinos from omega_m too!
 
     param_dict['Omega_cdm'] = param_dict['Omega_m'] - param_dict['Omega_b']
     del param_dict['Omega_b']

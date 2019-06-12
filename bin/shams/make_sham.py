@@ -124,11 +124,11 @@ n_obj_needed = int(nd*(1000.0**3))
 
 non_nan_idxs = ~np.isnan(catalog)
 sort_idxs = np.argsort(catalog[non_nan_idxs])[::-1]
-final_catalog = catalog[non_nan_idxs][sort_idxs[:n_obj_needed]]
+final_catalog = catalog#[non_nan_idxs][sort_idxs[:n_obj_needed]]
 
 
 
-output = halocat.halo_table[non_nan_idxs][sort_idxs[:n_obj_needed]]
+output = halocat.halo_table#[non_nan_idxs][sort_idxs[:n_obj_needed]]
 
 
 # In[ ]:
@@ -141,7 +141,7 @@ output['gal_smass'] = final_catalog
 
 
 #output.write('/nfs/slac/g/ki/ki18/des/swmclau2/catalog_ab_%s_large.hdf5'%ab_property, format = 'hdf5', path = '%s_catalog'%ab_property, overwrite=True)
-output.write('/scratch/users/swmclau2/catalog_ab_%s_fixed.hdf5'%ab_property, format = 'hdf5', path = '%s_catalog'%ab_property, overwrite=True)
+output.write('/scratch/users/swmclau2/catalog_ab_%s_large_fixed.hdf5'%ab_property, format = 'hdf5', path = '%s_catalog'%ab_property, overwrite=True)
 # In[ ]:
 
 
