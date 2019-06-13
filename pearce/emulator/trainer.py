@@ -5,6 +5,7 @@ Rather than firing off many jobs to do the training, will do everying with MPI i
 Will also write to an hdf5 file, to reduce the enormous clutter produced so far.
 """
 from os import path
+import os
 from glob import glob
 from shutil import copyfile
 from subprocess import call
@@ -139,7 +140,7 @@ class Trainer(object):
         """
         # TODO possibly better error messaging
         self.hod = hod_cfg['model']  # string defining which model
-        print 'Self.hod', self.hod
+        self._biased_satellites = bool(hod_cfg.get('biased_satellites', False))
         # TODO confirm is valid?
         del hod_cfg['model']
         # A little unnerved by the assymetry between this and cosmology
@@ -408,7 +409,7 @@ class Trainer(object):
         cat_pnames = set(cat.model.param_dict.keys())
         cfg_pnames = set(self._hod_param_names)
         try:
-            assert len(cat_pnames - cfg_pnames)==1 #logMmin
+            assert len(cat_pnames - cfg_pnames)<=1 #logMmin
         except AssertionError:
             print "Cat params", cat_pnames
             print "Cfg params", cfg_pnames
@@ -452,6 +453,7 @@ class Trainer(object):
                 #print self._scale_factors, scale_factor_idx, scale_factor
                 
                 cat.load(scale_factor, HOD= self.hod, particles = self._particles,
+                         biased_satellites = self._biased_satellites,
                          downsample_factor=self._downsample_factor, hod_kwargs= self._hod_kwargs  )
                 self._check_params(cat) 
                 calc_observable = self._get_calc_observable(cat)
@@ -516,6 +518,9 @@ class Trainer(object):
             output_cov = output_cov.reshape((-1, self.n_bins, self.n_bins))
 
         all_cosmo_sf_pairs = np.array(list(product(xrange(len(self.cats)), xrange(len(self._scale_factors)))))
+        output_dir = path.dirname(self.output_fname)
+        if not path.isdir(output_dir):
+            os.mkdir(output_dir)
 
         f = h5py.File(self.output_fname, 'w')
         try:
@@ -610,6 +615,9 @@ class Trainer(object):
         """
 
         output_directory = path.dirname(self.output_fname)
+        if not path.isdir(output_directory):
+            os.mkdir(output_directory)
+
         # Only have to write HOD info. Rest is uniquely specified by the config.
         if not rerun:
             np.savetxt(path.join(output_directory, HOD_FNAME), self._hod_param_vals, header = '\t'.join(self._hod_param_names))
