@@ -17,7 +17,8 @@ import h5py
 from ast import literal_eval
 from halotools.sim_manager import UserSuppliedHaloCatalog
 from halotools.empirical_models import HodModelFactory, TrivialPhaseSpace, NFWPhaseSpace, PrebuiltHodModelFactory
-from .cat import Cat, HOD_DICT
+from halotools.utils import add_halo_hostid
+from .cat import Cat, HOD_DICT, VALID_HODS, DEFAULT_HODS
 import sys
 from time import time
 
@@ -700,7 +701,7 @@ class DarkSky(Cat):
 
         if system == 'sherlock':
             # TODO update
-            fname = '/scratch/users/swmclau2/Darksky/ds14_a_halos_1.0000_fixed_boundaries_v2.hdf5'
+            fname = '/scratch/users/swmclau2/Darksky/ds14_a_halos_1.0000_fixed_boundaries_v3.hdf5'
         else:  # ki-ls, etc
             raise NotImplementedError("File not on ki-ls")
         self.fname = fname
@@ -711,7 +712,7 @@ class DarkSky(Cat):
                              'Omega0_cdm' : 0.2482735987535057,
                             'Omega0_b' : 0.04676431995034128,
                             'w0' : -1,
-                            'h' : 0.07036893781978598}
+                            'h' : 0.7036893781978598}
 
         cosmo = self._get_cosmo()
 
@@ -755,17 +756,18 @@ class DarkSky(Cat):
             # assuming halo_columns
             # TODO do this better
             # problem with the ids, not uinique? don't understand.
-            halo_id = data[:,self.columns_to_keep['halo_id'][0]]
-            #halo_upid = data[:,self.columns_to_keep['halo_upid'][0]]
-            halo_mass = data[:,self.columns_to_keep['halo_mvir'][0]]
-            halo_rvir = data[:, self.columns_to_keep['halo_rvir'][0]]
-            halo_vmax = data[:,self.columns_to_keep['halo_vmax'][0]]
-            halo_x, halo_y, halo_z = data[:, :3]%self.Lbox
+            halo_id = data['id']
+            halo_upid = data['pid']
+            halo_mass = data['m200b']
+            halo_rvir = data['r200b']
+            halo_vmax = data['vmax']
+            halo_x, halo_y, halo_z = data['x']%self.Lbox, data['y']%self.Lbox , data['z']%self.Lbox
 
             halocat = UserSuppliedHaloCatalog(redshift=z, Lbox=self.Lbox, particle_mass=self.pmass,
                                               halo_id=halo_id,halo_upid=halo_upid, halo_mvir=halo_mass,
                                               halo_rvir=halo_rvir, halo_vmax = halo_vmax,
                                               halo_x=halo_x, halo_y=halo_y, halo_z=halo_z)
+            add_halo_hostid(halocat.halo_table)
 
             halocat.add_halocat_to_cache(fname=cache_fnames, processing_notes = "DS14a subbox",
                                          simname=self.simname, halo_finder='rockstar',
@@ -789,7 +791,6 @@ class DarkSky(Cat):
                 Boolean whether or not to use the passed in scale_factor blindly. Default is false.
             :return: None
             '''
-            print 'A'
             if check_sf:
                 a = self._return_nearest_sf(scale_factor, tol)
                 if a is None:
@@ -798,32 +799,26 @@ class DarkSky(Cat):
                 a = scale_factor  # YOLO
             z = 1.0 / a - 1
             f = h5py.File(self.fname, 'r')
-            print 'B'
             sys.stdout.flush()
             dset = f['halos']['subbox_%03d'%self.boxno]
             # only one sf so skipping some of this
             # this copies a lot from cache, could make this one function...
             data = dset.value
-            halo_mass = data[:,self.columns_to_keep['halo_mvir'][0]]
-            mass_cut = halo_mass > min_ptcl*self.pmass
-            halo_mass = halo_mass[mass_cut]
-            halo_id = data[mass_cut, self.columns_to_keep['halo_id'][0]]
-            halo_upid = data[mass_cut,self.columns_to_keep['halo_upid'][0]]
-            #halo_upid = np.ones_like(halo_id)*-1
-            print 'C'
-            t0 = time()
-            halo_nfw_conc = self._conc_from_mass(halo_mass)
-            halo_rvir = data[mass_cut, self.columns_to_keep['halo_rvir'][0]]
-            halo_vmax = data[mass_cut,self.columns_to_keep['halo_vmax'][0]]
-            halo_x, halo_y, halo_z = data[mass_cut,0]%self.Lbox, data[mass_cut,1]%self.Lbox, data[mass_cut,2]%self.Lbox
-            print 'D'
+            halo_id = data['id']
+            halo_upid = data['pid']
+            halo_mass = data['m200b']
+            halo_rvir = data['r200b']
+            halo_vmax = data['vmax']
+            halo_x, halo_y, halo_z = data['x']%self.Lbox, data['y']%self.Lbox , data['z']%self.Lbox
+            halo_vx, halo_vy, halo_vz = np.zeros_like(halo_x), np.zeros_like(halo_x), np.zeros_like(halo_x)
             self.halocat = UserSuppliedHaloCatalog(redshift=z, Lbox=self.Lbox, particle_mass=self.pmass,
                                               halo_id=halo_id,halo_upid=halo_upid, halo_mvir=halo_mass,
-                                              halo_nfw_conc = halo_nfw_conc,
+                                              #halo_nfw_conc = halo_nfw_conc,
                                               halo_rvir=halo_rvir, halo_vmax = halo_vmax,
-                                              halo_x=halo_x, halo_y=halo_y, halo_z=halo_z)
+                                              halo_x=halo_x, halo_y=halo_y, halo_z=halo_z,
+                                              halo_vx=halo_vx, halo_vy=halo_vy, halo_vz=halo_vz)
 
-            print 'E'
+            add_halo_hostid(self.halocat.halo_table)
             # refelct the current catalog
             self.z = z
             self.a = a
@@ -873,11 +868,13 @@ class DarkSky(Cat):
                     satellites_profile=NFWPhaseSpace(redshift=z, conc_mass_model = 'dutton_maccio14'))
 
             else:
+                raise ValueError("This won't work with darksky, sorry!")
                 self.model = PrebuiltHodModelFactory(HOD, redshift=z, **hod_kwargs)
+                #self.model.model_dictionary['satellites_profile'].conc_mass_model = 'dutton_maccio14'
         else:
-            cens_occ = HOD_DICT[HOD][0](redshift=z, **hod_kwargs)
+            cens_occ = HOD[0](redshift=z, **hod_kwargs)
             # NOTE don't know if should always modulate, but I always do.
-            sats_occ = HOD_DICT[HOD][1](redshift=z, cenocc_model=cens_occ, **hod_kwargs)
+            sats_occ = HOD[1](redshift=z, cenocc_model=cens_occ, **hod_kwargs)
             self.model = HodModelFactory(
                 centrals_occupation=cens_occ,
                 centrals_profile=TrivialPhaseSpace(redshift=z),

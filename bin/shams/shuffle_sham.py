@@ -25,7 +25,8 @@ from halotools.utils import *
 
 Lbox = 1000.0
 
-ab_property = 'halo_mpeak'
+#ab_property = 'halo_mpeak'
+ab_property = 'halo_vmax@mpeak'
 catalog = astropy.table.Table.read('/scratch/users/swmclau2/catalog_ab_%s_large_fixed.hdf5'%ab_property, format = 'hdf5')
 
 
@@ -292,7 +293,6 @@ print xi
 
 
 # In[ ]:
-
 
 catalog.write('/scratch/users/swmclau2/catalog_ab_%s_shuffled_fixed.hdf5'%ab_property,
               format = 'hdf5', path = '%s_shuffled'%ab_property, overwrite=True)

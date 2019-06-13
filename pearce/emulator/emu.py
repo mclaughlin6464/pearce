@@ -2323,6 +2323,7 @@ class NashvilleHot(Emu):
             yerr = self.downsample_yerr
 
         for _y,_yerr, _kern1, _kern2, nv in izip(y,yerr, kern1, kern2, noise_var):
+            # TODO delete me
             emulator = GPKroneckerGaussianRegressionVar(x1, x2, _y, _yerr**2, _kern1, _kern2, noise_var = nv)
             #emulator = GPKroneckerGaussianRegression(x1, x2, _y, _kern1, _kern2)
 
