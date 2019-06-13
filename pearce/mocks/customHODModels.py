@@ -25,7 +25,7 @@ class RedMagicCens(Zheng07Cens):
 
         # Default values from our analysis
         defaults = {'logMmin': 12.1, 'f_c': 0.19, 'sigma_logM': 0.46}
-
+        self._suppress_repeated_param_warning = True
         self.param_dict.update(defaults)  # overwrite halotools zheng07 defaults with our own
 
     def mean_occupation(self, **kwargs):
@@ -1233,6 +1233,9 @@ class TabulatedSats(OccupationComponent):
         self._prim_haloprop_vals = prim_haloprop_vals
         self._sat_hod_vals = sat_hod_vals
 
+        self._sat_hod_vals[self._sat_hod_vals < 1e-4] = 0.0 
+
+
         self._mean_occupation = interp1d(np.log10(prim_haloprop_vals), sat_hod_vals, kind='cubic')
 
         # Call the super class constructor, which binds all the
@@ -1306,6 +1309,9 @@ class TabulatedSats(OccupationComponent):
         mean_nsat[over_idxs] = self._sat_hod_vals[-1]  # not happy abotu this, no better guess
         mean_nsat[under_idxs] = self._lower_occupation_bound
         mean_nsat[contained_indices] = self._mean_occupation(np.log10(mass[contained_indices]))
+
+        mean_nsat[mean_nsat < 1e-6] = 0.0
+
 
         return mean_nsat
 

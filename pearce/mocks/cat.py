@@ -425,7 +425,7 @@ class Cat(object):
 
     # adding **kwargs cuz some invalid things can be passed in, hopefully not a pain
     # TODO some sort of spell check in the input file
-    def load(self, scale_factor, HOD='redMagic', tol=0.01, particles=False, downsample_factor=1e-3, hod_kwargs={},
+    def load(self, scale_factor, HOD='redMagic', biased_satellites=False, tol=0.01, particles=False, downsample_factor=1e-3, hod_kwargs={},
              **kwargs):
         '''
         Load both a halocat and a model to prepare for population and calculation.
@@ -440,7 +440,7 @@ class Cat(object):
         if a is None:
             raise ValueError('Scale factor %.3f not within given tolerance.' % scale_factor)
         self.load_catalog(a, tol, check_sf=False, particles=particles, downsample_factor=downsample_factor)
-        self.load_model(a, HOD, check_sf=False, hod_kwargs=hod_kwargs)
+        self.load_model(a, HOD, biased_satellites=biased_satellites, check_sf=False, hod_kwargs=hod_kwargs)
 
     def load_catalog(self, scale_factor, tol=0.05, check_sf=True, particles=False, downsample_factor=1e-3):
         '''
@@ -505,14 +505,18 @@ class Cat(object):
         else:
             a = scale_factor  # YOLO
         z = 1.0 / a - 1
+        #min_conc, max_conc = np.min(self.halocat.halo_table['halo_nfw_conc']), np.max(self.halocat.halo_table[np.isfinite(self.halocat.halo_table['halo_nfw_conc'])]['halo_nfw_conc'])
+        min_conc, max_conc = 1, 100
+        concentration_bins = np.arange(min_conc, max_conc, 1) 
         if biased_satellites:
-            sat_phase_space = BiasedNFWPhaseSpace(redshift=z)
+            sat_phase_space = BiasedNFWPhaseSpace(redshift=z, concentration_bins = concentration_bins)
         else:
-            sat_phase_space = NFWPhaseSpace(redshift=z)
+            sat_phase_space = NFWPhaseSpace(redshift=z, concentration_bins = concentration_bins)
         if type(HOD) is str:
             assert HOD in VALID_HODS
             if HOD in  VALID_HODS-DEFAULT_HODS: # my custom ones
                 cens_occ = HOD_DICT[HOD][0](redshift=z, **hod_kwargs)
+
                 # TODO  this is a hack, something better would be better
                 try: #hack for central modulation
                     # the ab ones need to modulated with the baseline model
@@ -520,6 +524,7 @@ class Cat(object):
                 except: #assume the error is a cenocc issue
                     sats_occ = HOD_DICT[HOD][1](redshift=z,  **hod_kwargs)
 
+                sats_occ._suppress_repeated_param_warning = True
                 self.model = HodModelFactory(
                     centrals_occupation=cens_occ,
                     centrals_profile=TrivialPhaseSpace(redshift=z),
@@ -528,10 +533,17 @@ class Cat(object):
 
             else:
                 self.model = PrebuiltHodModelFactory(HOD,redshift=z, **hod_kwargs)
+                if biased_satellites:
+                    self.model = HodModelFactory(baseline_model_instance=self.model, satellites_profile = sat_phase_space)
         else:
-            cens_occ = HOD_DICT[HOD][0](redshift=z, **hod_kwargs)
-            # NOTE don't know if should always modulate, but I always do.
-            sats_occ = HOD_DICT[HOD][1](redshift=z, cenocc_model=cens_occ, **hod_kwargs)
+            cens_occ = HOD[0](redshift=z, **hod_kwargs)
+            try:
+                sats_occ = HOD[1](redshift=z, cenocc_model=cens_occ, **hod_kwargs)
+            except TypeError: #not all models accept cenoccs, but it shoudl be the default
+                sats_occ = HOD[1](redshift=z, **hod_kwargs)
+
+            sats_occ._suppress_repeated_param_warning = True
+
             self.model = HodModelFactory(
                 centrals_occupation=cens_occ,
                 centrals_profile=TrivialPhaseSpace(redshift=z),
