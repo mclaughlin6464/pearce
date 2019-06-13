@@ -8,7 +8,7 @@ import tensorflow as tf
 #xi gg
 training_file = '/scratch/users/swmclau2/xi_gg_chinchilla/PearceXiggChinchilla.hdf5'
 #test_file= '/scratch/users/swmclau2/xi_zheng07_cosmo_test_lowmsat2/'
-#test_file =  '/scratch/users/swmclau2/xi_gg_chinchilla_test/PearceXiggChinchillaTest.hdf5'
+test_file =  '/scratch/users/swmclau2/xi_gg_chinchilla_test/PearceXiggChinchillaTest.hdf5'
 
 em_method = 'nn'
 split_method = 'random'
@@ -32,14 +32,12 @@ emu = OriginalRecipe(training_file, method = em_method, fixed_params=fixed_param
                                     'tol': 1e-8, 'learning_rate_init':1e-4,\
                                    'max_iter':10, 'alpha':0, 'early_stopping':False, 'validation_fraction':0.3})
 
-train_size = 0.7
 n_train = int(train_size*emu.x.shape[0])
-x_train, y_train,yerr_train = emu.x[:n_train] ,emu.y[:n_train] ,emu.yerr[:n_train]
-x_test, y_test,yerr_test = emu.x[n_train:] ,emu.y[n_train:] ,emu.yerr[n_train:]
+x_train, y_train,yerr_train = emu.x ,emu.y,emu.yerr
 
-#_x_test, y_test, _, info = emu.get_data(test_file, fixed_params, None, False)
+_x_test, y_test, _, info = emu.get_data(test_file, fixed_params, None, False)
 # whtien the data
-#x_test = (_x_test - _x_test.mean(axis = 0))/_x_test.std(axis = 0)
+x_test = (_x_test - _x_test.mean(axis = 0))/_x_test.std(axis = 0)
 
 #y_train_mean, y_train_std = y_train.mean(axis = 0), y_train.std(axis =0)
 #y_test_mean, y_test_std = y_test.mean(axis = 0), y_test.std(axis = 0)
