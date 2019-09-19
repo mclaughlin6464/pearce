@@ -1,19 +1,20 @@
 """
-I'm modifying the halotools tpcf jackknfie code to return the subregion calculations so I can more
-directly manipulate them.
+I'm modifying the halotools tpcf code to add a few more efficincies.
+
+One directly returns the correlation functions from subregions, so I can compute arbitary jackknifes more efficiently
+
+Another is to add a flag for do_auto1 and do_auto2. Sometimes, you wanna compute xi_gg and xi_gm but not xi_mm!
 """
 
 from __future__ import absolute_import, division, unicode_literals
 import numpy as np
-from astropy.utils.misc import NumpyRNGContext
 from halotools.mock_observables import *
-from halotools.custom_exceptions import HalotoolsError
-from halotools.mock_observables.mock_observables_helpers import *
 from halotools.mock_observables.two_point_clustering import *
-from halotools.mock_observables.two_point_clustering.clustering_helpers import *
-from halotools.mock_observables.pair_counters.mesh_helpers import _enforce_maximum_search_length
+from halotools.mock_observables.two_point_clustering.tpcf import _tpcf_process_args, _random_counts
 from halotools.mock_observables.two_point_clustering.tpcf_estimators import _TP_estimator, _TP_estimator_requirements
 from halotools.mock_observables.pair_counters import npairs_jackknife_3d
+from halotools.mock_observables.two_point_clustering.clustering_helpers import (process_optional_input_sample2,
+    verify_tpcf_estimator, tpcf_estimator_dd_dr_rr_requirements)
 
 from halotools.mock_observables.two_point_clustering.tpcf_jackknife import \
     _tpcf_jackknife_process_args,_enclose_in_box, get_subvolume_numbers, jrandom_counts
@@ -21,7 +22,7 @@ from halotools.mock_observables.two_point_clustering.tpcf_jackknife import \
 np.seterr(divide='ignore', invalid='ignore')  # ignore divide by zero in e.g. DD/RR
 
 
-__all__ = ['tpcf_subregions']
+__all__ = ['tpcf_subregions', 'tpcf']
 
 # all lifted from duncan's code
 def tpcf_subregions(sample1, randoms, rbins, Nsub=[5, 5, 5],
@@ -141,6 +142,204 @@ def tpcf_subregions(sample1, randoms, rbins, Nsub=[5, 5, 5],
         outputs.append(xi_22_sub)
     return outputs[0] if len(outputs) ==1 else tuple(outputs)
 
+def tpcf(sample1, rbins, sample2=None, randoms=None, period=None,
+        do_auto1=True, do_cross=True, do_auto2=False, estimator='Natural', num_threads=1,
+        approx_cell1_size=None, approx_cell2_size=None, approx_cellran_size=None,
+        RR_precomputed=None, NR_precomputed=None, seed=None):
+    r"""
+    Calculate the real space two-point correlation function, :math:`\xi(r)`.
+    Example calls to this function appear in the documentation below.
+    See the :ref:`mock_obs_pos_formatting` documentation page for
+    instructions on how to transform your coordinate position arrays into the
+    format accepted by the ``sample1`` and ``sample2`` arguments.
+    See also :ref:`galaxy_catalog_analysis_tutorial2` for example usage on a
+    mock galaxy catalog.
+    Parameters
+    ----------
+    sample1 : array_like
+        Npts1 x 3 numpy array containing 3-D positions of points.
+        See the :ref:`mock_obs_pos_formatting` documentation page, or the
+        Examples section below, for instructions on how to transform
+        your coordinate position arrays into the
+        format accepted by the ``sample1`` and ``sample2`` arguments.
+        Length units are comoving and assumed to be in Mpc/h, here and throughout Halotools.
+    rbins : array_like
+        array of boundaries defining the real space radial bins in which pairs are counted.
+        Length units are comoving and assumed to be in Mpc/h, here and throughout Halotools.
+    sample2 : array_like, optional
+        Npts2 x 3 array containing 3-D positions of points.
+        Passing ``sample2`` as an input permits the calculation of
+        the cross-correlation function.
+        Default is None, in which case only the
+        auto-correlation function will be calculated.
+    randoms : array_like, optional
+        Nran x 3 array containing 3-D positions of randomly distributed points.
+        If no randoms are provided (the default option),
+        calculation of the tpcf can proceed using analytical randoms
+        (only valid for periodic boundary conditions).
+    period : array_like, optional
+        Length-3 sequence defining the periodic boundary conditions
+        in each dimension. If you instead provide a single scalar, Lbox,
+        period is assumed to be the same in all Cartesian directions.
+        If set to None (the default option), PBCs are set to infinity,
+        in which case ``randoms`` must be provided.
+        Length units are comoving and assumed to be in Mpc/h, here and throughout Halotools.
+    do_auto : boolean, optional
+        Boolean determines whether the auto-correlation function will
+        be calculated and returned. Default is True.
+    do_cross : boolean, optional
+        Boolean determines whether the cross-correlation function will
+        be calculated and returned. Only relevant when ``sample2`` is also provided.
+        Default is True for the case where ``sample2`` is provided, otherwise False.
+    estimator : string, optional
+        Statistical estimator for the tpcf.
+        Options are 'Natural', 'Davis-Peebles', 'Hewett' , 'Hamilton', 'Landy-Szalay'
+        Default is ``Natural``.
+    num_threads : int, optional
+        Number of threads to use in calculation, where parallelization is performed
+        using the python ``multiprocessing`` module. Default is 1 for a purely serial
+        calculation, in which case a multiprocessing Pool object will
+        never be instantiated. A string 'max' may be used to indicate that
+        the pair counters should use all available cores on the machine.
+    approx_cell1_size : array_like, optional
+        Length-3 array serving as a guess for the optimal manner by how points
+        will be apportioned into subvolumes of the simulation box.
+        The optimum choice unavoidably depends on the specs of your machine.
+        Default choice is to use Lbox/10 in each dimension,
+        which will return reasonable result performance for most use-cases.
+        Performance can vary sensitively with this parameter, so it is highly
+        recommended that you experiment with this parameter when carrying out
+        performance-critical calculations.
+    approx_cell2_size : array_like, optional
+        Analogous to ``approx_cell1_size``, but for sample2.  See comments for
+        ``approx_cell1_size`` for details.
+    approx_cellran_size : array_like, optional
+        Analogous to ``approx_cell1_size``, but for randoms.  See comments for
+        ``approx_cell1_size`` for details.
+    RR_precomputed : array_like, optional
+        Array storing the number of RR-counts calculated in advance during
+        a pre-processing phase. Must have the same length as *len(rbins)*.
+        If the ``RR_precomputed`` argument is provided,
+        you must also provide the ``NR_precomputed`` argument.
+        Default is None.
+    NR_precomputed : int, optional
+        Number of points in the random sample used to calculate ``RR_precomputed``.
+        If the ``NR_precomputed`` argument is provided,
+        you must also provide the ``RR_precomputed`` argument.
+        Default is None.
+    seed : int, optional
+        Random number seed used to randomly downsample data, if applicable.
+        Default is None, in which case downsampling will be stochastic.
+    Returns
+    -------
+    correlation_function(s) : numpy.array
+        *len(rbins)-1* length array containing the correlation function :math:`\xi(r)`
+        computed in each of the bins defined by input ``rbins``.
+        .. math::
+            1 + \xi(r) \equiv \mathrm{DD}(r) / \mathrm{RR}(r),
+        If ``estimator`` is set to 'Natural'.  :math:`\mathrm{DD}(r)` is the number
+        of sample pairs with separations equal to :math:`r`, calculated by the pair
+        counter.  :math:`\mathrm{RR}(r)` is the number of random pairs with separations
+        equal to :math:`r`, and is counted internally using "analytic randoms" if
+        ``randoms`` is set to None (see notes for an explanation), otherwise it is
+        calculated using the pair counter.
+        If ``sample2`` is passed as input
+        (and if ``sample2`` is not exactly the same as ``sample1``),
+        then three arrays of length *len(rbins)-1* are returned:
+        .. math::
+            \xi_{11}(r), \xi_{12}(r), \xi_{22}(r),
+        the autocorrelation of ``sample1``, the cross-correlation between ``sample1`` and
+        ``sample2``, and the autocorrelation of ``sample2``, respectively.
+        If ``do_auto`` or ``do_cross`` is set to False,
+        the appropriate sequence of results is returned.
+    Notes
+    -----
+    For a higher-performance implementation of the tpcf function written in C,
+    see the Corrfunc code written by Manodeep Sinha, available at
+    https://github.com/manodeep/Corrfunc.
+    Examples
+    --------
+    For demonstration purposes we calculate the `tpcf` for halos in the
+    `~halotools.sim_manager.FakeSim`.
+    >>> from halotools.sim_manager import FakeSim
+    >>> halocat = FakeSim()
+    >>> x = halocat.halo_table['halo_x']
+    >>> y = halocat.halo_table['halo_y']
+    >>> z = halocat.halo_table['halo_z']
+    We transform our *x, y, z* points into the array shape used by the pair-counter by
+    taking the transpose of the result of `numpy.vstack`. This boilerplate transformation
+    is used throughout the `~halotools.mock_observables` sub-package:
+    >>> sample1 = np.vstack((x,y,z)).T
+    Alternatively, you may use the `~halotools.mock_observables.return_xyz_formatted_array`
+    convenience function for this same purpose, which provides additional wrapper
+    behavior around `numpy.vstack` such as placing points into redshift-space.
+    >>> rbins = np.logspace(-1, 1, 10)
+    >>> xi = tpcf(sample1, rbins, period=halocat.Lbox)
+    See also
+    --------
+    :ref:`galaxy_catalog_analysis_tutorial2`
+    """
+
+    do_auto = do_auto1 or do_auto2
+    # check input arguments using clustering helper functions
+    function_args = (sample1, rbins, sample2, randoms, period,
+        do_auto, do_cross, estimator, num_threads,
+        approx_cell1_size, approx_cell2_size, approx_cellran_size,
+        RR_precomputed, NR_precomputed, seed)
+
+    # pass arguments in, and get out processed arguments, plus some control flow variables
+    (sample1, rbins, sample2, randoms, period,
+        do_auto, do_cross, num_threads,
+        _sample1_is_sample2, PBCs,
+        RR_precomputed, NR_precomputed) = _tpcf_process_args(*function_args)
+
+    # What needs to be done?
+    do_DD, do_DR, do_RR = tpcf_estimator_dd_dr_rr_requirements[estimator]
+    if RR_precomputed is not None:
+        # overwrite do_RR as necessary
+        do_RR = False
+
+    # How many points are there (for normalization purposes)?
+    N1 = len(sample1)
+    N2 = len(sample2)
+    if randoms is not None:
+        NR = len(randoms)
+    else:
+        # set the number of randoms equal to the number of points in sample1
+        # this is arbitrarily set, but must remain consistent!
+        if NR_precomputed is not None:
+            NR = NR_precomputed
+        else:
+            NR = N1
+
+    # count data pairs
+    D1D1, D1D2, D2D2 = _pair_counts(sample1, sample2, rbins, period,
+        num_threads, do_auto, do_cross, _sample1_is_sample2,
+        approx_cell1_size, approx_cell2_size)
+
+    # count random pairs
+    D1R, D2R, RR = _random_counts(sample1, sample2, randoms, rbins,
+        period, PBCs, num_threads, do_RR, do_DR, _sample1_is_sample2,
+        approx_cell1_size, approx_cell2_size, approx_cellran_size)
+    if RR_precomputed is not None:
+        RR = RR_precomputed
+
+    # run results through the estimator and return relavent/user specified results.
+
+    outputs = []
+    if do_auto1 or _sample1_is_sample2:
+        xi_11 = _TP_estimator(D1D1, D1R, RR, N1, N1, NR, NR, estimator)
+        outputs.append(xi_11)
+    if do_cross:
+        xi_12 = _TP_estimator(D1D2, D1R, RR, N1, N2, NR, NR, estimator)
+        outputs.append(xi_12)
+    if do_auto2:
+        xi_22 = _TP_estimator(D2D2, D2R, RR, N2, N2, NR, NR, estimator)
+        outputs.append(xi_22)
+
+    return outputs[0] if len(outputs) ==1 else tuple(outputs)
+
+
 # overload to skip the xi_mm calculation
 def jnpair_counts(sample1, sample2, j_index_1, j_index_2, N_sub_vol, rbins,
         period, num_threads, do_auto1 = True, do_cross=False,do_auto2=False, _sample1_is_sample2=False):
@@ -177,3 +376,41 @@ def jnpair_counts(sample1, sample2, j_index_1, j_index_2, N_sub_vol, rbins,
 
     return D1D1, D1D2, D2D2
 
+def _pair_counts(sample1, sample2, rbins,
+        period, num_threads, do_auto1, do_cross, do_auto2,
+        _sample1_is_sample2, approx_cell1_size, approx_cell2_size):
+    r"""
+    Internal function used calculate DD-pairs during the calculation of the tpcf.
+    """
+    if do_auto1 is True:
+        D1D1 = npairs_3d(sample1, sample1, rbins, period=period,
+            num_threads=num_threads,
+            approx_cell1_size=approx_cell1_size,
+            approx_cell2_size=approx_cell1_size)
+        D1D1 = np.diff(D1D1)
+    else:
+        D1D1 = None
+        D2D2 = None
+
+    if _sample1_is_sample2:
+        D1D2 = D1D1
+        D2D2 = D1D1
+    else:
+        if do_cross is True:
+            D1D2 = npairs_3d(sample1, sample2, rbins, period=period,
+                num_threads=num_threads,
+                approx_cell1_size=approx_cell1_size,
+                approx_cell2_size=approx_cell2_size)
+            D1D2 = np.diff(D1D2)
+        else:
+            D1D2 = None
+        if do_auto2 is True:
+            D2D2 = npairs_3d(sample2, sample2, rbins, period=period,
+                num_threads=num_threads,
+                approx_cell1_size=approx_cell2_size,
+                approx_cell2_size=approx_cell2_size)
+            D2D2 = np.diff(D2D2)
+        else:
+            D2D2 = None
+
+    return D1D1, D1D2, D2D2

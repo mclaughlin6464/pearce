@@ -222,16 +222,21 @@ class Emu(object):
                 if 'z' in fixed_params and np.abs(z-fixed_params['z'])> 1e-3:
                     continue
 
-                obs_dset = sf_group['obs']
-                cov_dset = sf_group['cov']
+                obs_dset = sf_group['obs'].value
+
+                cov_dset = []
+                for i in xrange(obs_dset.shape[1]):
+                    cov_dset.append(sf_group['cov'][:, i,i])
+
+                cov_dset = np.vstack(cov_dset).T
 
                 cosmo = cosmo_param_vals[cosmo_no, :]
                 # efficiency note. If I don't iterate over the datasets, just the indicies,
                 # I avoid loading them from disk in fixed HOD scenarios
                 # Those will be rare enough for now that I don't care.
                 counter = 0
+                t0 = time()
                 for HOD_no, (_obs, _cov) in enumerate(izip(obs_dset, cov_dset)):
-
                     if "HOD" in fixed_params and HOD_no != fixed_params['HOD']:
                         continue
                     #if any(np.any(np.isnan(arr)) for arr in [_obs, _cov]):
@@ -264,7 +269,7 @@ class Emu(object):
                         # TODO this may not work with things like r2 anymore
                         # _o, _c = self._iv_transform(independent_variable, _obs, _cov)
                         y.append(np.array([_obs[r_idx]]))
-                        ycov.append(np.array(_cov[r_idx, r_idx]))
+                        ycov.append(np.array(_cov[r_idx,]))# r_idx]))
 
                     else:
                         _params = np.zeros((scale_bin_centers.shape[0], len(params) + 1))
@@ -274,7 +279,7 @@ class Emu(object):
 
                         #_o, _c = self._iv_transform(independent_variable, _obs, _cov)
                         y.append(_obs[gt_rmin])
-                        ycov.append(_cov[gt_rmin, :][:, gt_rmin])
+                        ycov.append(np.diag(_cov[gt_rmin]))#, :][:, gt_rmin])
 
                     num_used += 1
 
@@ -338,7 +343,7 @@ class Emu(object):
             ycov_list.append(yc/(np.outer(self._y_std+1e-5, self._y_std+1e-5)))
 
         self.x = self._whiten(x)[0]
-        self.y = self._whiten(y, arr ='y')[0]
+        self.y = self._whiten(y, arr ='y')[0].reshape((-1, 1))
 
         # TODO differnet hyperparams depending on what this is.
         self.mean_function = self._make_custom_mean_function(custom_mean_function)
@@ -353,9 +358,8 @@ class Emu(object):
             self.yerr = np.sqrt(np.hstack(np.diag(syc) for syc in ycov))
         else:
             self.yerr = np.sqrt(np.hstack(np.diag(np.array(syc)) for syc in ycov))
-
+        self.yerr = self.yerr.reshape((-1,1))
         #self.yerr = np.hstack([yerr for i in xrange(self.x.shape[0] / fullcov.shape[0])])
-
         #compute the average covaraince matrix
         self.ycov = np.zeros((self.n_bins, self.n_bins))
         n_right_shape = 0
@@ -964,8 +968,7 @@ class Emu(object):
 
                 x, y = x[idxs], y[idxs]
         
-
-        pred_y = self._emulate_helper(x, False, old_idxs = old_idxs)
+        pred_y = self._emulate_helper(x, False)[:,0]#, old_idxs = old_idxs)
 
         #if scale_nbins > 1:
         #    try:
@@ -1122,10 +1125,9 @@ class OriginalRecipe(Emu):
 
         N_points = x.shape[0]/self.n_bins #sample full HOD/cosmo points,
         downsample_N_points = int(downsample_factor*N_points)
-
         downsample_x = np.zeros((downsample_N_points*self.n_bins, x.shape[1]))
-        downsample_y = np.zeros((downsample_N_points*self.n_bins))
-        downsample_yerr = np.zeros((downsample_N_points*self.n_bins))
+        downsample_y = np.zeros((downsample_N_points*self.n_bins,1))
+        downsample_yerr = np.zeros((downsample_N_points*self.n_bins,1))
 
         downsampled_points = np.random.choice(N_points, downsample_N_points, replace = False)
 
@@ -1156,9 +1158,8 @@ class OriginalRecipe(Emu):
         else:
             x, y, yerr  = self.downsample_x, self.downsample_y, self.downsample_yerr
 
-        noise = Fixed(kernel.input_dim, np.diag(yerr))
-
-        self._emulator = GPRegression(x, y, kernel+noise)
+        noise = Fixed(kernel.input_dim, np.diag(yerr[:, 0]**2))
+        self._emulator = GPRegression(x, y, kernel)#+noise)
         self._kernel = kernel
 
     def _build_skl(self, hyperparams):
@@ -1205,7 +1206,9 @@ class OriginalRecipe(Emu):
 
         if self.method == 'gp':
             mu, vars = self._emulator.predict(t, kern = self._kernel.copy())
-            return self._y_std*(mu+mean_func_at_params)+self._y_mean, vars*self._y_std**2
+            if gp_errs:
+                return self._y_std*(mu+mean_func_at_params)+self._y_mean, vars*self._y_std**2
+            return self._y_std*(mu+mean_func_at_params)+self._y_mean
         else:
             mu = self._emulator.predict(t)
             return self._y_std*(mu+mean_func_at_params) + self._y_mean
@@ -1233,7 +1236,7 @@ class OriginalRecipe(Emu):
         # TODO kernel based methods may want to use this...
         # TODO may wanna make some of these hyperparams
         assert self.method == 'gp'
-        self._emulator.optimize_restarts(num_restarts = 3, verbose = False)
+        self._emulator.optimize_restarts(num_restarts = 3, verbose = True)
 
 
 def get_leaves(kdtree):
