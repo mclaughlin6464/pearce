@@ -2533,7 +2533,7 @@ class NashvilleHot(Emu):
         np.random.seed(int(time()))
 
         if downsample_factor is not None and downsample_factor<1.0:  # make a random choice
-            x1, x2, y, yerr = self._downsample_data(downsample_factor, x1, x2, y, yerr)
+            x1, x2, y, yerr = self._downsample_data(downsample_factor, x1, x2, y, yerr, attach = False)
 
         #pred_y = self._emulate_helper(x, False, old_idxs=old_idxs)
         # emulate helper works better for one at a time

@@ -1,6 +1,7 @@
 from halotools.mock_observables.pair_counters import npairs_jackknife_3d
 from halotools.mock_observables.catalog_analysis_helpers import cuboid_subvolume_labels
-
+import yaml
+from pearce.mocks.kittens import TestBox
  
 import numpy as np
 
