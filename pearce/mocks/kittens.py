@@ -15,7 +15,7 @@ from astropy import units as u
 import pandas as pd
 import h5py 
 from ast import literal_eval
-from halotools.sim_manager import UserSuppliedHaloCatalog
+from halotools.sim_manager import UserSuppliedHaloCatalog, UserSuppliedPtclCatalog
 from halotools.empirical_models import HodModelFactory, TrivialPhaseSpace, NFWPhaseSpace, PrebuiltHodModelFactory
 from halotools.utils import add_halo_hostid
 from .cat import Cat, HOD_DICT, VALID_HODS, DEFAULT_HODS
@@ -702,10 +702,12 @@ class DarkSky(Cat):
 
         if system == 'sherlock':
             # TODO update
-            fname = '/scratch/users/swmclau2/Darksky/ds14_a_halos_1.0000_fixed_boundaries_v3.hdf5'
+            fname = '/oak/stanford/orgs/kipac/users/swmclau2/Darksky/ds14_a_halos_1.0000.hdf5'
+            ptcl_fname = '/scratch/users/swmclau2/Darksky/ds14_a_1.0000_0.010_downsample_v3.hdf5'
         else:  # ki-ls, etc
             raise NotImplementedError("File not on ki-ls")
         self.fname = fname
+        self.ptcl_fname
 
         pmass = 5.6749434e10 #Msun  (/h?)
 
@@ -783,7 +785,7 @@ class DarkSky(Cat):
         #colossus_cosmo.setCosmology('DarkSky', params)
         #return concentration.concentration(halo_mass, 'vir', 0.0)
 
-    def load_catalog_no_cache(self, scale_factor, min_ptcl = 50, tol=0.05, check_sf=True):
+    def load_catalog_no_cache(self, scale_factor, min_ptcl = 50, tol=0.05, check_sf=True, particles=False):
             '''
             Load a catalog without caching. I *think* thins will work...
             :param a:
@@ -804,7 +806,8 @@ class DarkSky(Cat):
             dset = f['halos']['subbox_%03d'%self.boxno]
             # only one sf so skipping some of this
             # this copies a lot from cache, could make this one function...
-            data = dset.value
+            data = dset[()]
+            f.close() 
             halo_id = data['id']
             halo_upid = data['pid']
             halo_mass = data['m200b']
@@ -824,6 +827,28 @@ class DarkSky(Cat):
             self.z = z
             self.a = a
             self.populated_once = False  # no way this one's been populated!
+
+            if particles: # now do the particles
+                assert hasattr(self, "ptcl_fname"), "Darksky has no particle file."
+
+                f = h5py.File(self.ptcl_fname, 'r')
+                sys.stdout.flush()
+                dset = f['particles']['subbox_%03d'%self.boxno]
+                # only one sf so skipping some of this
+                # this copies a lot from cache, could make this one function...
+                x = dset[:, 0]
+                y = dset[:, 1]
+                z = dset[:, 2]
+                f.close() 
+                vx=vy=vz = np.zeros_like(x)
+                ptcl_ids = np.array(range(x.shape[0]))
+
+                ptcl_catalog = UserSuppliedPtclCatalog(redshift=z, Lbox=self.Lbox,\
+                                                       particle_mass=self.pmass, x=x, y=y, z=z,\
+                                                        vx=vx, vy=vy, vz=vz, ptcl_ids=ptcl_ids)
+
+                # attach this to the halocat
+                setattr(self.halocat, "ptcl_table", ptcl_catalog)
 
     def load_model(self, scale_factor, HOD='redMagic', check_sf=True, hod_kwargs={}):
         '''
