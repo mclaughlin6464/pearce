@@ -314,7 +314,7 @@ def tpcf(sample1, rbins, sample2=None, randoms=None, period=None,
 
     # count data pairs
     D1D1, D1D2, D2D2 = _pair_counts(sample1, sample2, rbins, period,
-        num_threads, do_auto, do_cross, _sample1_is_sample2,
+        num_threads, do_auto1, do_cross, do_auto2, _sample1_is_sample2,
         approx_cell1_size, approx_cell2_size)
 
     # count random pairs

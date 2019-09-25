@@ -497,7 +497,7 @@ class TestBox(Cat):
         if system == 'ki-ls' or system == 'long':
             param_file = '/nfs/slac/g/ki/ki18/des/swmclau2/hypercube_test_points_np7.dat'
         else:  # sherlock
-            param_file = '~swmclau2/scratch/TestBoxes/hypercube_test_points_np7.dat'
+            param_file = '/home/users/swmclau2/Git/pearce/hypercube_test_points_np7.dat'
 
         self.cosmo_params = pd.read_csv(param_file, sep=' ', index_col=None)
 
@@ -707,7 +707,7 @@ class DarkSky(Cat):
         else:  # ki-ls, etc
             raise NotImplementedError("File not on ki-ls")
         self.fname = fname
-        self.ptcl_fname
+        self.ptcl_fname = ptcl_fname
 
         pmass = 5.6749434e10 #Msun  (/h?)
 
@@ -836,19 +836,29 @@ class DarkSky(Cat):
                 dset = f['particles']['subbox_%03d'%self.boxno]
                 # only one sf so skipping some of this
                 # this copies a lot from cache, could make this one function...
-                x = dset[:, 0]
-                y = dset[:, 1]
-                z = dset[:, 2]
+                p_x = dset[:, 0]
+                p_y = dset[:, 1]
+                p_z = dset[:, 2]
                 f.close() 
-                vx=vy=vz = np.zeros_like(x)
-                ptcl_ids = np.array(range(x.shape[0]))
+                # fix bounds cuz some are still off?
+                def fix_bounds(x):
+                    x_lt_0 = x< 0
+                    x_gt_L = x>self.Lbox
+                    x[x_lt_0] =  x[x_lt_0]+self.Lbox
+                    x[x_gt_L] = x[x_gt_L] - self.Lbox
+                    return x
 
-                ptcl_catalog = UserSuppliedPtclCatalog(redshift=z, Lbox=self.Lbox,\
-                                                       particle_mass=self.pmass, x=x, y=y, z=z,\
-                                                        vx=vx, vy=vy, vz=vz, ptcl_ids=ptcl_ids)
+                p_x = fix_bounds(p_x)
+                p_y = fix_bounds(p_y)
+                p_z = fix_bounds(p_z)
+
+                vx=vy=vz = np.zeros_like(p_x)
+                ptcl_ids = np.array(range(p_x.shape[0]))
+
+                ptcl_catalog = UserSuppliedPtclCatalog(redshift=z, Lbox=self.Lbox, particle_mass=self.pmass, x=p_x, y=p_y, z=p_z, vx=vx, vy=vy, vz=vz, ptcl_ids=ptcl_ids)
 
                 # attach this to the halocat
-                setattr(self.halocat, "ptcl_table", ptcl_catalog)
+                setattr(self.halocat, "ptcl_table", ptcl_catalog.ptcl_table)
 
     def load_model(self, scale_factor, HOD='redMagic', check_sf=True, hod_kwargs={}):
         '''
