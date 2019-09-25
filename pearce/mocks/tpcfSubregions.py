@@ -318,9 +318,19 @@ def tpcf(sample1, rbins, sample2=None, randoms=None, period=None,
         approx_cell1_size, approx_cell2_size)
 
     # count random pairs
-    D1R, D2R, RR = _random_counts(sample1, sample2, randoms, rbins,
-        period, PBCs, num_threads, do_RR, do_DR, _sample1_is_sample2,
-        approx_cell1_size, approx_cell2_size, approx_cellran_size)
+    # split this up over a few because randoms is large
+    # TODO do they stack like this?
+    n_split = 10
+    split_randoms = np.array_split(randoms, n_split, axis = 0)
+
+    D1R, D2R = np.zeros_like(D1D1), np.zeros_like(D1D2)
+    for i, _rand in enumerate(split_randoms):
+        _D1R, _D2R, _, = _random_counts(sample1, sample2, _rand, rbins,
+            period, PBCs, num_threads, do_RR, do_DR, _sample1_is_sample2,
+            approx_cell1_size, approx_cell2_size, approx_cellran_size)
+        D1R+=D1R
+        D2R+=D2R
+
     if RR_precomputed is not None:
         RR = RR_precomputed
 
