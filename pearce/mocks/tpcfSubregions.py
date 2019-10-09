@@ -145,7 +145,7 @@ def tpcf_subregions(sample1, randoms, rbins, Nsub=[5, 5, 5],
 def tpcf(sample1, rbins, sample2=None, randoms=None, period=None,
         do_auto1=True, do_cross=True, do_auto2=False, estimator='Natural', num_threads=1,
         approx_cell1_size=None, approx_cell2_size=None, approx_cellran_size=None,
-        RR_precomputed=None, NR_precomputed=None, seed=None):
+        RR_precomputed=None, NR_precomputed=None, seed=None, n_split = 1):
     r"""
     Calculate the real space two-point correlation function, :math:`\xi(r)`.
     Example calls to this function appear in the documentation below.
@@ -320,18 +320,33 @@ def tpcf(sample1, rbins, sample2=None, randoms=None, period=None,
     # count random pairs
     # split this up over a few because randoms is large
     # TODO do they stack like this?
-    n_split = 10
     split_randoms = np.array_split(randoms, n_split, axis = 0)
 
-    D1R, D2R = np.zeros_like(D1D1), np.zeros_like(D1D2)
+    D1R, D2R, RR = np.zeros_like(D1D1), np.zeros_like(D1D2), np.zeros_like(D1D2)
+    #D1Rs = []
     for i, _rand in enumerate(split_randoms):
-        _D1R, _D2R, _, = _random_counts(sample1, sample2, _rand, rbins,
+        print i,
+        _D1R, _D2R, _RR, = _random_counts(sample1, sample2, _rand, rbins,
             period, PBCs, num_threads, do_RR, do_DR, _sample1_is_sample2,
             approx_cell1_size, approx_cell2_size, approx_cellran_size)
-        D1R+=D1R
-        D2R+=D2R
+        #D1Rs.append(_D1R)
+
+        if _D1R is not None:
+            D1R+=_D1R
+        if _D2R is not None:
+            D2R+=_D2R
+        if _RR is not None:
+            RR+=_RR
+
+    print D1R
+    D1R=np.array(D1R)/n_split
+    D2R=np.array(D2R)/n_split
+    RR=np.array(RR)/n_split
+    print D1R
+    print 
 
     if RR_precomputed is not None:
+
         RR = RR_precomputed
 
     # run results through the estimator and return relavent/user specified results.

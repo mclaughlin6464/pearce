@@ -836,9 +836,9 @@ class DarkSky(Cat):
                 dset = f['particles']['subbox_%03d'%self.boxno]
                 # only one sf so skipping some of this
                 # this copies a lot from cache, could make this one function...
-                p_x = dset[:, 0]
-                p_y = dset[:, 1]
-                p_z = dset[:, 2]
+                p_x = dset[:, 0]%self.Lbox
+                p_y = dset[:, 1]%self.Lbox
+                p_z = dset[:, 2]%self.Lbox
                 f.close() 
                 # fix bounds cuz some are still off?
                 def fix_bounds(x):
@@ -848,9 +848,9 @@ class DarkSky(Cat):
                     x[x_gt_L] = x[x_gt_L] - self.Lbox
                     return x
 
-                p_x = fix_bounds(p_x)
-                p_y = fix_bounds(p_y)
-                p_z = fix_bounds(p_z)
+                #p_x = fix_bounds(p_x)
+                #p_y = fix_bounds(p_y)
+                #p_z = fix_bounds(p_z)
 
                 vx=vy=vz = np.zeros_like(p_x)
                 ptcl_ids = np.array(range(p_x.shape[0]))
