@@ -405,7 +405,7 @@ def _pair_counts(sample1, sample2, rbins,
         period, num_threads, do_auto1, do_cross, do_auto2,
         _sample1_is_sample2, approx_cell1_size, approx_cell2_size):
     r"""
-    Internal function used calculate DD-pairs during the calculation of the tpcf.
+    Internal function used calculate DD-pairs during the calculation of the tpcf.    
     """
     if do_auto1 is True:
         D1D1 = npairs_3d(sample1, sample1, rbins, period=period,
@@ -439,3 +439,87 @@ def _pair_counts(sample1, sample2, rbins,
             D2D2 = None
 
     return D1D1, D1D2, D2D2
+
+def _random_counts(sample1, sample2, randoms, rbins, period, PBCs, num_threads,
+        do_RR, do_DR, _sample1_is_sample2, approx_cell1_size,
+        approx_cell2_size, approx_cellran_size, diff = True):
+    r"""
+    Internal function used to random pairs during the calculation of the tpcf.
+    There are two high level branches:
+        1. w/ or wo/ PBCs and randoms.
+        2. PBCs and analytical randoms
+    There is also control flow governing whether RR and DR pairs are counted,
+    as not all estimators need one or the other.
+
+    Analytical counts are N**2*dv*rho, where dv is the volume of the spherical
+    shells, which is the correct volume to use for a continious cubical volume with PBCs.
+    
+    Adding a function to do the diff after so you can split it up a little better
+
+    """
+    def nball_volume(R, k=3):
+        """
+        Calculate the volume of a n-shpere.
+        This is used for the analytical randoms.
+        """
+        return (np.pi**(k/2.0)/gamma(k/2.0+1.0))*R**k
+
+    # randoms provided, so calculate random pair counts.
+    if randoms is not None:
+        if do_RR is True:
+            RR = npairs_3d(randoms, randoms, rbins, period=period,
+                        num_threads=num_threads,
+                        approx_cell1_size=approx_cellran_size,
+                        approx_cell2_size=approx_cellran_size)
+            RR = np.diff(RR)
+        else:
+            RR = None
+        if do_DR is True:
+            D1R = npairs_3d(sample1, randoms, rbins, period=period,
+                         num_threads=num_threads,
+                         approx_cell1_size=approx_cell1_size,
+                         approx_cell2_size=approx_cellran_size
+                            )
+            D1R = np.diff(D1R)
+        else:
+            D1R = None
+        if _sample1_is_sample2:
+            D2R = None
+        else:
+            if do_DR is True:
+                D2R = npairs_3d(sample2, randoms, rbins, period=period,
+                             num_threads=num_threads,
+                             approx_cell1_size=approx_cell2_size,
+                             approx_cell2_size=approx_cellran_size)
+                D2R = np.diff(D2R)
+            else:
+                D2R = None
+
+        return D1R, D2R, RR
+
+    # PBCs and no randoms--calculate randoms analytically.
+    elif randoms is None:
+
+        # set the number of randoms equal to the number of points in sample1
+        NR = len(sample1)
+
+        # do volume calculations
+        v = nball_volume(rbins)  # volume of spheres
+        dv = np.diff(v)  # volume of shells
+        global_volume = period.prod()  # volume of simulation
+        
+        # calculate randoms for sample1
+        N1 = np.shape(sample1)[0]  # number of points in sample1
+        rho1 = N1/global_volume  # number density of points
+        D1R = (NR)*(dv*rho1)  # random counts are N**2*dv*rho
+
+        # calculate randoms for sample2
+        N2 = np.shape(sample2)[0]  # number of points in sample2
+        rho2 = N2/global_volume  # number density of points
+        D2R = (NR)*(dv*rho2)  # random counts are N**2*dv*rho
+
+        # calculate the random-random pairs.
+        rhor = (NR**2)/global_volume
+        RR = (dv*rhor)
+
+        return D1R, D2R, RR
