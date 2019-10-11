@@ -15,7 +15,7 @@ from astropy import units as u
 import pandas as pd
 import h5py 
 from ast import literal_eval
-from halotools.sim_manager import UserSuppliedHaloCatalog
+from halotools.sim_manager import UserSuppliedHaloCatalog, UserSuppliedPtclCatalog
 from halotools.empirical_models import HodModelFactory, TrivialPhaseSpace, NFWPhaseSpace, PrebuiltHodModelFactory
 from halotools.utils import add_halo_hostid
 from .cat import Cat, HOD_DICT, VALID_HODS, DEFAULT_HODS
@@ -421,6 +421,7 @@ class TrainingBox(Cat):
         gadget_loc = loc + 'output/'
         loc += 'halos/m200b/'
 
+        #TODO why not using rs boxes???
         tmp_fnames = ['outbgc2_%d.list' % i for i in xrange(10)]
         #tmp_fnames = ['TestBox00%d-000_out_parents_5.list' % boxno]
         tmp_scale_factors = [0.25, 0.333, 0.5, 0.540541, 0.588235, 0.645161, 0.714286, 0.8, 0.909091, 1.0]
@@ -496,7 +497,7 @@ class TestBox(Cat):
         if system == 'ki-ls' or system == 'long':
             param_file = '/nfs/slac/g/ki/ki18/des/swmclau2/hypercube_test_points_np7.dat'
         else:  # sherlock
-            param_file = '~swmclau2/scratch/TestBoxes/hypercube_test_points_np7.dat'
+            param_file = '/home/users/swmclau2/Git/pearce/hypercube_test_points_np7.dat'
 
         self.cosmo_params = pd.read_csv(param_file, sep=' ', index_col=None)
 
@@ -701,10 +702,12 @@ class DarkSky(Cat):
 
         if system == 'sherlock':
             # TODO update
-            fname = '/scratch/users/swmclau2/Darksky/ds14_a_halos_1.0000_fixed_boundaries_v3.hdf5'
+            fname = '/oak/stanford/orgs/kipac/users/swmclau2/Darksky/ds14_a_halos_1.0000.hdf5'
+            ptcl_fname = '/scratch/users/swmclau2/Darksky/ds14_a_1.0000_0.010_downsample_v3.hdf5'
         else:  # ki-ls, etc
             raise NotImplementedError("File not on ki-ls")
         self.fname = fname
+        self.ptcl_fname = ptcl_fname
 
         pmass = 5.6749434e10 #Msun  (/h?)
 
@@ -713,6 +716,7 @@ class DarkSky(Cat):
                             'Omega0_b' : 0.04676431995034128,
                             'w0' : -1,
                             'h' : 0.7036893781978598}
+
 
         cosmo = self._get_cosmo()
 
@@ -738,6 +742,14 @@ class DarkSky(Cat):
     def _get_cosmo(self):
         return cosmology.core.FlatLambdaCDM(H0=self.cosmo_params['h'] * 100, Om0=self.cosmo_params['Omega0_m'], \
                                        Ob0=self.cosmo_params['Omega0_b'])#, w0=params['w'])
+
+    def _get_cosmo_param_names_vals(self):
+        names = ['Omega_c', 'Omega_b','w0', 'h', 'sigma8', 'n_s']
+
+        vals = [0.2482735987535057, 0.04676431995034128, -1, self.h, 0.835, 0.967]
+
+        return names, vals
+
 
     def cache(self, scale_factors = 'all', overwrite=False, **kwargs):
 
@@ -782,7 +794,7 @@ class DarkSky(Cat):
         #colossus_cosmo.setCosmology('DarkSky', params)
         #return concentration.concentration(halo_mass, 'vir', 0.0)
 
-    def load_catalog_no_cache(self, scale_factor, min_ptcl = 50, tol=0.05, check_sf=True):
+    def load_catalog_no_cache(self, scale_factor, min_ptcl = 50, tol=0.05, check_sf=True, particles=False):
             '''
             Load a catalog without caching. I *think* thins will work...
             :param a:
@@ -803,7 +815,8 @@ class DarkSky(Cat):
             dset = f['halos']['subbox_%03d'%self.boxno]
             # only one sf so skipping some of this
             # this copies a lot from cache, could make this one function...
-            data = dset.value
+            data = dset[()]
+            f.close() 
             halo_id = data['id']
             halo_upid = data['pid']
             halo_mass = data['m200b']
@@ -823,6 +836,38 @@ class DarkSky(Cat):
             self.z = z
             self.a = a
             self.populated_once = False  # no way this one's been populated!
+
+            if particles: # now do the particles
+                assert hasattr(self, "ptcl_fname"), "Darksky has no particle file."
+
+                f = h5py.File(self.ptcl_fname, 'r')
+                sys.stdout.flush()
+                dset = f['particles']['subbox_%03d'%self.boxno]
+                # only one sf so skipping some of this
+                # this copies a lot from cache, could make this one function...
+                p_x = dset[:, 0]%self.Lbox
+                p_y = dset[:, 1]%self.Lbox
+                p_z = dset[:, 2]%self.Lbox
+                f.close() 
+                # fix bounds cuz some are still off?
+                def fix_bounds(x):
+                    x_lt_0 = x< 0
+                    x_gt_L = x>self.Lbox
+                    x[x_lt_0] =  x[x_lt_0]+self.Lbox
+                    x[x_gt_L] = x[x_gt_L] - self.Lbox
+                    return x
+
+                #p_x = fix_bounds(p_x)
+                #p_y = fix_bounds(p_y)
+                #p_z = fix_bounds(p_z)
+
+                vx=vy=vz = np.zeros_like(p_x)
+                ptcl_ids = np.array(range(p_x.shape[0]))
+
+                ptcl_catalog = UserSuppliedPtclCatalog(redshift=z, Lbox=self.Lbox, particle_mass=self.pmass, x=p_x, y=p_y, z=p_z, vx=vx, vy=vy, vz=vz, ptcl_ids=ptcl_ids)
+
+                # attach this to the halocat
+                setattr(self.halocat, "ptcl_table", ptcl_catalog.ptcl_table)
 
     def load_model(self, scale_factor, HOD='redMagic', check_sf=True, hod_kwargs={}):
         '''

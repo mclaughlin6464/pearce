@@ -964,7 +964,7 @@ class Cat(object):
                                                                 estimator='Landy-Szalay')  # , do_auto=False)
             else:
                 xi_all = tpcf(pos_g / self.h, rbins, sample2=pos_m / self.h, period=self.Lbox / self.h,
-                              num_threads=n_cores,
+                              num_threads=n_cores, 
                               estimator='Landy-Szalay', do_auto=False)
 
         # TODO 1, 2 halo terms?
@@ -1216,7 +1216,7 @@ class Cat(object):
                            period=self.Lbox / self.h, num_threads=n_cores, cosmology=self.cosmology)[1] / (1e12)
 
     @observable(particles=True)
-    def calc_ds_analytic(self, bins, angular=False, n_cores='all', xi_kwargs={}):
+    def calc_ds_analytic(self, bins, angular=False, n_cores='all', xi_kwargs={}, xi = None, rbins = None):
         """
         Calculate delta sigma by integratin xi_gm instead of projecting the box's matter distribution.
 
@@ -1241,8 +1241,12 @@ class Cat(object):
 
         n_cores = self._check_cores(n_cores)
         # calculate xi_gg first
-        rbins = np.logspace(-1.3, 1.6, 16)
-        xi = self.calc_xi_gm(rbins, n_cores=n_cores, **xi_kwargs)
+        if xi is None:
+            assert rbins is None
+            rbins = np.logspace(-1.3, 1.6, 16)
+            xi = self.calc_xi_gm(rbins, n_cores=n_cores, **xi_kwargs)
+        else:
+            assert rbins is not None, "Must specify rbins along with xi"
 
         if np.any(xi <= 0):
             warnings.warn(
@@ -1280,15 +1284,17 @@ class Cat(object):
 
         def sigma_integrand_medium_scales(lRz, Rp, xi_interp):
             Rz = np.exp(lRz)
+            print "Med", Rz, Rp, rpoints[0]
             return Rz * 10 ** xi_interp(np.log10(Rz * Rz + Rp * Rp) * 0.5)
 
         def sigma_integrand_large_scales(lRz, Rp, bias, xi_mm_interp):
             Rz = np.exp(lRz)
+            print "Large", Rz, Rp, rpoints[0]
             return Rz * bias * 10 ** xi_mm_interp(np.log10(Rz * Rz + Rp * Rp) * 0.5)
 
         ### calculate sigma first###
 
-        sigma_rpoints = np.logspace(-1.1, 2.2, 15)
+        sigma_rpoints = np.logspace(-1.0, 2.2, 15)
 
         sigma = np.zeros_like(sigma_rpoints)
         for i, rp in enumerate(sigma_rpoints):
@@ -1297,7 +1303,7 @@ class Cat(object):
 
             if not np.isnan(log_u_ss_max):  # rp > xi_rmax
                 small_scales_contribution = \
-                quad(sigma_integrand_medium_scales, -10, log_u_ss_max, args=(rp, xi_interp))[0]
+                        quad(sigma_integrand_medium_scales, -10, log_u_ss_max, args=(rp, xi_interp))[0]
                 Rz = np.exp(log_u_ls_max)
 
                 large_scales_contribution = quad(sigma_integrand_large_scales, log_u_ss_max, log_u_ls_max, \
@@ -1318,6 +1324,7 @@ class Cat(object):
         ### calculate delta sigma ###
 
         def DS_integrand_medium_scales(lR, sigma_interp):
+            print 'DS', np.exp(lR), rp_points[0]
             return np.exp(2 * lR) * sigma_interp(np.log10(np.exp(lR)))
 
         rp_bins = bins if not angular else self._rp_from_ang(bins)

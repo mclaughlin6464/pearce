@@ -2,7 +2,7 @@
 #SBATCH --job-name=compute_rr_pairs
 #SBATCH -p bigmem 
 #SBATCH --time=04:00:00
-#SBATCH -o compute_rr_pairs.out 
+#SBATCH -o compute_rr_pairs_bigmem.out 
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=128G
