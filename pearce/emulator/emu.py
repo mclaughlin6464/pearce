@@ -2040,6 +2040,8 @@ class NashvilleHot(Emu):
                 obs_dset = sf_group['obs'].value
                 cov_dset = sf_group['cov'].value
 
+                #print cosmo_group_name, np.where(np.all(obs_dset==0.0, axis = 1))
+
                 if 'r' in fixed_params:
                     y.append(obs_dset[:,r_idx])
                     yerr.append(cov_dset[:, r_idx, r_idx])
@@ -2050,6 +2052,8 @@ class NashvilleHot(Emu):
                         # ugly, but takes the rbin slice and puts it to the corresponding list.
                         y[r_idx - np.sum(~gt_rmin)].append(obs_dset[:, r_idx])
                         yerr[r_idx - np.sum(~gt_rmin)].append(cov_dset[:, r_idx, r_idx])
+
+                        
 
                 # we will be using this differently, so keep this format too.
                 for _cov in cov_dset:
@@ -2066,26 +2070,28 @@ class NashvilleHot(Emu):
             y = np.vstack(y)
             yerr = np.vstack(yerr)
         else:
-            y = [np.vstack(_y) for _y in y]
-            yerr = [np.vstack(_yerr) for _yerr in yerr]
+            y = np.array([np.vstack(_y) for _y in y])
+            yerr = np.array([np.vstack(_yerr) for _yerr in yerr])
 
         _ycov = np.dstack(ycov)
 
         if (np.any(np.isnan(ycov)) or np.any(np.isnan(y))):
+            #y_nans = np.logical_or(np.isnan(y), np.all(y==0.0, axis = 0))
             y_nans = np.isnan(y)
+            nan_idxs = np.where(y_nans)  # np.logical_or(y_nans ,ycov_nans )
+            #print np.where(nan_idxs)
+            num_skipped = np.sum(y_nans)
+            for a,b,c in zip(*nan_idxs):
+                y[a,b,c] = np.nanmean(y[a])
 
-            nan_idxs = y_nans  # np.logical_or(y_nans ,ycov_nans )
-            num_skipped = np.sum(nan_idxs)
-            for yy, ni in zip(y, nan_idxs): 
-                yy[ni] = np.nanmean(yy)
+            #y_nans = np.logical_or(np.isnan(yerr), np.all(yerr==0.0, axis = 0))
             y_nans = np.isnan(yerr)
+            nan_idxs = np.where(y_nans)  # np.logical_or(y_nans ,ycov_nans )
+            #print np.where(nan_idxs)
+            #num_skipped = np.sum(y_nans)
+            for a,b,c in zip(*nan_idxs):
+                yerr[a,b,c] = np.nanmean(y[a])
 
-            nan_idxs = y_nans  # np.logical_or(y_nans ,ycov_nans )
-            num_skipped = np.sum(nan_idxs)
-            for yy, ni in zip(yerr, nan_idxs): 
-                yy[ni] = np.nanmean(yy)
-
-            
             ycov_list = []
 
             mean_mat = np.nanmean(_ycov, axis = 2)
@@ -2110,7 +2116,7 @@ class NashvilleHot(Emu):
         if len(y.shape) == 2: 
             y = np.expand_dims(y, 0)
             yerr = np.expand_dims(yerr, 0) # make sure they all have the same shape, ain't that nice?
-
+        print np.where(np.all(y==0.0, axis = 0))
         if attach_params:
             return x1, x2, y, yerr, ycov
         else:
@@ -2125,7 +2131,7 @@ class NashvilleHot(Emu):
         """
         assert custom_mean_function is None, "Mean functions not supported for Nashville Hot"
 
-        x1, x2, y, yerr, ycov = self.get_data(filename, self.fixed_params, attach_params=True)#, remove_nans=True)
+        x1, x2, y, yerr, ycov = self.get_data(filename, self.fixed_params, attach_params=True)
         # store the data loading args, if we wanna reload later
         # useful ofr sampling the training data
 
@@ -2524,7 +2530,6 @@ class NashvilleHot(Emu):
             assert downsample_factor > 0 and downsample_factor<=1.0
 
         x1, x2, y, yerr, _, info = self.get_data(truth_file, self.fixed_params)
-
         x1, x2 = self._whiten(x1, x2)[0]
 
         scale_bin_centers = info['sbc']

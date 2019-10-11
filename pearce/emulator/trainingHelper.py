@@ -66,11 +66,16 @@ def consolidate_outputs(directory=None):
     # i'd like to find a way to make the numpy arrays a priori but not sure how
     
     for o_fname, cov_fname in izip(output_fnames, output_cov_fnames):
-        all_output.append(np.load(o_fname))
-        all_output_cov.append(np.load(cov_fname))
+        o, cov = np.load(o_fname), np.load(cov_fname)
+        #if np.all(o[:,-1] == 0.0):
+        #    o = o[:,:-1]
+        #    cov = cov[:,:-1][:-1, :]
 
-    all_output = np.array(all_output)
-    all_output_cov = np.array(all_output_cov)
+        all_output.append(o)
+        all_output_cov.append(cov)
+
+    all_output = np.vstack(all_output)
+    all_output_cov = np.hstack(all_output_cov)
 
     trainer = get_trainer(directory)
 

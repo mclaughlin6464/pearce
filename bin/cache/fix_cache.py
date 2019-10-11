@@ -4,9 +4,9 @@ import h5py
 
 #cache = HaloTableCache()
 
-all_trainboxes = glob('/u/ki/swmclau2/des/halocats/hlist_1.00.list.trainingbox_??.hdf5')
+all_testboxes = glob('/u/ki/swmclau2/des/halocats/hlist_1.00.list.testbox_??_?.hdf5')
 
-for boxno, t in enumerate(sorted(all_trainboxes)):
+for boxno, t in enumerate(sorted(all_testboxes)):
     print boxno
 
     with h5py.File(t) as f:
