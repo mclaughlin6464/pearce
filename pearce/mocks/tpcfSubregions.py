@@ -145,7 +145,7 @@ def tpcf_subregions(sample1, randoms, rbins, Nsub=[5, 5, 5],
 def tpcf(sample1, rbins, sample2=None, randoms=None, period=None,
         do_auto1=True, do_cross=True, do_auto2=False, estimator='Natural', num_threads=1,
         approx_cell1_size=None, approx_cell2_size=None, approx_cellran_size=None,
-        RR_precomputed=None, NR_precomputed=None, seed=None, n_split = 1):
+        RR_precomputed=None, NR_precomputed=None, seed=None, n_split = 20):
     r"""
     Calculate the real space two-point correlation function, :math:`\xi(r)`.
     Example calls to this function appear in the documentation below.
@@ -322,13 +322,14 @@ def tpcf(sample1, rbins, sample2=None, randoms=None, period=None,
     # TODO do they stack like this?
     split_randoms = np.array_split(randoms, n_split, axis = 0)
 
-    D1R, D2R, RR = np.zeros_like(D1D1), np.zeros_like(D1D2), np.zeros_like(D1D2)
+    D1R, D2R, RR = np.zeros((len(rbins))), np.zeros((len(rbins))), np.zeros((len(rbins)))
     #D1Rs = []
     for i, _rand in enumerate(split_randoms):
-        print i,
+        #print i,
+        # don't diff here until after!
         _D1R, _D2R, _RR, = _random_counts(sample1, sample2, _rand, rbins,
             period, PBCs, num_threads, do_RR, do_DR, _sample1_is_sample2,
-            approx_cell1_size, approx_cell2_size, approx_cellran_size)
+            approx_cell1_size, approx_cell2_size, approx_cellran_size, diff = False)
         #D1Rs.append(_D1R)
 
         if _D1R is not None:
@@ -338,12 +339,9 @@ def tpcf(sample1, rbins, sample2=None, randoms=None, period=None,
         if _RR is not None:
             RR+=_RR
 
-    print D1R
-    D1R=np.array(D1R)/n_split
-    D2R=np.array(D2R)/n_split
-    RR=np.array(RR)/n_split
-    print D1R
-    print 
+    D1R=np.diff(D1R)
+    D2R=np.diff(D2R)
+    RR=np.diff(RR)
 
     if RR_precomputed is not None:
 
@@ -471,7 +469,8 @@ def _random_counts(sample1, sample2, randoms, rbins, period, PBCs, num_threads,
                         num_threads=num_threads,
                         approx_cell1_size=approx_cellran_size,
                         approx_cell2_size=approx_cellran_size)
-            RR = np.diff(RR)
+            if diff:
+                RR = np.diff(RR)
         else:
             RR = None
         if do_DR is True:
@@ -480,7 +479,8 @@ def _random_counts(sample1, sample2, randoms, rbins, period, PBCs, num_threads,
                          approx_cell1_size=approx_cell1_size,
                          approx_cell2_size=approx_cellran_size
                             )
-            D1R = np.diff(D1R)
+            if diff:
+                D1R = np.diff(D1R)
         else:
             D1R = None
         if _sample1_is_sample2:
@@ -491,7 +491,8 @@ def _random_counts(sample1, sample2, randoms, rbins, period, PBCs, num_threads,
                              num_threads=num_threads,
                              approx_cell1_size=approx_cell2_size,
                              approx_cell2_size=approx_cellran_size)
-                D2R = np.diff(D2R)
+                if diff:
+                    D2R = np.diff(D2R)
             else:
                 D2R = None
 

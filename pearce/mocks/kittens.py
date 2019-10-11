@@ -717,6 +717,7 @@ class DarkSky(Cat):
                             'w0' : -1,
                             'h' : 0.7036893781978598}
 
+
         cosmo = self._get_cosmo()
 
         tmp_scale_factors = [1.0]
@@ -741,6 +742,14 @@ class DarkSky(Cat):
     def _get_cosmo(self):
         return cosmology.core.FlatLambdaCDM(H0=self.cosmo_params['h'] * 100, Om0=self.cosmo_params['Omega0_m'], \
                                        Ob0=self.cosmo_params['Omega0_b'])#, w0=params['w'])
+
+    def _get_cosmo_param_names_vals(self):
+        names = ['Omega_c', 'Omega_b','w0', 'h', 'sigma8', 'n_s']
+
+        vals = [0.2482735987535057, 0.04676431995034128, -1, self.h, 0.835, 0.967]
+
+        return names, vals
+
 
     def cache(self, scale_factors = 'all', overwrite=False, **kwargs):
 
