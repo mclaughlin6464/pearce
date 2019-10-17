@@ -456,8 +456,8 @@ class TrainingBox(Cat):
         """
         params = self.cosmo_params.iloc[self.boxno]
         h = params['H0']/100.0
-        Om0 = (params['ombh2'] + params['omch2'])*(h**2)
-        return cosmology.core.FlatwCDM(H0= params['H0'], Om0 = Om0, Neff=params['Neff'], Ob0=params['ombh2']*(h**2),
+        Om0 = (params['ombh2'] + params['omch2'])/(h**2)
+        return cosmology.core.FlatwCDM(H0= params['H0'], Om0 = Om0, Neff=params['Neff'], Ob0=params['ombh2']/(h**2),
                                        w0 = params['w0'])
 
     def _get_cosmo_param_names_vals(self):
@@ -561,9 +561,9 @@ class TestBox(Cat):
         """
         params = self.cosmo_params.iloc[self.boxno]
         h = params['H0'] / 100.0
-        Om0 = (params['ombh2'] + params['omch2']) * (h ** 2)
+        Om0 = (params['ombh2'] + params['omch2']) / (h ** 2)
         return cosmology.core.FlatwCDM(H0=params['H0'], Om0=Om0, Neff=params['Neff'],
-                                       Ob0=params['ombh2'] * (h ** 2))
+                                       Ob0=params['ombh2'] / (h ** 2))
 
     def _get_cosmo_param_names_vals(self):
         # TODO docs
