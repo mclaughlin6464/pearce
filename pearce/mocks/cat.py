@@ -1261,11 +1261,20 @@ class Cat(object):
 
         # get the theotertical matter xi, for large scale estimates
         names, vals = self._get_cosmo_param_names_vals()
-        param_dict = {n: v for n, v in zip(names, vals)}
+        param_dict = dict(zip(names, vals)) 
 
         if 'Omega_c' not in param_dict:
             param_dict['Omega_c'] = param_dict['Omega_m'] - param_dict['Omega_b']
             del param_dict['Omega_m']
+        elif 'omch2' in param_dict: # in other units, convert
+            new_param_dict = {}
+            new_param_dict['Omega_c'] = param_dict['omch2']*self.h**2
+            new_param_dict['Omega_b'] = param_dict['ombh2']*self.h**2
+            new_param_dict['n_s'] = param_dict['ns']
+            new_param_dict['h'] = self.h
+            new_param_dict['A_s'] = np.exp(param_dict['ln10As'])*(np.power(10, -10))
+
+            param_dict = new_param_dict
 
         cosmo = ccl.Cosmology(**param_dict)
 
