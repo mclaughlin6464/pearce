@@ -1408,3 +1408,30 @@ class Cat(object):
         gamma_t = sigma_crit_inv * ds  # hope user has converter ds to pc from Mpc
 
         return gamma_t
+
+    @observable()
+    def calc_cic(self, hist_bins, c_rad = 2, c_half_l = 10, n_cores=4):
+        """
+        Calculate counts in cells. Wraps the halotools function. 
+
+        hist_bins: bins for the CIC counts to be histogrammed into
+
+        c_rad: radius of the cylinder in Mpc/h. Default is 2.
+
+        c_half_l: Half length of the cylinder in Mpc/h. Default is 10
+
+        n_cores: Number of cores to execute on. Default is 4. 
+        """
+        n_cores = self._check_cores(n_cores)
+
+        x_g, y_g, z_g = [self.model.mock.galaxy_table[c] for c in ['x', 'y', 'z']]
+        pos_g = return_xyz_formatted_array(x_g, y_g, z_g, period=self.Lbox)
+
+        # NOTE This isn't in /h units like the other radii. Gotta standardize all this! 
+        cic = counts_in_cylinders(pos_g, pos_g, proj_search_radius = c_rad,
+                               cylinder_half_length = c_half_l, 
+                                period=cat.Lbox, num_threads=n_cores)
+
+        hist, _ = np.histogram(cic, bins = hist_bins, normed=True) # should normed be an option?
+
+        return hist
