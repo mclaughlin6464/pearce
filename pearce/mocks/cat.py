@@ -1435,12 +1435,12 @@ class Cat(object):
         n_cores = self._check_cores(n_cores)
 
         x_g, y_g, z_g = [self.model.mock.galaxy_table[c] for c in ['x', 'y', 'z']]
-        pos_g = return_xyz_formatted_array(x_g, y_g, z_g, period=self.Lbox)
+        pos_g = return_xyz_formatted_array(x_g, y_g, z_g, period=self.Lbox).astype(float)
 
         # NOTE This isn't in /h units like the other radii. Gotta standardize all this! 
         cic = counts_in_cylinders(pos_g, pos_g, proj_search_radius = c_rad,
                                cylinder_half_length = c_half_l, 
-                                period=cat.Lbox, num_threads=n_cores)
+                                period=self.Lbox, num_threads=n_cores)
 
         hist, _ = np.histogram(cic, bins = hist_bins, normed=True) # should normed be an option?
 
