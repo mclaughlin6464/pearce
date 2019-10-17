@@ -1263,10 +1263,7 @@ class Cat(object):
         names, vals = self._get_cosmo_param_names_vals()
         param_dict = dict(zip(names, vals)) 
 
-        if 'Omega_c' not in param_dict:
-            param_dict['Omega_c'] = param_dict['Omega_m'] - param_dict['Omega_b']
-            del param_dict['Omega_m']
-        elif 'omch2' in param_dict: # in other units, convert
+        if 'omch2' in param_dict: # in other units, convert
             new_param_dict = {}
             new_param_dict['Omega_c'] = param_dict['omch2']*self.h**2
             new_param_dict['Omega_b'] = param_dict['ombh2']*self.h**2
@@ -1275,6 +1272,10 @@ class Cat(object):
             new_param_dict['A_s'] = np.exp(param_dict['ln10As'])*(np.power(10, -10))
 
             param_dict = new_param_dict
+
+        elif 'Omega_c' not in param_dict:
+            param_dict['Omega_c'] = param_dict['Omega_m'] - param_dict['Omega_b']
+            del param_dict['Omega_m']
 
         cosmo = ccl.Cosmology(**param_dict)
 
@@ -1442,5 +1443,7 @@ class Cat(object):
                                 period=cat.Lbox, num_threads=n_cores)
 
         hist, _ = np.histogram(cic, bins = hist_bins, normed=True) # should normed be an option?
+
+        hist[hist <= 0] = 1e-9 # set 0 counts to low values for clean emulation reasons
 
         return hist
