@@ -304,13 +304,13 @@ def chain_config(f, cfg):
         Cfg with MCMC data
     """
 
-    required_mcmc_keys = ['nwalkers', 'nsteps']
+    required_mcmc_keys = []#'nwalkers', 'nsteps']
 
     for key in required_mcmc_keys:
         assert key in cfg, "%s not in config but is required."%key
         f.attrs[key] = cfg[key]
 
-    optional_keys = ['nburn', 'seed']#, 'fixed_params']
+    optional_keys = ['mcmc_type', 'nwalkers', 'nsteps', 'nlive', 'dlogz', 'nburn', 'seed']#, 'fixed_params']
     for key in optional_keys:
         attr = cfg[key] if key in cfg else None
         attr = str(attr) if type(attr) is dict else attr
