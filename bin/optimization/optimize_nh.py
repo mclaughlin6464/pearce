@@ -19,11 +19,11 @@ hyperparams = {'kernel': (Matern32(input_dim=7, ARD=True) + RBF(input_dim=7, ARD
                            Matern32(input_dim=HOD_params, ARD=True) + RBF(input_dim=HOD_params, ARD=True)+Bias(input_dim=HOD_params) ), \
                'optimize': True}
 
-for df in [0.5]:#,0.25,  0.5]: 
-    emu = NashvilleHot(training_file, hyperparams=hyperparams,fixed_params = fixed_params, downsample_factor = df)
-    emu.save_as_default_kernel()
+#for df in [0.5]:#,0.25,  0.5]: 
+emu = NashvilleHot(training_file, hyperparams=hyperparams,fixed_params = fixed_params)#, downsample_factor = df)
+emu.save_as_default_kernel()
 
-    pred_y, data_y = emu.goodness_of_fit(test_file, downsample_factor = df, statistic = None)
+pred_y, data_y = emu.goodness_of_fit(test_file, downsample_factor = df, statistic = None)
 
-    print df, (np.abs(10**pred_y - 10**data_y)/(10**data_y)).mean(axis =1)
+print df, (np.abs(10**pred_y - 10**data_y)/(10**data_y)).mean(axis =1)
 

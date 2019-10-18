@@ -11,6 +11,7 @@ from ast import literal_eval
 
 import numpy as np
 import emcee as mc
+import dynesty as dyn
 from scipy.linalg import inv
 import h5py
 
@@ -35,6 +36,24 @@ def lnprior(theta, param_names, *args):
         if np.isnan(t) or t < low or t > high:
             return -np.inf
     return 0
+
+def lnprior_unitcube(u, param_names):
+    """
+    Prior for an MCMC in nested samplers. Default is to assume flat prior for all parameters defined by the boundaries the
+    emulator is built from. Retuns negative infinity if outside bounds or NaN
+    :param theta:
+        The parameters proposed by the sampler.
+    :param param_names
+        The names identifying the values in theta, needed to extract their boundaries
+    :return:
+        Either 0 or -np.inf, depending if the params are allowed or not.
+    """
+    for i, p in enumerate(param_names):
+        low, high = _emus[0].get_param_bounds(p)
+        u[i] = (high-low)*u[i] + low 
+
+    return u
+
 
 def lnlike(theta, param_names, fixed_params, r_bin_centers, y, combined_inv_cov):
     """
@@ -228,6 +247,70 @@ def run_mcmc(emus,  param_names, y, cov, r_bin_centers,fixed_params = {}, \
             raise AssertionError("Cannot resume from previous chain with nburn != 0. Please change! ")
         # load a previous chain
         pos0 = _resume_from_previous(resume_from_previous, nwalkers, num_params)
+    else:
+        pos0 = _random_initial_guess(param_names, nwalkers, num_params)
+
+    # TODO turn this into a generator
+    sampler.run_mcmc(pos0, nsteps)
+
+    chain = sampler.chain[:, nburn:, :].reshape((-1, num_params))
+
+    if return_lnprob:
+        lnprob_chain = sampler.lnprobability[:, nburn:].reshape((-1, )) # TODO think this will have the right shape
+        return chain, lnprob_chain
+    return chain
+
+def run_nested_mcmc(emus,  param_names, y, cov, r_bin_centers,fixed_params = {}, \
+             resume_from_previous=None, nwalkers=1000, nsteps=100, nburn=20, ncores='all'):
+    """
+    Run a nested sampling MCMC using dynesty and the emu. Includes some sanity checks and does some precomputation.
+    Also optimized to be more efficient than using emcee naively with the emulator.
+
+    :param emus:
+        A trained instance of the Emu object. If there are multiple observables, should be a list. Otherwiese,
+        can be a single emu object
+    :param param_names:
+        Names of the parameters to constrain
+    :param ys:
+        data to constrain against. either one array of observables, or multiple where each new observable is a column.
+    # TODO figure out whether it should be row or column and assign appropriately
+    :param covs:
+        measured covariance of y for each y. Should have the same iteration properties as ys
+    :param r_bin_centers:
+        The scale bins corresponding to all y in ys
+    :param resume_from_previous:
+        String listing filename of a previous chain to resume from. Default is None, which starts a new chain.
+    :param fixed_params:
+        Any values held fixed during the emulation, default is {}
+    :param nwalkers:
+        Number of walkers for the mcmc. default is 1000
+    :param nsteps:
+        Number of steps for the mcmc. Default is 1--
+    :param nburn:
+        Number of burn in steps, default is 20
+    :param ncores:
+        Number of cores. Default is 'all', which will use all cores available
+    :return:
+        chain, collaposed to the shape ((nsteps-nburn)*nwalkers, len(param_names))
+    """
+    # make emu global so it can be accessed by the liklihood functions
+    if type(emus) is not list:
+        emus = [emus]
+    _emus = emus
+    global _emus
+
+    ncores= _run_tests(y, cov, r_bin_centers,param_names, fixed_params, ncores)
+    num_params = len(param_names)
+
+    combined_inv_cov = inv(cov)
+
+    sampler = mc.EnsembleSampler(nwalkers, num_params, lnprob,
+                                 threads=ncores, args=(param_names, fixed_params, r_bin_centers, y, combined_inv_cov))
+
+    sampler = 
+
+    if resume_from_previous is not None:
+        raise NotImplemented("Haven't figured out reviving from dead points."
     else:
         pos0 = _random_initial_guess(param_names, nwalkers, num_params)
 
