@@ -486,7 +486,10 @@ def run_mcmc_config(config_fname):
         nwalkers, nsteps = f.attrs['nwalkers'], f.attrs['nsteps']
     elif mcmc_type=='nested':
         nlive = f.attrs['nlive']
-        dlogz = f.attrs['dlogz'] if 'dlogz' in f.attrs else 0.1
+        dlogz = eval(f.attrs['dlogz']) if 'dlogz' in f.attrs else 0.1
+        if dlogz is None:
+            dlogz = 0.1 
+
     else:
         raise NotImplementedError("Only 'normal' and 'nested' mcmc_type is valid.")
 

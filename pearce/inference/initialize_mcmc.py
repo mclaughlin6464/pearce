@@ -312,7 +312,7 @@ def chain_config(f, cfg):
 
     optional_keys = ['mcmc_type', 'nwalkers', 'nsteps', 'nlive', 'dlogz', 'nburn', 'seed']#, 'fixed_params']
     for key in optional_keys:
-        attr = cfg[key] if key in cfg else None
+        attr = cfg[key] if key in cfg else 'None'
         attr = str(attr) if type(attr) is dict else attr
         f.attrs[key] = attr 
 
