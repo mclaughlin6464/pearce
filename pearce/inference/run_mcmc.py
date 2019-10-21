@@ -481,12 +481,12 @@ def run_mcmc_config(config_fname):
 
     #covs = [f['cov'][-e.n_bins:, :][:, -e.n_bins:] for i,e in enumerate(emus)]
 
-    mcmc_type = 'normal' if 'mcmc_type' not in f.attrs else f.attrs['mcmc_type']
+    mcmc_type = 'normal' if ('mcmc_type' not in f.attrs or f.attrs['mcmc_type'] is None) else f.attrs['mcmc_type']
     if mcmc_type == 'normal':
         nwalkers, nsteps = f.attrs['nwalkers'], f.attrs['nsteps']
     elif mcmc_type=='nested':
         nlive = f.attrs['nlive']
-        dlogz = f.attrs['dlogz'] if 'dlogz' in f.attrs else  0.1
+        dlogz = f.attrs['dlogz'] if 'dlogz' in f.attrs else 0.1
     else:
         raise NotImplementedError("Only 'normal' and 'nested' mcmc_type is valid.")
 
