@@ -541,14 +541,19 @@ def run_mcmc_config(config_fname):
         # TODO anyway to make sure all shpaes are right?
         #chain_dset = f['chain']
 
-    f.create_dataset('chain', (nwalkers*nsteps, len(param_names)), chunks = True, compression = 'gzip')
+    f.create_dataset('chain', (0, len(param_names)), chunks = True, compression = 'gzip', maxshape = (None, len(param_names)))
 
     #lnprob = np.zeros((nwalkers*nsteps,))
     if 'lnprob' in f.keys():
         del f['lnprob']#[:] = lnprob 
         # TODO anyway to make sure all shpaes are right?
         #lnprob_dset = f['lnprob']
-    f.create_dataset('lnprob', (nwalkers*nsteps, ) , chunks = True, compression = 'gzip')
+
+    if mcmc_type == 'normal':
+        f.create_dataset('lnprob', (0,) , chunks = True, compression = 'gzip', maxshape = (None,))
+    else:
+        f.create_dataset('evidence', (0,) , chunks = True, compression = 'gzip', maxshape = (None,))
+
     f.close()
     np.random.seed(seed)
 
@@ -559,8 +564,14 @@ def run_mcmc_config(config_fname):
                                                      nsteps=nsteps, nburn=nburn, return_lnprob=True, ncores = 16)):
 
             f = h5py.File(config_fname, 'r+')
-            f['chain'][step*nwalkers:(step+1)*nwalkers] = pos[0]
-            f['lnprob'][step*nwalkers:(step+1)*nwalkers] = pos[1]
+            chain_dset, like_dset = f['chain'], f['lnprob']
+            l = len(chain_dset)
+            chain_dset.resize((l+nwalkers), axis = 0)
+            like_dset.resize((l+nwalkers), axis = 0)
+
+            chain_dset[-nwalkers:] = pos[0]
+            like_dset[-nwalkers:] = pos[1]
+
             f.close()
     else:
         for step, pos in enumerate(run_nested_mcmc(emus, param_names, y, cov, rpoints,\
@@ -569,8 +580,15 @@ def run_mcmc_config(config_fname):
 
             size = pos.shape[0]
             f = h5py.File(config_fname, 'r+')
-            f['chain'][step*size:(step+1)*size] = pos[:, :-1]
-            f['lnprob'][step*size:(step+1)*size] = pos[:,-1]
+            chain_dset, ev_dset = f['chain'], f['evidence']
+
+            l = len(chain_dset)
+            chain_dset.resize((l + size), axis=0)
+            ev_dset.resize((l + size), axis=0)
+
+            chain_dset[-nwalkers:] = pos[:, :-1]
+            ev_dset[-nwalkers:] = pos[:,-1]
+
             f.close()
 
 
