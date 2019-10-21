@@ -427,7 +427,7 @@ def run_mcmc_config(config_fname):
 
     assert path.isfile(config_fname), "Invalid config fname for chain"
 
-    print config_fname
+    #print config_fname
     f = h5py.File(config_fname, 'r+')
     emu_type_dict = {'OriginalRecipe':OriginalRecipe,
                      'ExtraCrispy': ExtraCrispy,
