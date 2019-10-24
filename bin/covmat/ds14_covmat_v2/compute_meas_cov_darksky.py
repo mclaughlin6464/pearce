@@ -1,9 +1,14 @@
 from pearce.mocks.kittens import DarkSky 
-from pearce.mocks import tpcf
-#from halotools.mock_observables import tpcf
 from halotools.empirical_models import Zheng07Cens, Zheng07Sats
+from halotools.mock_observables.surface_density.surface_density_helpers import rho_matter_comoving_in_halotools_units as rho_m_comoving
+from halotools.mock_observables.surface_density.surface_density_helpers import annular_area_weighted_midpoints
+from halotools.mock_observables.surface_density.surface_density_helpers import log_interpolation_with_inner_zero_masking as log_interp
+from halotools.mock_observables import return_xyz_formatted_array
+from halotools.mock_observables.surface_density.delta_sigma import _delta_sigma_precomputed_process_args
+from halotools.mock_observables.surface_density.mass_in_cylinders import _enclosed_mass_process_args
+from halotools.mock_observables.surface_density.weighted_npairs_per_object_xy import weighted_npairs_per_object_xy
+from itertools import product
 import numpy as np
-from collections import OrderedDict
 from time import time
 from scipy.optimize import minimize_scalar
 import yaml
@@ -23,7 +28,6 @@ def make_LHC(ordered_params, N, seed = None):
         points.append(point)
     return np.stack(points).T
 
-
 def add_logMmin(hod_params, cat):
 
     hod_params['logMmin'] = 13.0 #initial guess
@@ -38,46 +42,115 @@ def add_logMmin(hod_params, cat):
     #print 'logMmin', res.x
     hod_params['logMmin'] = res.x
 
+def total_mass_enclosed_per_cylinder(centers, particles,
+        particle_masses, downsampling_factor, rp_bins, period,
+        num_threads=1, approx_cell1_size=None, approx_cell2_size=None):
+
+#  Perform bounds-checking and error-handling in private helper functions
+    #print period
+    args = (centers, particles, particle_masses, downsampling_factor,
+        rp_bins, period, num_threads)
+    result = _enclosed_mass_process_args(*args)
+    centers, particles, particle_masses, downsampling_factor, \
+        rp_bins, period, num_threads, PBCs = result
 
 
-def compute_obs(cat, rp_bins, randoms):#, rand_scalecut = 1.0 ,  n_rands= [10, 5, 5], n_sub = 3, RR=RR):
-#np.random.seed(int(time()))
+    mean_particle_mass = np.mean(particle_masses)
+    normalized_particle_masses = particle_masses/mean_particle_mass
+
+    # Calculate M_tot(< Rp) normalized with internal code units
+    total_mass_per_cylinder = weighted_npairs_per_object_xy(centers, particles,
+        normalized_particle_masses, rp_bins,
+        period=None, num_threads=num_threads, #try large finite PBCs
+        approx_cell1_size=approx_cell1_size,
+        approx_cell2_size=approx_cell2_size)
+
+    # Renormalize the particle masses and account for downsampling
+    total_mass_per_cylinder *= downsampling_factor*mean_particle_mass
+
+    return total_mass_per_cylinder
+
+def calc_ds(cat, rp_bins, n_cores, tm_rand=None, randoms = None):
+
+    x_g, y_g, z_g = [cat.model.mock.galaxy_table[c] for c in ['x', 'y', 'z']]
+    pos_g = return_xyz_formatted_array(x_g, y_g, z_g, period=cat.Lbox)
+    x_m, y_m, z_m = [cat.halocat.ptcl_table[c] for c in ['x', 'y', 'z']]
+    pos_m = return_xyz_formatted_array(x_m, y_m, z_m, period=cat.Lbox)
+
+    tm_gal = total_mass_enclosed_per_cylinder(pos_g / cat.h, pos_m / cat.h,
+                                                  cat.pmass / cat.h, 1. / cat._downsample_factor, rp_bins,
+                                                  cat.Lbox / cat.h,
+                                                  num_threads=n_cores)
+    if tm_rand is None:
+        assert randoms is not None
+        tm_rand = total_mass_enclosed_per_cylinder(randoms / cat.h, pos_m / cat.h,
+                                                   cat.pmass / cat.h, 1. / cat._downsample_factor, rp_bins,
+                                                   cat.Lbox / cat.h,
+                                                   num_threads=n_cores)
+    if tm_rand.shape[0] > tm_gal.shape[0]:
+        tm_rand_idxs = np.random.choice(tm_rand.shape[0], tm_gal.shape[0], replace = False)
+        tm_rand = tm_rand[tm_rand_idxs]
+
+    elif tm_rand.shape[0] < tm_gal.shape[0]:
+        raise AssertionError("Need more randoms!")
+
+    return delta_sigma(pos_g / cat.h, tm_gal, tm_rand,
+                       cat.Lbox / cat.h, rp_bins, cosmology=cat.cosmology) / (1e12), tm_gal, tm_rand
+
+
+def delta_sigma(galaxies, mass_enclosed_per_galaxy,
+                mass_enclosed_per_random, period,
+                rp_bins, cosmology):
+    #  Perform bounds-checking and error-handling in private helper functions
+    args = (galaxies, mass_enclosed_per_galaxy, rp_bins, period)
+    result = _delta_sigma_precomputed_process_args(*args)
+    galaxies, mass_enclosed_per_galaxy, rp_bins, period, PBCs = result
+
+    total_mass_in_stack_of_cylinders = np.sum(mass_enclosed_per_galaxy, axis=0)
+
+    total_mass_in_stack_of_annuli = np.diff(total_mass_in_stack_of_cylinders)
+
+    mean_rho_comoving = rho_m_comoving(cosmology)
+    mean_sigma_comoving = mean_rho_comoving * float(period[2])
+
+    expected_mass_in_random_stack_of_cylinders = np.sum(mass_enclosed_per_random, axis=0)
+    expected_mass_in_random_stack_of_annuli = np.diff(expected_mass_in_random_stack_of_cylinders)
+
+    one_plus_mean_sigma_inside_rp = mean_sigma_comoving * (
+            total_mass_in_stack_of_cylinders / expected_mass_in_random_stack_of_cylinders)
+
+    one_plus_sigma = mean_sigma_comoving * (
+            total_mass_in_stack_of_annuli / expected_mass_in_random_stack_of_annuli)
+
+    rp_mids = annular_area_weighted_midpoints(rp_bins)
+    one_plus_mean_sigma_inside_rp_interp = log_interp(one_plus_mean_sigma_inside_rp,
+                                                      rp_bins, rp_mids)
+
+    excess_surface_density = one_plus_mean_sigma_inside_rp_interp - one_plus_sigma
+    return excess_surface_density
+
+
+def compute_obs(cat, rp_bins, cic_bins, randoms, total_mass_randoms):
 
     n_cores = cat._check_cores(8)#16)
 
-    x_g, y_g, z_g = [cat.model.mock.galaxy_table[c] for c in ['x', 'y', 'z']]
-#pos_g = return_xyz_formatted_array(x_g, y_g, z_g, period=cat.Lbox)
-    pos_g = np.vstack([x_g, y_g, z_g]).T
-    x_m, y_m, z_m = [cat.halocat.ptcl_table[c] for c in ['x', 'y', 'z']]
-    pos_m = np.vstack([x_m, y_m, z_m]).T
+    wp = cat.calc_wp(rp_bins, PBC=False, randoms=randoms, n_cores = n_cores)
+    # have to make a custom function to do no PBC
+    ds = calc_ds(cat, rp_bins, n_cores=n_cores, tm_rand = total_mass_randoms)
+    cic = cat.calc_cic(cic_bins, PBC=False, n_cores = n_cores)
 
-    rbins = np.array(rbins)
-
-    randoms = (randoms/np.max(randoms))*cat.Lbox/cat.h
-
-    xi_gg, xi_gm = tpcf(pos_g / cat.h, rbins,\
-                          randoms=randoms,  period=None,\
-                          num_threads=n_cores, estimator='Landy-Szalay',\
-                          do_auto1 = True, do_cross = True, RR_precomputed=RR, NR_precomputed=randoms.shape[0])#, do_auto2 = False)
-    
-    delta_sigma = cat.calc_ds_analytic(rp_bins, xi = xi_gm, rbins = rbins) 
-    return np.r_[xi_gg, delta_sigma] 
-
+    return np.r_[wp, ds, cic]
 
 config_fname = 'xi_cosmo_trainer.yaml'
-
-RR = np.load('RR.npy')
-randoms = np.load('/scratch/users/swmclau2/randoms_gm.npy')
 
 with open(config_fname, 'r') as ymlfile:
     cfg = yaml.load(ymlfile)
 
 nd = float(cfg['HOD']['fixed_nd'] )
-min_ptcl = int(cfg['HOD']['min_ptcl']) 
-r_bins = np.array(cfg['observation']['bins'] ).astype(float)
-rp_bins = np.logspace(-0.9, 1.6, 19)
-print r_bins
-print rp_bins 
+min_ptcl = int(cfg['HOD']['min_ptcl'])
+
+rp_bins = np.logspace(-1.0, 1.6, 19)
+cic_bins = np.r_[np.linspace(1, 10, 9), np.round(np.logspace(1,2, 7))]
 
 hod_param_ranges =  cfg['HOD']['ordered_params'] 
 
@@ -89,11 +162,15 @@ logMmin_bounds = hod_param_ranges['logMmin']
 
 del hod_param_ranges['logMmin']
 
+obs_vals = np.zeros((N, 2*(len(rp_bins)-1)+len(cic_bins)-1))
 
-obs_vals = np.zeros((N, 2*(len(r_bins)-1)))
-#obs_vals = np.load('xi_gg_darksky_obs.npy')
-from itertools import product
 HOD = (Zheng07Cens, Zheng07Sats)
+
+np.random.seed(23)
+randoms = np.random.rand(int(5e6), 3)
+
+total_mass_randoms = np.load('total_mass_randoms')
+
 
 b1, b2, b3 = sys.argv[1], sys.argv[2], sys.argv[3]
 start_subbox = (b1,  b2, b3)
@@ -110,10 +187,9 @@ for subbox_idx, subbox in enumerate(product(''.join([str(i) for i in xrange(8)])
         add_logMmin(hod_params, cat)
         cat.populate(hod_params, min_ptcl = min_ptcl)
         sys.stdout.flush()
-        obs = compute_obs(cat, r_bins, rp_bins, randoms, RR)
+        obs = compute_obs(cat, rp_bins, randoms*cat.Lbox/cat.h, total_mass_randoms)
         obs_vals[hod_idx] = obs
 
-        np.save('xi_gg_gm_darksky_obs_v8_%s%s%s.npy'%(b1,b2,b3), obs_vals)
+        np.save('wp_ds_cic_darksky_obs_%s%s%s.npy'%(b1,b2,b3), obs_vals)
 
     break
-        

@@ -976,7 +976,8 @@ class Cat(object):
     # TODO use Joe's code. Remember to add sensible asserts when I do.
     # TODO Jackknife? A way to do it without Joe's code?
     @observable()
-    def calc_wp(self, rp_bins, pi_max=40, do_jackknife=True, use_corrfunc=False, n_cores='all', RSD=False, halo=False):
+    def calc_wp(self, rp_bins, pi_max=40, do_jackknife=True, use_corrfunc=False, n_cores='all', RSD=False, halo=False,
+                            PBC=True, randoms = None):
         '''
         Calculate the projected correlation on a populated catalog
         :param rp_bins:
@@ -1012,6 +1013,11 @@ class Cat(object):
         else:
             pos = return_xyz_formatted_array(x, y, z, period=self.Lbox)
 
+        if PBC:
+            period = self.Lbox/self.h
+        else:
+            assert randoms is not None, "If PBC is false need to specify randoms"
+            period = None
         # don't forget little h!!
         if use_corrfunc:
             out = xi(self.model.mock.Lbox / self.h, pi_max / self.h, n_cores, rp_bins,
@@ -1020,7 +1026,8 @@ class Cat(object):
 
             wp_all = out[4]  # returns a lot of irrelevant info
         else:
-            wp_all = wp(pos / self.h, rp_bins, pi_max / self.h, period=self.Lbox / self.h, num_threads=n_cores)
+            wp_all = wp(pos / self.h, rp_bins, pi_max / self.h,\
+                        period=period, randoms = randoms, num_threads=n_cores)
         return wp_all
 
     @observable()
@@ -1208,12 +1215,14 @@ class Cat(object):
 
         rp_bins = bins if not angular else self._rp_from_ang(bins)
 
+
         # Halotools wnats downsampling factor defined oppositley
-        # TODO verify little h!
         # TODO maybe split into a few lines for clarity
+        # divid by cat.h**2 because there is an internal halotools calculation that is in little h units
+        # and we want our result to divide those out. That is, if we want to not be in non h=1 units.
         return delta_sigma(pos_g / self.h, pos_m / self.h, self.pmass / self.h,
                            downsampling_factor=1. / self._downsample_factor, rp_bins=rp_bins,
-                           period=self.Lbox / self.h, num_threads=n_cores, cosmology=self.cosmology)[1] / (1e12)
+                           period=self.Lbox / self.h, num_threads=n_cores, cosmology=self.cosmology)[1] / ((1e12)*self.h**2)
 
     @observable(particles=True)
     def calc_ds_analytic(self, bins, angular=False, n_cores='all', xi_kwargs={}, xi = None, rbins = None):
@@ -1420,7 +1429,7 @@ class Cat(object):
         return gamma_t
 
     @observable()
-    def calc_cic(self, hist_bins, c_rad = 2, c_half_l = 10, n_cores=4):
+    def calc_cic(self, hist_bins, c_rad = 2, c_half_l = 10, n_cores='all', PBC = True):
         """
         Calculate counts in cells. Wraps the halotools function. 
 
@@ -1436,11 +1445,14 @@ class Cat(object):
 
         x_g, y_g, z_g = [self.model.mock.galaxy_table[c] for c in ['x', 'y', 'z']]
         pos_g = return_xyz_formatted_array(x_g, y_g, z_g, period=self.Lbox).astype(float)
-
+        if PBC:
+            period = self.Lbox/self.h
+        else:
+            period = None
         # NOTE This isn't in /h units like the other radii. Gotta standardize all this! 
-        cic = counts_in_cylinders(pos_g, pos_g, proj_search_radius = c_rad,
+        cic = counts_in_cylinders(pos_g/self.h, pos_g/self.h, proj_search_radius = c_rad,
                                cylinder_half_length = c_half_l, 
-                                period=self.Lbox, num_threads=n_cores)
+                                period=period, num_threads=n_cores)
 
         hist, _ = np.histogram(cic, bins = hist_bins, normed=True) # should normed be an option?
 
