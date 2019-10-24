@@ -90,6 +90,7 @@ def lnlike(theta, param_names, fixed_params, r_bin_centers, y, combined_inv_cov)
     emu_pred = np.hstack(emu_preds)
 
     delta = emu_pred - y
+    #print delta
     return - np.dot(delta, np.dot(combined_inv_cov, delta))
 
 def lnprob(theta, *args):
@@ -131,7 +132,6 @@ def _run_tests(y, cov, r_bin_centers, param_names, fixed_params, ncores):
         # else, we're good!
 
     #make sure all inputs are of consistent shape
-    print y.shape, cov.shape
     assert y.shape[0] == cov.shape[0] and cov.shape[1] == cov.shape[0]
     #print y.shape[0]/r_bin_centers.shape[0] ,len(_emus) , y.shape[0]/r_bin_centers.shape[0] 
     assert y.shape[0]/r_bin_centers.shape[0] == len(_emus) and y.shape[0]%r_bin_centers.shape[0] == 0
@@ -142,7 +142,6 @@ def _run_tests(y, cov, r_bin_centers, param_names, fixed_params, ncores):
     tmp = param_names[:]
     assert not any([key in param_names for key in fixed_params])  # param names can't include the
     tmp.extend(fixed_params.keys())
-    print tmp
     assert _emus[0].check_param_names(tmp, ignore=['r'])
 
     return ncores
@@ -301,32 +300,38 @@ def run_nested_mcmc(emus,  param_names, y, cov, r_bin_centers,fixed_params = {},
     global _emus
 
     ncores= _run_tests(y, cov, r_bin_centers,param_names, fixed_params, ncores)
-    pool = Pool(processes=ncores)
+    #pool = Pool(processes=ncores)
 
     num_params = len(param_names)
 
     combined_inv_cov = inv(cov)
-    args = (param_names, fixed_params, r_bin_centers, y, combined_inv_cov)
+    #args = (param_names, fixed_params, r_bin_centers, y, combined_inv_cov)
 
-    ll = partial(lnlike, *args)
-    pi = partial(lnprior_unitcube, param_names)
-    sampler = dyn.NestedSampler(ll, pi, num_params, nlive = nlive, pool=pool)
+    ll = partial(lnlike, param_names = param_names, fixed_params = fixed_params, 
+                          r_bin_centers = r_bin_centers, y = y , combined_inv_cov = combined_inv_cov)
+    pi = partial(lnprior_unitcube, param_names = param_names)
+    sampler = dyn.NestedSampler(ll, pi, num_params, nlive = nlive)#, pool=pool, queue_size = ncores)
 
     # TODO
     if resume_from_previous is not None:
         raise NotImplemented("Haven't figured out reviving from dead points.")
 
-    #sampler.run_nested()
+    sampler.run_nested(dlogz)
+    '''
     n_steps = nlive
     results = np.zeros((n_steps, num_params+1))
     for i, result in enumerate(sampler.sample(dlogz)):
         if i%n_steps == 0 and i>0:
+            #print 'AAA', i
             yield results
             results = np.zeros((n_steps, num_params+1))
         else:
+            #print '__A', i 
+            #print result
             results[i%n_steps, :-1] = result[2]
             results[i%n_steps, -1] = result[6]
 
+    #print 'BBB', i, i%n_steps
     yield results[:i%n_steps]
 
     results = np.zeros((n_steps, num_params+1))
@@ -335,13 +340,15 @@ def run_nested_mcmc(emus,  param_names, y, cov, r_bin_centers,fixed_params = {},
         results[j%n_steps, -1] = result[6]
 
 
+    #print 'CCC', len(results)
     yield results
-    #res = sampler.results
-    #print res.sumamry()
+    '''
+    res = sampler.results
+    print res.summary()
     ## should i return the results or just these things?
-    #chain = res['samples']
-    #evidence = res['logz']
-    #return chain
+    chain = res['samples']
+    evidence = res['logz'].reshape((-1, 1))
+    yield np.hstack([chain, evidence])
 
 def run_mcmc_iterator(emus, param_names, y, cov, r_bin_centers,fixed_params={},
                       resume_from_previous=None, nwalkers=1000, nsteps=100, nburn=20, ncores='all', return_lnprob=False):
@@ -486,7 +493,7 @@ def run_mcmc_config(config_fname):
         nwalkers, nsteps = f.attrs['nwalkers'], f.attrs['nsteps']
     elif mcmc_type=='nested':
         nlive = f.attrs['nlive']
-        dlogz = eval(f.attrs['dlogz']) if 'dlogz' in f.attrs else 0.1
+        dlogz = float(f.attrs['dlogz']) if 'dlogz' in f.attrs else 0.1
         if dlogz is None:
             dlogz = 0.1 
 
@@ -579,7 +586,7 @@ def run_mcmc_config(config_fname):
     else:
         for step, pos in enumerate(run_nested_mcmc(emus, param_names, y, cov, rpoints,\
                                                      fixed_params=fixed_params, nlive=nlive,\
-                                                     dlogz=dlogz, nburn=nburn, return_lnprob=True, ncores = 16)):
+                                                     dlogz=dlogz, ncores = 16)):
 
             size = pos.shape[0]
             f = h5py.File(config_fname, 'r+')
@@ -589,8 +596,9 @@ def run_mcmc_config(config_fname):
             chain_dset.resize((l + size), axis=0)
             ev_dset.resize((l + size), axis=0)
 
-            chain_dset[-nwalkers:] = pos[:, :-1]
-            ev_dset[-nwalkers:] = pos[:,-1]
+            print pos.shape
+            chain_dset[-size:] = pos[:, :-1]
+            ev_dset[-size:] = pos[:,-1]
 
             f.close()
 
