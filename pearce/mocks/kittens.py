@@ -841,13 +841,24 @@ class DarkSky(Cat):
                 assert hasattr(self, "ptcl_fname"), "Darksky has no particle file."
 
                 f = h5py.File(self.ptcl_fname, 'r')
-                sys.stdout.flush()
                 dset = f['particles']['subbox_%03d'%self.boxno]
                 # only one sf so skipping some of this
                 # this copies a lot from cache, could make this one function...
-                p_x = dset[:, 0]%self.Lbox
-                p_y = dset[:, 1]%self.Lbox
-                p_z = dset[:, 2]%self.Lbox
+                sys.stdout.flush()
+                p_x, p_y, p_z = np.zeros((len(dset),)), np.zeros((len(dset),)), np.zeros((len(dset),)) 
+
+                last = 0
+                step_size = int(1e6)
+                for step in np.arange(step_size, len(dset), step_size):
+                    p_x[last:last+step] = dset[last:last+step, 0]%self.Lbox
+                    p_y[last:last+step] = dset[last:last+step, 1]%self.Lbox
+                    p_z[last:last+step] = dset[last:last+step, 2]%self.Lbox
+
+                    last = step
+
+                #p_x = dset[:, 0]%self.Lbox
+                #p_y = dset[:, 1]%self.Lbox
+                #p_z = dset[:, 2]%self.Lbox
                 f.close() 
                 # fix bounds cuz some are still off?
                 def fix_bounds(x):
@@ -862,10 +873,11 @@ class DarkSky(Cat):
                 #p_z = fix_bounds(p_z)
 
                 vx=vy=vz = np.zeros_like(p_x)
+                print 'HH'
                 ptcl_ids = np.array(range(p_x.shape[0]))
 
                 ptcl_catalog = UserSuppliedPtclCatalog(redshift=z, Lbox=self.Lbox, particle_mass=self.pmass, x=p_x, y=p_y, z=p_z, vx=vx, vy=vy, vz=vz, ptcl_ids=ptcl_ids)
-
+                print 'II'
                 # attach this to the halocat
                 setattr(self.halocat, "ptcl_table", ptcl_catalog.ptcl_table)
 

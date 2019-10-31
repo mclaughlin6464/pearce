@@ -31,7 +31,7 @@ from .customHODModels import *
 
 # try to import corrfunc, determine if it was successful
 try:
-    from Corrfunc.theory import xi, wp, DD
+    from Corrfunc.theory import xi, DD
     from Corrfunc.utils import convert_3d_counts_to_cf
 
     CORRFUNC_AVAILABLE = True

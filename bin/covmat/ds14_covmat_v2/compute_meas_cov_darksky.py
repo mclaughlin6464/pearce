@@ -95,7 +95,7 @@ def calc_ds(cat, rp_bins, n_cores, tm_rand=None, randoms = None):
         raise AssertionError("Need more randoms!")
 
     return delta_sigma(pos_g / cat.h, tm_gal, tm_rand,
-                       cat.Lbox / cat.h, rp_bins, cosmology=cat.cosmology) / (1e12), tm_gal, tm_rand
+                       cat.Lbox / cat.h, rp_bins, cosmology=cat.cosmology) / (1e12)#, tm_gal, tm_rand
 
 
 def delta_sigma(galaxies, mass_enclosed_per_galaxy,
@@ -130,15 +130,15 @@ def delta_sigma(galaxies, mass_enclosed_per_galaxy,
     return excess_surface_density
 
 
-def compute_obs(cat, rp_bins, cic_bins, randoms, total_mass_randoms):
+def compute_obs(cat, rp_bins, cic_bins, randoms, total_mass_randoms=None):
 
-    n_cores = cat._check_cores(8)#16)
+    n_cores = cat._check_cores(1)
 
-    wp = cat.calc_wp(rp_bins, PBC=False, randoms=randoms, n_cores = n_cores)
+    wp = cat.calc_wp(rp_bins, PBC=False, randoms=randoms/cat.h, n_cores = n_cores)
     # have to make a custom function to do no PBC
-    ds = calc_ds(cat, rp_bins, n_cores=n_cores, tm_rand = total_mass_randoms)
+    ds = calc_ds(cat, rp_bins, n_cores=n_cores, randoms = randoms)# tm_rand = total_mass_randoms)
     cic = cat.calc_cic(cic_bins, PBC=False, n_cores = n_cores)
-
+    #print len(ds), len(cic)
     return np.r_[wp, ds, cic]
 
 config_fname = 'xi_cosmo_trainer.yaml'
@@ -150,7 +150,7 @@ nd = float(cfg['HOD']['fixed_nd'] )
 min_ptcl = int(cfg['HOD']['min_ptcl'])
 
 rp_bins = np.logspace(-1.0, 1.6, 19)
-cic_bins = np.r_[np.linspace(1, 10, 9), np.round(np.logspace(1,2, 7))]
+cic_bins = np.round(np.r_[np.linspace(1, 9, 8), np.round(np.logspace(1,2, 7))])
 
 hod_param_ranges =  cfg['HOD']['ordered_params'] 
 
@@ -169,27 +169,33 @@ HOD = (Zheng07Cens, Zheng07Sats)
 np.random.seed(23)
 randoms = np.random.rand(int(5e6), 3)
 
-total_mass_randoms = np.load('total_mass_randoms.npy')
-
+#total_mass_randoms = np.load('total_mass_randoms.npy')
 
 b1, b2, b3 = sys.argv[1], sys.argv[2], sys.argv[3]
 start_subbox = (b1,  b2, b3)
+
+print 'A'
 
 start_idx = 64*int(start_subbox[0])+8*int(start_subbox[1])+int(start_subbox[2])
 for subbox_idx, subbox in enumerate(product(''.join([str(i) for i in xrange(8)]), repeat = 3)):
     if subbox_idx < start_idx:
         continue
+    print 'B'
     cat = DarkSky(int(''.join(subbox)), system = 'sherlock')
+    setattr(cat, '_downsample_factor', 1e-2)
+    print 'C'
     cat.load_model(1.0, HOD = HOD, hod_kwargs = {'modlulate_with_cenocc': True})
+    print 'D'
     cat.load_catalog_no_cache(1.0, min_ptcl=min_ptcl, particles = True)#, downsample_factor = 1e-2)
+    print 'E'
     for hod_idx, hod_params in enumerate(hod_dicts):
         print 'HOD: %d'%hod_idx
         add_logMmin(hod_params, cat)
         cat.populate(hod_params, min_ptcl = min_ptcl)
         sys.stdout.flush()
-        obs = compute_obs(cat, rp_bins, randoms*cat.Lbox/cat.h, total_mass_randoms)
+        obs = compute_obs(cat, rp_bins, cic_bins,  randoms*cat.Lbox)#, total_mass_randoms)
         obs_vals[hod_idx] = obs
 
-        np.save('wp_ds_cic_darksky_obs_%s%s%s.npy'%(b1,b2,b3), obs_vals)
+        np.save('wp_ds_cic_darksky_obs_%s%s%s_v2.npy'%(b1,b2,b3), obs_vals)
 
     break
