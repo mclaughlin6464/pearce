@@ -292,7 +292,7 @@ class Cat(object):
             return n_cores
 
     def cache(self, scale_factors='all', overwrite=False, add_local_density=False, add_particles=False,
-              downsample_factor=1e-3):
+              downsample_factor=1e-2):
         '''
         Cache a halo catalog in the halotools format, for later use.
         :param scale_factors:
@@ -386,7 +386,7 @@ class Cat(object):
                                           str(downsample_factor),
                                           overwrite=True)  # TODO would be nice to make a note of the downsampling without having to do some voodoo to get it.
 
-    def add_local_density(self, reader, all_particles, downsample_factor=1e-3, radius=[1, 5, 10]):  # [1,5,10]
+    def add_local_density(self, reader, all_particles, downsample_factor=1e-2, radius=[1, 5, 10]):  # [1,5,10]
         """
         Calculates the local density around each halo and adds it to the halo table, to be cached.
         :param reader:
@@ -425,7 +425,7 @@ class Cat(object):
 
     # adding **kwargs cuz some invalid things can be passed in, hopefully not a pain
     # TODO some sort of spell check in the input file
-    def load(self, scale_factor, HOD='redMagic', biased_satellites=False, tol=0.01, particles=False, downsample_factor=1e-3, hod_kwargs={},
+    def load(self, scale_factor, HOD='redMagic', biased_satellites=False, tol=0.01, particles=False, downsample_factor=1e-2, hod_kwargs={},
              **kwargs):
         '''
         Load both a halocat and a model to prepare for population and calculation.
@@ -442,7 +442,7 @@ class Cat(object):
         self.load_catalog(a, tol, check_sf=False, particles=particles, downsample_factor=downsample_factor)
         self.load_model(a, HOD, biased_satellites=biased_satellites, check_sf=False, hod_kwargs=hod_kwargs)
 
-    def load_catalog(self, scale_factor, tol=0.05, check_sf=True, particles=False, downsample_factor=1e-3):
+    def load_catalog(self, scale_factor, tol=0.05, check_sf=True, particles=False, downsample_factor=1e-2):
         '''
         Load only a specific catalog. Not reccomended to use separately from broader load function.
         Its possible for the redshift ni the model to be different fro the one from the catalog,
