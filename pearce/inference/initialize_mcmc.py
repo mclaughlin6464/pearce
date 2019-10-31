@@ -53,7 +53,7 @@ def emu_config(f, cfg):
     :param cfg:
         Emu portion of the cfg
     """
-    required_emu_keys = ['emu_type', 'training_file']
+    required_emu_keys = ['emu_type', 'training_file', 'emu_cov_fname']
     for key in required_emu_keys:
         assert key in cfg, "%s not in config but is required."%key
         f.attrs[key] = cfg[key]
@@ -94,8 +94,21 @@ def data_config(f, cfg):
         if key not in cfg:
             warnings.warn("Not all data attributes were specified. This is not reccomended, since the chain may not be well described in the future!")
 
+    # make emu_cov
+    emu_cov = np.zeros_like(cov)
+    ecf = f.attrs['emu_cov_fname']
+    ecf = [ecf] if type(ecf) is str else ecf
+
+    start_idx = 0
+    for ecf in f.attrs['emu_cov_fname']:
+        ec = np.load(ecf)
+        emu_cov[start_idx:start_idx+ec.shape[0], start_idx:start_idx+ec.shape[0]] = ec
+        start_idx+= ec.shape[0]
+
     f.create_dataset('data', data = data)
-    f.create_dataset('cov', data = cov)
+    f.create_dataset('cov', data = cov + ec)
+
+
 
 def _load_data(true_data_fname, true_cov_fname):
     """
@@ -219,6 +232,7 @@ def _compute_data(cfg):
                                             shot_cov+emu_cov
 
     elif sim_cfg['gal_type']== 'SHAM':
+        raise NotImplementedError("Only HODs are supported at this time.")
         cat.load(sim_cfg['scale_factor'], **sim_cfg['sim_hps'])
         cat.populate()# will generate a mock for us to overwrite
         gal_property = np.loadtxt(sim_cfg['gal_property_fname'])

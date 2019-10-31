@@ -117,7 +117,7 @@ class Trainer(object):
         # TODO does yaml parse these to bools automatically?
         self._particles = bool(cosmo_cfg['particles']) if 'particles' in cosmo_cfg else False
         #print cosmo_cfg.keys()
-        self._downsample_factor = float(cosmo_cfg['downsample_factor']) if 'downsample_factor' in cosmo_cfg else 1e-3
+        self._downsample_factor = float(cosmo_cfg['downsample_factor']) if 'downsample_factor' in cosmo_cfg else 1e-2
 
     def prep_hod(self, hod_cfg):
         """
