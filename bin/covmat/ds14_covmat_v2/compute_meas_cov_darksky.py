@@ -169,7 +169,7 @@ HOD = (Zheng07Cens, Zheng07Sats)
 np.random.seed(23)
 randoms = np.random.rand(int(5e6), 3)
 
-total_mass_randoms = np.load('total_mass_randoms')
+total_mass_randoms = np.load('total_mass_randoms.npy')
 
 
 b1, b2, b3 = sys.argv[1], sys.argv[2], sys.argv[3]
