@@ -26,7 +26,7 @@ from halotools.sim_manager import RockstarHlistReader, CachedHaloCatalog
 
 halo_dir = '/nfs/slac/des/fs1/g/sims/yymao/ds14_b_sub/hlists/'
 #halo_dir = '/scratch/users/swmclau2/hlists/ds_14_b_sub/hlists/'
-a = 0.65
+a = 1.0#0.65
 z = 1.0/a - 1 # ~ 0.55
 fname = path.join(halo_dir,  'hlist_%.5f.list'%a)
 
@@ -66,8 +66,9 @@ halocat = CachedHaloCatalog(simname = simname, halo_finder='rockstar', redshift 
 print halocat.halo_table.colnames
 # In[18]:
 
+smf = np.genfromtxt('/home/users/swmclau2/Git/pearce/bin/shams/smf_dr72bright34_m7_lowm.dat', skip_header=True)[:,0:2]
 
-smf = np.genfromtxt('/scratch/users/swmclau2/smf_dr72bright34_m7_lowm.dat', skip_header=True)[:,0:2]
+#smf = np.genfromtxt('/scratch/users/swmclau2/smf_dr72bright34_m7_lowm.dat', skip_header=True)[:,0:2]
 #smf = np.genfromtxt('DR10_cBOSS_WISE_SMF_z0.45_0.60_M7.dat', skip_header=True)[:,0:2]
 
 
@@ -77,7 +78,7 @@ smf = np.genfromtxt('/scratch/users/swmclau2/smf_dr72bright34_m7_lowm.dat', skip
 # In[20]:
 
 
-nd = 4.2e-4 #nd of final cat 
+nd = 5e-4#4.2e-4 #nd of final cat 
 
 
 # In[21]:
@@ -91,7 +92,7 @@ ab_property = 'halo_vmax@mpeak'
 
 af = AbundanceFunction(smf[:,0], smf[:,1], (9.0, 12.9), faint_end_first = True)
 
-scatter = 0.18
+scatter = 0.2
 remainder = af.deconvolute(scatter, 20)
 
 
@@ -124,11 +125,11 @@ n_obj_needed = int(nd*(1000.0**3))
 
 non_nan_idxs = ~np.isnan(catalog)
 sort_idxs = np.argsort(catalog[non_nan_idxs])[::-1]
-final_catalog = catalog#[non_nan_idxs][sort_idxs[:n_obj_needed]]
+final_catalog = catalog[non_nan_idxs][sort_idxs[:n_obj_needed]]
 
 
 
-output = halocat.halo_table#[non_nan_idxs][sort_idxs[:n_obj_needed]]
+output = halocat.halo_table[non_nan_idxs][sort_idxs[:n_obj_needed]]
 
 
 # In[ ]:
@@ -141,8 +142,10 @@ output['gal_smass'] = final_catalog
 
 
 #output.write('/nfs/slac/g/ki/ki18/des/swmclau2/catalog_ab_%s_large.hdf5'%ab_property, format = 'hdf5', path = '%s_catalog'%ab_property, overwrite=True)
-output.write('/scratch/users/swmclau2/catalog_ab_%s_large_fixed.hdf5'%ab_property, format = 'hdf5', path = '%s_catalog'%ab_property, overwrite=True)
+#output.write('/scratch/users/swmclau2/catalog_ab_%s_large_fixed.hdf5'%ab_property, format = 'hdf5', path = '%s_catalog'%ab_property, overwrite=True)
 # In[ ]:
+output.write('/scratch/users/swmclau2/test_%s_smf_sham.hdf5'%ab_property, format = 'hdf5', path = '%s_catalog'%ab_property, overwrite=True)
+
 
 
 print ab_property

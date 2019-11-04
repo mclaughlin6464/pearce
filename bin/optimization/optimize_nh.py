@@ -20,9 +20,9 @@ hyperparams = {'kernel': (Matern32(input_dim=7, ARD=True) + RBF(input_dim=7, ARD
                'optimize': True}
 
 #for df in [0.5]:#,0.25,  0.5]: 
-#emu = NashvilleHot(training_file, hyperparams=hyperparams,fixed_params = fixed_params)#, downsample_factor = df)
-#emu.save_as_default_kernel()
-emu = NashvilleHot(training_file, fixed_params = fixed_params)#, downsample_factor = df)
+emu = NashvilleHot(training_file, hyperparams=hyperparams,fixed_params = fixed_params)#, downsample_factor = df)
+emu.save_as_default_kernel()
+#emu = NashvilleHot(training_file, fixed_params = fixed_params)#, downsample_factor = df)
 #
 pred_y, data_y = emu.goodness_of_fit(test_file, statistic = None)
 
