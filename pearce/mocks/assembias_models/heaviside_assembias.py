@@ -225,7 +225,7 @@ class HeavisideAssembias(object):
                 "and the baseline model must have a method named ``%s``")
             raise HalotoolsError(msg % self._method_name_to_decorate)
 
-    @model_helpers.bounds_enforcing_decorator_factory(0, 1)
+    #@model_helpers.bounds_enforcing_decorator_factory(0, 1)
     def percentile_splitting_function(self, prim_haloprop):
         """
         Method returns the fraction of halos that are ``type-2``
@@ -264,10 +264,11 @@ class HeavisideAssembias(object):
             spline_function = model_helpers.custom_spline(
                 self._split_abscissa, self._split_ordinates, k=3)
             result = spline_function(prim_haloprop)
-
+        result = np.where(result < 0, 0., result)
+        result = np.where(result > 1, 1., result)
         return result
 
-    @model_helpers.bounds_enforcing_decorator_factory(-1, 1)
+    #@model_helpers.bounds_enforcing_decorator_factory(-1, 1)
     def assembias_strength(self, prim_haloprop):
         """
         Method returns the strength of assembly bias as a function of the primary halo property.
@@ -294,7 +295,8 @@ class HeavisideAssembias(object):
             result = spline_function(np.log10(prim_haloprop))
         else:
             result = spline_function(prim_haloprop)
-
+        result = np.where(result < -1, -1., result)
+        result = np.where(result > 1, 1., result)
         return result
 
     def _get_assembias_param_dict_key(self, ipar):
@@ -335,7 +337,6 @@ class HeavisideAssembias(object):
             split_pos = splitting_result[positive_strength_idx]
             type1_frac_pos = 1 - split_pos
             strength_pos = strength[positive_strength_idx]
-
             upper_bound1 = baseline_upper_bound - base_pos
             upper_bound2 = ((1 - type1_frac_pos)/type1_frac_pos)*(base_pos - baseline_lower_bound)
             upper_bound = np.minimum(upper_bound1, upper_bound2)
@@ -346,7 +347,6 @@ class HeavisideAssembias(object):
             split_neg = splitting_result[negative_strength_idx]
             type1_frac_neg = 1 - split_neg
             strength_neg = strength[negative_strength_idx]
-
             lower_bound1 = baseline_lower_bound - base_neg
             lower_bound2 = (1 - type1_frac_neg)/type1_frac_neg*(base_neg - baseline_upper_bound)
             lower_bound = np.maximum(lower_bound1, lower_bound2)
@@ -420,7 +420,6 @@ class HeavisideAssembias(object):
 
             # Compute the fraction of type-2 halos as a function of the input prim_haloprop
             split = self.percentile_splitting_function(prim_haloprop)
-
             # Compute the baseline, undecorated result
             result = func(*args, **kwargs)
 
@@ -430,6 +429,7 @@ class HeavisideAssembias(object):
                 (split > 0) & (split < 1) &
                 (result > baseline_lower_bound) & (result < baseline_upper_bound)
                 )
+
             # Now create convenient references to the non-edge-case sub-arrays
             no_edge_result = result[no_edge_mask]
             no_edge_split = split[no_edge_mask]
@@ -474,17 +474,14 @@ class HeavisideAssembias(object):
 
             # type1_mask has now been computed for all possible branchings
             #################################################################################
-
             perturbation = self._galprop_perturbation(
                     prim_haloprop=prim_haloprop[no_edge_mask],
                     baseline_result=no_edge_result,
                     splitting_result=no_edge_split)
-
             frac_type1 = 1 - no_edge_split
             frac_type2 = 1 - frac_type1
             perturbation[~type1_mask] *= (-frac_type1[~type1_mask] /
                 (frac_type2[~type1_mask]))
-
             no_edge_result += perturbation
             result[no_edge_mask] = no_edge_result
 

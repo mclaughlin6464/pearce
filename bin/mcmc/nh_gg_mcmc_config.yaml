@@ -1,0 +1,37 @@
+fname: '/scratch/users/swmclau2/PearceMCMC/pearce_mcmc_nh_gg_v6.hdf5'
+emu:
+    emu_type: 'NashvilleHot'
+    training_file: '/home/users/swmclau2/scratch/xi_gg_zheng07_cosmo_v3/PearceXiggCosmo.hdf5' 
+    fixed_params: {'z': 0.0} #, 'rmin': 1.0}
+    emu_hps: {} #'downsample_factor': 0.1 }
+
+data:
+    #true_data_fname: '' # if info is populated
+    #true_cov_fname
+    #cosmo_params = {}
+    sim:
+      simname: 'testbox'
+      sim_hps: {'boxno':3,'realization':2, 'system':'sherlock', 'downsample_factor': 1e-2, 'particles':False}
+      scale_factor: 1.0
+      gal_type: 'HOD' #as opposed to sham
+      hod_name: 'zheng07'
+      hod_params: {'logM0': 13.2, 'sigma_logM': 0.2, 'logM1': 14.2,'alpha': 1.083}
+      nd: 5e-4
+    obs:
+      obs: 'xi'
+      mean: False # compute the mean?
+      rbins: [7.943282000000000120e-02,1.122018500000000057e-01,1.584893199999999891e-01,2.238721100000000130e-01,3.162277700000000191e-01,4.466835900000000192e-01,6.309573400000000332e-01,8.912509400000000470e-01,1.258925410000000022e+00,1.778279409999999894e+00,2.511886430000000114e+00,3.548133889999999901e+00,5.011872340000000037e+00,7.079457839999999891e+00,1.000000000000000000e+01,1.412537544999999994e+01,1.995262315000000086e+01,2.818382931000000013e+01,3.981071706000000177e+01]
+    cov:
+      #jackknife_hps: {'n_sub': 5, 'n_rands': [10, 5], 'rand_scalecut': 1.0}
+      meas_cov_fname: '/home/users/swmclau2/Git/pearce/notebooks/meas_cov_testboxes_gg.npy' 
+      emu_cov_fname: '/home/users/swmclau2/Git/pearce/bin/covmat/xi_gg_nh_emu_cov.npy'
+      #cross_cov_fname: 'xi_gg_gm_cov.npy'
+      # shot as well
+      shot: True 
+chain:
+    nburn: 0
+    nwalkers: 400
+    nsteps: 10000 
+    seed: 0
+    #iterator: True
+    fixed_params: {} # {"HOD"} # could be str "HOD" or "cosmo" as well as vals

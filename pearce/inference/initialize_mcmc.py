@@ -4,12 +4,14 @@ Create the initial state for the sampler from a config. Since there are a lot of
 keeps everything together cleanly.
 '''
 from os import path
+from time import time
 import warnings
 import numpy as np
 from scipy.optimize import minimize_scalar
 import h5py
 import yaml
 from pearce.mocks import cat_dict
+from AbundanceMatching import *
 
 # I don't know if I need an object for this a la trainer
 # for now, make a main function, until there is clear need to do otherwise
@@ -51,7 +53,7 @@ def emu_config(f, cfg):
     :param cfg:
         Emu portion of the cfg
     """
-    required_emu_keys = ['emu_type', 'training_file']
+    required_emu_keys = ['emu_type', 'training_file', 'emu_cov_fname']
     for key in required_emu_keys:
         assert key in cfg, "%s not in config but is required."%key
         f.attrs[key] = cfg[key]
@@ -62,7 +64,11 @@ def emu_config(f, cfg):
 
     for key in optional_keys:
         attr = cfg[key] if key in cfg else None
-        attr = str(attr) if type(attr) is dict else attr 
+        if key == 'seed' and  attr is None:
+            attr = int(time()) 
+        else:
+            attr = str(attr) if type(attr) is dict else attr 
+
         f.attrs[key] = attr 
 
 def data_config(f, cfg):
@@ -84,12 +90,25 @@ def data_config(f, cfg):
         data, cov = _compute_data(cfg)
 
     for key in ['sim', 'obs', 'cov']:
-        f.attrs[key] = str(cfg[key]) if key in cfg else None
+        f.attrs[key] = str(cfg[key]) if key in cfg else str(None)
         if key not in cfg:
             warnings.warn("Not all data attributes were specified. This is not reccomended, since the chain may not be well described in the future!")
 
+    # make emu_cov
+    emu_cov = np.zeros_like(cov)
+    ecf = f.attrs['emu_cov_fname']
+    ecf = [ecf] if type(ecf) is str else ecf
+
+    start_idx = 0
+    for ecf in f.attrs['emu_cov_fname']:
+        ec = np.load(ecf)
+        emu_cov[start_idx:start_idx+ec.shape[0], start_idx:start_idx+ec.shape[0]] = ec
+        start_idx+= ec.shape[0]
+
     f.create_dataset('data', data = data)
-    f.create_dataset('cov', data = cov)
+    f.create_dataset('cov', data = cov + ec)
+
+
 
 def _load_data(true_data_fname, true_cov_fname):
     """
@@ -119,7 +138,7 @@ def _load_data(true_data_fname, true_cov_fname):
         cov.append(np.loadtxt(fname))
 
     # NOTE stacking could be wrong here, double check
-    return np.vstack(data), np.vstack(cov)
+    return np.vstack(data).squeeze(), np.vstack(cov).squeeze()
 
 def _compute_data(cfg):
     """
@@ -136,6 +155,31 @@ def _compute_data(cfg):
 
     cat = cat_dict[sim_cfg['simname']](**sim_cfg['sim_hps'])  # construct the specified catalog!
 
+    # TODO logspace
+    r_bins = obs_cfg['rbins']
+
+    obs = obs_cfg['obs']
+
+    if type(obs) is str:
+        obs = [obs]
+
+    meas_cov_fname = cov_cfg['meas_cov_fname']
+    emu_cov_fname = cov_cfg['emu_cov_fname']
+    if type(emu_cov_fname) is str:
+        emu_cov_fname = [emu_cov_fname]
+
+    assert len(obs) == len(emu_cov_fname), "Emu cov not same length as obs!"
+
+    n_bins = len(r_bins)-1
+    data = np.zeros((len(obs)*n_bins))
+    assert path.isfile(meas_cov_fname), "Invalid meas cov file specified"
+    try:
+        cov = np.loadtxt(meas_cov_fname)
+    except ValueError:
+        cov = np.load(meas_cov_fname)
+
+    assert cov.shape == (len(obs)*n_bins, len(obs)*n_bins), "Invalid meas cov shape."
+
     # TODO add shams
     if sim_cfg['gal_type'] == 'HOD':
         cat.load(sim_cfg['scale_factor'], HOD=sim_cfg['hod_name'], **sim_cfg['sim_hps'])
@@ -143,64 +187,94 @@ def _compute_data(cfg):
         em_params = sim_cfg['hod_params']
         add_logMmin(em_params, cat, float(sim_cfg['nd']))
 
-        # TODO logspace
-        r_bins = obs_cfg['rbins']
-
-        obs = obs_cfg['obs']
-
-        if type(obs) is str:
-            obs = [obs]
-
-        emu_cov_fname = cov_cfg['emu_cov_fname']
-        if type(emu_cov_fname) is str:
-            emu_cov_fname = [emu_cov_fname]
-
-        assert len(obs) == len(emu_cov_fname), "Emu cov not same length as obs!"
-
-        n_bins = len(r_bins)-1
-        data = np.zeros((len(obs)*n_bins))
-        cov = np.zeros((len(obs)*n_bins, len(obs)*n_bins))
-
         for idx, (o, ecf) in enumerate(zip(obs, emu_cov_fname)):
             # TODO need some check that a valid configuration is specified
             y_mean, yjk = None, None
             shot_cov = covjk = np.zeros((n_bins, n_bins))
 
             calc_observable = getattr(cat, 'calc_%s' % o)
-            if obs_cfg['mean'] or 'shot' in cov_cfg: #TODO add number of pop
-                xi_vals = []
-                for i in xrange(50):
-                    cat.populate(em_params)
-                    xi_vals.append(calc_observable(r_bins))
+            N = 1
+            if obs_cfg['mean'] or ('shot' in cov_cfg and cov_cfg['shot']):#TODO add number of pop
+                N=20
 
-                shot_xi_vals = np.array(xi_vals)
-                y_mean = np.mean(shot_xi_vals, axis = 0)
-                shot_cov = np.cov(xi_vals, rowvar=False)
-
-            if 'jackknife_hps' in cov_cfg:
+            xi_vals = []
+            for i in xrange(N):
                 cat.populate(em_params)
-                # TODO need to fix jackknife
-                yjk, covjk = calc_observable(r_bins, do_jackknife=True, jk_args=cov_cfg['jackknife_hps'])
+                xi_vals.append(calc_observable(r_bins))
+
+            shot_xi_vals = np.array(xi_vals)
+            y_mean = np.mean(shot_xi_vals, axis = 0)
+
+            if 'shot' in cov_cfg and cov_cfg['shot']:
+                shot_cov = np.cov(xi_vals, rowvar=False)
+            else:
+                shot_cov = np.zeros((r_bins.shape[0]-1, r_bins.shape[0]-1))
+
+            # remove jackknife calculation.
+            # instead, user passes in a meas_cov above
+            #if 'jackknife_hps' in cov_cfg:
+            #    cat.populate(em_params)
+            #    yjk, covjk = calc_observable(r_bins, do_jackknife=True, jk_args=cov_cfg['jackknife_hps'])
 
             assert path.isfile(ecf), "Invalid emu covariance specified."
-            emu_cov = np.loadtxt(ecf)
+            try:
+                emu_cov = np.loadtxt(ecf)
+            except ValueError:
+                emu_cov = np.load(ecf)
 
-            if yjk is None and y_mean is None:
-                raise AssertionError("Invalid data calculation specified.")
             if obs_cfg['mean']:
                 data[idx*n_bins:(idx+1)*n_bins] = y_mean
             else:
-                data[idx*n_bins:(idx+1)*n_bins] = yjk
+                data[idx*n_bins:(idx+1)*n_bins] = shot_xi_vals[0]
 
-            cov[idx*n_bins:(idx+1)*n_bins, idx*n_bins:(idx+1)*n_bins] = \
-                                            shot_cov+covjk+emu_cov
 
-        if 'cross_cov_fname' in cov_cfg:
-            # TODO should i be adding
-            cross_cov = np.loadtxt(cov_cfg['cross_cov_fname'])
-            assert cross_cov.shape[0] == n_bins, "Cross-cov matrix of wrong size."
-            cov[:n_bins, n_bins:] = cross_cov
-            cov[n_bins:, :n_bins] = cross_cov
+            cov[idx*n_bins:(idx+1)*n_bins, idx*n_bins:(idx+1)*n_bins] += \
+                                            shot_cov+emu_cov
+
+    elif sim_cfg['gal_type']== 'SHAM':
+        raise NotImplementedError("Only HODs are supported at this time.")
+        cat.load(sim_cfg['scale_factor'], **sim_cfg['sim_hps'])
+        cat.populate()# will generate a mock for us to overwrite
+        gal_property = np.loadtxt(sim_cfg['gal_property_fname'])
+        halo_property_name = sim_cfg['halo_property']
+        min_ptcl = sim_cfg.get('min_ptcl', 200)
+        nd = float(sim_cfg['nd'])
+        scatter = float(sim_cfg['scatter'])
+
+        af =  AbundanceFunction(gal_property[:,0], gal_property[:,1], sim_cfg['af_hyps'], faint_end_first = sim_cfg['reverse'])
+        remainder = af.deconvolute(scatter, 20)
+        # apply min mass
+        halo_table = cat.halocat.halo_table#[cat.halocat.halo_table['halo_mvir']>min_ptcl*cat.pmass] 
+        nd_halos = calc_number_densities(halo_table[halo_property_name], cat.Lbox) #don't think this matters which one i choose here
+        catalog_w_nan = af.match(nd_halos, scatter)
+        n_obj_needed = int(nd*(cat.Lbox**3))
+        catalog = halo_table[~np.isnan(catalog_w_nan)]
+        sort_idxs = np.argsort(catalog)
+
+        final_catalog = halo_table[~np.isnan(catalog_w_nan)][sort_idxs[:n_obj_needed]]
+
+        final_catalog['x'] = final_catalog['halo_x']
+        final_catalog['y'] = final_catalog['halo_y']
+        final_catalog['z'] = final_catalog['halo_z']
+        final_catalog['halo_upid'] = -1
+        # FYI cursed.
+        cat.model.mock.galaxy_table = final_catalog
+        # TODO save sham hod "truth"
+
+        for idx, (o, ecf) in enumerate(zip(obs, emu_cov_fname)):
+
+            calc_observable = getattr(cat, 'calc_%s' % o)
+
+            y = calc_observable(r_bins)
+            data[idx*n_bins:(idx+1)*n_bins] = y
+
+            assert path.isfile(ecf), "Invalid emu covariance specified."
+            try:
+                emu_cov = np.loadtxt(ecf)
+            except ValueError:
+                emu_cov = np.load(ecf)
+
+            cov[idx*n_bins:(idx+1)*n_bins, idx*n_bins:(idx+1)*n_bins] += emu_cov
 
     else:
         raise NotImplementedError("Non-HOD caclulation not supported")
@@ -244,15 +318,15 @@ def chain_config(f, cfg):
         Cfg with MCMC data
     """
 
-    required_mcmc_keys = ['nwalkers', 'nsteps']
+    required_mcmc_keys = []#'nwalkers', 'nsteps']
 
     for key in required_mcmc_keys:
         assert key in cfg, "%s not in config but is required."%key
         f.attrs[key] = cfg[key]
 
-    optional_keys = ['nburn', 'seed']#, 'fixed_params']
+    optional_keys = ['mcmc_type', 'nwalkers', 'nsteps', 'nlive', 'dlogz', 'nburn', 'seed']#, 'fixed_params']
     for key in optional_keys:
-        attr = cfg[key] if key in cfg else None
+        attr = cfg[key] if key in cfg else 'None'
         attr = str(attr) if type(attr) is dict else attr
         f.attrs[key] = attr 
 

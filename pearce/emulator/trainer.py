@@ -5,6 +5,7 @@ Rather than firing off many jobs to do the training, will do everying with MPI i
 Will also write to an hdf5 file, to reduce the enormous clutter produced so far.
 """
 from os import path
+import os
 from glob import glob
 from shutil import copyfile
 from subprocess import call
@@ -110,14 +111,13 @@ class Trainer(object):
 
         for idx, cat in enumerate(self.cats):
             _, vals = cat._get_cosmo_param_names_vals() 
-
             self._cosmo_param_vals[idx,:] = vals
 
         # In the future if there are more annoying params i'll turn this into a loop or something.
         # TODO does yaml parse these to bools automatically?
         self._particles = bool(cosmo_cfg['particles']) if 'particles' in cosmo_cfg else False
         #print cosmo_cfg.keys()
-        self._downsample_factor = float(cosmo_cfg['downsample_factor']) if 'downsample_factor' in cosmo_cfg else 1e-3
+        self._downsample_factor = float(cosmo_cfg['downsample_factor']) if 'downsample_factor' in cosmo_cfg else 1e-2
 
     def prep_hod(self, hod_cfg):
         """
@@ -140,6 +140,7 @@ class Trainer(object):
         """
         # TODO possibly better error messaging
         self.hod = hod_cfg['model']  # string defining which model
+        self._biased_satellites = bool(hod_cfg.get('biased_satellites', False))
         # TODO confirm is valid?
         del hod_cfg['model']
         # A little unnerved by the assymetry between this and cosmology
@@ -354,7 +355,7 @@ class Trainer(object):
         #cat.populate(hod_params) #may be overkill, but will ensure params are written everywhere
         def func(logMmin, hod_params):
             hod_params.update({'logMmin':logMmin}) 
-            return (cat.calc_analytic_nd(hod_params) - self._fixed_nd)**2
+            return (cat.calc_analytic_nd(hod_params, min_ptcl=self._min_ptcl) - self._fixed_nd)**2
 
         res = minimize_scalar(func, bounds = self._logMmin_bounds, args = (hod_params,), options = {'maxiter':100}, method = 'Bounded')
 
@@ -404,6 +405,16 @@ class Trainer(object):
             #print sendbuf[i]
         return sendbuf
 
+    def _check_params(self, cat):
+        cat_pnames = set(cat.model.param_dict.keys())
+        cfg_pnames = set(self._hod_param_names)
+        try:
+            assert len(cat_pnames - cfg_pnames)<=1 #logMmin
+        except AssertionError:
+            print "Cat params", cat_pnames
+            print "Cfg params", cfg_pnames
+            raise AssertionError("Incorrect  parameters specified. Compare the outputs above to resovle the issue.")
+
     def compute_measurement(self, param_idxs, rank = None):
 
         param_idxs = param_idxs.astype(int)
@@ -440,13 +451,16 @@ class Trainer(object):
                 scale_factor = self._scale_factors[scale_factor_idx]
 
                 #print self._scale_factors, scale_factor_idx, scale_factor
+                
                 cat.load(scale_factor, HOD= self.hod, particles = self._particles,
+                         biased_satellites = self._biased_satellites,
                          downsample_factor=self._downsample_factor, hod_kwargs= self._hod_kwargs  )
-
+                self._check_params(cat) 
                 calc_observable = self._get_calc_observable(cat)
 
             hod_params = dict(zip(self._hod_param_names, self._hod_param_vals[hod_idx, :]))
             if self._fixed_nd is not None:
+            # TODO this does not respect min_ptcl
                 self._add_logMmin(hod_params, cat)
             #continue
             if self.pop_seed is None:
@@ -467,7 +481,13 @@ class Trainer(object):
 
                 for repop in xrange(self._n_repops):
                     #print repop
-                    cat.populate(hod_params, min_ptcl= self._min_ptcl)
+                    try:
+                        cat.populate(hod_params, min_ptcl= self._min_ptcl)
+                    except ValueError:
+                        # try again, sometimes things are tempermental?
+                        print repop, cat.model.mock.Ngals, cat.model.mock._total_abundance
+                        cat.populate(hod_params, min_ptcl= self._min_ptcl)
+
                     try:
                         obs_repops[repop] = self._transform_func(calc_observable())
                     except ValueError: #likely an issue with population. If it comes up again, send it up
@@ -497,7 +517,17 @@ class Trainer(object):
             output = output.reshape((-1, self.n_bins))
             output_cov = output_cov.reshape((-1, self.n_bins, self.n_bins))
 
+        #delete rows with all 0's
+        print output.shape
+        drop_idxs = np.all(output == 0.0, axis = 1)
+        output = output[~drop_idxs] 
+        output_cov = output_cov[~drop_idxs]
+        print output.shape
+
         all_cosmo_sf_pairs = np.array(list(product(xrange(len(self.cats)), xrange(len(self._scale_factors)))))
+        output_dir = path.dirname(self.output_fname)
+        if not path.isdir(output_dir):
+            os.mkdir(output_dir)
 
         f = h5py.File(self.output_fname, 'w')
         try:
@@ -528,7 +558,6 @@ class Trainer(object):
 
             # I could compute this, which would be faster, but this is easier to read.
             hod_idxs = np.where(np.all(all_param_idxs[:, :2] == cosmo_sf_pair, axis=1))[0]
-
             grp.create_dataset("obs", data=output[hod_idxs], chunks=True, compression='gzip')
             grp.create_dataset("cov", data=output_cov[hod_idxs], chunks=True, compression='gzip')
 
@@ -541,12 +570,14 @@ class Trainer(object):
 
         rank = comm.Get_rank()
         size = comm.Get_size()
+        print rank, size
 
         n_combos = len(self.cats)*len(self._scale_factors)*len(self._hod_param_vals)
         n_per_node = np.ceil(float(n_combos) / size)
 
         if rank == 0:
             all_param_idxs_send = self._divide_tasks(size)
+            print all_param_idxs_send.shape
         else:
             all_param_idxs_send = None
 
@@ -591,6 +622,9 @@ class Trainer(object):
         """
 
         output_directory = path.dirname(self.output_fname)
+        if not path.isdir(output_directory):
+            os.mkdir(output_directory)
+
         # Only have to write HOD info. Rest is uniquely specified by the config.
         if not rerun:
             np.savetxt(path.join(output_directory, HOD_FNAME), self._hod_param_vals, header = '\t'.join(self._hod_param_names))
@@ -610,7 +644,7 @@ class Trainer(object):
             param_filename = path.join(output_directory, jobname + '.npy')
             if not rerun:
                 np.savetxt(param_filename, all_param_idxs[idx])
-            elif path.exists(path.join(output_directory, 'output_%04d.npy'%idx)):\
+            elif path.exists(path.join(output_directory, 'output_%04d.npy'%idx)) and path.exists(path.join(output_directory, 'output_cov_%04d.npy'%idx)):\
                 continue # this one ran successfull
 
             # TODO allow queue changing
@@ -620,7 +654,7 @@ class Trainer(object):
             call(command, shell=self.system == 'sherlock')
 
 
-def make_kils_command(jobname, max_time, outputdir, queue='medium'):  # 'bulletmpi'):
+def make_kils_command(jobname, max_time, outputdir, queue= 'bulletmpi'):
     '''
     Return a list of strings that comprise a bash command to call trainingHelper.py on the cluster.
     Designed to work on ki-ls's batch system

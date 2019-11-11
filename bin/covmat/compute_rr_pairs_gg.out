@@ -1,0 +1,58 @@
+/u/ki/swmclau2/.local/lib/python2.7/site-packages/halotools-0.7.dev5005-py2.7-linux-x86_64.egg/halotools/empirical_models/phase_space_models/analytic_models/monte_carlo_helpers.py:205: FutureWarning: Using a non-tuple sequence for multidimensional indexing is deprecated; use `arr[tuple(seq)]` instead of `arr[seq]`. In the future this will be interpreted as an array index, `arr[np.array(seq)]`, which will result either in an error or a different result.
+  self.rad_prof_func_table_indices[digitized_param_list]
+/u/ki/swmclau2/.local/lib/python2.7/site-packages/halotools-0.7.dev5005-py2.7-linux-x86_64.egg/halotools/empirical_models/phase_space_models/analytic_models/monte_carlo_helpers.py:522: FutureWarning: Using a non-tuple sequence for multidimensional indexing is deprecated; use `arr[tuple(seq)]` instead of `arr[seq]`. In the future this will be interpreted as an array index, `arr[np.array(seq)]`, which will result either in an error or a different result.
+  self.rad_prof_func_table_indices[digitized_param_list]
+/u/ki/swmclau2/.local/lib/python2.7/site-packages/pearce/mocks/cat.py:285: UserWarning: n_cores invalid. Changing from 16 to maximum 12.
+  warnings.warn('n_cores invalid. Changing from %d to maximum %d.' % (n_cores, max_cores))
+(17750460, 3)
+13 (4437615, 3) (4437615, 3)
+14 (4437615, 3) (4437615, 3)
+15 (4437615, 3) (4437615, 3)
+
+------------------------------------------------------------
+Sender: LSF System <lsf@dole0021>
+Subject: Job 206349: <compute_rr_pairs_gg> in cluster <slac> Done
+
+Job <compute_rr_pairs_gg> was submitted from host <ki-ls09> by user <swmclau2> in cluster <slac> at Sun May  5 09:29:19 2019
+Job was executed on host(s) <1*dole0021>, in queue <medium>, as user <swmclau2> in cluster <slac> at Sun May  5 09:29:22 2019
+                            <5*bubble0003>
+                            <1*kiso0043>
+                            <9*bubble0008>
+</u/ki/swmclau2> was used as the home directory.
+</u/ki/swmclau2/Git/pearce/bin/covmat> was used as the working directory.
+Started at Sun May  5 09:29:22 2019
+Terminated at Sun May  5 17:32:56 2019
+Results reported at Sun May  5 17:32:56 2019
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+#BSUB -q medium 
+#BSUB -W 12:00
+#BSUB -J compute_rr_pairs_gg
+#BSUB -oo /u/ki/swmclau2/Git/pearce/bin/covmat/compute_rr_pairs_gg.out    
+#BSUB -n 16 
+#BSUB --span[ptile=16]
+
+python ~/Git/pearce/bin/covmat/compute_rr_pairs_gg.py
+
+------------------------------------------------------------
+
+Successfully completed.
+
+Resource usage summary:
+
+    CPU time :                                   28936.00 sec.
+    Max Memory :                                 4094 MB
+    Average Memory :                             4011.60 MB
+    Total Requested Memory :                     -
+    Delta Memory :                               -
+    Max Swap :                                   7565 MB
+    Max Processes :                              18
+    Max Threads :                                28
+    Run time :                                   29014 sec.
+    Turnaround time :                            29017 sec.
+
+The output (if any) is above this job summary.
+

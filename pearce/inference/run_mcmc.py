@@ -3,7 +3,7 @@
     and MCMC analysis with a predefined number of steps and walkers."""
 
 from time import time
-from multiprocessing import cpu_count
+from multiprocessing import cpu_count, Pool
 import warnings
 from itertools import izip
 from os import path
@@ -11,10 +11,12 @@ from ast import literal_eval
 
 import numpy as np
 import emcee as mc
+import dynesty as dyn
+from functools import partial
 from scipy.linalg import inv
 import h5py
 
-from pearce.emulator import OriginalRecipe, ExtraCrispy, SpicyBuffalo
+from pearce.emulator import OriginalRecipe, ExtraCrispy, SpicyBuffalo, NashvilleHot
 
 # liklihood functions need to be defined here because the emulator will be made global
 
@@ -35,6 +37,24 @@ def lnprior(theta, param_names, *args):
         if np.isnan(t) or t < low or t > high:
             return -np.inf
     return 0
+
+def lnprior_unitcube(u, param_names):
+    """
+    Prior for an MCMC in nested samplers. Default is to assume flat prior for all parameters defined by the boundaries the
+    emulator is built from. Retuns negative infinity if outside bounds or NaN
+    :param theta:
+        The parameters proposed by the sampler.
+    :param param_names
+        The names identifying the values in theta, needed to extract their boundaries
+    :return:
+        Either 0 or -np.inf, depending if the params are allowed or not.
+    """
+    for i, p in enumerate(param_names):
+        low, high = _emus[0].get_param_bounds(p)
+        u[i] = (high-low)*u[i] + low 
+
+    return u
+
 
 def lnlike(theta, param_names, fixed_params, r_bin_centers, y, combined_inv_cov):
     """
@@ -70,6 +90,7 @@ def lnlike(theta, param_names, fixed_params, r_bin_centers, y, combined_inv_cov)
     emu_pred = np.hstack(emu_preds)
 
     delta = emu_pred - y
+    #print delta
     return - np.dot(delta, np.dot(combined_inv_cov, delta))
 
 def lnprob(theta, *args):
@@ -239,6 +260,96 @@ def run_mcmc(emus,  param_names, y, cov, r_bin_centers,fixed_params = {}, \
         return chain, lnprob_chain
     return chain
 
+def run_nested_mcmc(emus,  param_names, y, cov, r_bin_centers,fixed_params = {}, \
+             resume_from_previous=None, nlive = 1000, ncores='all', dlogz= 0.1):
+    """
+    Run a nested sampling MCMC using dynesty and the emu. Includes some sanity checks and does some precomputation.
+    Also optimized to be more efficient than using emcee naively with the emulator.
+
+    :param emus:
+        A trained instance of the Emu object. If there are multiple observables, should be a list. Otherwiese,
+        can be a single emu object
+    :param param_names:
+        Names of the parameters to constrain
+    :param ys:
+        data to constrain against. either one array of observables, or multiple where each new observable is a column.
+    # TODO figure out whether it should be row or column and assign appropriately
+    :param covs:
+        measured covariance of y for each y. Should have the same iteration properties as ys
+    :param r_bin_centers:
+        The scale bins corresponding to all y in ys
+    :param resume_from_previous:
+        String listing filename of a previous chain to resume from. Default is None, which starts a new chain.
+    :param fixed_params:
+        Any values held fixed during the emulation, default is {}
+    :param nwalkers:
+        Number of walkers for the mcmc. default is 1000
+    :param nsteps:
+        Number of steps for the mcmc. Default is 1--
+    :param nburn:
+        Number of burn in steps, default is 20
+    :param ncores:
+        Number of cores. Default is 'all', which will use all cores available
+    :return:
+        chain, collaposed to the shape ((nsteps-nburn)*nwalkers, len(param_names))
+    """
+    # make emu global so it can be accessed by the liklihood functions
+    if type(emus) is not list:
+        emus = [emus]
+    _emus = emus
+    global _emus
+
+    ncores= _run_tests(y, cov, r_bin_centers,param_names, fixed_params, ncores)
+    #pool = Pool(processes=ncores)
+
+    num_params = len(param_names)
+
+    combined_inv_cov = inv(cov)
+    #args = (param_names, fixed_params, r_bin_centers, y, combined_inv_cov)
+
+    ll = partial(lnlike, param_names = param_names, fixed_params = fixed_params, 
+                          r_bin_centers = r_bin_centers, y = y , combined_inv_cov = combined_inv_cov)
+    pi = partial(lnprior_unitcube, param_names = param_names)
+    sampler = dyn.NestedSampler(ll, pi, num_params, nlive = nlive)#, pool=pool, queue_size = ncores)
+
+    # TODO
+    if resume_from_previous is not None:
+        raise NotImplemented("Haven't figured out reviving from dead points.")
+
+    sampler.run_nested(dlogz)
+    '''
+    n_steps = nlive
+    results = np.zeros((n_steps, num_params+1))
+    for i, result in enumerate(sampler.sample(dlogz)):
+        if i%n_steps == 0 and i>0:
+            #print 'AAA', i
+            yield results
+            results = np.zeros((n_steps, num_params+1))
+        else:
+            #print '__A', i 
+            #print result
+            results[i%n_steps, :-1] = result[2]
+            results[i%n_steps, -1] = result[6]
+
+    #print 'BBB', i, i%n_steps
+    yield results[:i%n_steps]
+
+    results = np.zeros((n_steps, num_params+1))
+    for j, result in enumerate(sampler.add_live_points()):
+        results[j%n_steps, :-1] = result[2]
+        results[j%n_steps, -1] = result[6]
+
+
+    #print 'CCC', len(results)
+    yield results
+    '''
+    res = sampler.results
+    print res.summary()
+    ## should i return the results or just these things?
+    chain = res['samples']
+    evidence = res['logz'].reshape((-1, 1))
+    yield np.hstack([chain, evidence])
+
 def run_mcmc_iterator(emus, param_names, y, cov, r_bin_centers,fixed_params={},
                       resume_from_previous=None, nwalkers=1000, nsteps=100, nburn=20, ncores='all', return_lnprob=False):
     """
@@ -285,12 +396,13 @@ def run_mcmc_iterator(emus, param_names, y, cov, r_bin_centers,fixed_params={},
     global _emus
 
     ncores = _run_tests(y, cov, r_bin_centers, param_names, fixed_params, ncores)
-    num_params = len(param_names)
+    pool = Pool(processes=ncores)
 
+    num_params = len(param_names)
     combined_inv_cov = inv(cov)
 
-    sampler = mc.EnsembleSampler(nwalkers, num_params, lnprob,
-                                 threads=ncores, args=(param_names, fixed_params, r_bin_centers, y, combined_inv_cov))
+    sampler = mc.EnsembleSampler(nwalkers, num_params, lnprob, pool=pool,
+                                 args=(param_names, fixed_params, r_bin_centers, y, combined_inv_cov))
 
     # TODO this is currently broken with the config option
     if resume_from_previous is not None:
@@ -322,10 +434,12 @@ def run_mcmc_config(config_fname):
 
     assert path.isfile(config_fname), "Invalid config fname for chain"
 
+    #print config_fname
     f = h5py.File(config_fname, 'r+')
     emu_type_dict = {'OriginalRecipe':OriginalRecipe,
                      'ExtraCrispy': ExtraCrispy,
-                     'SpicyBuffalo': SpicyBuffalo}
+                     'SpicyBuffalo': SpicyBuffalo,
+                     'NashvilleHot': NashvilleHot}
     fixed_params = f.attrs['fixed_params']
     fixed_params = {} if fixed_params is None else literal_eval(fixed_params)
     #metric = f.attrs['metric'] if 'metric' in f.attrs else {}
@@ -374,10 +488,17 @@ def run_mcmc_config(config_fname):
 
     #covs = [f['cov'][-e.n_bins:, :][:, -e.n_bins:] for i,e in enumerate(emus)]
 
-    print y.shape
-    print cov.shape
+    mcmc_type = 'normal' if ('mcmc_type' not in f.attrs or f.attrs['mcmc_type'] is None) else f.attrs['mcmc_type']
+    if mcmc_type == 'normal':
+        nwalkers, nsteps = f.attrs['nwalkers'], f.attrs['nsteps']
+    elif mcmc_type=='nested':
+        nlive = f.attrs['nlive']
+        dlogz = float(f.attrs['dlogz']) if 'dlogz' in f.attrs else 0.1
+        if dlogz is None:
+            dlogz = 0.1 
 
-    nwalkers, nsteps = f.attrs['nwalkers'], f.attrs['nsteps']
+    else:
+        raise NotImplementedError("Only 'normal' and 'nested' mcmc_type is valid.")
 
     nburn, seed, fixed_params = f.attrs['nburn'], f.attrs['seed'], f.attrs['chain_fixed_params']
 
@@ -407,6 +528,8 @@ def run_mcmc_config(config_fname):
         sim_cfg = literal_eval(f.attrs['sim'])
         del fixed_params['HOD']
         fixed_params.update(sim_cfg['hod_params'])
+        if 'logMmin' in fixed_params:
+            del fixed_params['logMmin']
     elif "cosmo" in fixed_params:
         assert 'sim' in f.attrs.keys(), "No sim information in config file."
         sim_cfg = literal_eval(f.attrs['sim'])
@@ -428,22 +551,56 @@ def run_mcmc_config(config_fname):
         # TODO anyway to make sure all shpaes are right?
         #chain_dset = f['chain']
 
-    chain_dset = f.create_dataset('chain', (nwalkers*nsteps, len(param_names)), chunks = True, compression = 'gzip')
+    f.create_dataset('chain', (0, len(param_names)), chunks = True, compression = 'gzip', maxshape = (None, len(param_names)))
 
     #lnprob = np.zeros((nwalkers*nsteps,))
     if 'lnprob' in f.keys():
         del f['lnprob']#[:] = lnprob 
         # TODO anyway to make sure all shpaes are right?
         #lnprob_dset = f['lnprob']
-    lnprob_dset = f.create_dataset('lnprob', (nwalkers*nsteps, ) , chunks = True, compression = 'gzip')
 
+    if mcmc_type == 'normal':
+        f.create_dataset('lnprob', (0,) , chunks = True, compression = 'gzip', maxshape = (None,))
+    else:
+        f.create_dataset('evidence', (0,) , chunks = True, compression = 'gzip', maxshape = (None,))
+
+    f.close()
     np.random.seed(seed)
-    for step, pos in enumerate(run_mcmc_iterator(emus, param_names, y, cov, rpoints,\
-                                                 fixed_params=fixed_params, nwalkers=nwalkers,\
-                                                 nsteps=nsteps, nburn=nburn, return_lnprob=True, ncores = 16)):
 
-        chain_dset[step*nwalkers:(step+1)*nwalkers] = pos[0]
-        lnprob_dset[step*nwalkers:(step+1)*nwalkers] = pos[1]
+    if mcmc_type == 'normal':
+
+        for step, pos in enumerate(run_mcmc_iterator(emus, param_names, y, cov, rpoints,\
+                                                     fixed_params=fixed_params, nwalkers=nwalkers,\
+                                                     nsteps=nsteps, nburn=nburn, return_lnprob=True, ncores = 16)):
+
+            f = h5py.File(config_fname, 'r+')
+            chain_dset, like_dset = f['chain'], f['lnprob']
+            l = len(chain_dset)
+            chain_dset.resize((l+nwalkers), axis = 0)
+            like_dset.resize((l+nwalkers), axis = 0)
+
+            chain_dset[-nwalkers:] = pos[0]
+            like_dset[-nwalkers:] = pos[1]
+
+            f.close()
+    else:
+        for step, pos in enumerate(run_nested_mcmc(emus, param_names, y, cov, rpoints,\
+                                                     fixed_params=fixed_params, nlive=nlive,\
+                                                     dlogz=dlogz, ncores = 16)):
+
+            size = pos.shape[0]
+            f = h5py.File(config_fname, 'r+')
+            chain_dset, ev_dset = f['chain'], f['evidence']
+
+            l = len(chain_dset)
+            chain_dset.resize((l + size), axis=0)
+            ev_dset.resize((l + size), axis=0)
+
+            print pos.shape
+            chain_dset[-size:] = pos[:, :-1]
+            ev_dset[-size:] = pos[:,-1]
+
+            f.close()
 
 
 if __name__ == "__main__":

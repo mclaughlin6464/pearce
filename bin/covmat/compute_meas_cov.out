@@ -1,0 +1,4 @@
+/home/users/swmclau2/.local/lib/python2.7/site-packages/pearce/mocks/cat.py:284: UserWarning: n_cores invalid. Changing from 100 to maximum 16.
+  warnings.warn('n_cores invalid. Changing from %d to maximum %d.' % (n_cores, max_cores))
+/var/spool/slurmd/job40390442/slurm_script: line 15: 74643 Killed                  python /home/users/swmclau2/Git/pearce/bin/covmat/compute_meas_cov.py
+slurmstepd: error: Detected 1 oom-kill event(s) in step 40390442.batch cgroup. Some of your processes may have been killed by the cgroup out-of-memory handler.

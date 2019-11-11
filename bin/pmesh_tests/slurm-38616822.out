@@ -1,0 +1,13 @@
+Traceback (most recent call last):
+  File "/home/users/swmclau2/Git/pearce/pearce/sims/submit_sims.py", line 120, in <module>
+    submit_sims(**cfg)
+  File "/home/users/swmclau2/Git/pearce/pearce/sims/submit_sims.py", line 38, in submit_sims
+    cosmo = Cosmology(**param_dict)
+  File "/home/users/swmclau2/.local/lib/python2.7/site-packages/nbodykit/cosmology/cosmology.py", line 19, in inner
+    return function(self, *args, **kwargs)
+  File "/home/users/swmclau2/.local/lib/python2.7/site-packages/nbodykit/cosmology/cosmology.py", line 148, in __init__
+    deprecated_args = check_deprecated_init(self._user_args, self._user_kwargs)
+  File "/home/users/swmclau2/.local/lib/python2.7/site-packages/nbodykit/cosmology/cosmology.py", line 689, in check_deprecated_init
+    raise ValueError(msg)
+ValueError: mixing deprecated and valid arguments for the Cosmology class; the following args are deprecated: ['Neff', 'H0', 'w0']
+srun: error: sh-31-07: task 0: Exited with exit code 1
