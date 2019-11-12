@@ -87,7 +87,7 @@ def data_config(f, cfg):
         data, cov = _load_data(cfg['true_data_fname'], cfg['true_cov_fname'])
 
     else: #compute the data ourselves
-        data, cov = _compute_data(cfg)
+        data, cov = _compute_data(f, cfg)
 
     for key in ['sim', 'obs', 'cov']:
         f.attrs[key] = str(cfg[key]) if key in cfg else str(None)
@@ -95,6 +95,7 @@ def data_config(f, cfg):
             warnings.warn("Not all data attributes were specified. This is not reccomended, since the chain may not be well described in the future!")
 
     # make emu_cov
+    print cov.shape
     emu_cov = np.zeros_like(cov)
     ecf = f.attrs['emu_cov_fname']
     ecf = [ecf] if type(ecf) is str else ecf
@@ -102,6 +103,7 @@ def data_config(f, cfg):
     start_idx = 0
     for ecf in f.attrs['emu_cov_fname']:
         ec = np.load(ecf)
+        print emu_cov.shape, ec.shape
         emu_cov[start_idx:start_idx+ec.shape[0], start_idx:start_idx+ec.shape[0]] = ec
         start_idx+= ec.shape[0]
 
@@ -140,7 +142,7 @@ def _load_data(true_data_fname, true_cov_fname):
     # NOTE stacking could be wrong here, double check
     return np.vstack(data).squeeze(), np.vstack(cov).squeeze()
 
-def _compute_data(cfg):
+def _compute_data(f,cfg):
     """
     Compute the truth data explicitly
     :param cfg:
@@ -156,7 +158,7 @@ def _compute_data(cfg):
     cat = cat_dict[sim_cfg['simname']](**sim_cfg['sim_hps'])  # construct the specified catalog!
 
     # TODO logspace
-    r_bins = obs_cfg['rbins']
+    r_bins = np.array(obs_cfg['rbins'])
 
     obs = obs_cfg['obs']
 
@@ -164,7 +166,7 @@ def _compute_data(cfg):
         obs = [obs]
 
     meas_cov_fname = cov_cfg['meas_cov_fname']
-    emu_cov_fname = cov_cfg['emu_cov_fname']
+    emu_cov_fname = f.attrs['emu_cov_fname']
     if type(emu_cov_fname) is str:
         emu_cov_fname = [emu_cov_fname]
 
@@ -178,10 +180,12 @@ def _compute_data(cfg):
     except ValueError:
         cov = np.load(meas_cov_fname)
 
+    print 'Cov shape', cov.shape
     assert cov.shape == (len(obs)*n_bins, len(obs)*n_bins), "Invalid meas cov shape."
 
     # TODO add shams
     if sim_cfg['gal_type'] == 'HOD':
+        print sim_cfg['sim_hps']
         cat.load(sim_cfg['scale_factor'], HOD=sim_cfg['hod_name'], **sim_cfg['sim_hps'])
 
         em_params = sim_cfg['hod_params']
@@ -205,6 +209,7 @@ def _compute_data(cfg):
             shot_xi_vals = np.array(xi_vals)
             y_mean = np.mean(shot_xi_vals, axis = 0)
 
+            # TODO remove all this, should be in the covmat anyway
             if 'shot' in cov_cfg and cov_cfg['shot']:
                 shot_cov = np.cov(xi_vals, rowvar=False)
             else:
@@ -229,7 +234,7 @@ def _compute_data(cfg):
 
 
             cov[idx*n_bins:(idx+1)*n_bins, idx*n_bins:(idx+1)*n_bins] += \
-                                            shot_cov+emu_cov
+                                            emu_cov# + shot_cov 
 
     elif sim_cfg['gal_type']== 'SHAM':
         raise NotImplementedError("Only HODs are supported at this time.")
