@@ -12,10 +12,11 @@ from os import path
 import numpy as np
 from astropy import cosmology
 from astropy import units as u
+import astropy.constants as const
 import pandas as pd
 import h5py 
 from ast import literal_eval
-from halotools.sim_manager import UserSuppliedHaloCatalog, UserSuppliedPtclCatalog
+from halotools.sim_manager import RockstarHlistReader, UserSuppliedHaloCatalog, UserSuppliedPtclCatalog
 from halotools.empirical_models import HodModelFactory, TrivialPhaseSpace, NFWPhaseSpace, PrebuiltHodModelFactory
 from halotools.utils import add_halo_hostid
 from .cat import Cat, HOD_DICT, VALID_HODS, DEFAULT_HODS
@@ -1004,8 +1005,116 @@ class ResolutionTestBox(Cat):
         vals = [0.286, 0.047,self.h, 0.82, 0.96]
         return names, vals
 
+class MDPL2(Cat):
+
+    def __init__(self, system='cori', **kwargs):
+
+        simname = 'mdpl2'
+        columns_to_keep = HLIST_COLS
+
+        # halotools only likes mvir columns
+        # load m200b instead of mvir to be consistent with the train/test boxes
+        del columns_to_keep['halo_m200b']
+        columns_to_keep['halo_mvir'] = (39, 'f4')
+        del columns_to_keep['halo_rvir'] # TODO gonna have to compute this directly
+        #columns_to_keep['halo_rvir'] = (5, 'f4')
+
+        Lbox = 1000.0 # Mpc/h
+        self.npart = 3840
+
+        assert system == 'cori', "MDPL2 currently only on Cori"
+
+        pmass = 1.51e9 # Msun/h
+        cosmo = self._get_cosmo()
+
+        self.prim_haloprop_key = 'halo_m200b'
+
+        locations = {'cori': '/global/cscratch1/sd/swmclau2/MDPL2/'}
+        loc = locations[system]
+
+        gadget_loc = loc #path.join(loc, 'snapdir_130/')
+
+        tmp_fnames = ['hlist_1.00000.list']
+        tmp_scale_factors = [1.0]
+
+        self._update_lists(kwargs, tmp_fnames, tmp_scale_factors)
+
+        new_kwargs = kwargs.copy()
+
+        for key in ['simname', 'loc', 'columns_to_keep', 'Lbox', 'pmass', 'cosmo']:
+            if key in new_kwargs:
+                del new_kwargs[key]
+
+        cache_loc = '/scratch/users/swmclau2/hlists/'
+        super(MDPL2, self).__init__(simname=simname, loc=loc, columns_to_keep=columns_to_keep, Lbox=Lbox,
+                                          pmass=pmass, cosmo=cosmo, gadget_loc=gadget_loc, cache_loc=cache_loc,
+                                          **new_kwargs)
+
+    def _get_cosmo(self):
+        h = 0.6777
+        Om0 = 0.307115
+        Ob0 = 0.048206
+        #n_s = 0.96
+        #sigma8 = 0.8228
+
+        return cosmology.core.FlatLambdaCDM(H0 = h*100, Om0=Om0, Ob0=Ob0)
+
+    def cache(self, scale_factors='all', overwrite=False, add_local_density=False, add_particles=False,
+              downsample_factor=1e-2):
+        '''
+        A copy of the main cat version of this object. does the same thing, but
+        also adds the missing r200b column before cacheing as rvir.
+        :param scale_factors:
+        :param overwrite:
+        :param add_local_density:
+        :param add_particles:
+        :param downsample_factor:
+        :return:
+        '''
+        try:
+            assert not add_local_density or self.gadget_loc  # gadget loc must be nonzero here!
+            assert not add_particles or self.gadget_loc
+        except:
+            raise AssertionError(
+                'Particle location not specified; please specify gadget location for %s' % self.simname)
+
+        if add_local_density or add_particles:
+            all_snapdirs = sorted(glob(path.join(self.gadget_loc, 'snapdir*')))
+            snapdirs = [all_snapdirs[idx] for idx in
+                        self.sf_idxs]  # only the snapdirs for the scale factors were interested in .
+        else:
+            snapdirs = ['' for i in self.scale_factors]
+
+        for a, z, fname, cache_fnames, snapdir in izip(self.scale_factors, self.redshifts, self.filenames,
+                                                       self.cache_filenames, snapdirs):
+            # TODO get right reader for each halofinder.
+            print a, z
+            if scale_factors != 'all' and a not in scale_factors:
+                continue
+            reader = RockstarHlistReader(fname, self.columns_to_keep, cache_fnames, self.simname,
+                                         self.halo_finder, z, self.version_name, self.Lbox, self.pmass,
+                                         overwrite=overwrite)
+            reader.read_halocat(self.columns_to_convert)
+
+            ###### New stuff ####
+            # actually r200b, but halotools can have issues with other mass defs
+            reader.halo_table['halo_rvir'] = np.cbrt( (const.G*const.M_sun/(100*u.km/u.s/u.Mpc)**2)*reader.halo_table['halo_mvir']/100).to('kpc').value
+            #####################
+            if add_local_density or add_particles:
+                particles = self._read_particles(snapdir, downsample_factor=downsample_factor)
+                if add_local_density:
+                    self.add_local_density(reader, particles, downsample_factor)  # TODO how to add radius?
+
+            reader.write_to_disk()  # do these after so we have a halo table to work off of
+            reader.update_cache_log()
+
+            if add_particles:
+                self.cache_particles(particles, a, downsample_factor=downsample_factor)
+
+
 # a dict that maps the default simnames to objects, which makes construction easier.
 # TODO kitten_dict
 cat_dict = {'bolshoi': Bolshoi, 'multidark': Multidark, 'emu': Emu, 'fox': Fox, 'multidark_highres': MDHR,
             'chinchilla': Chinchilla, 'aardvark': Aardvark, 'guppy': Guppy,
-            'trainingbox': TrainingBox, 'testbox': TestBox, 'fastpm':FastPM, 'resolution': ResolutionTestBox}
+            'trainingbox': TrainingBox, 'testbox': TestBox, 'fastpm':FastPM, 'resolution': ResolutionTestBox,
+            'mdpl2': MDPL2}
