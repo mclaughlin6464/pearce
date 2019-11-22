@@ -403,7 +403,8 @@ class TrainingBox(Cat):
         locations = {#'ki-ls': ['/u/ki/swmclau2/des/NewAemulusBoxes/Box0%02d/',
                      #           '/u/ki/swmclau2/des/NewAemulusBoxes/Box0%02d/'],
                      'ki-ls': ['/nfs/slac/g/ki/ki22/cosmo/beckermr/tinkers_emu/Box0%02d/',
-                               '/nfs/slac/g/ki/ki23/des/beckermr/tinkers_emu/Box0%02d/'],
+                               '/nfs/slac/g/ki/ki23/des/beckermr/tinkers_emu/Box0%02d/',
+                               '/nfs/slac/g/ki/ki18/des/swmclau2/NewAemulusBoxes/Box0%02d/'],
                      'sherlock': ['/home/users/swmclau2/scratch/NewTrainingBoxes/Box0%02d/',
                                   '/home/users/swmclau2/scratch/NewTrainingBoxes/Box0%02d/']}
                       #same place on sherlock
@@ -412,19 +413,23 @@ class TrainingBox(Cat):
         #loc = locations[system][0]
         loc_list = locations[system]
 
-        in_first_loc = set([0,1,2,3,4,10,11,12,13,14,15,16,17,18,19,25,30,31,32,33,34])
+        in_first_loc = set([1,2,3,4,10,11,12,13,14,15,16,17,18,19,25,30,31,32,33,34])
 
         if boxno in in_first_loc:
             loc = loc_list[0]%(boxno)
+        elif boxno == 0: # TODO all the boxes should be updated this way
+            loc = loc_list[2]%(boxno)
         else:
             loc = loc_list[1]%(boxno)
 
-        gadget_loc = loc + 'output/'
+        if boxno!= 0:
+            gadget_loc = loc + 'output/'
+        else:
+            gadget_loc = loc_list[0]%(boxno) + 'output/' 
         loc += 'halos/m200b/'
 
         #TODO why not using rs boxes???
-        tmp_fnames = ['outbgc2_%d.list' % i for i in xrange(10)]
-        #tmp_fnames = ['TestBox00%d-000_out_parents_5.list' % boxno]
+        tmp_fnames = ['outbgc2_rs_%d.list' % i for i in xrange(10)]
         tmp_scale_factors = [0.25, 0.333, 0.5, 0.540541, 0.588235, 0.645161, 0.714286, 0.8, 0.909091, 1.0]
         #tmp_scale_factors = [0.645161]
         self._update_lists(kwargs, tmp_fnames, tmp_scale_factors)

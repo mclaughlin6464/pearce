@@ -1,8 +1,8 @@
 ###!/bin/bash
 #BSUB -q medium 
-#BSUB -W 8:00
+#BSUB -W 2:00
 #BSUB -J map_outlist_rs 
 #BSUB -oo /u/ki/swmclau2/Git/pearce/bin/cache/map_outlist_rs.out    
 #BSUB -n 8
 
-python /u/ki/swmclau2/Git/pearce/bin/cache/map_outlist_rs.py 
+python /u/ki/swmclau2/Git/pearce/bin/cache/map_outlist_rs_onto_bgc2_cats.py

@@ -1,6 +1,6 @@
 ###!/bin/bash
 #BSUB -q medium 
-#BSUB -W 3:00
+#BSUB -W 8:00
 #BSUB -J trainbox_cache
 #BSUB -oo /u/ki/swmclau2/Git/pearce/bin/cache/cache_halocat.out    
 #BSUB -n 8

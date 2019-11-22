@@ -1,30 +1,28 @@
 cosmology:
-        boxno: 0:40 
-        simname: trainingbox
-        scale_factors: 1.0 
-        particles: True 
-        downsample_factor: 1e-2
+        boxno: 0:122 
+        simname: fastpm 
+        scale_factors: 0.645 
+        particles: False 
+        #downsample_factor: 1e-2
         system: ki-ls 
 HOD:
         model: 'zheng07' 
-        #sec_haloprop_key: 'halo_local_density_10'
-        num_hods: 1000 
-        fixed_nd: 5e-4
-        biased_satellites: True
-        ordered_params: {'logMmin': [12.0, 16.0], 'sigma_logM': [0.05, 0.5], 'logM0': [12.6, 13.6], 'logM1': [13.7, 14.7], 'alpha': [0.7, 1.3], 'mean_occupation_centrals_assembias_corr1':[-1.0, 1.0], 'mean_occupation_satellites_assembias_corr1':[-1.0, 1.0], 'conc_gal_bias': [0.5, 2.0]}
+        num_hods: 500 
+        fixed_nd: 2e-4
+        ordered_params: {'logMmin': [12.0, 16.0], 'sigma_logM': [0.05, 0.5], 'logM0': [12.6, 13.6], 'logM1': [13.7, 14.7], 'alpha': [0.7, 1.3]} #, 'mean_occupation_cens_assembias_param':[-1.0, 1.0], 'mean_occupation_sats_assembias_param':[-1.0, 1.0]}
         system: ki-ls 
-        min_ptcl: 100
+        min_ptcl: 50
 
 observation:
-        obs: xi_gm
+        obs: xi 
         bins: [7.943282000000000120e-02,1.122018500000000057e-01,1.584893199999999891e-01,2.238721100000000130e-01,3.162277700000000191e-01,4.466835900000000192e-01,6.309573400000000332e-01,8.912509400000000470e-01,1.258925410000000022e+00,1.778279409999999894e+00,2.511886430000000114e+00,3.548133889999999901e+00,5.011872340000000037e+00,7.079457839999999891e+00,1.000000000000000000e+01,1.412537544999999994e+01,1.995262315000000086e+01,2.818382931000000013e+01,3.981071706000000177e+01]
-        n_repops: 5 
+        n_repops: 10 
         log_obs: True
 computation:
-        filename: /nfs/slac/g/ki/ki18/des/swmclau2/xi_gm_zheng07/PearceXigmCosmoCorrAB.hdf5
+        filename: /nfs/slac/g/ki/ki18/des/swmclau2/xi_gg_fastpm_test/PearceXiggFastPMTest.hdf5
         overwrite: True
         queue_skipper: True 
         system: ki-ls 
         max_time: 24 
-        n_jobs: 800
+        n_jobs: 250
 

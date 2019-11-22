@@ -6,8 +6,8 @@ cosmology:
         downsample_factor: 1e-2
         system: ki-ls 
 HOD:
-        model: 'zheng07' 
-        #sec_haloprop_key: 'halo_local_density_10'
+        model: 'corrZheng07' 
+        sec_haloprop_key: 'halo_local_density_10'
         num_hods: 1000 
         fixed_nd: 5e-4
         biased_satellites: True
@@ -21,7 +21,7 @@ observation:
         n_repops: 5 
         log_obs: True
 computation:
-        filename: /nfs/slac/g/ki/ki18/des/swmclau2/xi_gm_zheng07/PearceXigmCosmoCorrAB.hdf5
+        filename: /nfs/slac/g/ki/ki18/des/swmclau2/xi_gm_corrab_zheng07/PearceXigmCosmoCorrAB.hdf5
         overwrite: True
         queue_skipper: True 
         system: ki-ls 

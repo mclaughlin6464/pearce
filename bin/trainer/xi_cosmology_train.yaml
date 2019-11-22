@@ -1,26 +1,19 @@
 cosmology:
-        boxno: 0:40 
-        simname: trainingbox
+        simname: chinchilla 
         scale_factors: 1.0
         particles: False 
-        system: long 
+        system: ki-ls
 HOD:
-        model: zheng07 
-        num_hods: 1000 
-        fixed_nd: 1e-4
-        ordered_params: {'logMmin': [13.1, 14.1], 'sigma_logM': [0.05, 0.3], 'logM0': [13.1, 16.1], 'logM1': [13.1, 15.1], 'alpha': [0.8, 1.2]}
-        system: long 
-        min_ptcl: 100
-
+        model: redMagic
+        num_hods: 2000 
+        ordered_params: {'logMmin': [11.5, 13.5], 'sigma_logM': [0.05, 0.6], 'logM0': [12.0, 16.0], 'logM1': [13.0, 15.0], 'alpha': [0.8, 1.2], 'f_c': [0.01, 0.5]} #, 'mean_occupation_centrals_assembias_param1': [-1.0, 1.0], 
+        #'mean_occupation_satellites_assembias_param1': [-1.0, 1.0]}
+        system: ki-ls 
 observation:
         obs: xi 
         bins: [7.943282000000000120e-02,1.122018500000000057e-01,1.584893199999999891e-01,2.238721100000000130e-01,3.162277700000000191e-01,4.466835900000000192e-01,6.309573400000000332e-01,8.912509400000000470e-01,1.258925410000000022e+00,1.778279409999999894e+00,2.511886430000000114e+00,3.548133889999999901e+00,5.011872340000000037e+00,7.079457839999999891e+00,1.000000000000000000e+01,1.412537544999999994e+01,1.995262315000000086e+01,2.818382931000000013e+01,3.981071706000000177e+01]
         n_repops: 10 
         log_obs: True
 computation:
-        filename: /u/ki/swmclau2/des/xi_cosmo_trainer/PearceRedMagicXiCosmoFixedNd.hdf5 
+        filename: /u/ki/swmclau2/des/PearceChinchillaXi.hdf5 
         overwrite: True
-        queue_skipper: True
-        system: long 
-        n_jobs: 500
-        max_time: 24 

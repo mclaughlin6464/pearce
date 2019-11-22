@@ -1,0 +1,10 @@
+###!/bin/bash
+#BSUB -q medium 
+#BSUB -W 01:00
+#BSUB -J xigg_ab_trainer
+###BSUB -R span[ptile=16]
+#BSUB -oo /afs/slac.stanford.edu/u/ki/swmclau2/Git/pearce/bin/trainer/xi_gg_hsab_cosmo_trainer.out
+#BSUB -n 8 
+
+#mpirun -np 8 python /afs/slac.stanford.edu/u/ki/swmclau2/Git/pearce/pearce/emulator/trainer.py xi_gg_hsab_cosmo_trainer.yaml
+python /afs/slac.stanford.edu/u/ki/swmclau2/Git/pearce/pearce/emulator/trainer.py xi_gg_hsab_cosmo_trainer.yaml

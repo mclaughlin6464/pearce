@@ -1,12 +1,13 @@
 cosmology:
-        boxno: 0:40 
-        simname: trainingbox
+        boxno: 0:7 
+        realization: 0
+        simname: testbox
         scale_factors: 1.0
         particles: False 
         system: long 
 HOD:
         model: zheng07 
-        num_hods: 1000 
+        num_hods: 100 
         fixed_nd: 1e-4
         ordered_params: {'logMmin': [13.1, 14.1], 'sigma_logM': [0.05, 0.3], 'logM0': [13.1, 16.1], 'logM1': [13.1, 15.1], 'alpha': [0.8, 1.2]}
         system: long 
@@ -18,9 +19,9 @@ observation:
         n_repops: 10 
         log_obs: True
 computation:
-        filename: /u/ki/swmclau2/des/xi_cosmo_trainer/PearceRedMagicXiCosmoFixedNd.hdf5 
+        filename: /u/ki/swmclau2/des/xi_cosmo_tester/PearceRedMagicXiCosmoFixedNd_test.hdf5 
         overwrite: True
         queue_skipper: True
         system: long 
-        n_jobs: 500
-        max_time: 24 
+        n_jobs: 100
+        max_time: 1 
