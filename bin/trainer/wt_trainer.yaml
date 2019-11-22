@@ -1,0 +1,23 @@
+cosmology:
+        simname: chinchilla 
+        Lbox: 400.0
+        n_part: 2048
+        scale_factors: [0.8112, 0.7698, 0.7306, 0.6933, 0.658]
+        particles: False 
+        system: sherlock 
+HOD:
+        model: hsabRedMagic
+        num_hods: 500 
+        ordered_params: {'logMmin': [11.5, 13.5], 'sigma_logM': [0.05, 0.6], 'logM0': [12.0, 16.0], 'logM1': [13.0, 15.0], 'alpha': [0.8, 1.2], 'f_c': [0.01, 0.5], 'mean_occupation_centrals_assembias_param1': [-1.0, 1.0], 'mean_occupation_satellites_assembias_param1':[-1.0, 1.0]}
+        system: sherlock 
+
+observation:
+        obs: wt
+        log_obs: False 
+        W: 0.00275848072207
+        rbins: [0.31622777, 0.44326829, 0.62134575, 0.87096359, 1.22086225, 1.7113283, 2.39883292, 3.36253386, 4.71338954, 6.60693448, 9.26118728,  12.98175275, 18.19700859,  25.50742784,  35.75471605,  50.11872336]
+        bins: [ 0.04166667,  0.05245523,  0.06603722,  0.08313593,  0.10466193, 0.13176157,  0.16587799,  0.20882801,  0.26289889,  0.3309701 ,0.41666667,  0.52455225,  0.66037216,  0.8313593 ,  1.04661935, 1.31761569,  1.65877988,  2.08828014,  2.62898894,  3.30970098,4.16666667]
+        n_repops: 10 
+computation:
+        filename: /home/users/swmclau2/scratch/PearceHSABRedMagicWtChinchilla.hdf5 
+        overwrite: False 

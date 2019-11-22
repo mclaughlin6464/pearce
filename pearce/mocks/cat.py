@@ -325,14 +325,18 @@ class Cat(object):
                                          self.halo_finder, z, self.version_name, self.Lbox, self.pmass,
                                          overwrite=overwrite)
             reader.read_halocat(self.columns_to_convert)
+            print '123', add_particles
             if add_local_density or add_particles:
+                print '456'
                 particles = self._read_particles(snapdir, downsample_factor=downsample_factor)
+                print 'A', particles.shape
                 if add_local_density:
                     self.add_local_density(reader, particles, downsample_factor)  # TODO how to add radius?
 
             reader.write_to_disk()  # do these after so we have a halo table to work off of
             reader.update_cache_log()
 
+            print '789', add_particles
             if add_particles:
                 self.cache_particles(particles, a, downsample_factor=downsample_factor)
 
@@ -350,6 +354,7 @@ class Cat(object):
         np.random.seed(int(time()))  # TODO pass in seed?
         all_particles = np.array([], dtype='float32')
         # TODO should fail gracefully if memory is exceeded or if p is too small.
+        print '10111213', snapdir, len(glob(path.join(snapdir, 'snap*')))
         for file in glob(path.join(snapdir, 'snapshot*')):
             print 'Reading %s' % file
             # TODO should find out which is "fast" axis and use that.
@@ -364,6 +369,7 @@ class Cat(object):
 
             all_particles = np.resize(all_particles, (all_particles.shape[0] + particles.shape[0], 3))
             all_particles[-particles.shape[0]:, :] = particles
+            print 'B',all_particles.shape
 
         return all_particles
 
@@ -374,6 +380,7 @@ class Cat(object):
             A (N,3) shaped numpy array of all particle positions
         """
         z = 1.0 / scale_factor - 1.0
+        print 'C', particles.shape
         ptcl_catalog = UserSuppliedPtclCatalog(redshift=z, Lbox=self.Lbox, particle_mass=self.pmass, \
                                                x=particles[:, 0], y=particles[:, 1], z=particles[:, 2])
         ptcl_cache_loc = self.cache_loc

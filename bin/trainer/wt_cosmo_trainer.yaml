@@ -1,0 +1,28 @@
+cosmology:
+        boxno: 0:40 
+        simname: trainingbox
+        scale_factors: 1.0 
+        particles: False 
+        system: sherlock 
+HOD:
+        model: zheng07 
+        num_hods: 1000 
+        fixed_nd: 1e-4
+        ordered_params: {'logMmin': [13.1, 14.1], 'sigma_logM': [0.05, 0.3], 'logM0': [13.1, 14.6], 'logM1': [13.1, 14.6], 'alpha': [0.8, 1.2]}
+        system: sherlock 
+        min_ptcl: 100
+
+observation:
+        obs: wt 
+        bins: [ 0.04166667,  0.05245523,  0.06603722,  0.08313593,  0.10466193, 0.13176157,  0.16587799,  0.20882801,  0.26289889,  0.3309701 ,0.41666667,  0.52455225,  0.66037216,  0.8313593 ,  1.04661935, 1.31761569,  1.65877988,  2.08828014,  2.62898894,  3.30970098,4.16666667]
+        W: 1.0
+        n_repops: 10 
+        log_obs: True
+computation:
+        filename: /home/users/swmclau2/scratch/wt_zheng07_cosmo/PearceWtCosmo.hdf5 
+        overwrite: True
+        queue_skipper: True
+        system: sherlock
+        n_jobs: 400
+        max_time: 6
+

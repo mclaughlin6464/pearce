@@ -5,7 +5,7 @@ from pearce.mocks.kittens import cat_dict
 #0.85474
 #0.8112
 #cat = cat_dict['ds_14_b'](scale_factors = [0.538461538462], system = 'sherlock')
-cat = cat_dict['chinchilla'](400.0, scale_factors = [1.0], system = 'sherlock')
+cat = cat_dict['mdpl2'](scale_factors = [1.0], system = 'sherlock')
 #cat = cat_dict['ds_14_b'](scale_factors = [0.0], system = 'sherlock')
 #cat = cat_dict['multidark_highres'](scale_factors = [1.00110], system = 'sherlock')
 #cat.cache(overwrite = True, add_local_density=False)#, add_particles=True,downsample_factor = 1e-3)
@@ -17,4 +17,4 @@ cat = cat_dict['chinchilla'](400.0, scale_factors = [1.0], system = 'sherlock')
 #    cat = cat_dict['trainingbox'](boxno, scale_factors = [0.645161], system = 'sherlock')
     #cat = cat_dict['resolution'](boxno, scale_factors = [0.8, 1.0], system = 'ki-ls')
 
-cat.cache(overwrite = True)#, add_local_density=False, add_particles = False, downsample_factor = 1e-2)
+cat.cache(overwrite = True, add_local_density=False, add_particles = True, downsample_factor = 1e-2)

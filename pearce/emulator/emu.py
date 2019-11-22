@@ -213,6 +213,10 @@ class Emu(object):
             # we're fixed to a particular cosmology #
             if cosmo_group_name == 'attrs':
                 continue
+            #if cosmo_group_name == 'cosmo_no_00':
+            #    print 'Skipping first cosmology.'
+            #    continue
+
             cosmo_no = int(cosmo_group_name[-2:])
             if 'cosmo' in fixed_params and cosmo_no != fixed_params['cosmo']:
                     continue
@@ -1963,6 +1967,9 @@ class NashvilleHot(Emu):
             hod_param_vals = np.array(f['attrs/hod_param_vals'])
 
         x1, x2 = cosmo_param_vals, hod_param_vals
+# DELETE ME #####################################################################
+        if len(f.keys()) > 35:
+            x1 = x1[1:]
 
         scale_factors = f.attrs['scale_factors']
         redshift_bin_centers = 1.0 / scale_factors - 1  # emulator works in z, sims in a.
@@ -2033,13 +2040,17 @@ class NashvilleHot(Emu):
             # we're fixed to a particular cosmology #
             if cosmo_group_name == 'attrs':
                 continue
+            if cosmo_group_name == 'cosmo_no_00' and len(f.keys()) > 35:
+########DELETE ME ############################3
+                print 'Skipping cosmo 0!'
+                continue
 
             for sf_group_name, sf_group in cosmo_group.iteritems():
                 z = 1.0 / float(sf_group_name[-5:]) - 1.0
 
                 if 'z' in fixed_params and np.abs(z - fixed_params['z']) > 1e-3:
                     continue
-
+                #print cosmo_group_name, sf_group_name, sf_group.keys()
                 obs_dset = sf_group['obs'].value
                 cov_dset = sf_group['cov'].value
 
@@ -2331,6 +2342,7 @@ class NashvilleHot(Emu):
             y = self.downsample_y
             yerr = self.downsample_yerr
 
+        #print x1.shape, x2.shape, y.shape, yerr.shape
         for _y,_yerr, _kern1, _kern2, nv in izip(y,yerr, kern1, kern2, noise_var):
             # TODO delete me
             emulator = GPKroneckerGaussianRegressionVar(x1, x2, _y, _yerr**2, _kern1, _kern2, noise_var = nv)
@@ -2546,8 +2558,11 @@ class NashvilleHot(Emu):
         #pred_y = self._emulate_helper(x, False, old_idxs=old_idxs)
         # emulate helper works better for one at a time
         # since were doing a big batch, dont' bother builind the big t-matrix
+        print x1.shape, x2.shape
+        print len(self._emulators), self._y_mean.shape
         _py = [emu.predict(x1, x2)[0][:, 0] + ym for emu, ym in zip(self._emulators, self._y_mean)]
         pred_y = np.stack(_py)
+        print pred_y.shape
         # NOTE think this is the right ordering, should check, though may not matter if i'm consistent...
 
         # TODO untested!
@@ -2625,9 +2640,9 @@ class NashvilleHot(Emu):
         for idx, emulator in enumerate(self._emulators):
             print idx, '*'*15
             try:
-                emulator.optimize_restarts(parallel=False, num_restarts = 3, verbose = True)#, robust=True)
+                emulator.optimize_restarts(parallel=True, num_restarts = 5, verbose = True, max_iters = 20)# robust=True)
             except:
-                emulator.optimize_restarts(parallel=False, num_restarts = 3, verbose = True, robust=True)
+                emulator.optimize_restarts(parallel=False, num_restarts = 5, verbose = True, robust=True)
             sys.stdout.flush()
 
 
