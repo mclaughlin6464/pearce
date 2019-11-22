@@ -132,8 +132,10 @@ def _run_tests(y, cov, r_bin_centers, param_names, fixed_params, ncores):
         # else, we're good!
 
     #make sure all inputs are of consistent shape
+    print y.shape, cov.shape
     assert y.shape[0] == cov.shape[0] and cov.shape[1] == cov.shape[0]
     #print y.shape[0]/r_bin_centers.shape[0] ,len(_emus) , y.shape[0]/r_bin_centers.shape[0] 
+    print y.shape, r_bin_centers.shape[0], len(_emus)
     assert y.shape[0]/r_bin_centers.shape[0] == len(_emus) and y.shape[0]%r_bin_centers.shape[0] == 0
     # TODO informative error message when the array is jsut of the wrong shape?/
 
@@ -475,20 +477,22 @@ def run_mcmc_config(config_fname):
     rbins = np.array(obs_cfg['rbins'])
     rpoints = (rbins[1:]+rbins[:-1])/2.0
     orig_n_bins = len(rpoints)
+    cut_n_bins = orig_n_bins - emu.n_bins
     rpoints = rpoints[-emu.n_bins:]
 
     # un-stack these
     # TODO once i have the covariance terms these will need to be propertly combined
 
-    y = np.hstack([f['data'][(i+1)*orig_n_bins-emu.n_bins:(i+1)*orig_n_bins] \
-                   for i, e in enumerate(emus)])
-    # not sure if they should be flipped
-    _cov = np.hstack([f['cov'][(i+1)*orig_n_bins-emu.n_bins:(i+1)*orig_n_bins, :] for i, e in enumerate(emus)])
-    cov = np.vstack([ _cov[:, (i+1)*orig_n_bins-emu.n_bins:(i+1)*orig_n_bins] for i, e in enumerate(emus)])
+    y = f['data'][()]
+    cov = f['cov'][()]
 
-    #covs = [f['cov'][-e.n_bins:, :][:, -e.n_bins:] for i,e in enumerate(emus)]
+    # TODO this will fail when n_bins varies changes per emu
+    # crop out bins if we've done a scale cut
+    y = np.hstack([y[i*orig_n_bins+cut_n_bins:(i+1)*orig_n_bins] for i in xrange(len(emus))])
+    _cov = np.vstack([cov[i*orig_n_bins+cut_n_bins:(i+1)*orig_n_bins] for i in xrange(len(emus))])
+    cov = np.hstack([_cov[:, i*orig_n_bins+cut_n_bins:(i+1)*orig_n_bins] for i in xrange(len(emus))])
 
-    mcmc_type = 'normal' if ('mcmc_type' not in f.attrs or f.attrs['mcmc_type'] is None) else f.attrs['mcmc_type']
+    mcmc_type = 'normal' if ('mcmc_type' not in f.attrs or f.attrs['mcmc_type'] == 'None') else f.attrs['mcmc_type']
     if mcmc_type == 'normal':
         nwalkers, nsteps = f.attrs['nwalkers'], f.attrs['nsteps']
     elif mcmc_type=='nested':

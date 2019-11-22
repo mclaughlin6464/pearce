@@ -1210,6 +1210,8 @@ class Cat(object):
         x_g, y_g, z_g = [self.model.mock.galaxy_table[c] for c in ['x', 'y', 'z']]
         pos_g = return_xyz_formatted_array(x_g, y_g, z_g, period=self.Lbox)
 
+        print np.max(pos_g, axis =0), self.Lbox
+
         x_m, y_m, z_m = [self.halocat.ptcl_table[c] for c in ['x', 'y', 'z']]
         pos_m = return_xyz_formatted_array(x_m, y_m, z_m, period=self.Lbox)
 

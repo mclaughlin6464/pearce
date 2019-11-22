@@ -32,6 +32,7 @@ def main(config_fname):
     filename = cfg['fname']
 
     #assert path.isfile(filename), "%s is not a valid output filename"%filename
+    print 'Fname', filename
     f = h5py.File(filename, 'w')
 
     emu_cfg = cfg['emu']
@@ -101,14 +102,15 @@ def data_config(f, cfg):
     ecf = [ecf] if type(ecf) is str else ecf
 
     start_idx = 0
-    for ecf in f.attrs['emu_cov_fname']:
+    for ecf in ecf:
         ec = np.load(ecf)
         print emu_cov.shape, ec.shape
         emu_cov[start_idx:start_idx+ec.shape[0], start_idx:start_idx+ec.shape[0]] = ec
         start_idx+= ec.shape[0]
 
+    print cov.shape, emu_cov.shape
     f.create_dataset('data', data = data)
-    f.create_dataset('cov', data = cov + ec)
+    f.create_dataset('cov', data = cov + emu_cov)
 
 
 

@@ -645,7 +645,7 @@ class Trainer(object):
             if not rerun:
                 np.savetxt(param_filename, all_param_idxs[idx])
             elif path.exists(path.join(output_directory, 'output_%04d.npy'%idx)) and path.exists(path.join(output_directory, 'output_cov_%04d.npy'%idx)):\
-                continue # this one ran successfull
+                continue # this one ran successfully
 
             # TODO allow queue changing
             command = make_command(jobname, self.max_time, output_directory)
