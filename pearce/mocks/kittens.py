@@ -417,12 +417,12 @@ class TrainingBox(Cat):
 
         if boxno in in_first_loc:
             loc = loc_list[0]%(boxno)
-        elif boxno == 0: # TODO all the boxes should be updated this way
+        elif boxno == 0 and system== 'ki-ls': # TODO all the boxes should be updated this way
             loc = loc_list[2]%(boxno)
         else:
             loc = loc_list[1]%(boxno)
 
-        if boxno!= 0:
+        if boxno!= 0 or system != 'ki-ls':
             gadget_loc = loc + 'output/'
         else:
             gadget_loc = loc_list[0]%(boxno) + 'output/' 

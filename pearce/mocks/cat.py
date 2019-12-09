@@ -354,8 +354,7 @@ class Cat(object):
         np.random.seed(int(time()))  # TODO pass in seed?
         all_particles = np.array([], dtype='float32')
         # TODO should fail gracefully if memory is exceeded or if p is too small.
-        print '10111213', snapdir, len(glob(path.join(snapdir, 'snap*')))
-        for file in glob(path.join(snapdir, 'snapshot*')):
+        for file in glob(path.join(snapdir, 'snap*')):
             print 'Reading %s' % file
             # TODO should find out which is "fast" axis and use that.
             # Numpy uses fortran ordering.

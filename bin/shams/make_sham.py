@@ -10,42 +10,23 @@
 # - On DS14, which is located on ki-ls at /nfs/slac/des/fs1/g/sims/yymao/ds14_b_sub, courtesy of Yao
 # - Include in the catalog, along with the galaxies, M_vir, x, y, z, vx, vy, vz, M_gal, am_i_a_satellite?, and M_host
 
-# In[9]:
-
-
 from os import path
 import numpy as np
 from AbundanceMatching import *
 from halotools.sim_manager import RockstarHlistReader, CachedHaloCatalog
 
-
-# In[10]:
-
-# In[11]:
-
-
-halo_dir = '/nfs/slac/des/fs1/g/sims/yymao/ds14_b_sub/hlists/'
+halo_dir = '/scratch/users/swmclau2/MDPL2/'
+#halo_dir = '/nfs/slac/des/fs1/g/sims/yymao/ds14_b_sub/hlists/'
 #halo_dir = '/scratch/users/swmclau2/hlists/ds_14_b_sub/hlists/'
 a = 1.0#0.65
 z = 1.0/a - 1 # ~ 0.55
 fname = path.join(halo_dir,  'hlist_%.5f.list'%a)
 
-
-# In[12]:
-
-
 columns_to_keep = {'halo_id': (1, 'i8'), 'halo_upid':(6,'i8'), 'halo_mvir':(10, 'f4'), 'halo_x':(17, 'f4'),                        'halo_y':(18,'f4'), 'halo_z':(19,'f4'),'halo_vx':(20,'f4'), 'halo_vy':(21, 'f4'), 'halo_vz':(22,'f4'),
                   'halo_rvir': (11, 'f4'),'halo_rs':(12,'f4'), 'halo_mpeak':(58, 'f4'),'halo_vmax@mpeak':(72, 'f4')}
 
 
-# In[13]:
-
-
-
-# In[14]:
-
-
-simname = 'ds_14_b_sub'
+simname = 'mdpl2'
 
 
 # Only run the below if you want to cache, which is useful maybe the first time (maybe). It takes ~30 min and some disk space, so be warned.
@@ -61,7 +42,7 @@ simname = 'ds_14_b_sub'
 # In[15]:
 
 
-halocat = CachedHaloCatalog(simname = simname, halo_finder='rockstar', redshift = z,version_name='default')
+halocat = CachedHaloCatalog(simname = simname, halo_finder='rockstar', redshift = z,version_name='most_recent')
 
 print halocat.halo_table.colnames
 # In[18]:
@@ -85,7 +66,8 @@ nd = 5e-4#4.2e-4 #nd of final cat
 
 
 #ab_property = 'halo_mpeak'
-ab_property = 'halo_vmax@mpeak'
+ab_property = 'halo_vpeak'
+#ab_property = 'halo_vmax@mpeak'
 
 
 # In[22]:
@@ -116,9 +98,8 @@ catalog = af.match(nd_halos, scatter)
 
 
 # In[ ]:
-
-
-n_obj_needed = int(nd*(1000.0**3))
+h = 0.674 
+n_obj_needed = int(nd*((1000.0/h)**3))
 
 
 # In[ ]:
@@ -144,7 +125,7 @@ output['gal_smass'] = final_catalog
 #output.write('/nfs/slac/g/ki/ki18/des/swmclau2/catalog_ab_%s_large.hdf5'%ab_property, format = 'hdf5', path = '%s_catalog'%ab_property, overwrite=True)
 #output.write('/scratch/users/swmclau2/catalog_ab_%s_large_fixed.hdf5'%ab_property, format = 'hdf5', path = '%s_catalog'%ab_property, overwrite=True)
 # In[ ]:
-output.write('/scratch/users/swmclau2/test_%s_smf_sham.hdf5'%ab_property, format = 'hdf5', path = '%s_catalog'%ab_property, overwrite=True)
+output.write('/scratch/users/swmclau2/test_MDPL2_%s_smf_sham.hdf5'%ab_property, format = 'hdf5', path = '%s_catalog'%ab_property, overwrite=True)
 
 
 

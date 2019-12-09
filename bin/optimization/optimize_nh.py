@@ -16,12 +16,9 @@ HOD_params = len(f.attrs['hod_param_names'])
 f.close()
 
 fixed_params = {'z':0.0}
-<<<<<<< HEAD
-=======
 #hyperparams = {'kernel': (Matern32(input_dim=7, ARD=True) + RBF(input_dim=7, ARD=True)+Bias(input_dim=7),
 #                           Matern32(input_dim=HOD_params, ARD=True) + RBF(input_dim=HOD_params, ARD=True)+Bias(input_dim=HOD_params) ), \
 #               'optimize': True}
->>>>>>> 4cf4dbcfd18be3b85e14ac242760f56728d18315
 hyperparams = {'kernel': (Linear(input_dim=7, ARD=True) + RBF(input_dim=7, ARD=True)+Bias(input_dim=7),
                            Matern32(input_dim=HOD_params, ARD=True) + RBF(input_dim=HOD_params, ARD=True)+Bias(input_dim=HOD_params) ), \
                'optimize': True}
