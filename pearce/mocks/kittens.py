@@ -417,12 +417,12 @@ class TrainingBox(Cat):
 
         if boxno in in_first_loc:
             loc = loc_list[0]%(boxno)
-        elif boxno == 0: # TODO all the boxes should be updated this way
+        elif boxno == 0 and system== 'ki-ls': # TODO all the boxes should be updated this way
             loc = loc_list[2]%(boxno)
         else:
             loc = loc_list[1]%(boxno)
 
-        if boxno!= 0:
+        if boxno!= 0 or system != 'ki-ls':
             gadget_loc = loc + 'output/'
         else:
             gadget_loc = loc_list[0]%(boxno) + 'output/' 
@@ -1012,7 +1012,7 @@ class ResolutionTestBox(Cat):
 
 class MDPL2(Cat):
 
-    def __init__(self, system='cori', **kwargs):
+    def __init__(self, system='sherlock', **kwargs):
 
         simname = 'mdpl2'
         columns_to_keep = HLIST_COLS
@@ -1027,14 +1027,16 @@ class MDPL2(Cat):
         Lbox = 1000.0 # Mpc/h
         self.npart = 3840
 
-        assert system == 'cori', "MDPL2 currently only on Cori"
 
         pmass = 1.51e9 # Msun/h
         cosmo = self._get_cosmo()
 
         self.prim_haloprop_key = 'halo_m200b'
 
-        locations = {'cori': '/global/cscratch1/sd/swmclau2/MDPL2/'}
+        locations = {'cori': '/global/cscratch1/sd/swmclau2/MDPL2/',
+                     'sherlock':'/scratch/users/swmclau2/MDPL2/'}
+
+        assert system in locations, "MDPL2 currently only on Cori and Sherlock"
         loc = locations[system]
 
         gadget_loc = loc #path.join(loc, 'snapdir_130/')
@@ -1103,10 +1105,11 @@ class MDPL2(Cat):
 
             ###### New stuff ####
             # actually r200b, but halotools can have issues with other mass defs
-            reader.halo_table['halo_rvir'] = np.cbrt( (const.G*const.M_sun/(100*u.km/u.s/u.Mpc)**2)*reader.halo_table['halo_mvir']/100).to('kpc').value
+            reader.halo_table['halo_rvir'] = np.cbrt( (const.G*const.M_sun/(100*u.km/u.s/u.Mpc)**2)*reader.halo_table['halo_mvir']/100).to('Mpc').value
             #####################
             if add_local_density or add_particles:
                 particles = self._read_particles(snapdir, downsample_factor=downsample_factor)
+                print 'sneaky', particles.shape
                 if add_local_density:
                     self.add_local_density(reader, particles, downsample_factor)  # TODO how to add radius?
 
