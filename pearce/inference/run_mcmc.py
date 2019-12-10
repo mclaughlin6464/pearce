@@ -438,6 +438,7 @@ def run_mcmc_config(config_fname):
 
     #print config_fname
     f = h5py.File(config_fname, 'r+')
+    f.swmr_mode = True # enables the chains to be accessed while they're running
     emu_type_dict = {'OriginalRecipe':OriginalRecipe,
                      'ExtraCrispy': ExtraCrispy,
                      'SpicyBuffalo': SpicyBuffalo,
@@ -578,6 +579,7 @@ def run_mcmc_config(config_fname):
                                                      nsteps=nsteps, nburn=nburn, return_lnprob=True, ncores = 16)):
 
             f = h5py.File(config_fname, 'r+')
+            f.swmr_mode = True
             chain_dset, like_dset = f['chain'], f['lnprob']
             l = len(chain_dset)
             chain_dset.resize((l+nwalkers), axis = 0)
@@ -594,6 +596,7 @@ def run_mcmc_config(config_fname):
 
             size = pos.shape[0]
             f = h5py.File(config_fname, 'r+')
+            f.swmr_mode = True
             chain_dset, ev_dset = f['chain'], f['evidence']
 
             l = len(chain_dset)
