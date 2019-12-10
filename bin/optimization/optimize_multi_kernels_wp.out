@@ -1,0 +1,99 @@
+-------------------------------------------------------------------------------
+There are messages associated with the following module(s):
+-------------------------------------------------------------------------------
+
+py-scipystack/1.0_py27:
+    The SciPy Stack module is deprecated. Please use those individual
+    modules instead: py-scipy, py-numpy, py-matplotlib, py-pandas, py-sympy
+
+-------------------------------------------------------------------------------
+
+(array([], dtype=int64), array([], dtype=int64))
+0 ***************
+Optimization restart 1/3, f = -86836.6472474
+Optimization restart 2/3, f = -86681.1010639
+Optimization restart 3/3, f = -85743.6371476
+1 ***************
+Optimization restart 1/3, f = -89629.010489
+Optimization restart 2/3, f = -89817.7219189
+Optimization restart 3/3, f = -88488.8377604
+ /home/users/swmclau2/.local/lib/python2.7/site-packages/GPy/kern/src/stationary.py:166: RuntimeWarning:overflow encountered in divide
+ /home/users/swmclau2/.local/lib/python2.7/site-packages/GPy/kern/src/stationary.py:137: RuntimeWarning:overflow encountered in square
+2 ***************
+Optimization restart 1/3, f = -92670.0999303
+Optimization restart 2/3, f = -92523.0100615
+Optimization restart 3/3, f = -89247.3839918
+3 ***************
+Optimization restart 1/3, f = -94859.6052955
+Optimization restart 2/3, f = -95243.0697346
+Optimization restart 3/3, f = -95225.1710597
+4 ***************
+Optimization restart 1/3, f = -97659.2179814
+Optimization restart 2/3, f = -93234.0208614
+Optimization restart 3/3, f = -97641.1942851
+5 ***************
+Optimization restart 1/3, f = -99511.0213929
+Optimization restart 2/3, f = -98077.4232367
+Optimization restart 3/3, f = -99985.4792923
+6 ***************
+Optimization restart 1/3, f = -102336.182944
+Optimization restart 2/3, f = -102382.675822
+Optimization restart 3/3, f = -102239.565456
+7 ***************
+Optimization restart 1/3, f = -104829.043565
+Optimization restart 2/3, f = -104759.855594
+Optimization restart 3/3, f = -96143.5849813
+8 ***************
+Optimization restart 1/3, f = -106779.938098
+Optimization restart 2/3, f = -97380.8309364
+Optimization restart 3/3, f = -104481.057346
+9 ***************
+Optimization restart 1/3, f = -108528.06991
+Optimization restart 2/3, f = -108527.895674
+Optimization restart 3/3, f = -105839.737996
+10 ***************
+Optimization restart 1/3, f = -110446.751393
+Optimization restart 2/3, f = -109760.608651
+Optimization restart 3/3, f = -105743.395864
+11 ***************
+Optimization restart 1/3, f = -112983.047355
+Optimization restart 2/3, f = -109722.542977
+Optimization restart 3/3, f = -112718.534615
+12 ***************
+Optimization restart 1/3, f = -115184.671799
+Optimization restart 2/3, f = -115103.39041
+Optimization restart 3/3, f = -115183.414469
+13 ***************
+Optimization restart 1/3, f = -115965.766232
+Optimization restart 2/3, f = -115907.696288
+Optimization restart 3/3, f = -93509.6539391
+14 ***************
+Optimization restart 1/3, f = -115502.180026
+Optimization restart 2/3, f = -115414.166509
+Optimization restart 3/3, f = -107160.136694
+15 ***************
+Optimization restart 1/3, f = -114150.93915
+Optimization restart 2/3, f = -114095.721383
+Optimization restart 3/3, f = -105781.849712
+16 ***************
+Optimization restart 1/3, f = -111365.536926
+Optimization restart 2/3, f = -102836.130783
+Optimization restart 3/3, f = -111540.65483
+17 ***************
+Optimization restart 1/3, f = -106723.740907
+Optimization restart 2/3, f = -105114.949376
+Optimization restart 3/3, f = -106667.447178
+(array([], dtype=int64), array([], dtype=int64))
+Bias [ -2.83757338e+01  -1.48813172e+01  -7.07115617e+00  -6.55235520e+00
+  -3.24599927e+00  -2.81308895e+00  -1.57465161e+00  -2.77878798e-01
+  -5.72501383e-01  -4.33680112e-01  -3.01153350e-01  -2.32779303e-01
+   5.35398276e-03  -2.21818685e-01  -5.76112191e-03  -9.45583147e-03
+  -3.58501071e-02  -7.48775401e-02]
+Acc [ 0.01409096  0.01180815  0.01158562  0.0103243   0.01094882  0.00946536
+  0.0107651   0.00975723  0.01013136  0.0113081   0.01140809  0.01140378
+  0.00930967  0.01070769  0.01226439  0.01319112  0.01727089  0.02668508]
+(<GPy.kern.src.add.Add object at 0x7f7152870b50>, <GPy.kern.src.add.Add object at 0x7f715288bf90>)
+Yerr [ 0.04448127  0.03139369  0.03223196  0.03016437  0.03079758  0.03004163
+  0.0276374   0.02679565  0.02035088  0.01830617  0.01542509  0.01389085
+  0.0107257   0.01153075  0.01140174  0.01139189  0.01352482  0.0204253 ]
+**********

@@ -1,0 +1,14 @@
+-------------------------------------------------------------------------------
+There are messages associated with the following module(s):
+-------------------------------------------------------------------------------
+
+py-scipystack/1.0_py27:
+    The SciPy Stack module is deprecated. Please use those individual
+    modules instead: py-scipy, py-numpy, py-matplotlib, py-pandas, py-sympy
+
+-------------------------------------------------------------------------------
+
+  File "/home/users/swmclau2/Git/pearce/bin/optimization/optimize_multi_kernels.py", line 26
+    hyperparams = {'kernel': k ), \
+                               ^
+SyntaxError: invalid syntax
