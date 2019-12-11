@@ -222,7 +222,7 @@ class Emu(object):
                 if 'z' in fixed_params and np.abs(z-fixed_params['z'])> 1e-3:
                     continue
 
-                obs_dset = sf_group['obs'].value
+                obs_dset = sf_group['obs'][()]
 
                 cov_dset = []
                 for i in xrange(obs_dset.shape[1]):
@@ -2040,8 +2040,8 @@ class NashvilleHot(Emu):
                 if 'z' in fixed_params and np.abs(z - fixed_params['z']) > 1e-3:
                     continue
 
-                obs_dset = sf_group['obs'].value
-                cov_dset = sf_group['cov'].value
+                obs_dset = sf_group['obs'][()]
+                cov_dset = sf_group['cov'][()]
 
                 #print cosmo_group_name, np.where(np.all(obs_dset==0.0, axis = 1))
 

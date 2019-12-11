@@ -33,7 +33,8 @@ def main(config_fname):
 
     #assert path.isfile(filename), "%s is not a valid output filename"%filename
     print 'Fname', filename
-    f = h5py.File(filename, 'w')
+    f = h5py.File(filename, 'w')#, libver='lastest')
+    #f.swmr_mode = True # enables the chains to be accessed while they're running
 
     emu_cfg = cfg['emu']
     data_cfg = cfg['data']
@@ -191,6 +192,7 @@ def _compute_data(f,cfg):
         cat.load(sim_cfg['scale_factor'], HOD=sim_cfg['hod_name'], **sim_cfg['sim_hps'])
 
         em_params = sim_cfg['hod_params']
+        min_ptcl = sim_cfg['min_ptcl']
         add_logMmin(em_params, cat, float(sim_cfg['nd']))
 
         for idx, (o, ecf) in enumerate(zip(obs, emu_cov_fname)):
@@ -205,7 +207,7 @@ def _compute_data(f,cfg):
 
             xi_vals = []
             for i in xrange(N):
-                cat.populate(em_params)
+                cat.populate(em_params, min_ptcl=min_ptcl)
                 xi_vals.append(calc_observable(r_bins))
 
             shot_xi_vals = np.array(xi_vals)
