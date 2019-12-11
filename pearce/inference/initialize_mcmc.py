@@ -33,7 +33,8 @@ def main(config_fname):
 
     #assert path.isfile(filename), "%s is not a valid output filename"%filename
     print 'Fname', filename
-    f = h5py.File(filename, 'w')
+    f = h5py.File(filename, 'w')#, libver='lastest')
+    #f.swmr_mode = True # enables the chains to be accessed while they're running
 
     emu_cfg = cfg['emu']
     data_cfg = cfg['data']
