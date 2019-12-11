@@ -477,9 +477,13 @@ def run_mcmc_config(config_fname):
     obs_cfg = literal_eval(f.attrs['obs'])
     rbins = np.array(obs_cfg['rbins'])
     rpoints = (rbins[1:]+rbins[:-1])/2.0
+
     orig_n_bins = len(rpoints)
     cut_n_bins = orig_n_bins - emu.n_bins
     rpoints = rpoints[-emu.n_bins:]
+
+    # TODO this will fail when i mix different notions of scale
+    assert np.all(np.isclose(rpoints, emus[0].scale_bin_centers))
 
     # un-stack these
     # TODO once i have the covariance terms these will need to be propertly combined
