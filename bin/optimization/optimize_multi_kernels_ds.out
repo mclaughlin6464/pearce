@@ -10,80 +10,14 @@ py-scipystack/1.0_py27:
 
 (array([], dtype=int64), array([], dtype=int64))
 0 ***************
-Optimization restart 1/3, f = -21596.3707899
-Optimization restart 2/3, f = -21562.7710933
-Optimization restart 3/3, f = -21538.8436453
+Optimization restart 1/3, f = -94923.0260245
+Optimization restart 2/3, f = -94923.7165296
+Optimization restart 3/3, f = -94923.6590473
 1 ***************
-Optimization restart 1/3, f = -22374.6590898
-Optimization restart 2/3, f = -23021.7773628
-Optimization restart 3/3, f = -22328.5501021
+Optimization restart 1/3, f = -98526.6208857
+Optimization restart 2/3, f = -98526.5646023
+Optimization restart 3/3, f = -98526.6584852
 2 ***************
-Optimization restart 1/3, f = -23613.3479302
-Optimization restart 2/3, f = -22456.5185963
-Optimization restart 3/3, f = -22456.5338293
-3 ***************
-Optimization restart 1/3, f = -23346.3715908
-Optimization restart 2/3, f = -23346.3697446
-Optimization restart 3/3, f = -23363.2809051
-4 ***************
-Optimization restart 1/3, f = -24318.6975857
-Optimization restart 2/3, f = -23661.5980155
-Optimization restart 3/3, f = -23728.4193557
-5 ***************
-Optimization restart 1/3, f = -23882.2259332
-Optimization restart 2/3, f = -23891.1387606
-Optimization restart 3/3, f = -23882.1726642
-6 ***************
-Optimization restart 1/3, f = -23911.3403748
-Optimization restart 2/3, f = -23835.7644922
-Optimization restart 3/3, f = -24649.969355
-7 ***************
-Optimization restart 1/3, f = -23631.9102196
-Optimization restart 2/3, f = -23580.5885367
-Optimization restart 3/3, f = -24550.0893127
-8 ***************
-Optimization restart 1/3, f = -23354.2978765
-Optimization restart 2/3, f = -24244.739302
-Optimization restart 3/3, f = -23354.1376529
-9 ***************
-Optimization restart 1/3, f = -22862.5659621
-Optimization restart 2/3, f = -22812.8625794
-Optimization restart 3/3, f = -22812.6888133
-10 ***************
-Optimization restart 1/3, f = -22213.6102228
-Optimization restart 2/3, f = -22223.7789531
-Optimization restart 3/3, f = -21632.2081024
-11 ***************
-Optimization restart 1/3, f = -21662.1543097
-Optimization restart 2/3, f = -21084.3899494
-Optimization restart 3/3, f = -21234.5677853
-12 ***************
-Optimization restart 1/3, f = -21050.6630968
-Optimization restart 2/3, f = -20652.241175
-Optimization restart 3/3, f = -20581.0309166
-13 ***************
-Optimization restart 1/3, f = -20770.3754817
-Optimization restart 2/3, f = -20287.3640083
-Optimization restart 3/3, f = -22385.0359049
-14 ***************
-Optimization restart 1/3, f = -20474.7465957
-Optimization restart 2/3, f = -20039.8061961
-Optimization restart 3/3, f = -20059.7589198
-15 ***************
-Optimization restart 1/3, f = -21741.3687876
-Optimization restart 2/3, f = -20004.4009041
-Optimization restart 3/3, f = -21704.9184896
-16 ***************
-Optimization restart 1/3, f = -19985.809542
-Optimization restart 2/3, f = -19786.7640676
-Optimization restart 3/3, f = -19978.1433812
-17 ***************
-Optimization restart 1/3, f = -19633.2259899
-Optimization restart 2/3, f = -19404.7246277
-Optimization restart 3/3, f = -19408.9204525
-(array([], dtype=int64), array([], dtype=int64))
-Bias
-Traceback (most recent call last):
-  File "/home/users/swmclau2/Git/pearce/bin/optimization/optimize_multi_kernels.py", line 44, in <module>
-    print 'Bias', (10**pred_y - 10**data_y).mean(axis=1)/(10**data_y)
-ValueError: operands could not be broadcast together with shapes (18,) (18,3500) 
+Optimization restart 1/3, f = -102526.794552
+Optimization restart 2/3, f = -102527.522319
+Optimization restart 3/3, f = -102528.194236

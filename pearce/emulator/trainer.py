@@ -706,15 +706,15 @@ def make_sherlock_command(jobname, max_time, outputdir, queue=None):
     param_file = jobname + '.npy'
     sbatch_header = ['#!/bin/bash',
                      '--job-name=%s' % jobname,
-                     '-p kipac',  # KIPAC queue
+                     '-p kipac,iric',  # KIPAC queue
                      '--output=%s' % path.join(outputdir, log_file),
                      '--error=%s' % path.join(outputdir, err_file),
                      '--time=%d:00' % (max_time * 60),  # max_time is in minutes
                      '--ntasks=1',
-                     '--cpus-per-task=8']#,
+                     '--nodes=1',
+                     '--cpus-per-task=16']#,
                      #'--mem-per-cpu=MaxMemPerCPU']
                      #'--qos=normal',
-                     #'--nodes=%d' % 1,
                      #'--exclusive']#,
                      #'--mem-per-cpu=32000',
                      #'--cpus-per-task=%d' % 16]
