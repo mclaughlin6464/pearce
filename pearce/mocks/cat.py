@@ -325,18 +325,14 @@ class Cat(object):
                                          self.halo_finder, z, self.version_name, self.Lbox, self.pmass,
                                          overwrite=overwrite)
             reader.read_halocat(self.columns_to_convert)
-            print '123', add_particles
             if add_local_density or add_particles:
-                print '456'
                 particles = self._read_particles(snapdir, downsample_factor=downsample_factor)
-                print 'A', particles.shape
                 if add_local_density:
                     self.add_local_density(reader, particles, downsample_factor)  # TODO how to add radius?
 
             reader.write_to_disk()  # do these after so we have a halo table to work off of
             reader.update_cache_log()
 
-            print '789', add_particles
             if add_particles:
                 self.cache_particles(particles, a, downsample_factor=downsample_factor)
 
@@ -368,7 +364,6 @@ class Cat(object):
 
             all_particles = np.resize(all_particles, (all_particles.shape[0] + particles.shape[0], 3))
             all_particles[-particles.shape[0]:, :] = particles
-            print 'B',all_particles.shape
 
         return all_particles
 
@@ -379,7 +374,6 @@ class Cat(object):
             A (N,3) shaped numpy array of all particle positions
         """
         z = 1.0 / scale_factor - 1.0
-        print 'C', particles.shape
         ptcl_catalog = UserSuppliedPtclCatalog(redshift=z, Lbox=self.Lbox, particle_mass=self.pmass, \
                                                x=particles[:, 0], y=particles[:, 1], z=particles[:, 2])
         ptcl_cache_loc = self.cache_loc
@@ -1215,8 +1209,6 @@ class Cat(object):
 
         x_g, y_g, z_g = [self.model.mock.galaxy_table[c] for c in ['x', 'y', 'z']]
         pos_g = return_xyz_formatted_array(x_g, y_g, z_g, period=self.Lbox)
-
-        print np.max(pos_g, axis =0), self.Lbox
 
         x_m, y_m, z_m = [self.halocat.ptcl_table[c] for c in ['x', 'y', 'z']]
         pos_m = return_xyz_formatted_array(x_m, y_m, z_m, period=self.Lbox)
