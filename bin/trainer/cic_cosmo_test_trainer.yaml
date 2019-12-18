@@ -7,7 +7,7 @@ cosmology:
         system: ki-ls 
 HOD:
         model: zheng07 
-        num_hods: 1000 
+        num_hods: 100 
         fixed_nd: 5e-4
         biased_satellites: True 
         ordered_params: {'logMmin': [12.0, 16.0], 'sigma_logM': [0.05, 0.5], 'logM0': [12.6, 13.6], 'logM1': [13.7, 14.7], 'alpha': [0.7, 1.3], 'conc_gal_bias': [0.5, 2.0]}
@@ -20,7 +20,7 @@ observation:
         n_repops: 10 
         log_obs: True
 computation:
-        filename: /nfs/slac/g/ki/ki18/des/swmclau2/cic_zheng07_v2_test/PearceCICCosmoTest.hdf5 
+        filename: /nfs/slac/g/ki/ki18/des/swmclau2/cic_zheng07_v3_test/PearceCICCosmoTest.hdf5 
         overwrite: True
         queue_skipper: True
         system: ki-ls 

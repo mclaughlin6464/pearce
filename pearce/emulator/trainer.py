@@ -677,7 +677,7 @@ def make_kils_command(jobname, max_time, outputdir, queue= 'long'):
                '-J', jobname,
                '-oo', path.join(outputdir, log_file),
                '-W', '%d:00' % max_time,
-               #'-R span[ptile=8]',
+               '-R span[ptile=8]',
                #'--exclusive',
                'python', path.join(path.dirname(__file__), 'trainingHelper.py'),
                path.join(outputdir, param_file)]
