@@ -1,3 +1,7 @@
+
+The following have been reloaded with a version change:
+  1) python/3.6.1 => python/2.7.13
+
 -------------------------------------------------------------------------------
 There are messages associated with the following module(s):
 -------------------------------------------------------------------------------
@@ -8,16 +12,27 @@ py-scipystack/1.0_py27:
 
 -------------------------------------------------------------------------------
 
-(array([], dtype=int64), array([], dtype=int64))
-0 ***************
-Optimization restart 1/3, f = -94923.0260245
-Optimization restart 2/3, f = -94923.7165296
-Optimization restart 3/3, f = -94923.6590473
-1 ***************
-Optimization restart 1/3, f = -98526.6208857
-Optimization restart 2/3, f = -98526.5646023
-Optimization restart 3/3, f = -98526.6584852
-2 ***************
-Optimization restart 1/3, f = -102526.794552
-Optimization restart 2/3, f = -102527.522319
-Optimization restart 3/3, f = -102528.194236
+Traceback (most recent call last):
+  File "/home/users/swmclau2/Git/pearce/bin/optimization/optimize_multi_kernels.py", line 1, in <module>
+    from pearce.emulator import NashvilleHot
+  File "/home/users/swmclau2/.local/lib/python2.7/site-packages/pearce/emulator/__init__.py", line 2, in <module>
+    from .trainer import *
+  File "/home/users/swmclau2/.local/lib/python2.7/site-packages/pearce/emulator/trainer.py", line 21, in <module>
+    from pearce.mocks import cat_dict
+  File "/home/users/swmclau2/.local/lib/python2.7/site-packages/pearce/mocks/__init__.py", line 1, in <module>
+    from .cat import *
+  File "/home/users/swmclau2/.local/lib/python2.7/site-packages/pearce/mocks/cat.py", line 27, in <module>
+    from halotools.mock_observables import *  # i'm importing so much this is just easier
+  File "/home/users/swmclau2/.local/lib/python2.7/site-packages/halotools-0.7.dev5048-py2.7-linux-x86_64.egg/halotools/mock_observables/__init__.py", line 8, in <module>
+    from .group_identification import *
+  File "/home/users/swmclau2/.local/lib/python2.7/site-packages/halotools-0.7.dev5048-py2.7-linux-x86_64.egg/halotools/mock_observables/group_identification/__init__.py", line 6, in <module>
+    from .fof_groups import FoFGroups
+  File "/home/users/swmclau2/.local/lib/python2.7/site-packages/halotools-0.7.dev5048-py2.7-linux-x86_64.egg/halotools/mock_observables/group_identification/fof_groups.py", line 10, in <module>
+    from ..pair_counters.pairwise_distance_xy_z import pairwise_distance_xy_z
+  File "/home/users/swmclau2/.local/lib/python2.7/site-packages/halotools-0.7.dev5048-py2.7-linux-x86_64.egg/halotools/mock_observables/pair_counters/__init__.py", line 5, in <module>
+    from .npairs_3d import npairs_3d
+  File "/home/users/swmclau2/.local/lib/python2.7/site-packages/halotools-0.7.dev5048-py2.7-linux-x86_64.egg/halotools/mock_observables/pair_counters/npairs_3d.py", line 11, in <module>
+    from .cpairs import npairs_3d_engine
+  File "/home/users/swmclau2/.local/lib/python2.7/site-packages/halotools-0.7.dev5048-py2.7-linux-x86_64.egg/halotools/mock_observables/pair_counters/cpairs/__init__.py", line 5, in <module>
+    from .pairwise_distances import *
+ImportError: /lib64/libstdc++.so.6: version `GLIBCXX_3.4.21' not found (required by /home/users/swmclau2/.local/lib/python2.7/site-packages/halotools-0.7.dev5048-py2.7-linux-x86_64.egg/halotools/mock_observables/pair_counters/cpairs/pairwise_distances.so)
