@@ -19,7 +19,7 @@ observation:
         n_repops: 10 
         log_obs: True
 computation:
-        filename: /nfs/slac/g/ki/ki18/des/swmclau2/cic_zheng07_v2/PearceCICCosmo.hdf5 
+        filename: /nfs/slac/g/ki/ki18/des/swmclau2/cic_zheng07_v3/PearceCICCosmo.hdf5 
         overwrite: True
         queue_skipper: True
         system: ki-ls 
