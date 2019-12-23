@@ -30,12 +30,14 @@ with h5py.File(argv[1], 'r') as f:
 from time import time
 p = Pool(cpu_count())
 t0 = time()
-print cosmo_chain.shape
-s8_chain = p.map(compute_s8, cosmo_chain[:1000])
+#print cosmo_chain.shape
+s8_chain = p.map(compute_s8, cosmo_chain)#[:10000])
 
-print np.array(s8_chain).shape
+#print np.array(s8_chain).shape
 print time()-t0, 's'
 
-#with h5py.File(argv[1], 'a') as f:
-#    f.create_dataset('s8_chain', data=s8_chain)
+with h5py.File(argv[1], 'a') as f:
+    if 's8_chain' in f.keys():
+        del f['s8_chain']
+    f.create_dataset('s8_chain', data=s8_chain)
 

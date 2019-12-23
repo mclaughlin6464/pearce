@@ -20,9 +20,9 @@ f.close()
 
 fixed_params = {'z':0.0}
 
-cosmo_kernels = [Linear(input_dim=7, ARD=True), RBF(input_dim=7, ARD=True), Linear(input_dim=7, ARD=True) + RBF(input_dim=7, ARD=True), Linear(input_dim=7, ARD=True) + Matern32(input_dim=7, ARD=True), \
+cosmo_kernels = [Linear(input_dim=7, ARD=True), RBF(input_dim=7, ARD=True)+Bias(input_dim=7), Linear(input_dim=7, ARD=True) + RBF(input_dim=7, ARD=True), Linear(input_dim=7, ARD=True) + Matern32(input_dim=7, ARD=True), \
           Matern32(input_dim=7, ARD=True)+RBF(input_dim=7, ARD=True) + Bias(input_dim=7)]
-HOD_kernels = [ Matern32(input_dim=HOD_params, ARD=True), RBF(input_dim=HOD_params, ARD=True) + Linear(input_dim=HOD_params, ARD=True), Matern32(input_dim=HOD_params, ARD=True)+RBF(input_dim=HOD_params, ARD=True) + Bias(input_dim=HOD_params)]#, RBF(input_dim=HOD_params, ARD=True) + Matern32(input_dim=HOD_params, ARD=True)]
+HOD_kernels = [ Matern32(input_dim=HOD_params, ARD=True),RBF(input_dim=HOD_params, ARD=True) + Bias(input_dim=HOD_params), RBF(input_dim=HOD_params, ARD=True) + Linear(input_dim=HOD_params, ARD=True), Matern32(input_dim=HOD_params, ARD=True)+RBF(input_dim=HOD_params, ARD=True) + Bias(input_dim=HOD_params)]#, RBF(input_dim=HOD_params, ARD=True) + Matern32(input_dim=HOD_params, ARD=True)]
 
 #k = (cosmo_kernels[3], HOD_kernels[0])
 k = (cosmo_kernels[cosmo_idx], HOD_kernels[hod_idx])
@@ -39,7 +39,8 @@ emu = NashvilleHot(training_file, hyperparams=hyperparams,fixed_params = fixed_p
 emu.save_as_default_kernel()
 #emu = NashvilleHot(training_file, fixed_params = fixed_params)#, downsample_factor = df)
 #
-pred_y, data_y = emu.goodness_of_fit(test_file, statistic = None, downsample_factor = 0.1)
+pred_y, data_y = emu.goodness_of_fit(test_file, statistic = None, downsample_factor = 0.5)
+print data_y.shape
 
 print 'Bias', ((10**pred_y - 10**data_y)/(10**data_y)).mean(axis=1)
 print 'Acc',  (np.abs(10**pred_y - 10**data_y)/(10**data_y)).mean(axis =1)
