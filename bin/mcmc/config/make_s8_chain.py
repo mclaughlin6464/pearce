@@ -15,9 +15,11 @@ def compute_s8(sample):
     Neff = sample[6]
     #print cosmo_param_names
     #print Omb, Omc, h, A_s, n_s, Neff, w0
-    
-    cosmo = ccl.Cosmology(Omega_c = Omc, Omega_b = Omb, h=h, A_s = A_s, n_s = n_s, Neff = Neff, w0=w0)
-    sigma_8 = ccl.sigma8(cosmo)
+    try:    
+        cosmo = ccl.Cosmology(Omega_c = Omc, Omega_b = Omb, h=h, A_s = A_s, n_s = n_s, Neff = Neff, w0=w0)
+        sigma_8 = ccl.sigma8(cosmo)
+    except:
+        return 0.,0.,0.
     
     Om = (Omb+Omc)
     s8 = sigma_8*np.sqrt(Om/0.3)

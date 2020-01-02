@@ -20,7 +20,7 @@ f.close()
 
 fixed_params = {'z':0.0}
 
-cosmo_kernels = [Linear(input_dim=7, ARD=True), RBF(input_dim=7, ARD=True)+Bias(input_dim=7), Linear(input_dim=7, ARD=True) + RBF(input_dim=7, ARD=True), Linear(input_dim=7, ARD=True) + Matern32(input_dim=7, ARD=True), \
+cosmo_kernels = [Linear(input_dim=7, ARD=True), RBF(input_dim=7, ARD=True)+Bias(input_dim=7), Linear(input_dim=7, ARD=True) + RBF(input_dim=7, ARD=True) +Bias(input_dim=7), Linear(input_dim=7, ARD=True) + Matern32(input_dim=7, ARD=True), \
           Matern32(input_dim=7, ARD=True)+RBF(input_dim=7, ARD=True) + Bias(input_dim=7)]
 HOD_kernels = [ Matern32(input_dim=HOD_params, ARD=True),RBF(input_dim=HOD_params, ARD=True) + Bias(input_dim=HOD_params), RBF(input_dim=HOD_params, ARD=True) + Linear(input_dim=HOD_params, ARD=True), Matern32(input_dim=HOD_params, ARD=True)+RBF(input_dim=HOD_params, ARD=True) + Bias(input_dim=HOD_params)]#, RBF(input_dim=HOD_params, ARD=True) + Matern32(input_dim=HOD_params, ARD=True)]
 
