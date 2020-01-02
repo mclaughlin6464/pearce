@@ -11,86 +11,88 @@ py-scipystack/1.0_py27:
 (array([], dtype=int64), array([], dtype=int64))
 0 ***************
 Optimization restart 1/3, f = -97735.8325034
-Optimization restart 2/3, f = -97733.8366485
-Optimization restart 3/3, f = -97736.9917454
+Optimization restart 2/3, f = -97645.382245
+Optimization restart 3/3, f = -97618.3069812
 1 ***************
 Optimization restart 1/3, f = -102288.742218
-Optimization restart 2/3, f = -102364.431409
-Optimization restart 3/3, f = -102403.896708
+Optimization restart 2/3, f = -102289.003777
+Optimization restart 3/3, f = -98244.3920166
 2 ***************
 Optimization restart 1/3, f = -106639.298307
-Optimization restart 2/3, f = -106639.19117
-Optimization restart 3/3, f = -106264.940796
+Optimization restart 2/3, f = -108490.489349
+Optimization restart 3/3, f = -106902.863114
 3 ***************
 Optimization restart 1/3, f = -110544.176574
-Optimization restart 2/3, f = -110614.448508
-Optimization restart 3/3, f = -110544.231569
+Optimization restart 2/3, f = -110544.023459
+Optimization restart 3/3, f = -110545.624689
 4 ***************
 Optimization restart 1/3, f = -116261.642565
-Optimization restart 2/3, f = -116261.977749
-Optimization restart 3/3, f = -114198.521779
+Optimization restart 2/3, f = -116263.076268
+Optimization restart 3/3, f = -116262.928542
 5 ***************
 Optimization restart 1/3, f = -119498.526692
-Optimization restart 2/3, f = -117056.861634
-Optimization restart 3/3, f = -119242.997944
+Optimization restart 2/3, f = -119578.514847
+Optimization restart 3/3, f = -119379.484032
 6 ***************
 Optimization restart 1/3, f = -121682.175339
-Optimization restart 2/3, f = -121671.287136
-Optimization restart 3/3, f = -121599.443163
+Optimization restart 2/3, f = -118739.307893
+Optimization restart 3/3, f = -118012.803128
 7 ***************
 Optimization restart 1/3, f = -119584.911631
-Optimization restart 2/3, f = -123288.876441
-Optimization restart 3/3, f = -120894.878567
+Optimization restart 2/3, f = -123295.261259
+Optimization restart 3/3, f = -119585.061945
 8 ***************
 Optimization restart 1/3, f = -119130.551914
-Optimization restart 2/3, f = -119245.207816
-Optimization restart 3/3, f = -119208.465925
+Optimization restart 2/3, f = -123590.111159
+Optimization restart 3/3, f = -123590.169925
 9 ***************
 Optimization restart 1/3, f = -117895.08362
-Optimization restart 2/3, f = -117945.522624
-Optimization restart 3/3, f = -122677.304123
+Optimization restart 2/3, f = -117950.391327
+Optimization restart 3/3, f = -121605.514602
 10 ***************
 Optimization restart 1/3, f = -115776.922529
-Optimization restart 2/3, f = -121719.854173
-Optimization restart 3/3, f = -115788.911167
+Optimization restart 2/3, f = -115802.252074
+Optimization restart 3/3, f = -121722.37442
+ /home/users/swmclau2/.local/lib/python2.7/site-packages/GPy/kern/src/stationary.py:166: RuntimeWarning:overflow encountered in divide
+ /home/users/swmclau2/.local/lib/python2.7/site-packages/GPy/kern/src/stationary.py:137: RuntimeWarning:overflow encountered in square
 11 ***************
 Optimization restart 1/3, f = -113490.589831
-Optimization restart 2/3, f = -120027.372828
-Optimization restart 3/3, f = -113499.309814
+Optimization restart 2/3, f = -118362.299785
+Optimization restart 3/3, f = -120154.136607
 12 ***************
 Optimization restart 1/3, f = -111137.3847
-Optimization restart 2/3, f = -118180.747597
-Optimization restart 3/3, f = -118201.811634
+Optimization restart 2/3, f = -111137.248629
+Optimization restart 3/3, f = -118187.781134
 13 ***************
 Optimization restart 1/3, f = -108609.070082
-Optimization restart 2/3, f = -108591.435315
-Optimization restart 3/3, f = -116128.04536
+Optimization restart 2/3, f = -108583.517371
+Optimization restart 3/3, f = -116145.238814
 14 ***************
 Optimization restart 1/3, f = -107085.528974
-Optimization restart 2/3, f = -107126.062769
-Optimization restart 3/3, f = -114661.305239
+Optimization restart 2/3, f = -114312.057317
+Optimization restart 3/3, f = -114659.061682
 15 ***************
 Optimization restart 1/3, f = -105589.763925
-Optimization restart 2/3, f = -113056.426767
-Optimization restart 3/3, f = -112955.900348
+Optimization restart 2/3, f = -105590.450454
+Optimization restart 3/3, f = -105626.262382
 16 ***************
 Optimization restart 1/3, f = -104085.197171
-Optimization restart 2/3, f = -111791.446075
-Optimization restart 3/3, f = -111796.418364
+Optimization restart 2/3, f = -111678.345958
+Optimization restart 3/3, f = -111675.216827
 17 ***************
 Optimization restart 1/3, f = -102092.06936
-Optimization restart 2/3, f = -109751.155097
-Optimization restart 3/3, f = -109744.039469
+Optimization restart 2/3, f = -109785.482237
+Optimization restart 3/3, f = -109786.529531
 (array([], dtype=int64), array([], dtype=int64))
 (18, 17500)
-Bias [-0.00234305  0.00012369 -0.0010013   0.00086593  0.00018354 -0.00226487
- -0.00296064 -0.00493068 -0.00770528 -0.0032485  -0.00527029 -0.00450159
- -0.00049538  0.00653235  0.00742077 -0.00776903 -0.00785211  0.00556973]
-Acc [ 0.01234189  0.01066695  0.01049568  0.0090595   0.00869288  0.00887583
-  0.01038086  0.00976264  0.01722998  0.00867574  0.01653628  0.01623677
-  0.01567915  0.02130908  0.01946358  0.01907256  0.03078945  0.03393402]
-(<GPy.kern.src.add.Add object at 0x7f9e46b37250>, <GPy.kern.src.stationary.Matern32 object at 0x7f9e46baeb50>)
-Yerr [ 0.01513391  0.01396177  0.01344759  0.01240597  0.01295849  0.01322357
-  0.01561773  0.01455949  0.02060823  0.01331554  0.02554674  0.02368973
-  0.02042149  0.02655517  0.0177987   0.01659482  0.02822852  0.0317921 ]
+Bias [-0.00232392 -0.00138269  0.00212295  0.00119052  0.00017002 -0.00146678
+ -0.00296064 -0.00497059 -0.00337136 -0.00740654 -0.00459137 -0.00360588
+ -0.00161834  0.00641637  0.00773122 -0.0005551  -0.01205299  0.00906751]
+Acc [ 0.01236505  0.01069261  0.01200959  0.00898712  0.00866863  0.00862689
+  0.01038086  0.00994052  0.00907432  0.02020847  0.01592353  0.01536286
+  0.01775083  0.02089859  0.01969338  0.04606999  0.0315493   0.03265827]
+(<GPy.kern.src.add.Add object at 0x7fefd1660250>, <GPy.kern.src.stationary.Matern32 object at 0x7fefd16d7b50>)
+Yerr [ 0.01518136  0.01420075  0.01615071  0.01237797  0.01292263  0.01301225
+  0.01561773  0.0147076   0.01404668  0.02497141  0.02457625  0.02334525
+  0.02592357  0.02597891  0.01795052  0.05715972  0.03118303  0.02999099]
 **********
