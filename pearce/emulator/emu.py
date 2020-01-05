@@ -2625,7 +2625,7 @@ class NashvilleHot(Emu):
         for idx, emulator in enumerate(self._emulators):
             print idx, '*'*15
             try:
-                emulator.optimize_restarts(parallel=False, num_restarts = 3, verbose = True)#, robust=True)
+                emulator.optimize_restarts(parallel=False, num_restarts = 3, verbose = True, robust=True)
             except:
                 emulator.optimize_restarts(parallel=False, num_restarts = 3, verbose = True, robust=True)
             sys.stdout.flush()

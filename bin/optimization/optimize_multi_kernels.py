@@ -39,7 +39,7 @@ emu = NashvilleHot(training_file, hyperparams=hyperparams,fixed_params = fixed_p
 emu.save_as_default_kernel()
 #emu = NashvilleHot(training_file, fixed_params = fixed_params)#, downsample_factor = df)
 #
-pred_y, data_y = emu.goodness_of_fit(test_file, statistic = None, downsample_factor = 0.5)
+pred_y, data_y = emu.goodness_of_fit(test_file, statistic = None)#, downsample_factor = 0.5)
 print data_y.shape
 
 print 'Bias', ((10**pred_y - 10**data_y)/(10**data_y)).mean(axis=1)
