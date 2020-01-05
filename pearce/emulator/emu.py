@@ -2546,8 +2546,14 @@ class NashvilleHot(Emu):
         #pred_y = self._emulate_helper(x, False, old_idxs=old_idxs)
         # emulate helper works better for one at a time
         # since were doing a big batch, dont' bother builind the big t-matrix
-        _py = [emu.predict(x1, x2)[0][:, 0] + ym for emu, ym in zip(self._emulators, self._y_mean)]
-        pred_y = np.stack(_py)
+        #_py = [emu.predict(x1, x2)[0][:, 0] + ym for emu, ym in zip(self._emulators, self._y_mean)]
+        pred_ys = []
+        # there can be memory issues with trying to this all at once.
+        for _x2 in x2:
+            _py = [emu.predict(x1, _x2.reshape((1, -1)))[0][:, 0] + ym for emu, ym in zip(self._emulators, self._y_mean)]
+            pred_ys.append(np.stack(_py))
+
+        pred_y = np.vstack(pred_ys)
         # NOTE think this is the right ordering, should check, though may not matter if i'm consistent...
 
         # TODO untested!
