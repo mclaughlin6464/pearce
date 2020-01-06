@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=optimize_nh
 #SBATCH -p kipac 
-#SBATCH --time=4:00:00
+#SBATCH --time=24:00:00
 #SBATCH -o optimize_multi_kernels_ds.out 
 ####SBATCH --exclusive
 #SBATCH --cpus-per-task=8

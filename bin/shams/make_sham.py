@@ -99,18 +99,18 @@ catalog = af.match(nd_halos, scatter)
 
 # In[ ]:
 h = 0.674 
-n_obj_needed = int(nd*((1000.0/h)**3))
+n_obj_needed = int(nd*((1000.0)**3)) # don't divide by h
 
 
 # In[ ]:
 
 non_nan_idxs = ~np.isnan(catalog)
 sort_idxs = np.argsort(catalog[non_nan_idxs])[::-1]
-final_catalog = catalog[non_nan_idxs][sort_idxs[:n_obj_needed]]
+final_catalog = catalog[non_nan_idxs][sort_idxs]#[:n_obj_needed]]
 
 
 
-output = halocat.halo_table[non_nan_idxs][sort_idxs[:n_obj_needed]]
+output = halocat.halo_table[non_nan_idxs][sort_idxs]#[:n_obj_needed]]
 
 
 # In[ ]:
@@ -125,7 +125,7 @@ output['gal_smass'] = final_catalog
 #output.write('/nfs/slac/g/ki/ki18/des/swmclau2/catalog_ab_%s_large.hdf5'%ab_property, format = 'hdf5', path = '%s_catalog'%ab_property, overwrite=True)
 #output.write('/scratch/users/swmclau2/catalog_ab_%s_large_fixed.hdf5'%ab_property, format = 'hdf5', path = '%s_catalog'%ab_property, overwrite=True)
 # In[ ]:
-output.write('/scratch/users/swmclau2/test_MDPL2_%s_smf_sham.hdf5'%ab_property, format = 'hdf5', path = '%s_catalog'%ab_property, overwrite=True)
+output.write('/scratch/users/swmclau2/test_MDPL2_%s_smf_sham_large.hdf5'%ab_property, format = 'hdf5', path = '%s_catalog'%ab_property, overwrite=True)
 
 
 

@@ -2553,7 +2553,7 @@ class NashvilleHot(Emu):
             _py = [emu.predict(x1, _x2.reshape((1, -1)))[0][:, 0] + ym for emu, ym in zip(self._emulators, self._y_mean)]
             pred_ys.append(np.stack(_py))
 
-        pred_y = np.vstack(pred_ys)
+        pred_y = np.hstack(pred_ys)#.T
         # NOTE think this is the right ordering, should check, though may not matter if i'm consistent...
 
         # TODO untested!
@@ -2631,7 +2631,7 @@ class NashvilleHot(Emu):
         for idx, emulator in enumerate(self._emulators):
             print idx, '*'*15
             try:
-                emulator.optimize_restarts(parallel=False, num_restarts = 3, verbose = True, robust=True)
+                emulator.optimize_restarts(parallel=True, num_restarts = 3, verbose = True, robust=True)
             except:
                 emulator.optimize_restarts(parallel=False, num_restarts = 3, verbose = True, robust=True)
             sys.stdout.flush()

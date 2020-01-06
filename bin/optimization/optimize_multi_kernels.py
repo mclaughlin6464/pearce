@@ -35,7 +35,7 @@ hyperparams = {'kernel': k , \
                'optimize': True}
 
 #for df in [0.5]:#,0.25,  0.5]: 
-emu = NashvilleHot(training_file, hyperparams=hyperparams,fixed_params = fixed_params, downsample_factor = 0.5)
+emu = NashvilleHot(training_file, hyperparams=hyperparams,fixed_params = fixed_params, downsample_factor = 1.0)
 emu.save_as_default_kernel()
 #emu = NashvilleHot(training_file, fixed_params = fixed_params)#, downsample_factor = df)
 #

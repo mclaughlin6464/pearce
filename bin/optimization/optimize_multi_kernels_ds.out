@@ -8,91 +8,127 @@ py-scipystack/1.0_py27:
 
 -------------------------------------------------------------------------------
 
+ /home/users/swmclau2/.local/lib/python2.7/site-packages/GPy/kern/src/stationary.py:137: RuntimeWarning:overflow encountered in square
+ /home/users/swmclau2/.local/lib/python2.7/site-packages/GPy/kern/src/stationary.py:166: RuntimeWarning:overflow encountered in divide
 (array([], dtype=int64), array([], dtype=int64))
 0 ***************
-Optimization restart 1/3, f = -97735.8325034
-Optimization restart 2/3, f = -97645.382245
-Optimization restart 3/3, f = -97618.3069812
+Optimization restart 1/5, f = -182716.198939
+Optimization restart 2/5, f = -205954.100299
+Optimization restart 3/5, f = -202714.44632
+Optimization restart 4/5, f = -211744.166621
+Optimization restart 5/5, f = -203346.4223
 1 ***************
-Optimization restart 1/3, f = -102288.742218
-Optimization restart 2/3, f = -102289.003777
-Optimization restart 3/3, f = -98244.3920166
+Optimization restart 1/5, f = -220149.98581
+Optimization restart 2/5, f = -215765.104506
+Optimization restart 3/5, f = -215800.341641
+Optimization restart 4/5, f = -215731.144523
+Optimization restart 5/5, f = -215883.294289
 2 ***************
-Optimization restart 1/3, f = -106639.298307
-Optimization restart 2/3, f = -108490.489349
-Optimization restart 3/3, f = -106902.863114
+Optimization restart 1/5, f = -224036.375414
+Optimization restart 2/5, f = -226943.838159
+Optimization restart 3/5, f = -225627.369553
+Optimization restart 4/5, f = -224041.315121
+Optimization restart 5/5, f = -224050.457431
 3 ***************
-Optimization restart 1/3, f = -110544.176574
-Optimization restart 2/3, f = -110544.023459
-Optimization restart 3/3, f = -110545.624689
+Optimization restart 1/5, f = -235205.674934
+Optimization restart 2/5, f = -235052.883018
+Optimization restart 3/5, f = -230827.605956
+Optimization restart 4/5, f = -235289.604197
+Optimization restart 5/5, f = -235100.89026
 4 ***************
-Optimization restart 1/3, f = -116261.642565
-Optimization restart 2/3, f = -116263.076268
-Optimization restart 3/3, f = -116262.928542
+Optimization restart 1/5, f = -236420.253846
+Optimization restart 2/5, f = -236419.708519
+Optimization restart 3/5, f = -236525.905095
+Optimization restart 4/5, f = -236185.591943
+Optimization restart 5/5, f = -236525.893821
 5 ***************
-Optimization restart 1/3, f = -119498.526692
-Optimization restart 2/3, f = -119578.514847
-Optimization restart 3/3, f = -119379.484032
+Optimization restart 1/5, f = -240629.764493
+Optimization restart 2/5, f = nan
+Optimization restart 3/5, f = -240547.749701
+Optimization restart 4/5, f = 1.82127193836e+15
+Optimization restart 5/5, f = -240548.693144
 6 ***************
-Optimization restart 1/3, f = -121682.175339
-Optimization restart 2/3, f = -118739.307893
-Optimization restart 3/3, f = -118012.803128
+Optimization restart 1/5, f = -242640.006044
+Optimization restart 2/5, f = -242665.190048
+Optimization restart 3/5, f = -242571.77801
+Optimization restart 4/5, f = -248783.246896
+Optimization restart 5/5, f = -248717.426968
 7 ***************
-Optimization restart 1/3, f = -119584.911631
-Optimization restart 2/3, f = -123295.261259
-Optimization restart 3/3, f = -119585.061945
+Optimization restart 1/5, f = -250714.930632
+Optimization restart 2/5, f = -243262.249368
+Optimization restart 3/5, f = -250714.967952
+Optimization restart 4/5, f = -250715.194952
+Optimization restart 5/5, f = -243262.274033
 8 ***************
-Optimization restart 1/3, f = -119130.551914
-Optimization restart 2/3, f = -123590.111159
-Optimization restart 3/3, f = -123590.169925
+Optimization restart 1/5, f = -250648.617455
+Optimization restart 2/5, f = -242168.46728
+Optimization restart 3/5, f = -239794.79869
+Optimization restart 4/5, f = -250331.690011
+Optimization restart 5/5, f = -242172.851472
 9 ***************
-Optimization restart 1/3, f = -117895.08362
-Optimization restart 2/3, f = -117950.391327
-Optimization restart 3/3, f = -121605.514602
+Optimization restart 1/5, f = -248884.949609
+Optimization restart 2/5, f = -238966.181815
+Optimization restart 3/5, f = -248835.343146
+Optimization restart 4/5, f = -238947.139591
+Optimization restart 5/5, f = -248880.75683
 10 ***************
-Optimization restart 1/3, f = -115776.922529
-Optimization restart 2/3, f = -115802.252074
-Optimization restart 3/3, f = -121722.37442
- /home/users/swmclau2/.local/lib/python2.7/site-packages/GPy/kern/src/stationary.py:166: RuntimeWarning:overflow encountered in divide
- /home/users/swmclau2/.local/lib/python2.7/site-packages/GPy/kern/src/stationary.py:137: RuntimeWarning:overflow encountered in square
+Optimization restart 1/5, f = -246114.623479
+Optimization restart 2/5, f = -246152.737202
+Optimization restart 3/5, f = -234851.35766
+Optimization restart 4/5, f = -246152.710958
+Optimization restart 5/5, f = -246150.989021
 11 ***************
-Optimization restart 1/3, f = -113490.589831
-Optimization restart 2/3, f = -118362.299785
-Optimization restart 3/3, f = -120154.136607
+Optimization restart 1/5, f = -242656.628756
+Optimization restart 2/5, f = -242686.069861
+Optimization restart 3/5, f = -235529.447339
+Optimization restart 4/5, f = -229568.338189
+Optimization restart 5/5, f = -229575.023376
 12 ***************
-Optimization restart 1/3, f = -111137.3847
-Optimization restart 2/3, f = -111137.248629
-Optimization restart 3/3, f = -118187.781134
+Optimization restart 1/5, f = -239041.870857
+Optimization restart 2/5, f = -224921.619094
+Optimization restart 3/5, f = -239042.992208
+Optimization restart 4/5, f = -224894.02721
+Optimization restart 5/5, f = -224901.434778
 13 ***************
-Optimization restart 1/3, f = -108609.070082
-Optimization restart 2/3, f = -108583.517371
-Optimization restart 3/3, f = -116145.238814
+Optimization restart 1/5, f = -235052.897496
+Optimization restart 2/5, f = -235042.230172
+Optimization restart 3/5, f = -232693.951279
+Optimization restart 4/5, f = -234611.709305
+Optimization restart 5/5, f = -234986.891227
 14 ***************
-Optimization restart 1/3, f = -107085.528974
-Optimization restart 2/3, f = -114312.057317
-Optimization restart 3/3, f = -114659.061682
+Optimization restart 1/5, f = -231854.559065
+Optimization restart 2/5, f = -216903.153711
+Optimization restart 3/5, f = -216891.824044
+Optimization restart 4/5, f = -231854.360192
+Optimization restart 5/5, f = -231235.317387
 15 ***************
-Optimization restart 1/3, f = -105589.763925
-Optimization restart 2/3, f = -105590.450454
-Optimization restart 3/3, f = -105626.262382
+Optimization restart 1/5, f = -228385.77125
+Optimization restart 2/5, f = -228533.619445
+Optimization restart 3/5, f = -228301.372624
+Optimization restart 4/5, f = -228247.145754
+Optimization restart 5/5, f = -228532.332594
 16 ***************
-Optimization restart 1/3, f = -104085.197171
-Optimization restart 2/3, f = -111678.345958
-Optimization restart 3/3, f = -111675.216827
+Optimization restart 1/5, f = -210226.730084
+Optimization restart 2/5, f = -225735.132362
+Optimization restart 3/5, f = -210225.918631
+Optimization restart 4/5, f = -225182.568755
+Optimization restart 5/5, f = -225648.181193
 17 ***************
-Optimization restart 1/3, f = -102092.06936
-Optimization restart 2/3, f = -109785.482237
-Optimization restart 3/3, f = -109786.529531
+Optimization restart 1/5, f = -221305.898554
+Optimization restart 2/5, f = -221411.750066
+Optimization restart 3/5, f = -221645.575556
+Optimization restart 4/5, f = -221592.45298
+Optimization restart 5/5, f = -221588.028893
 (array([], dtype=int64), array([], dtype=int64))
-(18, 17500)
-Bias [-0.00232392 -0.00138269  0.00212295  0.00119052  0.00017002 -0.00146678
- -0.00296064 -0.00497059 -0.00337136 -0.00740654 -0.00459137 -0.00360588
- -0.00161834  0.00641637  0.00773122 -0.0005551  -0.01205299  0.00906751]
-Acc [ 0.01236505  0.01069261  0.01200959  0.00898712  0.00866863  0.00862689
-  0.01038086  0.00994052  0.00907432  0.02020847  0.01592353  0.01536286
-  0.01775083  0.02089859  0.01969338  0.04606999  0.0315493   0.03265827]
-(<GPy.kern.src.add.Add object at 0x7fefd1660250>, <GPy.kern.src.stationary.Matern32 object at 0x7fefd16d7b50>)
-Yerr [ 0.01518136  0.01420075  0.01615071  0.01237797  0.01292263  0.01301225
-  0.01561773  0.0147076   0.01404668  0.02497141  0.02457625  0.02334525
-  0.02592357  0.02597891  0.01795052  0.05715972  0.03118303  0.02999099]
+(18, 35000)
+Bias [ 0.00183828  0.00136805  0.00252644 -0.00053072  0.00030374 -0.03627788
+ -0.00346112 -0.00518286 -0.00343992 -0.00548562 -0.00598233 -0.00440341
+ -0.00336209  0.00489066  0.00418354 -0.00689573 -0.01065324 -0.00387122]
+Acc [ 0.01125569  0.01090732  0.01272579  0.00734066  0.00745847  0.19822791
+  0.00950306  0.00962469  0.01009045  0.01232054  0.01715068  0.01664443
+  0.01823004  0.02248029  0.01832194  0.01988059  0.03293325  0.02940509]
+(<GPy.kern.src.add.Add object at 0x7fe63c249ed0>, <GPy.kern.src.stationary.Matern32 object at 0x7fe63c224890>)
+Yerr [ 0.01426565  0.01428891  0.01675052  0.01027945  0.01086255  0.23227635
+  0.01490468  0.01486884  0.01564519  0.01989095  0.0266671   0.02570737
+  0.02705466  0.03009904  0.01914733  0.01786862  0.03185879  0.02085755]
 **********
