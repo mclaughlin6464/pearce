@@ -80,8 +80,8 @@ def lnlike(theta, param_names, fixed_params, r_bin_centers, y, combined_inv_cov)
     param_dict.update(fixed_params)
 
     emu_preds = []
-    for _emu, in izip(_emus):
-        y_bar = _emu.emulate_wrt_r(param_dict, r_bin_centers)[0]
+    for _emu, rbc in izip(_emus, r_bin_centers):
+        y_bar = _emu.emulate_wrt_r(param_dict, rbc)[0]
 
         emu_preds.append(10**y_bar)
         #delta = y_bar - y
@@ -463,40 +463,61 @@ def run_mcmc_config(config_fname):
 
     assert len(emu_type) == len(training_file)
 
-    emus = []
-
-    np.random.seed(seed)
-    for et, tf in zip(emu_type, training_file): # TODO iterate over the others?
-        emu = emu_type_dict[et](tf,
-                                 fixed_params = fixed_params,
-                                 **emu_hps)
-        emus.append(emu)
-        # TODO write hps to the file too
-
     assert 'obs' in f.attrs.keys(), "No obs info in config file."
+
     obs_cfg = literal_eval(f.attrs['obs'])
-    rbins = np.array(obs_cfg['rbins'])
-    rpoints = (rbins[1:]+rbins[:-1])/2.0
 
-    orig_n_bins = len(rpoints)
-    cut_n_bins = orig_n_bins - emu.n_bins
-    rpoints = rpoints[-emu.n_bins:]
+    rbins = obs_cfg['rbins']
+    obs = obs_cfg['obs']
 
-    # TODO this will fail when i mix different notions of scale
-    assert np.all(np.isclose(rpoints, emus[0].scale_bin_centers))
+    if type(obs) is str:
+        obs = [obs]
 
-    # un-stack these
-    # TODO once i have the covariance terms these will need to be propertly combined
+    if type(rbins[0]) is list: # is list of list
+        rbins = [np.array(r) for r in rbins] # to numpy array
+        assert len(rbins) == len(obs), "not equal number of r_bins to obs"
+    else:
+        rbins = [np.array(rbins)]
+        rbins = [rbins for _ in len(obs)]
+
+    rpoints = [(rb[1:]+rb[:-1])/2.0 for rb in rbins]
 
     y = f['data'][()]
     cov = f['cov'][()]
 
-    # TODO this will fail when n_bins varies changes per emu
-    # crop out bins if we've done a scale cut
-    y = np.hstack([y[i*orig_n_bins+cut_n_bins:(i+1)*orig_n_bins] for i in xrange(len(emus))])
-    _cov = np.vstack([cov[i*orig_n_bins+cut_n_bins:(i+1)*orig_n_bins] for i in xrange(len(emus))])
-    cov = np.hstack([_cov[:, i*orig_n_bins+cut_n_bins:(i+1)*orig_n_bins] for i in xrange(len(emus))])
+    emus = []
+    _rp = []
+    _y = []
+    _cov = []
+    init_idx = 0
 
+    np.random.seed(seed)
+    for et, tf, rp in zip(emu_type, training_file, rpoints): # TODO iterate over the others?
+        # TODO how will cic work with rmin?
+        emu = emu_type_dict[et](tf,
+                                 fixed_params = fixed_params,
+                                 **emu_hps)
+        emus.append(emu)
+
+        orig_n_bins = len(rp)
+        cut_n_bins = orig_n_bins - emu.n_bins
+        _rp.append(rp[-emu.n_bins:])
+
+        assert np.all(np.isclose(rp, emu.scale_bin_centers))
+
+        _y.append(y[init_idx+cut_n_bins:init_idx + orig_n_bins])
+# TODO dunno if this will work... may need to be more creative
+# should just recursively cut rows. 
+        _c = cov[init_idx + cut_n_bins:init_idx + orig_n_bins] 
+        _cov.append(_c[:, init_idx+cut_n_bins:init_idx+orig_n_bins])
+
+        init_idx+=orig_n_bins
+
+    rpoints = _rp
+
+    y = np.hstack(y)
+    cov = np.hstack(_cov)
+    
     mcmc_type = 'normal' if ('mcmc_type' not in f.attrs or f.attrs['mcmc_type'] == 'None') else f.attrs['mcmc_type']
     if mcmc_type == 'normal':
         nwalkers, nsteps = f.attrs['nwalkers'], f.attrs['nsteps']

@@ -160,13 +160,18 @@ def _compute_data(f,cfg):
 
     cat = cat_dict[sim_cfg['simname']](**sim_cfg['sim_hps'])  # construct the specified catalog!
 
-    # TODO logspace
-    r_bins = np.array(obs_cfg['rbins'])
-
+    r_bins = obs_cfg['rbins']
     obs = obs_cfg['obs']
 
     if type(obs) is str:
         obs = [obs]
+
+    if type(r_bins[0]) is list: # is list of list
+        r_bins = [np.array(r) for r in r_bins] # to numpy array
+        assert len(r_bins) == len(obs), "not equal number of r_bins to obs"
+    else:
+        r_bins = [np.array(r_bins)]
+        r_bins = [r_bins for _ in len(obs)]
 
     meas_cov_fname = cov_cfg['meas_cov_fname']
     emu_cov_fname = f.attrs['emu_cov_fname']
@@ -175,17 +180,17 @@ def _compute_data(f,cfg):
 
     assert len(obs) == len(emu_cov_fname), "Emu cov not same length as obs!"
 
-    n_bins = len(r_bins)-1
-    data = np.zeros((len(obs)*n_bins))
+# NOTE 
+    n_bins_total = np.sum([r.shape[0] for r in r_bins]) 
+    data = np.zeros(n_bins_total)
     assert path.isfile(meas_cov_fname), "Invalid meas cov file specified"
     try:
         cov = np.loadtxt(meas_cov_fname)
     except ValueError:
         cov = np.load(meas_cov_fname)
 
-    print 'Cov shape', cov.shape
-    assert cov.shape == (len(obs)*n_bins, len(obs)*n_bins), "Invalid meas cov shape."
-
+    assert cov.shape == (n_bins_total, n_bins_total), "Invalid meas cov shape."
+###
     # TODO add shams
     if sim_cfg['gal_type'] == 'HOD':
         print sim_cfg['sim_hps']
@@ -194,10 +199,12 @@ def _compute_data(f,cfg):
         em_params = sim_cfg['hod_params']
         min_ptcl = sim_cfg['min_ptcl']
         add_logMmin(em_params, cat, float(sim_cfg['nd']))
-
-        for idx, (o, ecf) in enumerate(zip(obs, emu_cov_fname)):
+# NOTE
+        init_idx = 0
+        for idx, (o, rb, ecf) in enumerate(zip(obs, r_bins, emu_cov_fname)):
             # TODO need some check that a valid configuration is specified
             y_mean, yjk = None, None
+            n_bins = len(rb)
             shot_cov = covjk = np.zeros((n_bins, n_bins))
 
             calc_observable = getattr(cat, 'calc_%s' % o)
@@ -208,7 +215,7 @@ def _compute_data(f,cfg):
             xi_vals = []
             for i in xrange(N):
                 cat.populate(em_params, min_ptcl=min_ptcl)
-                xi_vals.append(calc_observable(r_bins))
+                xi_vals.append(calc_observable(rb))
 
             shot_xi_vals = np.array(xi_vals)
             y_mean = np.mean(shot_xi_vals, axis = 0)
@@ -217,7 +224,7 @@ def _compute_data(f,cfg):
             if 'shot' in cov_cfg and cov_cfg['shot']:
                 shot_cov = np.cov(xi_vals, rowvar=False)
             else:
-                shot_cov = np.zeros((r_bins.shape[0]-1, r_bins.shape[0]-1))
+                shot_cov = np.zeros((rb.shape[0]-1, rb.shape[0]-1))
 
             # remove jackknife calculation.
             # instead, user passes in a meas_cov above
@@ -232,13 +239,14 @@ def _compute_data(f,cfg):
                 emu_cov = np.load(ecf)
 
             if obs_cfg['mean']:
-                data[idx*n_bins:(idx+1)*n_bins] = y_mean
+                data[init_idx:init_idx + n_bins] = y_mean
             else:
-                data[idx*n_bins:(idx+1)*n_bins] = shot_xi_vals[0]
+                data[init_idx:init_idx + _bins] = shot_xi_vals[0]
 
 
-            cov[idx*n_bins:(idx+1)*n_bins, idx*n_bins:(idx+1)*n_bins] += \
+            cov[init_idx:init_idx + n_bins, init_idx: init_idx + n_bins] += \
                                             emu_cov# + shot_cov 
+            init_idx+=n_bins
 
     elif sim_cfg['gal_type']== 'SHAM':
         raise NotImplementedError("Only HODs are supported at this time.")
