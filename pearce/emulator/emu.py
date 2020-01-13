@@ -2119,7 +2119,7 @@ class NashvilleHot(Emu):
         if len(y.shape) == 2: 
             y = np.expand_dims(y, 0)
             yerr = np.expand_dims(yerr, 0) # make sure they all have the same shape, ain't that nice?
-        print np.where(np.all(y==0.0, axis = 0))
+
         if attach_params:
             return x1, x2, y, yerr, ycov
         else:
@@ -2333,8 +2333,8 @@ class NashvilleHot(Emu):
 
         for _y,_yerr, _kern1, _kern2, nv in izip(y,yerr, kern1, kern2, noise_var):
             # TODO delete me
-            emulator = GPKroneckerGaussianRegressionVar(x1, x2, _y, _yerr**2, _kern1, _kern2, noise_var = nv)
-            #emulator = GPKroneckerGaussianRegression(x1, x2, _y, _kern1, _kern2)
+            #emulator = GPKroneckerGaussianRegressionVar([x1, x2], _y, _yerr**2, _kern1, _kern2, noise_var = nv)
+            emulator = GPKroneckerGaussianRegression([x1, x2], _y, [_kern1, _kern2])
 
             self._emulators.append(emulator)
             self._kernels.append((_kern1, _kern2))
@@ -2488,9 +2488,9 @@ class NashvilleHot(Emu):
                 # however, have to split up t into the two groups
                 #TODO may have weird behavior for larger t's? have to do some resizing
                 if gp_errs:
-                    local_mu, local_err = emulator.predict(t1_in_bin.reshape((1,-1)), t2_in_bin.reshape((1,-1)))
+                    local_mu, local_err = emulator.predict([t1_in_bin.reshape((1,-1)), t2_in_bin.reshape((1,-1))])
                 else:
-                    local_mu, _ = emulator.predict(t1_in_bin.reshape((1,-1)), t2_in_bin.reshape((1,-1)))
+                    local_mu, _ = emulator.predict([t1_in_bin.reshape((1,-1)), t2_in_bin.reshape((1,-1))])
                     # print local_mu
                     local_err = np.ones_like(local_mu)
 
@@ -2550,7 +2550,7 @@ class NashvilleHot(Emu):
         pred_ys = []
         # there can be memory issues with trying to this all at once.
         for _x2 in x2:
-            _py = [emu.predict(x1, _x2.reshape((1, -1)))[0][:, 0] + ym for emu, ym in zip(self._emulators, self._y_mean)]
+            _py = [emu.predict([x1, _x2.reshape((1, -1))])[0].squeeze() + ym for emu, ym in zip(self._emulators, self._y_mean)]
             pred_ys.append(np.stack(_py))
 
         pred_y = np.hstack(pred_ys)#.T

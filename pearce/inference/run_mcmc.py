@@ -132,12 +132,11 @@ def _run_tests(y, cov, r_bin_centers, param_names, fixed_params, ncores):
         # else, we're good!
 
     #make sure all inputs are of consistent shape
-    print y.shape, cov.shape
     assert y.shape[0] == cov.shape[0] and cov.shape[1] == cov.shape[0]
-    #print y.shape[0]/r_bin_centers.shape[0] ,len(_emus) , y.shape[0]/r_bin_centers.shape[0] 
-    print y.shape, r_bin_centers.shape[0], len(_emus)
-    assert y.shape[0]/r_bin_centers.shape[0] == len(_emus) and y.shape[0]%r_bin_centers.shape[0] == 0
-    # TODO informative error message when the array is jsut of the wrong shape?/
+
+    tot_bins = sum(len(rbc) for rbc in r_bin_centers)
+    assert y.shape[0] == tot_bins, "Scale bins mismatch with data shape"
+
 
     # check we've defined all necessary params
     assert all([ _emu.emulator_ndim <= len(fixed_params) + len(param_names) + 1 for _emu in _emus])  # for r
@@ -477,18 +476,18 @@ def run_mcmc_config(config_fname):
         rbins = [np.array(r) for r in rbins] # to numpy array
         assert len(rbins) == len(obs), "not equal number of r_bins to obs"
     else:
-        rbins = [np.array(rbins)]
-        rbins = [rbins for _ in len(obs)]
+        rbins = np.array(rbins)
+        rbins = [rbins for _ in xrange(len(obs))]
 
     rpoints = [(rb[1:]+rb[:-1])/2.0 for rb in rbins]
 
-    y = f['data'][()]
+    y = f['data'][()].flatten()
     cov = f['cov'][()]
+
 
     emus = []
     _rp = []
     _y = []
-    _cov = []
     init_idx = 0
 
     np.random.seed(seed)
@@ -501,23 +500,25 @@ def run_mcmc_config(config_fname):
 
         orig_n_bins = len(rp)
         cut_n_bins = orig_n_bins - emu.n_bins
-        _rp.append(rp[-emu.n_bins:])
+        _rp.append(np.array(rp[-emu.n_bins:]))
 
-        assert np.all(np.isclose(rp, emu.scale_bin_centers))
+
+        assert np.all(np.isclose(_rp[-1], emu.scale_bin_centers))
 
         _y.append(y[init_idx+cut_n_bins:init_idx + orig_n_bins])
-# TODO dunno if this will work... may need to be more creative
-# should just recursively cut rows. 
-        _c = cov[init_idx + cut_n_bins:init_idx + orig_n_bins] 
-        _cov.append(_c[:, init_idx+cut_n_bins:init_idx+orig_n_bins])
 
-        init_idx+=orig_n_bins
+        cov_idxs = np.ones((cov.shape[0],), dtype = bool)
+        cov_idxs[init_idx:init_idx+cut_n_bins] = False # deselect the bins we're cutting
+
+        cov = cov[cov_idxs]
+        cov = cov[:, cov_idxs]
+
+        init_idx+=orig_n_bins#emu.n_bins
 
     rpoints = _rp
 
-    y = np.hstack(y)
-    cov = np.hstack(_cov)
-    
+    y = np.hstack(_y)
+
     mcmc_type = 'normal' if ('mcmc_type' not in f.attrs or f.attrs['mcmc_type'] == 'None') else f.attrs['mcmc_type']
     if mcmc_type == 'normal':
         nwalkers, nsteps = f.attrs['nwalkers'], f.attrs['nsteps']

@@ -97,7 +97,6 @@ def data_config(f, cfg):
             warnings.warn("Not all data attributes were specified. This is not reccomended, since the chain may not be well described in the future!")
 
     # make emu_cov
-    print cov.shape
     emu_cov = np.zeros_like(cov)
     ecf = f.attrs['emu_cov_fname']
     ecf = [ecf] if type(ecf) is str else ecf
@@ -105,11 +104,9 @@ def data_config(f, cfg):
     start_idx = 0
     for ecf in ecf:
         ec = np.load(ecf)
-        print emu_cov.shape, ec.shape
         emu_cov[start_idx:start_idx+ec.shape[0], start_idx:start_idx+ec.shape[0]] = ec
         start_idx+= ec.shape[0]
 
-    print cov.shape, emu_cov.shape
     f.create_dataset('data', data = data)
     f.create_dataset('cov', data = cov + emu_cov)
 
@@ -128,22 +125,28 @@ def _load_data(true_data_fname, true_cov_fname):
 
     if type(true_data_fname) is str:
         true_data_fname = [true_data_fname]
-    if type(true_cov_fname) is str:
-        true_cov_fname = true_cov_fname
+    #if type(true_cov_fname) is str:
+    #    true_cov_fname = true_cov_fname
 
-    assert len(true_data_fname) == len(true_cov_fname), "Cov and Data fnames different lengths!"
+    # actually cov shouldn't be a list like this
+    #assert len(true_data_fname) == len(true_cov_fname), "Cov and Data fnames different lengths!"
 
     data = []
-    cov = []
 
     for fname in true_data_fname:
-        data.append(np.loadtxt(fname))
+        try:
+            d = np.loadtxt(fname)
+        except:
+            d = np.load(fname) 
+        
+        data.append(d)
 
-    for fname in true_cov_fname:
-        cov.append(np.loadtxt(fname))
+    try:
+        cov = np.loadtxt(true_cov_fname)
+    except:
+        cov = np.load(true_cov_fname)
 
-    # NOTE stacking could be wrong here, double check
-    return np.vstack(data).squeeze(), np.vstack(cov).squeeze()
+    return np.vstack(data).squeeze(), cov.squeeze()
 
 def _compute_data(f,cfg):
     """
@@ -170,8 +173,8 @@ def _compute_data(f,cfg):
         r_bins = [np.array(r) for r in r_bins] # to numpy array
         assert len(r_bins) == len(obs), "not equal number of r_bins to obs"
     else:
-        r_bins = [np.array(r_bins)]
-        r_bins = [r_bins for _ in len(obs)]
+        r_bins = np.array(r_bins)
+        r_bins = [np.array(r_bins) for _ in xrange(len(obs))]
 
     meas_cov_fname = cov_cfg['meas_cov_fname']
     emu_cov_fname = f.attrs['emu_cov_fname']
@@ -181,7 +184,7 @@ def _compute_data(f,cfg):
     assert len(obs) == len(emu_cov_fname), "Emu cov not same length as obs!"
 
 # NOTE 
-    n_bins_total = np.sum([r.shape[0] for r in r_bins]) 
+    n_bins_total = np.sum([len(r)-1 for r in r_bins]) 
     data = np.zeros(n_bins_total)
     assert path.isfile(meas_cov_fname), "Invalid meas cov file specified"
     try:
@@ -193,7 +196,6 @@ def _compute_data(f,cfg):
 ###
     # TODO add shams
     if sim_cfg['gal_type'] == 'HOD':
-        print sim_cfg['sim_hps']
         cat.load(sim_cfg['scale_factor'], HOD=sim_cfg['hod_name'], **sim_cfg['sim_hps'])
 
         em_params = sim_cfg['hod_params']
@@ -204,7 +206,7 @@ def _compute_data(f,cfg):
         for idx, (o, rb, ecf) in enumerate(zip(obs, r_bins, emu_cov_fname)):
             # TODO need some check that a valid configuration is specified
             y_mean, yjk = None, None
-            n_bins = len(rb)
+            n_bins = len(rb)-1
             shot_cov = covjk = np.zeros((n_bins, n_bins))
 
             calc_observable = getattr(cat, 'calc_%s' % o)
@@ -241,7 +243,7 @@ def _compute_data(f,cfg):
             if obs_cfg['mean']:
                 data[init_idx:init_idx + n_bins] = y_mean
             else:
-                data[init_idx:init_idx + _bins] = shot_xi_vals[0]
+                data[init_idx:init_idx + n_bins] = shot_xi_vals[0]
 
 
             cov[init_idx:init_idx + n_bins, init_idx: init_idx + n_bins] += \
