@@ -2791,6 +2791,7 @@ class LemonPepperWet(NashvilleHot):
             y = np.dstack([np.vstack(_y) for _y in y])
             yerr = np.dstack([np.vstack(_yerr) for _yerr in yerr])
 
+        print y.shape
         _ycov = np.dstack(ycov)
 
         if (np.any(np.isnan(ycov)) or np.any(np.isnan(y))):
@@ -2859,6 +2860,7 @@ class LemonPepperWet(NashvilleHot):
             raise AssertionError("Incorrect kernel size specified.")
 
         # now, make a list of emulators
+        print self.y.shape, self.downsample_y.shape
 
         # yerr taken care of in kernel
         if self._downsample_factor == 1.0:
