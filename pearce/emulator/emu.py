@@ -2897,6 +2897,17 @@ class LemonPepperWet(NashvilleHot):
             return [Kern.from_dict(kd) for kd in kernel_dict]
         return Kern.from_dict(kernel_dict)
 
+    def _get_default_kernel(self):
+        # TODO I should save these under the emu name, so different kernels don't overlap
+        f = h5py.File(self.filename, 'r')
+        if 'lpw_kernel' in f.attrs:
+           kernel_dict =f.attrs['lpw_kernel']
+        else:
+            raise KeyError("No default saved for this observable!")
+        f.close()
+
+        return self._kernel_from_dict(kernel_dict)
+
     def save_as_default_kernel(self):
         # TODO how to clip of tye Yvar portion
         if hasattr(self, '_kernel'):
@@ -2913,7 +2924,7 @@ class LemonPepperWet(NashvilleHot):
             raise AssertionError("No emulator loaded, cannot save.")
 
         f = h5py.File(self.filename)
-        f.attrs['nh_kernel'] = str(kernel_dict)
+        f.attrs['lpw_kernel'] = str(kernel_dict)
         f.close()
 
     def _make_kernel(self, hyperparams):
