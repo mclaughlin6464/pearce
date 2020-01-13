@@ -2271,12 +2271,12 @@ class NashvilleHot(Emu):
             self.downsample_yerr = np.stack(downsample_yerr)
         else:
             return downsample_x1, downsample_x2, np.stack(downsample_y), np.stack(downsample_yerr)
+
     def check_param_names(self, param_names, ignore=[]):
         #see above, just adding 'r' to ignore by default
         ig = ['r'] if 'r' not in ignore else []
         ig.extend(ignore)
         return super(NashvilleHot, self).check_param_names(param_names, ig)
-
 
     def _build_gp(self, hyperparams):
         """
@@ -2839,6 +2839,35 @@ class LemonPepperWet(NashvilleHot):
         else:
             return x1, x2, y, yerr, ycov, info
 
+    def _downsample_data(self, downsample_factor, x1, x2, y, yerr, attach=True):
+
+        if x1.shape[0] > x2.shape[0]:
+            # downsample x1
+            N_points = x1.shape[0]
+            downsample_N_points = int(downsample_factor * N_points)
+            downsample_x1 = x1[:downsample_N_points, :]
+            downsample_x2 = x2
+
+            downsample_y = y[:downsample_N_points, :]
+            downsample_yerr = yerr[:downsample_N_points, :]
+
+        else:  # downsample x2
+            N_points = x2.shape[0]
+            downsample_N_points = int(self._downsample_factor * N_points)
+            downsample_x2 = x2[:downsample_N_points, :]
+            downsample_x1 = x1
+
+            downsample_y = y[:, :downsample_N_points]
+            downsample_yerr = yerr[:, :downsample_N_points]
+
+        if attach:
+            self.downsample_x1 = np.stack(downsample_x1)
+            self.downsample_x2 = np.stack(downsample_x2)
+            self.downsample_y = np.stack(downsample_y)
+            self.downsample_yerr = np.stack(downsample_yerr)
+        else:
+            return downsample_x1, downsample_x2, np.stack(downsample_y), np.stack(downsample_yerr)
+
     def _build_gp(self, hyperparams):
         """
         Initialize the GP emulator model.
@@ -2859,7 +2888,7 @@ class LemonPepperWet(NashvilleHot):
             raise AssertionError("Incorrect kernel size specified.")
 
         # now, make a list of emulators
-
+        print self.y.shape, self.downsample_y.shape
         # yerr taken care of in kernel
         if self._downsample_factor == 1.0:
             x1, x2 = self.x1, self.x2
@@ -2897,6 +2926,17 @@ class LemonPepperWet(NashvilleHot):
             return [Kern.from_dict(kd) for kd in kernel_dict]
         return Kern.from_dict(kernel_dict)
 
+    def _get_default_kernel(self):
+        # TODO I should save these under the emu name, so different kernels don't overlap
+        f = h5py.File(self.filename, 'r')
+        if 'lpw_kernel' in f.attrs:
+           kernel_dict =f.attrs['lpw_kernel']
+        else:
+            raise KeyError("No default saved for this observable!")
+        f.close()
+
+        return self._kernel_from_dict(kernel_dict)
+
     def save_as_default_kernel(self):
         # TODO how to clip of tye Yvar portion
         if hasattr(self, '_kernel'):
@@ -2913,7 +2953,7 @@ class LemonPepperWet(NashvilleHot):
             raise AssertionError("No emulator loaded, cannot save.")
 
         f = h5py.File(self.filename)
-        f.attrs['nh_kernel'] = str(kernel_dict)
+        f.attrs['lpw_kernel'] = str(kernel_dict)
         f.close()
 
     def _make_kernel(self, hyperparams):
