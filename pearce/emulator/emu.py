@@ -3054,7 +3054,7 @@ class LemonPepperWet(NashvilleHot):
         pred_ys = []
         # there can be memory issues with trying to this all at once.
         for _x2 in x2:
-            _py = [emu.predict([x1, _x2.reshape((1, -1), scale_bin_centers]))[0][:, 0] + ym for emu, ym in
+            _py = [emu.predict([x1, _x2.reshape((1, -1)), scale_bin_centers])[0][:, 0] + ym for emu, ym in
                    zip(self._emulators, self._y_mean)]
             pred_ys.append(np.stack(_py))
 
