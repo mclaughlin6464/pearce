@@ -2890,9 +2890,9 @@ class LemonPepperWet(NashvilleHot):
 
         if type(kernel_dict) is list:
             if type(kernel_dict[0]) in (tuple, list):  # 2D
-                if len(kernel_dict[0]) == 2:
+                if len(kernel_dict[0]) == 3:
                     return [[Kern.from_dict(kd[0]), Kern.from_dict(kd[1]), Kern.from_dict(kd[2])] for kd in kernel_dict]
-                else:  # 3?
+                else:  # 4?
                     return [[Kern.from_dict(kd[0]), Kern.from_dict(kd[1]),Kern.from_dict(kd[2]), float(kd[3])] for kd in kernel_dict]
             return [Kern.from_dict(kd) for kd in kernel_dict]
         return Kern.from_dict(kernel_dict)
@@ -3054,7 +3054,7 @@ class LemonPepperWet(NashvilleHot):
         pred_ys = []
         # there can be memory issues with trying to this all at once.
         for _x2 in x2:
-            _py = [emu.predict([x1, _x2.reshape((1, -1), scale_bin_centers]))[0][:, 0] + ym for emu, ym in
+            _py = [emu.predict([x1, _x2.reshape((1, -1)), scale_bin_centers])[0][:, 0] + ym for emu, ym in
                    zip(self._emulators, self._y_mean)]
             pred_ys.append(np.stack(_py))
 
