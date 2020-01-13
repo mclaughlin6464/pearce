@@ -2192,14 +2192,14 @@ class NashvilleHot(Emu):
 
 
         # TODO x1 & x2 or xcosmo and xhod?
-        self.x1, self.x2 = self._whiten(x1, x2)[0] 
+        self.x1, self.x2, _ = self._whiten(x1, x2)[0] 
 
-        self._y_mean = np.stack([_y.mean() for _y in y] )
+        self._y_mean = y.mean() 
         #self._y_mean = np.stack([ 0.0 for _y in y] ) #np.stack([_y.mean() for _y in y] )
         #self._y_std = np.stack([_y.std() for _y in y])
-        self._y_std = np.stack([ 1.0 for _y in y]) #np.stack([_y.std() for _y in y])
+        self._y_std = 1.0 
 
-        self.y  = np.stack([_y-_ym for _y,_ym in zip(y, self._y_mean)])
+        self.y  = y - self._y_mean 
         self.yerr = np.stack(yerr)
 
         self.mean_function = self._make_custom_mean_function(custom_mean_function)
@@ -2271,12 +2271,12 @@ class NashvilleHot(Emu):
             self.downsample_yerr = np.stack(downsample_yerr)
         else:
             return downsample_x1, downsample_x2, np.stack(downsample_y), np.stack(downsample_yerr)
+
     def check_param_names(self, param_names, ignore=[]):
         #see above, just adding 'r' to ignore by default
         ig = ['r'] if 'r' not in ignore else []
         ig.extend(ignore)
         return super(NashvilleHot, self).check_param_names(param_names, ig)
-
 
     def _build_gp(self, hyperparams):
         """
@@ -2791,7 +2791,6 @@ class LemonPepperWet(NashvilleHot):
             y = np.dstack([np.vstack(_y) for _y in y])
             yerr = np.dstack([np.vstack(_yerr) for _yerr in yerr])
 
-        print y.shape
         _ycov = np.dstack(ycov)
 
         if (np.any(np.isnan(ycov)) or np.any(np.isnan(y))):
@@ -2840,6 +2839,35 @@ class LemonPepperWet(NashvilleHot):
         else:
             return x1, x2, y, yerr, ycov, info
 
+    def _downsample_data(self, downsample_factor, x1, x2, y, yerr, attach=True):
+
+        if x1.shape[0] > x2.shape[0]:
+            # downsample x1
+            N_points = x1.shape[0]
+            downsample_N_points = int(downsample_factor * N_points)
+            downsample_x1 = x1[:downsample_N_points, :]
+            downsample_x2 = x2
+
+            downsample_y = y[:downsample_N_points, :]
+            downsample_yerr = yerr[:downsample_N_points, :]
+
+        else:  # downsample x2
+            N_points = x2.shape[0]
+            downsample_N_points = int(downsample_factor * N_points)
+            downsample_x2 = x2[:downsample_N_points, :]
+            downsample_x1 = x1
+
+            downsample_y = y[:, :downsample_N_points]
+            downsample_yerr = yerr[:, :downsample_N_points]
+
+        if attach:
+            self.downsample_x1 = np.stack(downsample_x1)
+            self.downsample_x2 = np.stack(downsample_x2)
+            self.downsample_y = np.stack(downsample_y)
+            self.downsample_yerr = np.stack(downsample_yerr)
+        else:
+            return downsample_x1, downsample_x2, np.stack(downsample_y), np.stack(downsample_yerr)
+
     def _build_gp(self, hyperparams):
         """
         Initialize the GP emulator model.
@@ -2860,8 +2888,6 @@ class LemonPepperWet(NashvilleHot):
             raise AssertionError("Incorrect kernel size specified.")
 
         # now, make a list of emulators
-        print self.y.shape, self.downsample_y.shape
-
         # yerr taken care of in kernel
         if self._downsample_factor == 1.0:
             x1, x2 = self.x1, self.x2
@@ -2873,11 +2899,12 @@ class LemonPepperWet(NashvilleHot):
             yerr = self.downsample_yerr
 
         #emulator = GPKroneckerGaussianRegressionVar(x1, x2, y, yerr ** 2, kern1, kern2, noise_var=nv)
-        emulator = GPKroneckerGaussianRegression([x1, x2,self.scale_bin_centers],\
+        print x1.shape, x2.shape, self.scale_bin_centers.reshape((-1,1)).shape
+        emulator = GPKroneckerGaussianRegression([x1, x2, self.scale_bin_centers.reshape((-1,1))],\
                                                       y, [kern1, kern2, kern3], noise_var)
 
         self._emulator = emulator
-        self._kernel(kern1, kern2, kern3)
+        self._kernel= (kern1, kern2, kern3)
 
     def _build_skl(self, hyperparams):
         warnings.warn("LemonPepperWer does not provide advantages for skl mode, so it is not reccomended.")
@@ -2912,18 +2939,7 @@ class LemonPepperWet(NashvilleHot):
 
     def save_as_default_kernel(self):
         # TODO how to clip of tye Yvar portion
-        if hasattr(self, '_kernel'):
-            kernel_dict = self._kernel.to_dict()
-        elif hasattr(self, '_kernels'):
-            if type(self._kernels[0]) in (tuple, list):  # 2D
-                if len(self._kernels[0]) == 3:
-                    kernel_dict = [[_k[0].to_dict(), _k[1].to_dict(), _k[2].to_dict()] for _k in self._kernels]
-                else:  # d
-                    kernel_dict = [[_k[0].to_dict(), _k[1].to_dict(), _k[2].to_dict(), _k[3]] for _k in self._kernels]
-            else:
-                kernel_dict = [_k.to_dict() for _k in self._kernels]
-        else:
-            raise AssertionError("No emulator loaded, cannot save.")
+        kernel_dict = [_k.to_dict() for _k in self._kernel]
 
         f = h5py.File(self.filename)
         f.attrs['lpw_kernel'] = str(kernel_dict)
@@ -2988,8 +3004,8 @@ class LemonPepperWet(NashvilleHot):
                 x1, x2, x3 = x1[:, :self.x1.shape[-1]], x1[:, self.x1.shape[-1]:-1], x1[:, :-1]
 
         # TODO whiten x3?
-        return ((x1-self._x1_mean)/(self._x1_std+1e-9), (x2-self._x2_mean)/(self._x2_std+1e-9)),\
-                x3, None
+        return ((x1-self._x1_mean)/(self._x1_std+1e-9), (x2-self._x2_mean)/(self._x2_std+1e-9),\
+                x3), None
 
     def _emulate_helper(self, t, gp_errs=False, old_idxs=None):
         """
@@ -3066,12 +3082,15 @@ class LemonPepperWet(NashvilleHot):
         # _py = [emu.predict(x1, x2)[0][:, 0] + ym for emu, ym in zip(self._emulators, self._y_mean)]
         pred_ys = []
         # there can be memory issues with trying to this all at once.
-        for _x2 in x2:
-            _py = [emu.predict([x1, _x2.reshape((1, -1)), scale_bin_centers])[0][:, 0] + ym for emu, ym in
-                   zip(self._emulators, self._y_mean)]
-            pred_ys.append(np.stack(_py))
+        print x1.shape, x2.shape, scale_bin_centers.reshape((-1,1)).shape
+        for i,_x2 in enumerate(x2):
+            print i,
+            _py = self._emulator.predict([x1, _x2.reshape((1,-1)), scale_bin_centers.reshape((-1,1))], mean_only=True)[0].squeeze() + self._y_mean  
+            pred_ys.append(_py)
 
-        pred_y = np.hstack(pred_ys)  # .T
+        pred_y = np.array(pred_ys)#np.hstack(pred_ys)  # .T
+        pred_y = np.swapaxes(pred_y, 0, 1) # comes out in the wrong shape
+
         # NOTE think this is the right ordering, should check, though may not matter if i'm consistent...
 
         # TODO untested!
@@ -3087,7 +3106,7 @@ class LemonPepperWet(NashvilleHot):
             y = y[:, self.scale_bin_centers[0] <= bin_centers <= self.scale_bin_centers[-1]]
 
         if statistic is None:
-            return pred_y, y.reshape((y.shape[0], -1), order='F')
+            return pred_y.reshape((-1,18)).T, y.reshape((-1,18)).T
 
         y = y.reshape((y.shape[0], -1), order='F')
 
@@ -3144,9 +3163,9 @@ class LemonPepperWet(NashvilleHot):
         assert self.method == 'gp'
 
         try:
-            self._emulator.optimize_restarts(parallel=True, num_restarts=3, verbose=True, robust=True)
+            self._emulator.optimize_restarts(parallel=False, num_restarts=5, verbose=True, robust=True)
         except:
-            self._emulator.optimize_restarts(parallel=False, num_restarts=3, verbose=True, robust=True)
+            self._emulator.optimize_restarts(parallel=False, num_restarts=5, verbose=True, robust=True)
         sys.stdout.flush()
 
 # TODO
