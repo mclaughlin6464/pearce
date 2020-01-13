@@ -35,8 +35,8 @@ hyperparams = {'kernel': k , \
                'optimize': True}
 
 #for df in [0.5]:#,0.25,  0.5]: 
-emu = NashvilleHot(training_file, hyperparams=hyperparams,fixed_params = fixed_params, downsample_factor = 1.0)
-emu.save_as_default_kernel()
+emu = NashvilleHot(training_file, hyperparams=hyperparams,fixed_params = fixed_params, downsample_factor = 0.2)
+#emu.save_as_default_kernel()
 #emu = NashvilleHot(training_file, fixed_params = fixed_params)#, downsample_factor = df)
 #
 pred_y, data_y = emu.goodness_of_fit(test_file, statistic = None)#, downsample_factor = 0.5)
@@ -54,5 +54,5 @@ print k
 print 'Yerr', np.sqrt(np.diag(cov))/(10**data_y.mean(axis=1))
 print '*'*10
 
-np.save(save_fname, cov)
+#np.save(save_fname, cov)
 
