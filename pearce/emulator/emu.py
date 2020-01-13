@@ -3029,7 +3029,7 @@ class LemonPepperWet(NashvilleHot):
             if gp_errs:
                 mu, err = self._emulator.predict([t1, t2, t3])
             else:
-                mu, _ = self._emulator.predict(t1, t2, t3)
+                mu, _ = self._emulator.predict([t1, t2, t3], mean_only=True)
                 # print local_mu
                 err = np.ones_like(mu)
 
@@ -3082,7 +3082,6 @@ class LemonPepperWet(NashvilleHot):
         # _py = [emu.predict(x1, x2)[0][:, 0] + ym for emu, ym in zip(self._emulators, self._y_mean)]
         pred_ys = []
         # there can be memory issues with trying to this all at once.
-        print x1.shape, x2.shape, scale_bin_centers.reshape((-1,1)).shape
         for i,_x2 in enumerate(x2):
             print i,
             _py = self._emulator.predict([x1, _x2.reshape((1,-1)), scale_bin_centers.reshape((-1,1))], mean_only=True)[0].squeeze() + self._y_mean  
