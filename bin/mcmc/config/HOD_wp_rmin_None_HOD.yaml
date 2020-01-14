@@ -1,0 +1,52 @@
+chain:
+  fixed_params: {}
+  mcmc_type: normal
+  nburn: 0
+  nsteps: 10000
+  nwalkers: 200
+  seed: 0
+data:
+  cov:
+    emu_cov_fname: &id001 '/u/ki/swmclau2/Git/pearce/bin/optimization/wp_hod_emu_cov.npy'
+    meas_cov_fname: '/u/ki/swmclau2/Git/pearce/bin/covmat/wp_full_covmat.npy'
+  obs:
+    mean: false
+    obs: wp
+    rbins: [0.1,
+             0.13945832491957455,
+              0.19448624389373625,
+               0.27122725793320285,
+                0.3782489906389385,
+                 0.527499706370262,
+                  0.7356422544596414,
+                   1.0259143654700102,
+                    1.430722989193758,
+                     1.9952623149688797,
+                      2.782559402207126,
+                       3.8805107322101837,
+                        5.411695265464638,
+                         7.547059566968908,
+                          10.525002852777337,
+                           14.677992676220706,
+                            20.46968271807522,
+                             28.54667663497933,
+                              39.810717055349734]
+
+  sim: &id002
+    gal_type: HOD
+    hod_name: zheng07
+    hod_params: {alpha: 1.083, logM0: 13.2, logM1: 14.2, sigma_logM: 0.2}
+    min_ptcl: 100
+    nd: 5e-4
+    scale_factor: 1.0
+    sim_hps: {boxno: 3, downsample_factor: 0.01, particles: true, realization: 2,
+      system: ki-ls}
+    simname: testbox
+emu:
+  emu_cov_fname: *id001
+  emu_hps: {}
+  emu_type: NashvilleHot
+  fixed_params: {z: 0.0}
+  training_file: '/u/ki/swmclau2/des/wp_zheng07/PearceWpCosmo.hdf5'
+fname: '/nfs/slac/g/ki/ki18/des/swmclau2/PearceMCMC/HOD_wp_rmin_None_HOD.hdf5'
+sim: *id002
