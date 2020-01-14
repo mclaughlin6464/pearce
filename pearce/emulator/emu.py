@@ -3083,7 +3083,6 @@ class LemonPepperWet(NashvilleHot):
         pred_ys = []
         # there can be memory issues with trying to this all at once.
         for i,_x2 in enumerate(x2):
-            print i,
             _py = self._emulator.predict([x1, _x2.reshape((1,-1)), scale_bin_centers.reshape((-1,1))], mean_only=True)[0].squeeze() + self._y_mean  
             pred_ys.append(_py)
 
@@ -3162,9 +3161,9 @@ class LemonPepperWet(NashvilleHot):
         assert self.method == 'gp'
 
         try:
-            self._emulator.optimize_restarts(parallel=False, num_restarts=5, verbose=True, robust=True)
+            self._emulator.optimize_restarts(parallel=False, num_restarts=3, verbose=True, robust=True)
         except:
-            self._emulator.optimize_restarts(parallel=False, num_restarts=5, verbose=True, robust=True)
+            self._emulator.optimize_restarts(parallel=False, num_restarts=3, verbose=True, robust=True)
         sys.stdout.flush()
 
 # TODO
