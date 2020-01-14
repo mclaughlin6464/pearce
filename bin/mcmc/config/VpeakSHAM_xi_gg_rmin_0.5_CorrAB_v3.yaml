@@ -1,0 +1,32 @@
+chain:
+  fixed_params: {}
+  nburn: 0
+  nsteps: 20000
+  nwalkers: 100
+  seed: 0
+data:
+  cov: {emu_cov_fname: /afs/slac.stanford.edu/u/ki/swmclau2/Git/pearce/bin/covmat/xi_gg_nh_emu_corrab_cov_v4.npy,
+    meas_cov_fname: /u/ki/swmclau2/Git/pearce/bin/covmat/xi_gg_darksky_cov.npy}
+  obs:
+    mean: false
+    obs: xi
+    rbins: [0.07943282, 0.11220185, 0.15848932, 0.22387211, 0.31622777, 0.44668359,
+      0.63095734, 0.89125094, 1.25892541, 1.77827941, 2.51188643, 3.54813389, 5.01187234,
+      7.07945784, 10.0, 14.12537545, 19.95262315, 28.18382931, 39.81071706]
+  sim:
+    gal_type: SHAM
+    halo_property: halo_vpeak
+    min_ptcl: 100
+    nd: 5e-4
+    scale_factor: 1.001
+    scatter: 0.2
+    sim_hps: {system: ki-ls}
+    simname: ds_14_b_sub
+  true_cov_fname: [/afs/slac.stanford.edu/u/ki/swmclau2/Git/pearce/notebooks/CorrAB_full_cov.npy]
+  true_data_fname: [/afs/slac.stanford.edu/u/ki/swmclau2/Git/pearce/bin/shams/ds14b_sub_xi_gg.npy]
+emu:
+  emu_hps: {}
+  emu_type: NashvilleHot
+  fixed_params: {rmin: 0.5, z: 0.0}
+  training_file: /nfs/slac/g/ki/ki18/des/swmclau2/xi_gg_corrabzheng07_v2/PearceXiggCosmoCorrAB.hdf5
+fname: /nfs/slac/g/ki/ki18/des/swmclau2/PearceMCMC/VpeakSHAM_xi_gg_rmin_0.5_CorrAB_v3.hdf5
