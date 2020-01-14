@@ -3150,7 +3150,7 @@ class LemonPepperWet(NashvilleHot):
 
         return ll, gll
 
-    def train_metric(self, p0=None, **kwargs):
+    def train_metric(self, **kwargs):
         """
         Train the emulator. Has a spotty record of working. Better luck may be had with the NAMEME code.
         :param kwargs:
@@ -3161,9 +3161,10 @@ class LemonPepperWet(NashvilleHot):
         assert self.method == 'gp'
 
         try:
-            self._emulator.optimize_restarts(parallel=False, num_restarts=3, verbose=True, robust=True)
+            #self._emulator.optimize_restarts(parallel=False, num_restarts=5, verbose=True, robust=False)
+            self._emulator.optimize('lbfgs')
         except:
-            self._emulator.optimize_restarts(parallel=False, num_restarts=3, verbose=True, robust=True)
+            self._emulator.optimize_restarts(parallel=False, num_restarts=5, verbose=True, robust=True)
         sys.stdout.flush()
 
 # TODO
