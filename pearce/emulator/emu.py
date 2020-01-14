@@ -2192,14 +2192,15 @@ class NashvilleHot(Emu):
 
 
         # TODO x1 & x2 or xcosmo and xhod?
-        self.x1, self.x2, _ = self._whiten(x1, x2)[0] 
+        xs = self._whiten(x1, x2)[0]
+        self.x1, self.x2 = xs[:2] 
 
-        self._y_mean = y.mean() 
+        self._y_mean = [_y.mean() for _y in y] 
         #self._y_mean = np.stack([ 0.0 for _y in y] ) #np.stack([_y.mean() for _y in y] )
         #self._y_std = np.stack([_y.std() for _y in y])
-        self._y_std = 1.0 
+        self._y_std = np.ones_like(self._y_mean) 
 
-        self.y  = y - self._y_mean 
+        self.y  = np.stack([_y - _ym for _y, _ym in zip(y, self._y_mean )])
         self.yerr = np.stack(yerr)
 
         self.mean_function = self._make_custom_mean_function(custom_mean_function)
@@ -2838,6 +2839,17 @@ class LemonPepperWet(NashvilleHot):
             return x1, x2, y, yerr, ycov
         else:
             return x1, x2, y, yerr, ycov, info
+
+    def load_training_data(self, filename, custom_mean_function=None):
+
+        out = super(LemonPepperWet, self).load_training_data(filename, custom_mean_function)
+        # redo the normalization cuz its different than in NH. Its the only thing different, so its a coda here
+        y = np.array([_y*_ys + _ym for _y, _ym, _ys in zip(self.y, self._y_mean, self._y_std)])
+        self._y_mean = y.mean() 
+        self._y_std = 1.0
+
+        self.y  = y - self._y_mean
+        return out
 
     def _downsample_data(self, downsample_factor, x1, x2, y, yerr, attach=True):
 
