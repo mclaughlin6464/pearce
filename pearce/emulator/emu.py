@@ -756,7 +756,6 @@ class Emu(object):
         # TODO standardize this
         #if hasattr(self, 'r_idx'):
         t, old_idxs = self._whiten(t)
-
         return self._emulate_helper(t, gp_errs, old_idxs = old_idxs)
 
     @abstractmethod
@@ -793,7 +792,6 @@ class Emu(object):
         elif 'z' not in self.fixed_params:
             raise ValueError("Please specify z in emulate_wrt_z")
         out = self.emulate_wrt_r_z(ep, r_bin_centers, z_bin_centers, gp_errs)
-
         # Extract depending on if there are errors
         if gp_errs:
             _mu, _errs = out
@@ -878,6 +876,7 @@ class Emu(object):
 
         # now, emulate.
         out = self.emulate(vep, gp_errs)
+
         if gp_errs:
             _mu, _errs = out
         else:
@@ -2178,7 +2177,7 @@ class NashvilleHot(Emu):
         self.emulator_ndim = ndim  # The number of params for the emulator is different than those in sampling.
 
         #r_idx = self.get_param_names().index('r')
-        self.r_idx = ndim # this object doesn't use this, but i think i use this as a marker
+        #self.r_idx = ndim # this object doesn't use this, but i think i use this as a marker
         # TODO be smarter about how i split up the multi bin emus vs the OR
         if 'r' in self._ordered_params:
             del self._ordered_params['r']  # remove r!
@@ -2912,7 +2911,7 @@ class LemonPepperWet(NashvilleHot):
 
         #emulator = GPKroneckerGaussianRegressionVar(x1, x2, y, yerr ** 2, kern1, kern2, noise_var=nv)
         print x1.shape, x2.shape, self.scale_bin_centers.reshape((-1,1)).shape
-        emulator = GPKroneckerGaussianRegression([x1, x2, self.scale_bin_centers.reshape((-1,1))],\
+        emulator = GPKroneckerGaussianRegression([x1, x2, np.log10(self.scale_bin_centers.reshape((-1,1)))],\
                                                       y, [kern1, kern2, kern3], noise_var)
 
         self._emulator = emulator
@@ -3008,16 +3007,73 @@ class LemonPepperWet(NashvilleHot):
         :param arr:
         :return:
         """
+        
         if x2 is None:
             if len(x1.shape) == 1:
-                x1, x2, x3 = x1[:self.x1.shape[-1]], x1[self.x1.shape[-1]:-1], x1[:-1]
+                x1, x2, x3 = x1[:self.x1.shape[-1]], x1[self.x1.shape[-1]:], x3
 
             else:
-                x1, x2, x3 = x1[:, :self.x1.shape[-1]], x1[:, self.x1.shape[-1]:-1], x1[:, :-1]
+                x1, x2, x3 = x1[:, :self.x1.shape[-1]], x1[:, self.x1.shape[-1]:], x3.reshape((-1,1))
 
-        # TODO whiten x3?
+        # TODO whiten x3? Possibly log10...
+        #x3 = None if x3 is None else np.log10(x3)
         return ((x1-self._x1_mean)/(self._x1_std+1e-9), (x2-self._x2_mean)/(self._x2_std+1e-9),\
                 x3), None
+
+    # tried to avoid subclassing this class but really just makes things easier
+    def emulate(self, em_params, gp_errs=False):
+        """
+        Perform predictions with the emulator.
+        :param em_params:
+            Dictionary of what values to predict at for each param. Values can be
+            an array or a float.
+        :param gp_errs:
+            Boolean, decide whether or not to return the errors from the gp prediction. Default is False.
+            Will throw error if method is not gp.
+        :return: mu, (errs)
+                  The predicted value and the uncertainties for the predictions
+                  mu and errs both have shape (npoints,)
+        """
+
+        # only has meaning for gp's
+        assert not gp_errs or self.method == 'gp'
+
+        input_params = {}
+        # input_params.update(self.fixed_params)
+        input_params.update(em_params)
+
+        self._check_params(input_params)
+
+        # create the dependent variable matrix
+        t_list = [input_params[pname] for pname in self._ordered_params if pname in em_params]
+        # cover spicy_buffalo edge case
+        t_dim = self.emulator_ndim
+        # TODO this does a lot of extra uncecessary work for NH
+        if hasattr(self, 'r_idx') and 'r' in input_params:
+            print 'adding r'
+            t_list.insert(self.r_idx, input_params['r'])
+            t_dim += 1
+
+        t_grid = np.meshgrid(*t_list)
+        t = np.stack(t_grid).T
+        t = t.reshape((-1, t_dim))
+
+        # TODO george can sort?
+        _t = self._sort_params(t)
+        if _t.shape == t.shape:  # protect against weird edge case...
+            t = _t
+
+        if len(t.shape) == 1:
+            t = np.array([t])
+
+        # whiten, but only non- Spicy Buffalo versions
+        # I'm not psyched about this, but handling it in _emulator_helper is just easier
+        # I need to know what rows corredspond to what rs for later
+        # TODO standardize this
+        # if hasattr(self, 'r_idx'):
+        # TODO should be smarter here about the meshgriding. Should only meshgrid things in the same sub-kernel
+        t, old_idxs = self._whiten(t, x3= input_params['r'])
+        return self._emulate_helper(t, gp_errs, old_idxs=old_idxs)
 
     def _emulate_helper(self, t, gp_errs=False, old_idxs=None):
         """
@@ -3033,7 +3089,9 @@ class LemonPepperWet(NashvilleHot):
         assert old_idxs is None, "Old_idxs not supported, not sure how you even got here!"
         #
         t1, t2, t3 = t
-
+        print t1
+        print t2
+        print t3
         if self.method == 'gp':
             # because were using a custom object here, don't have to do the copying stuff
             # however, have to split up t into the two groups
@@ -3049,6 +3107,8 @@ class LemonPepperWet(NashvilleHot):
             mu = self._emulator.predict(t)
             err = np.ones_like(mu)  # weight with this instead of the errors.
 
+        print mu.shape
+        print 
         mu = self._y_std * mu + self._y_mean
         err = err * self._y_std
 
