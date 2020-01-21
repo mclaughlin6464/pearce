@@ -730,21 +730,17 @@ class Emu(object):
         self._check_params(input_params)
 
         # create the dependent variable matrix
-        print self._ordered_params.keys()
-        print em_params.keys()
         t_list = [input_params[pname] for pname in self._ordered_params if pname in em_params]
         # cover spicy_buffalo edge case
         t_dim = self.emulator_ndim
 # TODO this does a lot of extra uncecessary work for NH
         if hasattr(self, 'r_idx') and 'r' in input_params:
-            print 'adding r'
             t_list.insert(self.r_idx, input_params['r'])
             t_dim+=1
 
         t_grid = np.meshgrid(*t_list)
         t = np.stack(t_grid).T
         t = t.reshape((-1, t_dim))
-        print t.shape
 
         # TODO george can sort?
         _t = self._sort_params(t)
@@ -760,7 +756,6 @@ class Emu(object):
         # TODO standardize this
         #if hasattr(self, 'r_idx'):
         t, old_idxs = self._whiten(t)
-        print t
         return self._emulate_helper(t, gp_errs, old_idxs = old_idxs)
 
     @abstractmethod
@@ -3013,15 +3008,20 @@ class LemonPepperWet(NashvilleHot):
         :param arr:
         :return:
         """
+        
         if x2 is None:
             if len(x1.shape) == 1:
                 x1, x2, x3 = x1[:self.x1.shape[-1]], x1[self.x1.shape[-1]:-1], x1[:-1]
 
             else:
                 print x1.shape
-                x1, x2, x3 = x1[:, :self.x1.shape[-1]], x1[:, self.x1.shape[-1]:-1], x1[:, :-1]
+                x1, x2, x3 = x1[:, :self.x1.shape[-1]], x1[:, self.x1.shape[-1]:], x1[:, :-1]
 
         # TODO whiten x3?
+            print x1.shape, x2.shape, x3.shape
+            print self._x1_mean.shape, self._x1_std.shape
+            print self._x2_mean.shape, self._x2_std.shape
+
         return ((x1-self._x1_mean)/(self._x1_std+1e-9), (x2-self._x2_mean)/(self._x2_std+1e-9),\
                 x3), None
 
