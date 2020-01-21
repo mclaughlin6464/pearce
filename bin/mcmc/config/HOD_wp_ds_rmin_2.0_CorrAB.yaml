@@ -92,16 +92,10 @@ data:
       - *id001
       - !!binary |
         rYSTk8XnQ0A=
-  sim: &id003
-    gal_type: HOD
-    hod_name: zheng07
-    hod_params: {alpha: 1.083, conc_gal_bias: 1.0, logM0: 13.2, logM1: 14.2, sigma_logM: 0.2}
-    min_ptcl: 100
-    nd: 5e-4
-    scale_factor: 1.0
-    sim_hps: {boxno: 1, downsample_factor: 0.01, particles: true, realization: 0,
-      system: sherlock}
-    simname: testbox
+  sim: sherlock
+  true_cov_fname: /home/users/swmclau2/Git/pearce/bin/covmat/wp_ds_full_covmat.npy
+  true_data_fname: [/home/users/swmclau2/Git/pearce/bin/mock_measurements/HODmock_wp.npy,
+    /home/users/swmclau2/Git/pearce/bin/mock_measurements/HODmock_ds.npy]
 emu:
   emu_cov_fname: *id002
   emu_hps: {}
@@ -110,4 +104,12 @@ emu:
   training_file: [/home/users/swmclau2/scratch/wp_corrab/PearceWpCorrABCosmo.hdf5,
     /home/users/swmclau2/scratch/ds_corrab/PearceDsCorrABCosmo.hdf5]
 fname: /home/users/swmclau2/scratch/PearceMCMC/HOD_wp_ds_rmin_2.0_CorrAB.hdf5
-sim: *id003
+sim:
+  gal_type: HOD
+  hod_name: zheng07
+  hod_params: {alpha: 1.083, conc_gal_bias: 1.0, logM0: 13.2, logM1: 14.2, sigma_logM: 0.2}
+  min_ptcl: 100
+  nd: 5e-4
+  scale_factor: 1.0
+  sim_hps: {boxno: 1, downsample_factor: 0.01, particles: true, realization: 0, system: sherlock}
+  simname: testbox

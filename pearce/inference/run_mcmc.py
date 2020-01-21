@@ -16,7 +16,7 @@ from functools import partial
 from scipy.linalg import inv
 import h5py
 
-from pearce.emulator import OriginalRecipe, ExtraCrispy, SpicyBuffalo, NashvilleHot
+from pearce.emulator import OriginalRecipe, ExtraCrispy, SpicyBuffalo, NashvilleHot, LemonPepperWet
 
 # liklihood functions need to be defined here because the emulator will be made global
 
@@ -437,11 +437,13 @@ def run_mcmc_config(config_fname):
 
     #print config_fname
     f = h5py.File(config_fname, 'r+')
+    # TODO there's a better way to do this. 
     #f.swmr_mode = True # enables the chains to be accessed while they're running
     emu_type_dict = {'OriginalRecipe':OriginalRecipe,
                      'ExtraCrispy': ExtraCrispy,
                      'SpicyBuffalo': SpicyBuffalo,
-                     'NashvilleHot': NashvilleHot}
+                     'NashvilleHot': NashvilleHot,
+                     'LemonPepperWet':LemonPepperWet}
     fixed_params = f.attrs['fixed_params']
     fixed_params = {} if fixed_params is None else literal_eval(fixed_params)
     #metric = f.attrs['metric'] if 'metric' in f.attrs else {}
