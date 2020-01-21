@@ -3019,11 +3019,70 @@ class LemonPepperWet(NashvilleHot):
 
             else:
                 print x1.shape
-                x1, x2, x3 = x1[:, :self.x1.shape[-1]], x1[:, self.x1.shape[-1]:-1], x1[:, :-1]
+                x1, x2, x3 = x1[:, :self.x1.shape[-1]], x1[:, self.x1.shape[-1]:], x3
 
-        # TODO whiten x3?
+        # TODO whiten x3? Possibly log10...
         return ((x1-self._x1_mean)/(self._x1_std+1e-9), (x2-self._x2_mean)/(self._x2_std+1e-9),\
                 x3), None
+
+    # tried to avoid subclassing this class but really just makes things easier
+    def emulate(self, em_params, gp_errs=False):
+        """
+        Perform predictions with the emulator.
+        :param em_params:
+            Dictionary of what values to predict at for each param. Values can be
+            an array or a float.
+        :param gp_errs:
+            Boolean, decide whether or not to return the errors from the gp prediction. Default is False.
+            Will throw error if method is not gp.
+        :return: mu, (errs)
+                  The predicted value and the uncertainties for the predictions
+                  mu and errs both have shape (npoints,)
+        """
+
+        # only has meaning for gp's
+        assert not gp_errs or self.method == 'gp'
+
+        input_params = {}
+        # input_params.update(self.fixed_params)
+        input_params.update(em_params)
+
+        self._check_params(input_params)
+
+        # create the dependent variable matrix
+        print self._ordered_params.keys()
+        print em_params.keys()
+        t_list = [input_params[pname] for pname in self._ordered_params if pname in em_params]
+        # cover spicy_buffalo edge case
+        t_dim = self.emulator_ndim
+        # TODO this does a lot of extra uncecessary work for NH
+        if hasattr(self, 'r_idx') and 'r' in input_params:
+            print 'adding r'
+            t_list.insert(self.r_idx, input_params['r'])
+            t_dim += 1
+
+        t_grid = np.meshgrid(*t_list)
+        t = np.stack(t_grid).T
+        t = t.reshape((-1, t_dim))
+        print t.shape
+
+        # TODO george can sort?
+        _t = self._sort_params(t)
+        if _t.shape == t.shape:  # protect against weird edge case...
+            t = _t
+
+        if len(t.shape) == 1:
+            t = np.array([t])
+
+        # whiten, but only non- Spicy Buffalo versions
+        # I'm not psyched about this, but handling it in _emulator_helper is just easier
+        # I need to know what rows corredspond to what rs for later
+        # TODO standardize this
+        # if hasattr(self, 'r_idx'):
+        # TODO should be smarter here about the meshgriding. Should only meshgrid things in the same sub-kernel
+        t, old_idxs = self._whiten(t, x3= input_params['r'])
+        print t
+        return self._emulate_helper(t, gp_errs, old_idxs=old_idxs)
 
     def _emulate_helper(self, t, gp_errs=False, old_idxs=None):
         """
