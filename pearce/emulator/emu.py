@@ -730,17 +730,21 @@ class Emu(object):
         self._check_params(input_params)
 
         # create the dependent variable matrix
+        print self._ordered_params.keys()
+        print em_params.keys()
         t_list = [input_params[pname] for pname in self._ordered_params if pname in em_params]
         # cover spicy_buffalo edge case
         t_dim = self.emulator_ndim
 # TODO this does a lot of extra uncecessary work for NH
         if hasattr(self, 'r_idx') and 'r' in input_params:
+            print 'adding r'
             t_list.insert(self.r_idx, input_params['r'])
             t_dim+=1
 
         t_grid = np.meshgrid(*t_list)
         t = np.stack(t_grid).T
         t = t.reshape((-1, t_dim))
+        print t.shape
 
         # TODO george can sort?
         _t = self._sort_params(t)
@@ -756,7 +760,7 @@ class Emu(object):
         # TODO standardize this
         #if hasattr(self, 'r_idx'):
         t, old_idxs = self._whiten(t)
-
+        print t
         return self._emulate_helper(t, gp_errs, old_idxs = old_idxs)
 
     @abstractmethod
@@ -793,7 +797,6 @@ class Emu(object):
         elif 'z' not in self.fixed_params:
             raise ValueError("Please specify z in emulate_wrt_z")
         out = self.emulate_wrt_r_z(ep, r_bin_centers, z_bin_centers, gp_errs)
-
         # Extract depending on if there are errors
         if gp_errs:
             _mu, _errs = out
@@ -877,7 +880,9 @@ class Emu(object):
                     raise ValueError("The parameter %s has been specified twice in emulate_wrt_r_z!" % key)
 
         # now, emulate.
+        print vep
         out = self.emulate(vep, gp_errs)
+        print out
         if gp_errs:
             _mu, _errs = out
         else:
@@ -2178,7 +2183,7 @@ class NashvilleHot(Emu):
         self.emulator_ndim = ndim  # The number of params for the emulator is different than those in sampling.
 
         #r_idx = self.get_param_names().index('r')
-        self.r_idx = ndim # this object doesn't use this, but i think i use this as a marker
+        #self.r_idx = ndim # this object doesn't use this, but i think i use this as a marker
         # TODO be smarter about how i split up the multi bin emus vs the OR
         if 'r' in self._ordered_params:
             del self._ordered_params['r']  # remove r!
@@ -3013,6 +3018,7 @@ class LemonPepperWet(NashvilleHot):
                 x1, x2, x3 = x1[:self.x1.shape[-1]], x1[self.x1.shape[-1]:-1], x1[:-1]
 
             else:
+                print x1.shape
                 x1, x2, x3 = x1[:, :self.x1.shape[-1]], x1[:, self.x1.shape[-1]:-1], x1[:, :-1]
 
         # TODO whiten x3?
@@ -3033,6 +3039,10 @@ class LemonPepperWet(NashvilleHot):
         assert old_idxs is None, "Old_idxs not supported, not sure how you even got here!"
         #
         t1, t2, t3 = t
+        print t1.shape, t2.shape, t3.shape
+        print t1
+        print t2
+        print t3
 
         if self.method == 'gp':
             # because were using a custom object here, don't have to do the copying stuff
