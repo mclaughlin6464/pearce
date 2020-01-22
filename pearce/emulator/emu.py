@@ -3102,7 +3102,6 @@ class LemonPepperWet(NashvilleHot):
             mu = self._emulator.predict(t)
             err = np.ones_like(mu)  # weight with this instead of the errors.
 
-        print 
         mu = self._y_std * mu + self._y_mean
         err = err * self._y_std
 
