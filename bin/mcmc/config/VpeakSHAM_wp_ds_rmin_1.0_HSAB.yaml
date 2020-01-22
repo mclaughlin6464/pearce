@@ -7,8 +7,8 @@ chain:
   seed: 0
 data:
   cov:
-    emu_cov_fname: &id002 [/home/users/swmclau2/Git/pearce/bin/optimization/wp_hsab_emu_cov.npy,
-      /home/users/swmclau2/Git/pearce/bin/optimization/ds_hsab_emu_cov.npy]
+    emu_cov_fname: &id002 [/home/users/swmclau2/Git/pearce/bin/optimization/wp_hsab_emu_cov_lpw.npy,
+      /home/users/swmclau2/Git/pearce/bin/optimization/ds_hsab_emu_cov_lpw.npy]
     meas_cov_fname: /home/users/swmclau2/Git/pearce/bin/covmat/wp_ds_full_covmat.npy
   obs:
     mean: false
@@ -107,7 +107,7 @@ data:
 emu:
   emu_cov_fname: *id002
   emu_hps: {}
-  emu_type: [NashvilleHot, NashvilleHot]
+  emu_type: [LemonPepperWet, LemonPepperWet]
   fixed_params: {rmin: 1.0, z: 0.0}
   training_file: [/home/users/swmclau2/scratch/wp_hsab/PearceWpHSABCosmo.hdf5, /home/users/swmclau2/scratch/ds_hsab/PearceDsHSABCosmo.hdf5]
 fname: /home/users/swmclau2/scratch/PearceMCMC/VpeakSHAM_wp_ds_rmin_1.0_HSAB.hdf5

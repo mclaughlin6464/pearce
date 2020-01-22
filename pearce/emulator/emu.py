@@ -3133,6 +3133,7 @@ class LemonPepperWet(NashvilleHot):
 
         x1, x2, y, yerr, _, info = self.get_data(truth_file, self.fixed_params)
         x1, x2, scale_bin_centers = self._whiten(x1, x2, info['sbc'])[0]
+        _scale_bin_centers = np.log10(scale_bin_centers)
 
         scale_nbins = len(scale_bin_centers) if 'r' not in self.fixed_params else 1
 
@@ -3148,7 +3149,7 @@ class LemonPepperWet(NashvilleHot):
         pred_ys = []
         # there can be memory issues with trying to this all at once.
         for i,_x2 in enumerate(x2):
-            _py = self._emulator.predict([x1, _x2.reshape((1,-1)), scale_bin_centers.reshape((-1,1))], mean_only=True)[0].squeeze() + self._y_mean  
+            _py = self._emulator.predict([x1, _x2.reshape((1,-1)), _scale_bin_centers.reshape((-1,1))], mean_only=True)[0].squeeze() + self._y_mean  
             pred_ys.append(_py)
 
         pred_y = np.array(pred_ys)#np.hstack(pred_ys)  # .T
@@ -3227,9 +3228,9 @@ class LemonPepperWet(NashvilleHot):
 
         try:
             #self._emulator.optimize_restarts(parallel=False, num_restarts=5, verbose=True, robust=False)
-            self._emulator.optimize('lbfgs')
+            self._emulator.optimize_restarts(optimizer='scg', num_restarts=3, verbose=True, max_iters=100)
         except:
-            self._emulator.optimize_restarts(parallel=False, num_restarts=5, verbose=True, robust=True)
+            self._emulator.optimize_restarts(parallel=False, num_restarts=3, verbose=True, robust=True)
         sys.stdout.flush()
 
 # TODO
