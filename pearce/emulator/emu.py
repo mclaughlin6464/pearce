@@ -2910,7 +2910,6 @@ class LemonPepperWet(NashvilleHot):
             yerr = self.downsample_yerr
 
         #emulator = GPKroneckerGaussianRegressionVar(x1, x2, y, yerr ** 2, kern1, kern2, noise_var=nv)
-        print x1.shape, x2.shape, self.scale_bin_centers.reshape((-1,1)).shape
         emulator = GPKroneckerGaussianRegression([x1, x2, np.log10(self.scale_bin_centers.reshape((-1,1)))],\
                                                       y, [kern1, kern2, kern3], noise_var)
 
@@ -3050,7 +3049,6 @@ class LemonPepperWet(NashvilleHot):
         t_dim = self.emulator_ndim
         # TODO this does a lot of extra uncecessary work for NH
         if hasattr(self, 'r_idx') and 'r' in input_params:
-            print 'adding r'
             t_list.insert(self.r_idx, input_params['r'])
             t_dim += 1
 
@@ -3089,9 +3087,6 @@ class LemonPepperWet(NashvilleHot):
         assert old_idxs is None, "Old_idxs not supported, not sure how you even got here!"
         #
         t1, t2, t3 = t
-        print t1
-        print t2
-        print t3
         if self.method == 'gp':
             # because were using a custom object here, don't have to do the copying stuff
             # however, have to split up t into the two groups
@@ -3107,8 +3102,6 @@ class LemonPepperWet(NashvilleHot):
             mu = self._emulator.predict(t)
             err = np.ones_like(mu)  # weight with this instead of the errors.
 
-        print mu.shape
-        print 
         mu = self._y_std * mu + self._y_mean
         err = err * self._y_std
 
