@@ -102,7 +102,7 @@ emu:
   emu_type: [LemonPepperWet, LemonPepperWet]
   fixed_params: {rmin: 1.0, z: 0.0}
   training_file: [/home/users/swmclau2/scratch/wp_zheng07/PearceWpCosmo.hdf5, /home/users/swmclau2/scratch/ds_zheng07/PearceDsCosmo.hdf5]
-fname: /home/users/swmclau2/scratch/PearceMCMC/HOD_wp_ds_rmin_1.0_HOD.hdf5
+fname: /home/users/swmclau2/scratch/PearceMCMC/HOD_wp_ds_rmin_1.0_HOD_v2.hdf5
 sim:
   gal_type: HOD
   hod_name: zheng07
