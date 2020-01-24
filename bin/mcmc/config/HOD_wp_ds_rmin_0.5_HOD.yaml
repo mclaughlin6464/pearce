@@ -2,8 +2,8 @@ chain:
   fixed_params: {}
   mcmc_type: normal
   nburn: 0
-  nsteps: 50000
-  nwalkers: 200
+  nsteps: 100000
+  nwalkers: 500
   seed: 0
 data:
   cov:
@@ -92,7 +92,16 @@ data:
       - *id001
       - !!binary |
         rYSTk8XnQ0A=
-  sim: sherlock
+  sim: &id003
+    gal_type: HOD
+    hod_name: zheng07
+    hod_params: {alpha: 1.083, conc_gal_bias: 1.0, logM0: 13.2, logM1: 14.2, sigma_logM: 0.2}
+    min_ptcl: 100
+    nd: 5e-4
+    scale_factor: 1.0
+    sim_hps: {boxno: 1, downsample_factor: 0.01, particles: true, realization: 0,
+      system: sherlock}
+    simname: testbox
   true_cov_fname: /home/users/swmclau2/Git/pearce/bin/covmat/wp_ds_full_covmat.npy
   true_data_fname: [/home/users/swmclau2/Git/pearce/bin/mock_measurements/HODmock_wp.npy,
     /home/users/swmclau2/Git/pearce/bin/mock_measurements/HODmock_ds.npy]
@@ -102,13 +111,5 @@ emu:
   emu_type: [LemonPepperWet, LemonPepperWet]
   fixed_params: {rmin: 0.5, z: 0.0}
   training_file: [/home/users/swmclau2/scratch/wp_zheng07/PearceWpCosmo.hdf5, /home/users/swmclau2/scratch/ds_zheng07/PearceDsCosmo.hdf5]
-fname: /home/users/swmclau2/scratch/PearceMCMC/HOD_wp_ds_rmin_0.5_HOD_v2.hdf5
-sim:
-  gal_type: HOD
-  hod_name: zheng07
-  hod_params: {alpha: 1.083, conc_gal_bias: 1.0, logM0: 13.2, logM1: 14.2, sigma_logM: 0.2}
-  min_ptcl: 100
-  nd: 5e-4
-  scale_factor: 1.0
-  sim_hps: {boxno: 1, downsample_factor: 0.01, particles: true, realization: 0, system: sherlock}
-  simname: testbox
+fname: /home/users/swmclau2/scratch/PearceMCMC/HOD_wp_ds_rmin_0.5_HOD.hdf5
+sim: *id003
