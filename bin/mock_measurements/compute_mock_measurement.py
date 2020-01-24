@@ -37,7 +37,7 @@ print 'B'
 #mock_ds = calc_ds(cat, rbins, n_cores = 1, randoms = randoms) 
 mock_ds = delta_sigma(pos/cat.h, pos_m/cat.h, cat.pmass/cat.h,\
                      downsampling_factor=1./cat._downsample_factor, rp_bins=rbins,
-                     period=cat.Lbox/cat.h, num_threads=1, cosmology=cat.cosmology)[1] / ((1e12)*cat.h**2)
+                     period=cat.Lbox/cat.h, num_threads=1, cosmology=cat.cosmology)[1] / ((1e12))#*cat.h**2)
 
 print 'C'
 np.save(basename+'mock_ds.npy', mock_ds)
