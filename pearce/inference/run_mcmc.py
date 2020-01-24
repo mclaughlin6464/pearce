@@ -130,6 +130,7 @@ def _run_tests(y, cov, r_bin_centers, param_names, fixed_params, ncores):
         warnings.warn('ncores invalid. Changing from %d to maximum %d.' % (ncores, max_cores))
         ncores = max_cores
         # else, we're good!
+    print 'N cores', ncores
 
     #make sure all inputs are of consistent shape
     assert y.shape[0] == cov.shape[0] and cov.shape[1] == cov.shape[0]

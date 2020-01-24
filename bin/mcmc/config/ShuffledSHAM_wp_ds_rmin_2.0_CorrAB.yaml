@@ -2,8 +2,8 @@ chain:
   fixed_params: {}
   mcmc_type: normal
   nburn: 0
-  nsteps: 50000
-  nwalkers: 200
+  nsteps: 100000
+  nwalkers: 500
   seed: 0
 data:
   cov:
@@ -111,4 +111,4 @@ emu:
   fixed_params: {rmin: 2.0, z: 0.0}
   training_file: [/home/users/swmclau2/scratch/wp_corrab/PearceWpCorrABCosmo.hdf5,
     /home/users/swmclau2/scratch/ds_corrab/PearceDsCorrABCosmo.hdf5]
-fname: /home/users/swmclau2/scratch/swmclau2/PearceMCMC/ShuffledSHAM_wp_ds_rmin_2.0_CorrAB.hdf5
+fname: /home/users/swmclau2/scratch/PearceMCMC/ShuffledSHAM_wp_ds_rmin_2.0_CorrAB.hdf5

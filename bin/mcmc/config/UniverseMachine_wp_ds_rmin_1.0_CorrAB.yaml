@@ -2,8 +2,8 @@ chain:
   fixed_params: {}
   mcmc_type: normal
   nburn: 0
-  nsteps: 50000
-  nwalkers: 200
+  nsteps: 100000
+  nwalkers: 500
   seed: 0
 data:
   cov:
