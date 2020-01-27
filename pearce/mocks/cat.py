@@ -1222,7 +1222,7 @@ class Cat(object):
         # and we want our result to divide those out. That is, if we want to not be in non h=1 units.
         return delta_sigma(pos_g / self.h, pos_m / self.h, self.pmass / self.h,
                            downsampling_factor=1. / self._downsample_factor, rp_bins=rp_bins,
-                           period=self.Lbox / self.h, num_threads=n_cores, cosmology=self.cosmology)[1] / ((1e12)#*self.h**2)
+                           period=self.Lbox / self.h, num_threads=n_cores, cosmology=self.cosmology)[1] / (1e12)#*self.h**2)
 
     @observable(particles=True)
     def calc_ds_analytic(self, bins, angular=False, n_cores='all', xi_kwargs={}, xi = None, rbins = None):

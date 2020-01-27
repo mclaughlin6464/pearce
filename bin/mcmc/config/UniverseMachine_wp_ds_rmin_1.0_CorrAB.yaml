@@ -3,7 +3,7 @@ chain:
   mcmc_type: normal
   nburn: 0
   nsteps: 100000
-  nwalkers: 500
+  nwalkers: 250
   seed: 0
 data:
   cov:

@@ -3228,7 +3228,7 @@ class LemonPepperWet(NashvilleHot):
 
         try:
             #self._emulator.optimize_restarts(parallel=False, num_restarts=5, verbose=True, robust=False)
-            self._emulator.optimize_restarts(optimizer='scg', num_restarts=3, verbose=True, max_iters=100)
+            self._emulator.optimize_restarts(optimizer='scg', num_restarts=10, verbose=True, max_iters=500)
         except:
             self._emulator.optimize_restarts(parallel=False, num_restarts=3, verbose=True, robust=True)
         sys.stdout.flush()
