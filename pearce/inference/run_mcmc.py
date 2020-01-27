@@ -162,6 +162,7 @@ def _resume_from_previous(resume_from_previous, nwalkers, num_params):
     :return: pos0, the initial position for each walker in the chain.
     """
     # load a previous chain
+    raise NotImplementedError
     # TODO add error messages here
     old_chain = np.loadtxt(resume_from_previous)
     if len(old_chain.shape) == 2:
@@ -353,7 +354,7 @@ def run_nested_mcmc(emus,  param_names, y, cov, r_bin_centers,fixed_params = {},
     yield np.hstack([chain, evidence])
 
 def run_mcmc_iterator(emus, param_names, y, cov, r_bin_centers,fixed_params={},
-                      resume_from_previous=None, nwalkers=1000, nsteps=100, nburn=20, ncores='all', return_lnprob=False):
+                      pos0=None, nwalkers=1000, nsteps=100, nburn=20, ncores='all', return_lnprob=False):
     """
     Run an MCMC using emcee and the emu. Includes some sanity checks and does some precomputation.
     Also optimized to be more efficient than using emcee naively with the emulator.
@@ -406,15 +407,8 @@ def run_mcmc_iterator(emus, param_names, y, cov, r_bin_centers,fixed_params={},
     sampler = mc.EnsembleSampler(nwalkers, num_params, lnprob, pool=pool,
                                  args=(param_names, fixed_params, r_bin_centers, y, combined_inv_cov))
 
-    # TODO this is currently broken with the config option
-    if resume_from_previous is not None:
-        try:
-            assert nburn == 0
-        except AssertionError:
-            raise AssertionError("Cannot resume from previous chain with nburn != 0. Please change! ")
-        # load a previous chain
-        pos0 = _resume_from_previous(resume_from_previous, nwalkers, num_params)
-    else:
+
+    if pos0 is None:
         pos0 = _random_initial_guess(param_names, nwalkers, num_params)
 
     for result in sampler.sample(pos0, iterations=nsteps, storechain=False):
@@ -423,7 +417,7 @@ def run_mcmc_iterator(emus, param_names, y, cov, r_bin_centers,fixed_params={},
         else:
             yield result[0]
 
-def run_mcmc_config(config_fname):
+def run_mcmc_config(config_fname, resume = False):
     """
     Run an MCMC from a config file generated from intialize_mcmc.
 
@@ -506,7 +500,7 @@ def run_mcmc_config(config_fname):
         _rp.append(np.array(rp[-emu.n_bins:]))
 
 
-        assert np.all(np.isclose(_rp[-1], emu.scale_bin_centers))
+        #assert np.all(np.isclose(_rp[-1], emu.scale_bin_centers))
 
         _y.append(y[init_idx+cut_n_bins:init_idx + orig_n_bins])
 
@@ -529,7 +523,7 @@ def run_mcmc_config(config_fname):
         nlive = f.attrs['nlive']
         dlogz = float(f.attrs['dlogz']) if 'dlogz' in f.attrs else 0.1
         if dlogz is None:
-            dlogz = 0.1 
+            dlogz = 0.1 # TODO will this break with restart?
 
     else:
         raise NotImplementedError("Only 'normal' and 'nested' mcmc_type is valid.")
@@ -575,28 +569,32 @@ def run_mcmc_config(config_fname):
 
     #TODO resume from previous, will need to access the written chain
     param_names = [pname for pname in emu.get_param_names() if pname not in fixed_params]
-    f.attrs['param_names'] = param_names
+    if 'param_names' not in f.attrs.keys():
+        f.attrs['param_names'] = param_names
 
-    #chain = np.zeros((nwalkers*nsteps, len(param_names)), dtype={'names':param_names,
-    #                                                             'formats':['f8' for _ in param_names]})
-    # TODO warning? Overwrite key?
-    if 'chain' in f.keys():
+    if 'chain' in f.keys() and not restart:
         del f['chain']#[:,:] = chain
+
         # TODO anyway to make sure all shpaes are right?
         #chain_dset = f['chain']
 
-    f.create_dataset('chain', (0, len(param_names)), chunks = True, compression = 'gzip', maxshape = (None, len(param_names)))
+    if not restart:
+        f.create_dataset('chain', (0, len(param_names)), chunks = True, compression = 'gzip', maxshape = (None, len(param_names)))
 
-    #lnprob = np.zeros((nwalkers*nsteps,))
-    if 'lnprob' in f.keys():
-        del f['lnprob']#[:] = lnprob 
-        # TODO anyway to make sure all shpaes are right?
-        #lnprob_dset = f['lnprob']
+        #lnprob = np.zeros((nwalkers*nsteps,))
+        if 'lnprob' in f.keys():
+            del f['lnprob']#[:] = lnprob
+            # TODO anyway to make sure all shpaes are right?
+            #lnprob_dset = f['lnprob']
 
-    if mcmc_type == 'normal':
-        f.create_dataset('lnprob', (0,) , chunks = True, compression = 'gzip', maxshape = (None,))
+        if mcmc_type == 'normal':
+            f.create_dataset('lnprob', (0,) , chunks = True, compression = 'gzip', maxshape = (None,))
+        else:
+            f.create_dataset('evidence', (0,) , chunks = True, compression = 'gzip', maxshape = (None,))
+
+        pos0 = None
     else:
-        f.create_dataset('evidence', (0,) , chunks = True, compression = 'gzip', maxshape = (None,))
+        pos0 = f['chain'][-nwalkers:]# get last step
 
     f.close()
     np.random.seed(seed)
@@ -605,7 +603,8 @@ def run_mcmc_config(config_fname):
 
         for step, pos in enumerate(run_mcmc_iterator(emus, param_names, y, cov, rpoints,\
                                                      fixed_params=fixed_params, nwalkers=nwalkers,\
-                                                     nsteps=nsteps, nburn=nburn, return_lnprob=True, ncores = 16)):
+                                                     nsteps=nsteps, nburn=nburn, return_lnprob=True, ncores = 16,
+                                                     pos0=pos0)):
 
             f = h5py.File(config_fname, 'r+')
             #f.swmr_mode = True
@@ -640,9 +639,18 @@ def run_mcmc_config(config_fname):
 
 
 if __name__ == "__main__":
-    from sys import argv
-    fname = argv[1] 
+    import argparse
+
+    parser = argparse.ArgumentParser(description='Run chains with a YAML or HDF5 file for the chain')
+    parser.add_argument('fname', type=str, help='Config YAML File or output HDF5 file')
+    parser.add_argument('--restart', action='store_true')
+    args = vars(parser.parse_args())
+
+    fname = args['fname']
+
     suffix = fname.split('.')[-1]
+
+    restart = args['restart']
 
     if suffix == 'hdf5' or suffix == 'h5':
         pass
@@ -656,5 +664,5 @@ if __name__ == "__main__":
     else:
         raise IOError("Invalid input filetype")
 
-    run_mcmc_config(fname)
+    run_mcmc_config(fname, restart=restart)
 

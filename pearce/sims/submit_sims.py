@@ -109,7 +109,6 @@ def make_cosmo(param_names, param_vals):
     return C3#Cosmology(**param_dict)
 
 
-
 sim_config_template = """
 nc = {nc:d}
 boxsize  = {boxsize:.1f}
