@@ -387,12 +387,10 @@ class TrainingBox(Cat):
         Lbox = 1050.0  # Mpc/h
         self.npart = 1400
         # Need to make a way to combine all the params
-        if system == 'ki-ls' or system == 'long':
-            param_file = '~swmclau2/des/LH_eigenspace_lnA_np7_n40_s556.dat'
-        else: #sherlock
-            param_file = '/home/users/swmclau2/Git/pearce/LH_eigenspace_lnA_np7_n40_s556.dat'
+        param_file = './cosmos.txt' # may need an abs path, can get the __file__ path
 
-        self.cosmo_params = pd.read_csv(param_file, sep = ' ', index_col = None)
+        cosmo_params = pd.read_csv(param_file, sep = ' ', index_col = 0)
+        self.cosmo_params = cosmo_params.drop('ln10As', axis = 1) # replaced this with sigma8, remove redundancy
 
         cosmo = self._get_cosmo()
         pmass = 3.98769e10 * cosmo.Om0/\
@@ -500,12 +498,9 @@ class TestBox(Cat):
         Lbox = 1050.0  # Mpc/h
         self.npart = 1400
         # Need to make a way to combine all the params
-        if system == 'ki-ls' or system == 'long':
-            param_file = '/nfs/slac/g/ki/ki18/des/swmclau2/hypercube_test_points_np7.dat'
-        else:  # sherlock
-            param_file = '/home/users/swmclau2/Git/pearce/hypercube_test_points_np7.dat'
-
-        self.cosmo_params = pd.read_csv(param_file, sep=' ', index_col=None)
+        param_file = './test_cosmos.txt'  # may need an abs path, can get the __file__ path
+        cosmo_params = pd.read_csv(param_file, sep=' ', index_col=0)
+        self.cosmo_params = cosmo_params.drop('ln10As', axis=1)  # replaced this with sigma8, remove redundancy
 
         cosmo = self._get_cosmo()
         pmass =  3.83914e10* cosmo.Om0/\
