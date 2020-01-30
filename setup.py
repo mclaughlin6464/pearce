@@ -10,4 +10,4 @@ setup(name='pearce',
         url='https://github.com/mclaughlin6464/pearce',
         #scripts=scripts,
         packages=['pearce', 'pearce.emulator', 'pearce.mocks','pearce.inference', 'pearce.mocks.assembias_models', 'pearce.sims'],
-        package_data={'pearce.emulator': ['default_metrics.pkl']})
+        package_data={'pearce.mocks': ['*.txt']})

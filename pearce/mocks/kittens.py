@@ -387,7 +387,7 @@ class TrainingBox(Cat):
         Lbox = 1050.0  # Mpc/h
         self.npart = 1400
         # Need to make a way to combine all the params
-        param_file = './cosmos.txt' # may need an abs path, can get the __file__ path
+        param_file = path.join(path.dirname(path.realpath(__file__)), 'cosmos.txt')  # may need an abs path, can get the __file__ path
 
         cosmo_params = pd.read_csv(param_file, sep = ' ', index_col = 0)
         self.cosmo_params = cosmo_params.drop('ln10As', axis = 1) # replaced this with sigma8, remove redundancy
@@ -498,7 +498,7 @@ class TestBox(Cat):
         Lbox = 1050.0  # Mpc/h
         self.npart = 1400
         # Need to make a way to combine all the params
-        param_file = './test_cosmos.txt'  # may need an abs path, can get the __file__ path
+        param_file = path.join(path.dirname(path.realpath(__file__)), 'test_cosmos.txt')  # may need an abs path, can get the __file__ path
         cosmo_params = pd.read_csv(param_file, sep=' ', index_col=0)
         self.cosmo_params = cosmo_params.drop('ln10As', axis=1)  # replaced this with sigma8, remove redundancy
 
