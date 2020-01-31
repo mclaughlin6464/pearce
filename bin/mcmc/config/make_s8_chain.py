@@ -26,20 +26,34 @@ def compute_s8(sample):
         
     return np.array([Om, sigma_8, s8])
 
-with h5py.File(argv[1], 'r') as f:
-    cosmo_chain = f['chain'][:, :7]
+fname = argv[1]
+with h5py.File(fname, 'a') as f:
+    nsteps, nwalkers = f.attrs['nsteps'], f.attrs['nwalkers'] 
+    #cosmo_chain = f['chain'][:, :7]
+    # TODO write in a resume option since this op is slow
+    assert 's8_chain' not in f.keys(), "Already has an s8 chain, are you sure you want to overwrite?"
+    f.create_dataset('s8_chain',shape=(0,3),  maxshape=(None, 3))#, dtype = np.float64)
+
+max_chain_size = nsteps*nwalkers
 
 from time import time
 p = Pool(cpu_count())
 t0 = time()
-#print cosmo_chain.shape
-s8_chain = p.map(compute_s8, cosmo_chain)#[:10000])
 
-#print np.array(s8_chain).shape
-print time()-t0, 's'
+batch_size = 5000
 
-with h5py.File(argv[1], 'a') as f:
-    if 's8_chain' in f.keys():
-        del f['s8_chain']
-    f.create_dataset('s8_chain', data=s8_chain)
+for i in xrange(max_chain_size/batch_size+1):
+    with h5py.File(fname, 'r') as f:
+        cosmo_chain = f['chain'][i*batch_size:(i+1)*batch_size, :7]
+
+    s8_chain = p.map(compute_s8, cosmo_chain)
+
+    #print np.array(s8_chain).shape
+    print time()-t0, 's', i
+
+    with h5py.File(fname, 'a') as f:
+        dset = f['s8_chain']
+        dset.resize(np.min(max_chain_size, (i+1)*batch_size)), axis = 0)
+        dset[-batch_size:] = s8_chain
+
 
