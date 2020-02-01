@@ -1472,6 +1472,6 @@ class Cat(object):
             x, y, z = [self.model.mock.galaxy_table[c] for c in ['x', 'y', 'z']]
         pos = return_xyz_formatted_array(x, y, z, period=self.Lbox)
 
-        vdf = void_density_function(pos, n_ran=pos.shape[0]*n_ran, period=self.Lbox, n_jobs = n_cores, **vdf_kwargs)
+        vdf = void_density_function(pos, r_bins, n_ran=pos.shape[0]*n_ran, period=self.Lbox, n_jobs = n_cores, **vdf_kwargs)
 
         return vdf
