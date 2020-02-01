@@ -8,10 +8,8 @@ from itertools import izip
 from functools import wraps
 from multiprocessing import cpu_count
 import inspect
-import warnings
 from time import time
 from glob import glob
-from multiprocessing import Pool
 
 import numpy as np
 from scipy.integrate import quad
@@ -28,6 +26,7 @@ from halotools.mock_observables import *  # i'm importing so much this is just e
 from halotools.custom_exceptions import InvalidCacheLogEntry
 
 from .customHODModels import *
+from .void_density_function import void_density_function
 
 # try to import corrfunc, determine if it was successful
 try:
@@ -1460,3 +1459,19 @@ class Cat(object):
         hist[hist <= 0] = 1e-9 # set 0 counts to low values for clean emulation reasons
 
         return hist
+
+    @observable()
+    def calc_vdf(self, r_bins, n_cores = 'all', halo = False, n_ran = 10, vdf_kwargs={}):
+        """Calculate the void density function."""
+        n_cores = self._check_cores(n_cores)
+
+        # TODO particles
+        if halo:
+            x, y, z = [self.model.mock.halo_table[c] for c in ['halo_x', 'halo_y', 'halo_z']]
+        else:
+            x, y, z = [self.model.mock.galaxy_table[c] for c in ['x', 'y', 'z']]
+        pos = return_xyz_formatted_array(x, y, z, period=self.Lbox)
+
+        vdf = void_density_function(pos, n_ran=pos.shape[0]*n_ran, period=self.Lbox, n_jobs = n_cores, **vdf_kwargs)
+
+        return vdf
