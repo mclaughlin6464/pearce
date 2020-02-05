@@ -7,6 +7,7 @@ from pearce.mocks.kittens import TrainingBox
 from collections import OrderedDict
 import h5py
 
+
 def lnprior(theta, param_names, param_bounds, *args):
     """
     Prior for an MCMC. Default is to assume flat prior for all parameters defined by the boundaries the
@@ -27,7 +28,7 @@ def lnprior(theta, param_names, param_bounds, *args):
             return -np.inf
     return 0
 
-def lnlike(theta, param_names, param_bounds, fixed_params, cat, r_bins, y, combined_inv_cov):
+def lnlike(theta, param_names, param_bounds, fixed_params, r_bins, y, combined_inv_cov):
     """
     :param theta:
         Proposed parameters.
@@ -49,6 +50,7 @@ def lnlike(theta, param_names, param_bounds, fixed_params, cat, r_bins, y, combi
     :return:
         The log liklihood of theta given the measurements and the emulator.
     """
+    cat = _cat
     param_dict = dict(izip(param_names, theta))
     param_dict.update(fixed_params)
 
@@ -131,6 +133,8 @@ def run_mcmc_iterator(cat, param_bounds, y, cov, r_bins,fixed_params={},
     :yield:
         chain, collaposed to the shape ((nsteps-nburn)*nwalkers, len(param_names))
     """
+    _cat = cat
+    global _cat
 
     pool = Pool(processes=ncores)
 
@@ -143,7 +147,7 @@ def run_mcmc_iterator(cat, param_bounds, y, cov, r_bins,fixed_params={},
 
 
     if pos0 is None:
-        pos0 = _random_initial_guess(param_names, nwalkers, num_params)
+        pos0 = _random_initial_guess(param_bounds, nwalkers)
 
     for result in sampler.sample(pos0, iterations=nsteps, storechain=False):
         if return_lnprob:
@@ -151,56 +155,72 @@ def run_mcmc_iterator(cat, param_bounds, y, cov, r_bins,fixed_params={},
         else:
             yield result[0]
 
-if __name__ == "__main__":
-    from sys import argv
-    output_fname = argv[1]
+#if __name__ == "__main__":
+from sys import argv
+output_fname = argv[1]
 
-    boxno = 12
-    cat = TrainingBox(boxno)
-    cat.load(1.0, HOD='zheng07')
+boxno = 12
+cat = TrainingBox(boxno)
+cat.load(1.0, HOD='zheng07')
 
-    hod_param_bounds = OrderedDict({'logMmin': (13.0, 14.0),
-                        'sigma_logM': (0.05, 0.5),
-                        'alpha': (0.85, 1.15),
-                        'logM0': (12.5, 14.5),
-                        'logM1': (13.5, 15.5)} )
+hod_param_bounds = OrderedDict({'logMmin': (13.0, 14.0),
+                    'sigma_logM': (0.05, 0.5),
+                    'alpha': (0.85, 1.15),
+                    'logM0': (12.5, 14.5),
+                    'logM1': (13.5, 15.5)} )
 
-    true_point = _random_initial_guess(hod_param_bounds, 1)
-    true_dict = OrderedDict(dict(zip(hod_param_bounds.keys(), true_point)))
-    print 'Truth', true_dict
+true_point = _random_initial_guess(hod_param_bounds, 1).squeeze()
+true_dict = OrderedDict(dict(zip(hod_param_bounds.keys(), true_point)))
+print 'Truth', true_dict
+cat.populate(true_dict)
+r_bins = np.logspace(-1, 1.6, 19)
+y = cat.calc_vdf(r_bins, n_cores=1).squeeze()
+
+cov_ys = np.zeros((25, y.shape[0]))
+for i in xrange(25):
     cat.populate(true_dict)
-    r_bins = np.logspace(-1, 1.6, 19)
-    y = cat.calc_vdf(r_bins, ncores=1).squeeze()
 
-    cov_ys = np.zeros((25, y.shape[0]))
-    for i in xrange(25):
-        cat.populate(true_dict)
+    cov_ys[i] = cat.calc_vdf(r_bins, n_cores=1).squeeze()
 
-        cov_ys[i] = cat.calc_vdf(r_bins, ncores=1).squeeze()
+covmat = np.cov(cov_ys, rowvar=False)
+nwalkers = 100
+nsteps = 5000
 
-    with h5py.File(output_fname, 'w') as f:
-        f.create_dataset('chain', (0, len(hod_param_bounds)),
-                         compression = 'gzip', maxshape = (None, len(hod_param_bounds)))
+with h5py.File(output_fname, 'w') as f:
+    f.create_dataset('chain', (0, len(hod_param_bounds)),
+                     compression = 'gzip', maxshape = (None, len(hod_param_bounds)))
 
-        f.attrs['boxno'] = boxno
-        f.attrs['r_bins'] = r_bins
-        f.attrs['true_point'] = true_point
-        f.attrs['hod_pnames'] = hod_param_bounds.keys()
-        f.attrs['cov'] = covmat
-        f.attrs['y'] = y
+    f.attrs['boxno'] = boxno
+    f.attrs['r_bins'] = r_bins
+    f.attrs['true_point'] = true_point
+    f.attrs['hod_pnames'] = hod_param_bounds.keys()
+    f.attrs['cov'] = covmat
+    f.attrs['y'] = y
+    f.attrs['nwalkers'] = nwalkers
+    f.attrs['nsteps'] = nsteps
 
-    covmat = np.cov(cov_ys, rowvar=False)
-    nwalkers = 100
-    nsteps = 5000
+_cat = cat
+global _cat
 
-    for step, pos in enumerate(run_mcmc_iterator(cat, hod_param_bounds, y, covmat, r_bins,\
-                                                 nwalkers=nwalkers, nsteps=nsteps, ncores=8, return_lnprob=False)):
+pool = Pool(processes=1)
 
-        with h5py.File(output_fname, 'a') as f:
+param_names = hod_param_bounds.keys()
+num_params = len(param_names)
+combined_inv_cov = inv(covmat)
+fixed_params = {}
 
-            chain_dset, like_dset = f['chain'], f['lnprob']
-            l = len(chain_dset)
-            chain_dset.resize((l + nwalkers), axis=0)
+sampler = mc.EnsembleSampler(nwalkers, num_params, lnprob, pool=pool,
+                             args=(param_names, hod_param_bounds, fixed_params, r_bins, y, combined_inv_cov))
 
-            chain_dset[-nwalkers:] = pos[0]
+
+pos0 = _random_initial_guess(hod_param_bounds, nwalkers)
+
+for step, pos in enumerate(sampler.sample(pos0, iterations=nsteps, storechain=False)):
+    with h5py.File(output_fname, 'a') as f:
+
+        chain_dset, like_dset = f['chain'], f['lnprob']
+        l = len(chain_dset)
+        chain_dset.resize((l + nwalkers), axis=0)
+
+        chain_dset[-nwalkers:] = pos[0]
 
