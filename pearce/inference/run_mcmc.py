@@ -595,9 +595,7 @@ def run_mcmc_config(config_fname, restart = False):
         pos0 = None
     else:
         pos0 = f['chain'][-nwalkers:]# get last step
-        print 'hi','A'
         nsteps = nsteps - len(f['chain'])/nwalkers # don't add more steps to the end
-        print 'Nsteps', nsteps
         if nsteps<=0:
             return
         # TODO add a way to start a new chain from the end of an old one
