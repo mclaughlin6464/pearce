@@ -196,6 +196,8 @@ def _compute_data(f,cfg):
 ###
     # TODO add shams
     if sim_cfg['gal_type'] == 'HOD':
+        if 'sec_haloprop_key' in sim_cfg['sim_hps']:
+            sim_cfg['sim_hps']['hod_kwargs'] = {'sec_haloprop_key': sim_cfg['sim_hps']['sec_haloprop_key']}
         cat.load(sim_cfg['scale_factor'], HOD=sim_cfg['hod_name'], **sim_cfg['sim_hps'])
 
         em_params = sim_cfg['hod_params']

@@ -518,11 +518,9 @@ class Trainer(object):
             output_cov = output_cov.reshape((-1, self.n_bins, self.n_bins))
 
         #delete rows with all 0's
-        print output.shape
         drop_idxs = np.all(output == 0.0, axis = 1)
         output = output[~drop_idxs] 
         output_cov = output_cov[~drop_idxs]
-        print output.shape
 
         all_cosmo_sf_pairs = np.array(list(product(xrange(len(self.cats)), xrange(len(self._scale_factors)))))
         output_dir = path.dirname(self.output_fname)
