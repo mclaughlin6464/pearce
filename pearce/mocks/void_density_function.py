@@ -47,14 +47,15 @@ def void_density_function(sample1, rbins, n_ran=None, randoms=None,
     # TODO in the old version on slac a 0 would give periodic 
     # i think the current version is periodic on sherlock.
     #periodic = 0
-    x = np.any(sample1>=period) or  np.any(randoms>=period) 
-    print x
-    if x: 
-        print sample1[sample1>=period]
-        print 
-        print randoms[randoms>=period]
+    #x = np.any(sample1>=period) or  np.any(randoms>=period) 
+    #print x
+    #jif x: 
+    #    print sample1[sample1>=period]
+    #    print 
+    #    print randoms[randoms>=period]
 
-    tree = cKDTree(sample1, boxsize=period, leafsize=leafsize)
+# i think theres a weird boundary condition error here
+    tree = cKDTree(sample1, boxsize=period+1e-6, leafsize=leafsize)
 
     void_size, _ = tree.query(randoms, k=1, eps=eps, n_jobs=n_jobs)
 

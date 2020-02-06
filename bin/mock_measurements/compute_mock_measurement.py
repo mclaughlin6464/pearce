@@ -17,7 +17,7 @@ except ValueError: # assemble it ourselves
     #pos = np.r_[[ galcat['halo_%s'%c]%cat.Lbox for c in ['x','y','z']]].T
     pos = np.r_[[ galcat['%s'%c]%cat.Lbox for c in ['x','y','z']]].T
 
-rbins = np.logspace(-1.1, 1.6, 19)
+rbins = np.logspace(-1., 1.6, 19)
 rpoints = (rbins[1:] + rbins[:-1])/2.0
 
 # Note: make sure the luminosity cut i did makes snese with the min ptcl count I do on the emus

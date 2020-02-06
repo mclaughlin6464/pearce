@@ -202,7 +202,7 @@ with h5py.File(output_fname, 'w') as f:
 _cat = cat
 global _cat
 
-pool = Pool(processes=1)
+pool = Pool(processes=8)
 
 param_names = hod_param_bounds.keys()
 num_params = len(param_names)
@@ -218,7 +218,7 @@ pos0 = _random_initial_guess(hod_param_bounds, nwalkers)
 for step, pos in enumerate(sampler.sample(pos0, iterations=nsteps, storechain=False)):
     with h5py.File(output_fname, 'a') as f:
 
-        chain_dset, like_dset = f['chain'], f['lnprob']
+        chain_dset = f['chain']
         l = len(chain_dset)
         chain_dset.resize((l + nwalkers), axis=0)
 
