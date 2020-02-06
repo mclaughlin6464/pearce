@@ -221,6 +221,8 @@ def _compute_data(f,cfg):
                 cat.populate(em_params, min_ptcl=min_ptcl)
                 xi_vals.append(calc_observable(rb))
 
+            print cat.model.model_dictionary['centrals_occupation'].__dict__
+
             shot_xi_vals = np.array(xi_vals)
             y_mean = np.mean(shot_xi_vals, axis = 0)
 
