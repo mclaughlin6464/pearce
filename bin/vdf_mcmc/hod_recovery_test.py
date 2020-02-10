@@ -55,7 +55,7 @@ def lnlike(theta, param_names, param_bounds, fixed_params, r_bins, y, combined_i
     param_dict.update(fixed_params)
 
     cat.populate(param_dict)
-    pred = cat.calc_vdf(r_bins, n_cores=1).squeeze()
+    pred = cat.calc_vdf(r_bins, n_cores=16).squeeze()
 
     delta = pred - y
     #print delta
@@ -174,13 +174,13 @@ true_dict = OrderedDict(dict(zip(hod_param_bounds.keys(), true_point)))
 print 'Truth', true_dict
 cat.populate(true_dict)
 r_bins = np.logspace(-1, 1.6, 19)
-y = cat.calc_vdf(r_bins, n_cores=1).squeeze()
+y = cat.calc_vdf(r_bins, n_cores=16).squeeze()
 
 cov_ys = np.zeros((25, y.shape[0]))
 for i in xrange(25):
     cat.populate(true_dict)
 
-    cov_ys[i] = cat.calc_vdf(r_bins, n_cores=1).squeeze()
+    cov_ys[i] = cat.calc_vdf(r_bins, n_cores=16).squeeze()
 
 covmat = np.cov(cov_ys, rowvar=False)
 nwalkers = 100
@@ -202,7 +202,7 @@ with h5py.File(output_fname, 'w') as f:
 _cat = cat
 global _cat
 
-pool = Pool(processes=8)
+pool = None#Pool(processes=4)
 
 param_names = hod_param_bounds.keys()
 num_params = len(param_names)
