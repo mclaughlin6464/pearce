@@ -23,7 +23,7 @@ z = 1.0/a - 1 # ~ 0.55
 fname = path.join(halo_dir,  'hlist_%.5f.list'%a)
 
 columns_to_keep = {'halo_id': (1, 'i8'), 'halo_upid':(6,'i8'), 'halo_mvir':(10, 'f4'), 'halo_x':(17, 'f4'),                        'halo_y':(18,'f4'), 'halo_z':(19,'f4'),'halo_vx':(20,'f4'), 'halo_vy':(21, 'f4'), 'halo_vz':(22,'f4'),
-                  'halo_rvir': (11, 'f4'),'halo_rs':(12,'f4'), 'halo_mpeak':(58, 'f4'),'halo_vmax@mpeak':(72, 'f4')}
+                  'halo_rvir': (11, 'f4'),'halo_rs':(12,'f4'), 'halo_mpeak':(58, 'f4'),'halo_vmax@mpeak':(72, 'f4'), 'halo_m200b':(39, 'f4')}
 
 
 simname = 'mdpl2'

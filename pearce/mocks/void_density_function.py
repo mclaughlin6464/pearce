@@ -32,7 +32,6 @@ def void_density_function(sample1, rbins, n_ran=None, randoms=None,
         VDF, the cdf of the VPF
     """
     assert sample1.shape[1] == 3, "Invalid sample1 shape"
-    N = float(sample1.shape[0])
 
     if seed is None:
         seed = int(time())
@@ -67,4 +66,4 @@ def void_density_function(sample1, rbins, n_ran=None, randoms=None,
     unnorm_CDF = np.searchsorted(sorted_void_size, bin_centers)
 
     # TODO could add option to return the tree, and pass it in.
-    return unnorm_CDF / N
+    return unnorm_CDF*1.0/sorted_void_size.shape[0]

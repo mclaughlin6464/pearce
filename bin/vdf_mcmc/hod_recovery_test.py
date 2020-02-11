@@ -183,7 +183,7 @@ for i in xrange(25):
     cov_ys[i] = cat.calc_vdf(r_bins, n_cores=16).squeeze()
 
 covmat = np.cov(cov_ys, rowvar=False)
-nwalkers = 100
+nwalkers = 20
 nsteps = 5000
 
 with h5py.File(output_fname, 'w') as f:
