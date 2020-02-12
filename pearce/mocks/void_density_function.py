@@ -9,7 +9,7 @@ from scipy.spatial import cKDTree
 from time import time
 
 def void_density_function(sample1, rbins, n_ran=None, randoms=None,
-                         period = None, seed = None, leafsize=16, eps=0.0, n_jobs = 1):
+                         period = None, seed = None, leafsize=16, eps=0.0, n_jobs = 1, PBC=True):
     """
     Compute the CDF of void sizes for the sample
     :param sample1:
@@ -54,7 +54,8 @@ def void_density_function(sample1, rbins, n_ran=None, randoms=None,
     #    print randoms[randoms>=period]
 
 # i think theres a weird boundary condition error here
-    tree = cKDTree(sample1, boxsize=period+1e-6, leafsize=leafsize)
+    boxsize = period+1e-6 if PBC else np.inf
+    tree = cKDTree(sample1, boxsize=boxsize, leafsize=leafsize)
 
     void_size, _ = tree.query(randoms, k=1, eps=eps, n_jobs=n_jobs)
 
