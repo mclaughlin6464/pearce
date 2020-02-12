@@ -1461,7 +1461,7 @@ class Cat(object):
         return hist
 
     @observable()
-    def calc_vdf(self, r_bins, n_cores = 'all', halo = False, n_ran = 10, vdf_kwargs={}):
+    def calc_vdf(self, r_bins, n_cores = 'all', halo = False, n_ran = 10, vdf_kwargs={}, PBC=True):
         """Calculate the void density function."""
         n_cores = self._check_cores(n_cores)
 
@@ -1472,7 +1472,7 @@ class Cat(object):
             x, y, z = [self.model.mock.galaxy_table[c] for c in ['x', 'y', 'z']]
 
         pos = return_xyz_formatted_array(x, y, z, period=self.Lbox)
-
-        vdf = void_density_function(pos, r_bins, n_ran=pos.shape[0]*n_ran, period=self.Lbox, n_jobs = n_cores, **vdf_kwargs)
+        period = self.Lbox
+        vdf = void_density_function(pos/self.h, r_bins, n_ran=pos.shape[0]*n_ran, period=period/self.h, n_jobs = n_cores,PBC=PBC, **vdf_kwargs)
 
         return vdf

@@ -173,9 +173,14 @@ true_point = _random_initial_guess(hod_param_bounds, 1).squeeze()
 true_dict = OrderedDict(dict(zip(hod_param_bounds.keys(), true_point)))
 print 'Truth', true_dict
 cat.populate(true_dict)
+print true_dict
 r_bins = np.logspace(-1, 1.6, 19)
 y = cat.calc_vdf(r_bins, n_cores=16).squeeze()
-
+print hod_param_bounds.keys()
+print true_point
+print y
+from sys import exit
+exit(0)
 cov_ys = np.zeros((25, y.shape[0]))
 for i in xrange(25):
     cat.populate(true_dict)
