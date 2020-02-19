@@ -650,7 +650,7 @@ class Trainer(object):
             # the odd shell call is to deal with minute differences in the systems.
             # TODO make this more general
             call(command, shell=self.system == 'sherlock')
-            break
+            #break
 
 
 def make_kils_command(jobname, max_time, outputdir, queue= 'long'):
