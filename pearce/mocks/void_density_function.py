@@ -54,7 +54,7 @@ def void_density_function(sample1, rbins, n_ran=None, randoms=None,
     #    print randoms[randoms>=period]
 
 # i think theres a weird boundary condition error here
-    boxsize = period+1e-6 if PBC else np.inf
+    boxsize = period+1e-6 if PBC else None 
     tree = cKDTree(sample1, boxsize=boxsize, leafsize=leafsize)
 
     void_size, _ = tree.query(randoms, k=1, eps=eps, n_jobs=n_jobs)
@@ -65,6 +65,5 @@ def void_density_function(sample1, rbins, n_ran=None, randoms=None,
     # possibly more efficiency gains if we can assume bin_centers is sorted
     # however were mainly limited by the tree stuff so probably doesn't matter.
     unnorm_CDF = np.searchsorted(sorted_void_size, bin_centers)
-
     # TODO could add option to return the tree, and pass it in.
     return unnorm_CDF*1.0/sorted_void_size.shape[0]

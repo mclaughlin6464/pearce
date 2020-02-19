@@ -14,8 +14,11 @@ galcat = np.load(galcat_fname)
 try:
     pos = galcat['pos'][:, :3]%cat.Lbox
 except ValueError: # assemble it ourselves
-    #pos = np.r_[[ galcat['halo_%s'%c]%cat.Lbox for c in ['x','y','z']]].T
-    pos = np.r_[[ galcat['%s'%c]%cat.Lbox for c in ['x','y','z']]].T
+    colnames = galcat.columns if hasattr(galcat, "columns") else galcat.dtype.names
+    if 'x' in colnames:
+        pos = np.r_[[ galcat['%s'%c]%cat.Lbox for c in ['x','y','z']]].T
+    else:
+        pos = np.r_[[ galcat['halo_%s'%c]%cat.Lbox for c in ['x','y','z']]].T
 
 rbins = np.logspace(-1., 1.6, 19)
 rpoints = (rbins[1:] + rbins[:-1])/2.0

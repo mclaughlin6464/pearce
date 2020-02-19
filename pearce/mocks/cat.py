@@ -1184,7 +1184,7 @@ class Cat(object):
 
     # TODO may want to enable central/satellite cuts, etc
     @observable(particles=True)
-    def calc_ds(self, bins, angular=False, n_cores=1):
+    def calc_ds(self, bins, angular=False, n_cores='all'):
         """
         Calculate delta sigma, from a given galaxy and particle sample
         Returns in units of h*M_sun/pc^2, so be wary! 

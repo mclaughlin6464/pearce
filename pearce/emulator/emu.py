@@ -2136,7 +2136,6 @@ class NashvilleHot(Emu):
         x1, x2, y, yerr, ycov = self.get_data(filename, self.fixed_params, attach_params=True)
         # store the data loading args, if we wanna reload later
         # useful ofr sampling the training data
-        print 'A', np.sum(np.isnan(y))
         y_std = 1.0  # y.mean(axis = 0), y.std(axis = 0)
 
         ycov_list = []
@@ -2199,7 +2198,6 @@ class NashvilleHot(Emu):
         #self._y_std = np.stack([_y.std() for _y in y])
         self._y_std = np.ones_like(self._y_mean) 
 
-        print 'B', np.sum(np.isnan(y))
         self.y  = np.stack([_y - _ym for _y, _ym in zip(y, self._y_mean )])
         self.yerr = np.stack(yerr)
 
@@ -2793,7 +2791,7 @@ class LemonPepperWet(NashvilleHot):
             yerr = np.dstack([np.vstack(_yerr) for _yerr in yerr])
 
         _ycov = np.dstack(ycov)
-        if (np.any(np.isnan(ycov)) or np.any(np.isnan(y))):
+        if (np.any(np.isnan(ycov)) or np.any(np.isnan(y))) or np.any(~np.isfinite(y)):
             # y_nans = np.logical_or(np.isnan(y), np.all(y==0.0, axis = 0))
             y_nans = np.isnan(y)
             nan_idxs = np.where(y_nans)  # np.logical_or(y_nans ,ycov_nans )
@@ -2801,6 +2799,9 @@ class LemonPepperWet(NashvilleHot):
             num_skipped = np.sum(y_nans)
             for a, b, c in zip(*nan_idxs):
                 y[a, b, c] = np.nanmean(y[a])
+
+            y_infs_idxs = ~np.isfinite(y) # usually -np.inf due to log, just assuem that for now
+            y[y_infs_idxs] = -10 # large negative number
 
             # y_nans = np.logical_or(np.isnan(yerr), np.all(yerr==0.0, axis = 0))
             y_nans = np.isnan(yerr)
@@ -2843,14 +2844,11 @@ class LemonPepperWet(NashvilleHot):
 
         out = super(LemonPepperWet, self).load_training_data(filename, custom_mean_function)
         # redo the normalization cuz its different than in NH. Its the only thing different, so its a coda here
-        print 'C', np.sum(np.isnan(self.y))
         y = np.array([_y*_ys + _ym for _y, _ym, _ys in zip(self.y, self._y_mean, self._y_std)])
-        print 'D',np.sum(np.isnan(y))
         self._y_mean = y.mean() 
         self._y_std = 1.0
         
         self.y  = y - self._y_mean
-        print 'E', np.sum(np.isnan(self.y))
         return out
 
     def _downsample_data(self, downsample_factor, x1, x2, y, yerr, attach=True):
