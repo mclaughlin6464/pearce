@@ -39,7 +39,7 @@ def add_logMmin(hod_params, cat):
     res = minimize_scalar(func, bounds = logMmin_bounds, args = (hod_params,), options = {'maxiter':100}, method = 'Bounded')
 
     # assuming this doens't fail
-    #print 'logMmin', res.x
+    print 'logMmin', res.x
     hod_params['logMmin'] = res.x
 
 def total_mass_enclosed_per_cylinder(centers, particles,
@@ -148,7 +148,7 @@ with open(config_fname, 'r') as ymlfile:
 
 nd = float(cfg['HOD']['fixed_nd'] )
 min_ptcl = int(cfg['HOD']['min_ptcl'])
-
+print min_ptcl, nd
 rp_bins = np.logspace(-1.0, 1.6, 19)
 cic_bins = np.round(np.r_[np.linspace(1, 9, 8), np.round(np.logspace(1,2, 7))])
 
@@ -157,6 +157,12 @@ hod_param_ranges =  cfg['HOD']['ordered_params']
 N = 5 
 LHC = make_LHC(hod_param_ranges, N, 16)# 23)
 hod_dicts = [dict(zip(hod_param_ranges.keys(), vals)) for vals in LHC]
+
+for hd in hod_dicts:
+    print hd
+
+from sys import exit
+exit(0)
 
 logMmin_bounds = hod_param_ranges['logMmin']
 

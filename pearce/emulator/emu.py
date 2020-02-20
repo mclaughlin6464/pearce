@@ -2333,7 +2333,7 @@ class NashvilleHot(Emu):
         for _y,_yerr, _kern1, _kern2, nv in izip(y,yerr, kern1, kern2, noise_var):
             # TODO delete me
             #emulator = GPKroneckerGaussianRegressionVar([x1, x2], _y, _yerr**2, _kern1, _kern2, noise_var = nv)
-            emulator = GPKroneckerGaussianRegression([x1, x2], _y, [_kern1, _kern2])
+            emulator = GPKroneckerGaussianRegression(x1, x2, _y, _kern1, _kern2)
 
             self._emulators.append(emulator)
             self._kernels.append((_kern1, _kern2))
@@ -2487,9 +2487,9 @@ class NashvilleHot(Emu):
                 # however, have to split up t into the two groups
                 #TODO may have weird behavior for larger t's? have to do some resizing
                 if gp_errs:
-                    local_mu, local_err = emulator.predict([t1_in_bin.reshape((1,-1)), t2_in_bin.reshape((1,-1))])
+                    local_mu, local_err = emulator.predict(t1_in_bin.reshape((1,-1)), t2_in_bin.reshape((1,-1)))
                 else:
-                    local_mu, _ = emulator.predict([t1_in_bin.reshape((1,-1)), t2_in_bin.reshape((1,-1))])
+                    local_mu, _ = emulator.predict(t1_in_bin.reshape((1,-1)), t2_in_bin.reshape((1,-1)))
                     # print local_mu
                     local_err = np.ones_like(local_mu)
 
@@ -2911,8 +2911,9 @@ class LemonPepperWet(NashvilleHot):
             yerr = self.downsample_yerr
 
         #emulator = GPKroneckerGaussianRegressionVar(x1, x2, y, yerr ** 2, kern1, kern2, noise_var=nv)
-        emulator = GPKroneckerGaussianRegression([x1, x2, np.log10(self.scale_bin_centers.reshape((-1,1)))],\
-                                                      y, [kern1, kern2, kern3], noise_var)
+        emulator = GPKroneckerGaussianRegression(x1, x2,\
+                                                      y, kern1, kern2, noise_var,\
+                                             additional_Xs=[np.log10(self.scale_bin_centers.reshape((-1,1)))], additional_kerns = [kern3])
 
         self._emulator = emulator
         self._kernel= (kern1, kern2, kern3)
@@ -3093,9 +3094,9 @@ class LemonPepperWet(NashvilleHot):
             # however, have to split up t into the two groups
             # TODO may have weird behavior for larger t's? have to do some resizing
             if gp_errs:
-                mu, err = self._emulator.predict([t1, t2, t3])
+                mu, err = self._emulator.predict(t1, t2, additional_Xnews=[t3])
             else:
-                mu, _ = self._emulator.predict([t1, t2, t3], mean_only=True)
+                mu, _ = self._emulator.predict(t1, t2, additional_Xnews=[t3], mean_only=True)
                 # print local_mu
                 err = np.ones_like(mu)
 
@@ -3150,7 +3151,7 @@ class LemonPepperWet(NashvilleHot):
         pred_ys = []
         # there can be memory issues with trying to this all at once.
         for i,_x2 in enumerate(x2):
-            _py = self._emulator.predict([x1, _x2.reshape((1,-1)), _scale_bin_centers.reshape((-1,1))], mean_only=True)[0].squeeze() + self._y_mean  
+            _py = self._emulator.predict(x1, _x2.reshape((1,-1)), mean_only=True, additional_Xnews=[_scale_bin_centers.reshape((-1,1))])[0].squeeze() + self._y_mean  
             pred_ys.append(_py)
 
         pred_y = np.array(pred_ys)#np.hstack(pred_ys)  # .T
