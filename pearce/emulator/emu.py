@@ -3154,8 +3154,8 @@ class LemonPepperWet(NashvilleHot):
             _py = self._emulator.predict(x1, _x2.reshape((1,-1)), mean_only=True, additional_Xnews=[_scale_bin_centers.reshape((-1,1))])[0].squeeze() + self._y_mean  
             pred_ys.append(_py)
 
-        pred_y = np.array(pred_ys)#np.hstack(pred_ys)  # .T
-        pred_y = np.swapaxes(pred_y, 0, 1) # comes out in the wrong shape
+        pred_y = np.array(pred_ys).reshape((-1, 18), order = 'F')#np.hstack(pred_ys)  # .T
+        #pred_y = np.swapaxes(pred_y, 0, 1) # comes out in the wrong shape
 
         # NOTE think this is the right ordering, should check, though may not matter if i'm consistent...
 
