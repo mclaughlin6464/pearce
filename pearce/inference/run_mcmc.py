@@ -499,7 +499,8 @@ def run_mcmc_config(config_fname, restart = False):
         cut_n_bins = orig_n_bins - emu.n_bins
         _rp.append(np.array(rp[-emu.n_bins:]))
 
-
+        print 'Cut N bins', cut_n_bins 
+        print 'Emu SBC', emu.scale_bin_centers
         #assert np.all(np.isclose(_rp[-1], emu.scale_bin_centers))
 
         _y.append(y[init_idx+cut_n_bins:init_idx + orig_n_bins])
