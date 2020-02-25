@@ -459,6 +459,13 @@ def run_mcmc_config(config_fname, restart = False):
 
     assert len(emu_type) == len(training_file)
 
+    fixed_params = {} if fixed_params is None else fixed_params
+
+    if type(fixed_params) is dict:
+        fixed_params = [fixed_params for e in emu_type]
+    else:
+        assert len(fixed_params) == len(emu_type)
+
     assert 'obs' in f.attrs.keys(), "No obs info in config file."
 
     obs_cfg = literal_eval(f.attrs['obs'])
@@ -488,10 +495,10 @@ def run_mcmc_config(config_fname, restart = False):
     init_idx = 0
 
     np.random.seed(seed)
-    for et, tf, rp in zip(emu_type, training_file, rpoints): # TODO iterate over the others?
+    for et, tf, rp, fp in zip(emu_type, training_file, rpoints, fixed_params): # TODO iterate over the others?
         # TODO how will cic work with rmin?
         emu = emu_type_dict[et](tf,
-                                 fixed_params = fixed_params,
+                                 fixed_params = fp,
                                  **emu_hps)
         emus.append(emu)
 
