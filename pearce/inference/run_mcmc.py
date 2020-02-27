@@ -440,7 +440,6 @@ def run_mcmc_config(config_fname, restart = False):
                      'NashvilleHot': NashvilleHot,
                      'LemonPepperWet':LemonPepperWet}
     fixed_params = f.attrs['fixed_params']
-    fixed_params = {} if fixed_params is None else literal_eval(fixed_params)
     #metric = f.attrs['metric'] if 'metric' in f.attrs else {}
     emu_hps = f.attrs['emu_hps']
     emu_hps = {} if emu_hps is None else literal_eval(emu_hps)
@@ -465,6 +464,7 @@ def run_mcmc_config(config_fname, restart = False):
         fixed_params = [fixed_params for e in emu_type]
     else:
         assert len(fixed_params) == len(emu_type)
+        fixed_params = [eval(fp) for fp in fixed_params]
 
     assert 'obs' in f.attrs.keys(), "No obs info in config file."
 
@@ -497,6 +497,7 @@ def run_mcmc_config(config_fname, restart = False):
     np.random.seed(seed)
     for et, tf, rp, fp in zip(emu_type, training_file, rpoints, fixed_params): # TODO iterate over the others?
         # TODO how will cic work with rmin?
+        print fp, type(fp)
         emu = emu_type_dict[et](tf,
                                  fixed_params = fp,
                                  **emu_hps)
