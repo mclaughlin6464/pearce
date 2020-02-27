@@ -497,8 +497,7 @@ def run_mcmc_config(config_fname, restart = False):
     np.random.seed(seed)
     for et, tf, rp, fp in zip(emu_type, training_file, rpoints, fixed_params): # TODO iterate over the others?
         # TODO how will cic work with rmin?
-        emu = emu_type_dict[et](tf,
-                                 fixed_params = fp,
+        emu = emu_type_dict[et](tf, fixed_params = fp,
                                  **emu_hps)
         emus.append(emu)
 

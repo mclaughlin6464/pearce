@@ -891,26 +891,26 @@ class Cat(object):
             # corrfunc doesn't have built in cross correlations
             rand_N1 = 3 * len(x_g)
 
-            rand_X1 = np.random.uniform(0, self.Lbox / self.h, rand_N1)
-            rand_Y1 = np.random.uniform(0, self.Lbox / self.h, rand_N1)
-            rand_Z1 = np.random.uniform(0, self.Lbox / self.h, rand_N1)
+            rand_X1 = np.random.uniform(0, self.Lbox, rand_N1)
+            rand_Y1 = np.random.uniform(0, self.Lbox, rand_N1)
+            rand_Z1 = np.random.uniform(0, self.Lbox, rand_N1)
 
             rand_N2 = 3 * len(x_m)
 
-            rand_X2 = np.random.uniform(0, self.Lbox / self.h, rand_N2)
-            rand_Y2 = np.random.uniform(0, self.Lbox / self.h, rand_N2)
-            rand_Z2 = np.random.uniform(0, self.Lbox / self.h, rand_N2)
+            rand_X2 = np.random.uniform(0, self.Lbox, rand_N2)
+            rand_Y2 = np.random.uniform(0, self.Lbox, rand_N2)
+            rand_Z2 = np.random.uniform(0, self.Lbox, rand_N2)
 
             autocorr = False
-            D1D2 = DD(autocorr, n_cores, rbins, x_g.astype('float32') / self.h, y_g.astype('float32') / self.h,
-                      z_g.astype('float32') / self.h,
-                      X2=x_m.astype('float32') / self.h, Y2=y_m.astype('float32') / self.h,
-                      Z2=z_m.astype('float32') / self.h)
-            D1R2 = DD(autocorr, n_cores, rbins, x_g.astype('float32') / self.h, y_g.astype('float32') / self.h,
-                      z_g.astype('float32') / self.h,
+            D1D2 = DD(autocorr, n_cores, rbins, x_g.astype('float32'), y_g.astype('float32') ,
+                      z_g.astype('float32'),
+                      X2=x_m.astype('float32'), Y2=y_m.astype('float32') ,
+                      Z2=z_m.astype('float32'))
+            D1R2 = DD(autocorr, n_cores, rbins, x_g.astype('float32'), y_g.astype('float32'),
+                      z_g.astype('float32'),
                       X2=rand_X2.astype('float32'), Y2=rand_Y2.astype('float32'), Z2=rand_Z2.astype('float32'))
-            D2R1 = DD(autocorr, n_cores, rbins, x_m.astype('float32') / self.h, y_m.astype('float32') / self.h,
-                      z_m.astype('float32') / self.h,
+            D2R1 = DD(autocorr, n_cores, rbins, x_m.astype('float32') , y_m.astype('float32'),
+                      z_m.astype('float32'),
                       X2=rand_X1.astype('float32'), Y2=rand_Y1.astype('float32'), Z2=rand_Z1.astype('float32'))
             R1R2 = DD(autocorr, n_cores, rbins, rand_X1.astype('float32'), rand_Y1.astype('float32'),
                       rand_Z1.astype('float32'),
@@ -944,9 +944,9 @@ class Cat(object):
                     xis, covs = [], []
                     for rb, nr in zip([rbins_small, rbins_large], n_rands):  #
                         randoms = np.random.random((pos_g.shape[0] * nr,
-                                                    3)) * self.Lbox / self.h  # Solution to NaNs: Just fuck me up with randoms
-                        _, xi, _, _, cov, _ = tpcf_jackknife(pos_g / self.h, randoms, rb, sample2=pos_m / self.h,
-                                                             period=self.Lbox / self.h,
+                                                    3)) * self.Lbox  # Solution to NaNs: Just fuck me up with randoms
+                        _, xi, _, _, cov, _ = tpcf_jackknife(pos_g , randoms, rb, sample2=pos_m,
+                                                             period=self.Lbox,
                                                              num_threads=n_cores, Nsub=n_sub, estimator='Landy-Szalay')
                         xis.append(xi)
                         covs.append(cov)
@@ -956,13 +956,13 @@ class Cat(object):
                 else:
 
                     randoms = np.random.random((pos_g.shape[0] * n_rands,
-                                                3)) * self.Lbox / self.h  # Solution to NaNs: Just fuck me up with randoms
-                    _, xi_all, _, _, xi_cov, _ = tpcf_jackknife(pos_g / self.h, randoms, rbins, sample2=pos_m / self.h,
-                                                                period=self.Lbox / self.h,
+                                                3)) * self.Lbox   # Solution to NaNs: Just fuck me up with randoms
+                    _, xi_all, _, _, xi_cov, _ = tpcf_jackknife(pos_g, randoms, rbins, sample2=pos_m,
+                                                                period=self.Lbox,
                                                                 num_threads=n_cores, Nsub=n_sub,
                                                                 estimator='Landy-Szalay')  # , do_auto=False)
             else:
-                xi_all = tpcf(pos_g / self.h, rbins, sample2=pos_m / self.h, period=self.Lbox / self.h,
+                xi_all = tpcf(pos_g, rbins, sample2=pos_m, period=self.Lbox,
                               num_threads=n_cores, 
                               estimator='Landy-Szalay', do_auto=False)
 
@@ -1013,19 +1013,19 @@ class Cat(object):
             pos = return_xyz_formatted_array(x, y, z, period=self.Lbox)
 
         if PBC:
-            period = self.Lbox/self.h
+            period = self.Lbox
         else:
             assert randoms is not None, "If PBC is false need to specify randoms"
             period = None
         # don't forget little h!!
         if use_corrfunc:
-            out = xi(self.model.mock.Lbox / self.h, pi_max / self.h, n_cores, rp_bins,
-                     x.astype('float32') / self.h, y.astype('float32') / self.h,
-                     z.astype('float32') / self.h)
+            out = xi(self.model.mock.Lbox, pi_max, n_cores, rp_bins,
+                     x.astype('float32'), y.astype('float32'),
+                     z.astype('float32'))
 
             wp_all = out[4]  # returns a lot of irrelevant info
         else:
-            wp_all = wp(pos / self.h, rp_bins, pi_max / self.h,\
+            wp_all = wp(pos, rp_bins, pi_max,\
                         period=period, randoms = randoms, num_threads=n_cores)
         return wp_all
 
@@ -1055,14 +1055,14 @@ class Cat(object):
             vels = np.vstack([self.model.mock.galaxy_table[c] for c in ['vx', 'vy', 'vz']]).T
 
         # TODO is the model cosmo same as the one attached to the cat?
-        ra, dec, z = mock_survey.ra_dec_z(pos / self.h, vels / self.h, cosmo=self.cosmology)
+        ra, dec, z = mock_survey.ra_dec_z(pos , vels / self.h, cosmo=self.cosmology)
         ang_pos = np.vstack((np.degrees(ra), np.degrees(dec))).T
 
         n_rands = 5
         rand_pos = np.random.random((pos.shape[0] * n_rands, 3)) * self.Lbox  # *self.h
         rand_vels = np.zeros((pos.shape[0] * n_rands, 3))
 
-        rand_ra, rand_dec, rand_z = mock_survey.ra_dec_z(rand_pos / self.h, rand_vels / self.h, cosmo=self.cosmology)
+        rand_ra, rand_dec, rand_z = mock_survey.ra_dec_z(rand_pos, rand_vels, cosmo=self.cosmology)
         rand_ang_pos = np.vstack((np.degrees(rand_ra), np.degrees(rand_dec))).T
 
         # NOTE I can transform coordinates and not have to use randoms at all. Consider?
@@ -1141,7 +1141,7 @@ class Cat(object):
         # need this distance for computation
         x = self.cosmology.comoving_distance(self.z).to("Mpc").value  # /self.h
 
-        assert tpoints[0] * x / self.h >= xi_rmin  # TODO explain this check
+        assert tpoints[0] * x >= xi_rmin  # TODO explain this check
 
         def integrand(u, x, t, bias2, xi_interp, xi_mm_interp):
             r2 = u ** 2 + (x * t) ** 2
@@ -1219,9 +1219,9 @@ class Cat(object):
         # TODO maybe split into a few lines for clarity
         # divid by cat.h**2 because there is an internal halotools calculation that is in little h units
         # and we want our result to divide those out. That is, if we want to not be in non h=1 units.
-        return delta_sigma(pos_g / self.h, pos_m / self.h, self.pmass / self.h,
+        return delta_sigma(pos_g, pos_m, self.pmass,
                            downsampling_factor=1. / self._downsample_factor, rp_bins=rp_bins,
-                           period=self.Lbox / self.h, num_threads=n_cores, cosmology=self.cosmology)[1] / (1e12)#*self.h**2)
+                           period=self.Lbox, num_threads=n_cores, cosmology=self.cosmology)[1] / (1e12)#*self.h**2)
 
     @observable(particles=True)
     def calc_ds_analytic(self, bins, angular=False, n_cores='all', xi_kwargs={}, xi = None, rbins = None):
@@ -1446,11 +1446,11 @@ class Cat(object):
         x_g, y_g, z_g = [self.model.mock.galaxy_table[c] for c in ['x', 'y', 'z']]
         pos_g = return_xyz_formatted_array(x_g, y_g, z_g, period=self.Lbox).astype(float)
         if PBC:
-            period = self.Lbox/self.h
+            period = self.Lbox
         else:
             period = None
         # NOTE This isn't in /h units like the other radii. Gotta standardize all this! 
-        cic = counts_in_cylinders(pos_g/self.h, pos_g/self.h, proj_search_radius = c_rad,
+        cic = counts_in_cylinders(pos_g, pos_g, proj_search_radius = c_rad,
                                cylinder_half_length = c_half_l, 
                                 period=period, num_threads=n_cores)
 
@@ -1473,6 +1473,6 @@ class Cat(object):
 
         pos = return_xyz_formatted_array(x, y, z, period=self.Lbox)
         period = self.Lbox
-        vdf = void_density_function(pos/self.h, r_bins, n_ran=pos.shape[0]*n_ran, period=period/self.h, n_jobs = n_cores,PBC=PBC, **vdf_kwargs)
+        vdf = void_density_function(pos, r_bins, n_ran=pos.shape[0]*n_ran, period=period, n_jobs = n_cores,PBC=PBC, **vdf_kwargs)
 
         return vdf
