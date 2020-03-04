@@ -25,8 +25,8 @@ rpoints = (rbins[1:] + rbins[:-1])/2.0
 
 # Note: make sure the luminosity cut i did makes snese with the min ptcl count I do on the emus
 pi_max = 40.0
-mock_wp = wp(pos / cat.h, rbins, pi_max / cat.h,\
-                        period=cat.Lbox/cat.h, num_threads=8)
+mock_wp = wp(pos, rbins, pi_max,\
+                        period=cat.Lbox, num_threads=8)
 np.save(basename+'mock_wp.npy', mock_wp)
 
 print 'A'
@@ -39,9 +39,9 @@ sys.stdout.flush()
 
 print 'B'
 #mock_ds = calc_ds(cat, rbins, n_cores = 1, randoms = randoms) 
-mock_ds = delta_sigma(pos/cat.h, pos_m/cat.h, cat.pmass/cat.h,\
+mock_ds = delta_sigma(pos, pos_m, cat.pmass,\
                      downsampling_factor=1./cat._downsample_factor, rp_bins=rbins,
-                     period=cat.Lbox/cat.h, num_threads=1, cosmology=cat.cosmology)[1] / ((1e12))#*cat.h**2)
+                     period=cat.Lbox, num_threads=1, cosmology=cat.cosmology)[1] / ((1e12))#*cat.h**2)
 
 print 'C'
 np.save(basename+'mock_ds.npy', mock_ds)

@@ -642,7 +642,7 @@ class Trainer(object):
         else:
             assert self.n_jobs == len(glob(path.join(output_directory, 'trainer_*.npy'))), 'n_jobs has changed, cannot rerun'
 
-
+        idxs_to_do = []
         for idx in xrange(self.n_jobs):
 
             # slice out a portion of the poitns
@@ -650,19 +650,23 @@ class Trainer(object):
             param_filename = path.join(output_directory, jobname + '.npy')
             if not rerun:
                 np.savetxt(param_filename, all_param_idxs[idx])
+                idxs_to_do.append(idx)
             elif path.exists(path.join(output_directory, 'output_%04d.npy'%idx)) and path.exists(path.join(output_directory, 'output_cov_%04d.npy'%idx)):\
                 continue # this one ran successfully
 
-            # TODO allow queue changing
-            command = make_command(jobname, self.max_time, output_directory)
-            # the odd shell call is to deal with minute differences in the systems.
-            # TODO make this more general
-            # TODO job array
-            call(command, shell=self.system == 'sherlock')
-            #break
+        # TODO allow queue changing
+        if len(idxs_to_do) == self.n_jobs:
+            command = make_command('trainer', self.max_time, output_directory, self.n_jobs)
+        else: # dont blindy submit all of em
+            command = make_command('trainer', self.max_time, output_directory, self.n_jobs, idxs_to_do, rerun=True)
+
+        # the odd shell call is to deal with minute differences in the systems.
+        # TODO make this more general
+        call(command, shell=self.system == 'sherlock')
+        #break
 
 
-def make_kils_command(jobname, max_time, outputdir, queue= 'long'):
+def make_kils_command(jobname, max_time, outputdir, N, idxs_to_do=[], rerun=False, queue= 'long'):
     '''
     Return a list of strings that comprise a bash command to call trainingHelper.py on the cluster.
     Designed to work on ki-ls's batch system
@@ -677,23 +681,28 @@ def make_kils_command(jobname, max_time, outputdir, queue= 'long'):
     :return:
         Command, a list of strings that can be ' '.join'd to form a bash command.
     '''
-    log_file = jobname + '.out'
-    param_file = jobname + '.npy'
+    log_file = jobname + '_%I.out'
+    param_file = jobname + '_$tmp.npy'
     command = ['bsub',
+               '-J', "%s[0-%d]"%(jobname,N-1),
                '-q', queue,
                '-n', str(8),
-               '-J', jobname,
                '-oo', path.join(outputdir, log_file),
                '-W', '%d:00' % max_time,
                '-R span[ptile=8]',
                #'--exclusive',
+               'tmp=`printf "%04d" ${LSB_JOBINDEX}`\n',
                'python', path.join(path.dirname(__file__), 'trainingHelper.py'),
-               path.join(outputdir, param_file)]
+               outputdir + param_file]
+
+    if rerun:
+        command.pop[2]
+        command.insert(2, '%s%s'%(jobname, str(idxs_to_do)) )
 
     return command
 
 
-def make_sherlock_command(jobname, max_time, outputdir, queue=None):
+def make_sherlock_command(jobname, max_time, outputdir, N, idxs_to_do=[], rerun=False, queue=None):
     '''
     Return a list of strings that comprise a bash command to call trainingHelper.py on the cluster.
     Designed to work on sherlock's sbatch system. Differnet from the above in that it must write a file
@@ -709,12 +718,13 @@ def make_sherlock_command(jobname, max_time, outputdir, queue=None):
     :return:
         Command, a string to call to submit the job.
     '''
-    log_file = jobname + '.out'
-    err_file = jobname + '.err'
-    param_file = jobname + '.npy'
+    log_file = jobname + '_%a.out'
+    err_file = jobname + '_%a.err'
+
     sbatch_header = ['#!/bin/bash',
                      '--job-name=%s' % jobname,
                      '-p kipac,iric',  # KIPAC queue
+                     '--array=0-%d' % (N - 1),
                      '--output=%s' % path.join(outputdir, log_file),
                      '--error=%s' % path.join(outputdir, err_file),
                      '--time=%d:00' % (max_time * 60),  # max_time is in minutes
@@ -727,10 +737,16 @@ def make_sherlock_command(jobname, max_time, outputdir, queue=None):
                      #'--mem-per-cpu=32000',
                      #'--cpus-per-task=%d' % 16]
 
-    sbatch_header = '\n#SBATCH '.join(sbatch_header)
+    if rerun:
+        sbatch_header.pop[3]
+        sbatch_header.insert(3, '--array='%(str(idxs_to_do)[1:-1]) )
 
-    call_str = ['python', path.join(path.dirname(__file__), 'trainingHelper.py'),
-                path.join(outputdir, param_file)]
+    sbatch_header = '\n#SBATCH '.join(sbatch_header)
+    param_file = jobname + '_$tmp.npy'
+
+    call_str = ['tmp=`printf "%04d" ${SLURM_ARRAY_TASK_ID}`\n',
+                'python', path.join(path.dirname(__file__), 'trainingHelper.py'),
+                outputdir+ param_file]
 
     call_str = ' '.join(call_str)
     # have to write to file in order to work.
