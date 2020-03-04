@@ -8,7 +8,7 @@ import numpy as np
 from scipy.spatial import cKDTree
 from time import time
 
-def void_density_function(sample1, rbins, n_ran=None, randoms=None,
+def void_density_function(sample1, rbins, n_ran=1e9, randoms=None,
                          period = None, seed = None, leafsize=16, eps=0.0, n_jobs = 1, PBC=True):
     """
     Compute the CDF of void sizes for the sample
@@ -41,7 +41,7 @@ def void_density_function(sample1, rbins, n_ran=None, randoms=None,
         raise AssertionError("must specify either randoms or n_ran")
     elif randoms is None: # n_ran is not None
         assert period is not None
-        randoms = np.random.rand(n_ran, 3)*period
+        randoms = np.random.rand(int(n_ran), 3)*period
 
     # TODO in the old version on slac a 0 would give periodic 
     # i think the current version is periodic on sherlock.

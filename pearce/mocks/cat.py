@@ -80,9 +80,10 @@ def observable(particles=False):
             if particles:
                 try:
                     assert self.halocat.ptcl_table is not None
-                except AssertionError, InvalidCacheLogEntry:
+                #except AssertionError, InvalidCacheLogEntry:
+                except: # the invalid cache log entry isn't getting caught here
                     raise AssertionError("The function you called requires the loading of particles, but the catalog loaded\
-                     doesn't have a particle table. Please try a different catalog")
+                     doesn't have a particle table. Please try a different catalog, or load with 'particles=True'")
             return func(self, *args, **kwargs)
 
         # store the arguments, as the decorator destroys the spec
@@ -467,6 +468,7 @@ class Cat(object):
                                              redshift=z, dz_tol=tol)
         else:
             self._downsample_factor = downsample_factor
+            print self.version_name + '_particle_%.2f' % (-1 * np.log10(downsample_factor))
             self.halocat = CachedHaloCatalog(simname=self.simname, halo_finder=self.halo_finder,
                                              version_name=self.version_name,
                                              ptcl_version_name=self.version_name + '_particle_%.2f' % (
@@ -1205,7 +1207,7 @@ class Cat(object):
             raise AssertionError("The catalog loaded doesn't have a downsampling factor."
                                  "Make sure you load particles to calculate delta_sigma.")
         n_cores = self._check_cores(n_cores)
-
+        #print 'Delta Sigma N_cores:', n_cores
         x_g, y_g, z_g = [self.model.mock.galaxy_table[c] for c in ['x', 'y', 'z']]
         pos_g = return_xyz_formatted_array(x_g, y_g, z_g, period=self.Lbox)
 
@@ -1219,9 +1221,9 @@ class Cat(object):
         # TODO maybe split into a few lines for clarity
         # divid by cat.h**2 because there is an internal halotools calculation that is in little h units
         # and we want our result to divide those out. That is, if we want to not be in non h=1 units.
-        return delta_sigma(pos_g, pos_m, self.pmass,
-                           downsampling_factor=1. / self._downsample_factor, rp_bins=rp_bins,
-                           period=self.Lbox, num_threads=n_cores, cosmology=self.cosmology)[1] / (1e12)#*self.h**2)
+        return mean_delta_sigma(pos_g, pos_m, self.pmass/self._downsample_factor,
+                           rp_bins=rp_bins,
+                           period=self.Lbox, num_threads=n_cores) / (1e12)#*self.h**2)
 
     @observable(particles=True)
     def calc_ds_analytic(self, bins, angular=False, n_cores='all', xi_kwargs={}, xi = None, rbins = None):
@@ -1473,6 +1475,6 @@ class Cat(object):
 
         pos = return_xyz_formatted_array(x, y, z, period=self.Lbox)
         period = self.Lbox
-        vdf = void_density_function(pos, r_bins, n_ran=pos.shape[0]*n_ran, period=period, n_jobs = n_cores,PBC=PBC, **vdf_kwargs)
+        vdf = void_density_function(pos, r_bins, period=period, n_jobs = n_cores,PBC=PBC, **vdf_kwargs)
 
         return vdf

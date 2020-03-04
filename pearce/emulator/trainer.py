@@ -17,6 +17,8 @@ import numpy as np
 from scipy.optimize import minimize_scalar
 import pandas as pd
 import h5py
+import gc
+from guppy import hpy
 
 from pearce.mocks import cat_dict
 
@@ -416,7 +418,7 @@ class Trainer(object):
             raise AssertionError("Incorrect  parameters specified. Compare the outputs above to resovle the issue.")
 
     def compute_measurement(self, param_idxs, rank = None):
-
+        h = hpy()
         param_idxs = param_idxs.astype(int)
         if self.n_bins > 1 :
             output = np.zeros((param_idxs.shape[0], self.n_bins))
@@ -429,6 +431,9 @@ class Trainer(object):
         last_cosmo_idx, last_scale_factor_idx = -1, -1
         t0 = time()
         for output_idx, (cosmo_idx, scale_factor_idx, hod_idx) in enumerate(param_idxs):
+            #print
+            #print h.heap()
+            #print 
             if rank is not None:
                 print 'Rank: %d, Cosmo: %d, Scale_Factor: %d, HOD: %d'%(rank, cosmo_idx, scale_factor_idx, hod_idx)
             else:
@@ -445,6 +450,7 @@ class Trainer(object):
                     last_cat = self.cats[last_cosmo_idx]
                     del last_cat.halocat
                     del last_cat.model
+                    gc.collect()
 
                 cat = self.cats[cosmo_idx]
 
@@ -459,6 +465,7 @@ class Trainer(object):
                 calc_observable = self._get_calc_observable(cat)
 
             hod_params = dict(zip(self._hod_param_names, self._hod_param_vals[hod_idx, :]))
+            #print hod_params
             if self._fixed_nd is not None:
             # TODO this does not respect min_ptcl
                 self._add_logMmin(hod_params, cat)
@@ -480,7 +487,7 @@ class Trainer(object):
                     obs_repops = np.zeros((self._n_repops,))
 
                 for repop in xrange(self._n_repops):
-                    #print repop
+                    print repop
                     try:
                         cat.populate(hod_params, min_ptcl= self._min_ptcl)
                     except ValueError:
@@ -502,6 +509,7 @@ class Trainer(object):
 
             last_cosmo_idx = cosmo_idx
             last_scale_factor_idx = scale_factor_idx
+            gc.collect()
 
         return output, output_cov
 
@@ -649,6 +657,7 @@ class Trainer(object):
             command = make_command(jobname, self.max_time, output_directory)
             # the odd shell call is to deal with minute differences in the systems.
             # TODO make this more general
+            # TODO job array
             call(command, shell=self.system == 'sherlock')
             #break
 
