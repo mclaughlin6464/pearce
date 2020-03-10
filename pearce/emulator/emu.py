@@ -2663,7 +2663,7 @@ class LemonPepperWet(NashvilleHot):
         # fixed params can only fix an hod index, cosmo index, or z or r
         assert len(fixed_params) <= 2
         # 'cosmo' and 'hod' not allowed here
-        assert all(key in {'z', 'r', 'rmin'} for key in fixed_params)
+        assert all(key in {'z', 'r', 'rmin', 'cosmo', 'HOD'} for key in fixed_params)
 
         f = h5py.File(filename, 'r')
 
@@ -2703,12 +2703,19 @@ class LemonPepperWet(NashvilleHot):
         # construct ordered_params
         # ordered_params is an ordered dict whose keys are the parameters in the
         # order they are in in the data. The values are their bounds in the training data
+        min_max_vals = []
+        op_names = []
 
-        op_names = list(cosmo_param_names[:])
-        op_names.extend(hod_param_names)
+        if 'cosmo' not in fixed_params:
+            op_names.extend(cosmo_param_names[:])
+            min_max_vals.extend(zip(np.r_[cosmo_param_vals.min(axis=0), hod_param_vals.min(axis=0)]))
 
-        min_max_vals = zip(np.r_[cosmo_param_vals.min(axis=0), hod_param_vals.min(axis=0)], \
-                           np.r_[cosmo_param_vals.max(axis=0), hod_param_vals.max(axis=0)])
+        if 'HOD' not in fixed_params:
+            op_names.extend(hod_param_names)
+            min_max_vals.extend(zip(np.r_[cosmo_param_vals.max(axis=0), hod_param_vals.max(axis=0)]))
+
+        #min_max_vals = zip(np.r_[cosmo_param_vals.min(axis=0), hod_param_vals.min(axis=0)], \
+        #                   np.r_[cosmo_param_vals.max(axis=0), hod_param_vals.max(axis=0)])
         ordered_params = OrderedDict(izip(op_names, min_max_vals))
 
         # NOTE if its single_valued, may have to fudge this somehow?
@@ -2830,11 +2837,11 @@ class LemonPepperWet(NashvilleHot):
             # stack so xs have shape (n points, n params)
         # ys have shape (npoints)
         # and ycov has shape (n_bins, n_bins, n_points/n_bins)
-        y = np.stack(y)
-        yerr = np.stack(yerr)
-        if len(y.shape) == 2:
-            y = np.expand_dims(y, 0)
-            yerr = np.expand_dims(yerr, 0)  # make sure they all have the same shape, ain't that nice?
+        y = np.stack(y).squeeze()
+        yerr = np.stack(yerr).squeeze()
+        #if len(y.shape) == 2:
+        #    y = np.expand_dims(y, 0)
+        #    yerr = np.expand_dims(yerr, 0)  # make sure they all have the same shape, ain't that nice?
         if attach_params:
             return x1, x2, y, yerr, ycov
         else:
@@ -2848,7 +2855,8 @@ class LemonPepperWet(NashvilleHot):
         self._y_mean = y.mean() 
         self._y_std = 1.0
         
-        self.y  = y - self._y_mean
+        self.y  = y - self._y_mean # TODO squeeze here?
+        self._n_kernels = len(self.y.squeeze().shape)
         return out
 
     def _downsample_data(self, downsample_factor, x1, x2, y, yerr, attach=True):
@@ -2889,18 +2897,19 @@ class LemonPepperWet(NashvilleHot):
         """
         output = self._make_kernel(hyperparams)
 
-        if len(output) == 3:
-            kern1, kern2, kern3 = output
+        if len(output) == self._n_kernels:
+            kerns = output
             noise_var = 1.0
 
-        elif len(output) == 4:
-            kern1, kern2, kern3, noise_var = output
-
+        elif len(output) == self._n_kernels+1:
+            kerns = output[:-1]
+            noise_var = output[-1]
         else:
             raise AssertionError("Incorrect kernel size specified.")
 
         # now, make a list of emulators
         # yerr taken care of in kernel
+
         if self._downsample_factor == 1.0:
             x1, x2 = self.x1, self.x2
             y = self.y
@@ -2910,13 +2919,22 @@ class LemonPepperWet(NashvilleHot):
             y = self.downsample_y
             yerr = self.downsample_yerr
 
+        xs = []
+
+        if 'cosmo' not in self.fixed_params:
+            xs.append(x1)
+        if 'HOD' not in self.fixed_params:
+            xs.append(x2)
+        x3 = np.log10(self.scale_bin_centers.reshape((-1, 1)))
+        xs.append(x3)
+
         #emulator = GPKroneckerGaussianRegressionVar(x1, x2, y, yerr ** 2, kern1, kern2, noise_var=nv)
-        emulator = GPKroneckerGaussianRegression(x1, x2,\
-                                                      y, kern1, kern2, noise_var,\
-                                             additional_Xs=[np.log10(self.scale_bin_centers.reshape((-1,1)))], additional_kerns = [kern3])
+        emulator = GPKroneckerGaussianRegression(xs[0], xs[1],\
+                                                      y, kerns[0], kerns[1], noise_var,\
+                                             additional_Xs=xs[2:], additional_kerns = kerns[2:])
 
         self._emulator = emulator
-        self._kernel= (kern1, kern2, kern3)
+        self._kernel= kerns
 
     def _build_skl(self, hyperparams):
         warnings.warn("LemonPepperWer does not provide advantages for skl mode, so it is not reccomended.")
@@ -2978,14 +2996,14 @@ class LemonPepperWet(NashvilleHot):
                 if type(hyperparams['kernel']) is dict:  # describes one kernel
                     k = self._kernel_from_dict(hyperparams['kernel'])
                     return k, k.copy()
-                elif len(hyperparams['kernel']) == 3:  # one for each?
+                elif len(hyperparams['kernel']) == self._n_kernels:  # one for each?
                     k = hyperparams['kernel']
                     if type(k[0]) is dict:
                         return [self._kernel_from_dict(_k) for _k in k]
                     else:
                         assert isinstance(hyperparams['kernel'][0], Kern)
                         return hyperparams['kernel']
-                elif len(hyperparams['kernel']) == 4:  # one for each+ a var?
+                elif len(hyperparams['kernel']) == self._n_kernels+1:  # one for each+ a var?
                     k = hyperparams['kernel']
                     if type(k[0]) is dict:
                         return [self._kernel_from_dict(_k) for _k in k], float(k[2])
@@ -3088,15 +3106,15 @@ class LemonPepperWet(NashvilleHot):
         """
         assert old_idxs is None, "Old_idxs not supported, not sure how you even got here!"
         #
-        t1, t2, t3 = t
+        #t1, t2, t3 = t
         if self.method == 'gp':
             # because were using a custom object here, don't have to do the copying stuff
             # however, have to split up t into the two groups
             # TODO may have weird behavior for larger t's? have to do some resizing
             if gp_errs:
-                mu, err = self._emulator.predict(t1, t2, additional_Xnews=[t3])
+                mu, err = self._emulator.predict(t[0], t[1], additional_Xnews=t[2:])
             else:
-                mu, _ = self._emulator.predict(t1, t2, additional_Xnews=[t3], mean_only=True)
+                mu, _ = self._emulator.predict(t[0], t[1], additional_Xnews=t[2:], mean_only=True)
                 # print local_mu
                 err = np.ones_like(mu)
 
