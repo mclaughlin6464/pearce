@@ -33,7 +33,7 @@ def compute_on_subset(param_fname):
     """
     job_number = int(path.basename(param_fname).split('.')[0][-4:])
     output_directory = path.dirname(param_fname)
-    print job_number
+    #print job_number
     trainer = get_trainer(output_directory)
 
     param_idxs = np.loadtxt(param_fname)
@@ -97,7 +97,7 @@ if __name__ == '__main__':
     parser.add_argument('param_fname', type = str, help='File where the vector of HOD params are stored.')
     args = vars(parser.parse_args())
     param_fname = args['param_fname']
-    print param_fname
+    #print param_fname
 
     compute_on_subset(param_fname)
 

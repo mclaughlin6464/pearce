@@ -487,7 +487,7 @@ class Trainer(object):
                     obs_repops = np.zeros((self._n_repops,))
 
                 for repop in xrange(self._n_repops):
-                    print repop
+                    #print repop
                     try:
                         cat.populate(hod_params, min_ptcl= self._min_ptcl)
                     except ValueError:
@@ -653,12 +653,17 @@ class Trainer(object):
                 idxs_to_do.append(idx)
             elif path.exists(path.join(output_directory, 'output_%04d.npy'%idx)) and path.exists(path.join(output_directory, 'output_cov_%04d.npy'%idx)):\
                 continue # this one ran successfully
+            else:
+                idxs_to_do.append(idx)
 
         # TODO allow queue changing
-        if len(idxs_to_do) == self.n_jobs:
-            command = make_command('trainer', self.max_time, output_directory, self.n_jobs)
+
+        if len(idxs_to_do) == 0:
+            raise AssertionError("No unfinished jobs found")
+        elif len(idxs_to_do) == self.n_jobs:
+            command = make_command('trainer', self.max_time, output_directory + '/', self.n_jobs)
         else: # dont blindy submit all of em
-            command = make_command('trainer', self.max_time, output_directory, self.n_jobs, idxs_to_do, rerun=True)
+            command = make_command('trainer', self.max_time, output_directory + '/', self.n_jobs, idxs_to_do, rerun=True)
 
         # the odd shell call is to deal with minute differences in the systems.
         # TODO make this more general
@@ -684,21 +689,29 @@ def make_kils_command(jobname, max_time, outputdir, N, idxs_to_do=[], rerun=Fals
     log_file = jobname + '_%I.out'
     param_file = jobname + '_$tmp.npy'
     command = ['bsub',
-               '-J', "%s[0-%d]"%(jobname,N-1),
+               '-J', '%s[1-%d]'%(jobname,N),
                '-q', queue,
-               '-n', str(8),
+               '-n', str(12),
                '-oo', path.join(outputdir, log_file),
                '-W', '%d:00' % max_time,
-               '-R span[ptile=8]',
+               '-R span[ptile=12]',# select[hname!=bubble0002 && hname!=bubble0003]',
+               # todo add memory requirements as well
                #'--exclusive',
-               'tmp=`printf "%04d" ${LSB_JOBINDEX}`\n',
+               'tmp=`printf "%04d" $((${LSB_JOBINDEX}-1))`\n',
+               #'echo $tmp \n',
                'python', path.join(path.dirname(__file__), 'trainingHelper.py'),
                outputdir + param_file]
 
     if rerun:
-        command.pop[2]
-        command.insert(2, '%s%s'%(jobname, str(idxs_to_do)) )
+        command.pop(2)
+        N = 100
+        if len(idxs_to_do) > N:
+            idxs_to_do = idxs_to_do[:N] # reduce quantity
+        idxs_to_do = np.array(idxs_to_do)+1
+        idxs_to_do = [str(i) for i in idxs_to_do]
 
+        command.insert(2, '%s%s'%(jobname, '['+','.join(idxs_to_do)+']') )
+    print command
     return command
 
 
