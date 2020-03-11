@@ -704,7 +704,7 @@ class DarkSky(Cat):
         if system == 'sherlock':
             # TODO update
             fname = '/oak/stanford/orgs/kipac/users/swmclau2/Darksky/ds14_a_halos_1.0000.hdf5'
-            ptcl_fname = '/scratch/users/swmclau2/Darksky/ds14_a_1.0000_0.010_downsample_v3.hdf5'
+            ptcl_fname = '/oak/stanford/orgs/kipac/users/swmclau2/Darksky/Darksky/ds14_a_1.0000_0.010_downsample_v3.hdf5'
         else:  # ki-ls, etc
             raise NotImplementedError("File not on ki-ls")
         self.fname = fname
