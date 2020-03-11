@@ -13,7 +13,7 @@ from pearce.mocks.kittens import cat_dict
 #cat = cat_dict['mdpl2'](scale_factors = [1.0], system = 'sherlock')
 
 for boxno in xrange(7):
-    for realization in xrange(1):
+    for realization in xrange(5):
 #for boxno in xrange(40):
          cat = cat_dict['testbox'](boxno, realization,scale_factors = [1.0], system = 'sherlock')
 #boxno = 0

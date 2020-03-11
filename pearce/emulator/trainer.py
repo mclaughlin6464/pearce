@@ -663,7 +663,8 @@ class Trainer(object):
         elif len(idxs_to_do) == self.n_jobs:
             command = make_command('trainer', self.max_time, output_directory + '/', self.n_jobs)
         else: # dont blindy submit all of em
-            command = make_command('trainer', self.max_time, output_directory + '/', self.n_jobs, idxs_to_do, rerun=True)
+            command = make_command('trainer', self.max_time, output_directory,\
+                                   self.n_jobs, idxs_to_do, rerun=True)
 
         # the odd shell call is to deal with minute differences in the systems.
         # TODO make this more general

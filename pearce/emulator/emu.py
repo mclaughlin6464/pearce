@@ -2184,7 +2184,6 @@ class NashvilleHot(Emu):
 
         #self._x1_mean, self._x1_std = np.zeros((x1.shape[1],)), np.ones((x1.shape[1],))#x1.mean(axis = 0), x1.std(axis = 0)
         self._x1_mean, self._x1_std = x1.mean(axis = 0), x1.std(axis = 0)
-
         #self._x2_mean, self._x2_std = np.zeros((x2.shape[1],)), np.ones((x2.shape[1],))#x2.mean(axis = 0), x2.std(axis = 0)
         self._x2_mean, self._x2_std = x2.mean(axis = 0), x2.std(axis = 0)
 
@@ -2202,8 +2201,9 @@ class NashvilleHot(Emu):
         self.yerr = np.stack(yerr)
 
         self.mean_function = self._make_custom_mean_function(custom_mean_function)
-        for i, mf in enumerate(self.mean_function(self.x1)):
-            self.y[i] -= mf
+        #for i, mf in enumerate(self.mean_function(self.x1)):
+        #    self.y[i] -= mf
+        self.y-=self.mean_function(self.x1)
 
     def _whiten(self, x1, x2=None):
         """
@@ -2663,7 +2663,7 @@ class LemonPepperWet(NashvilleHot):
         # fixed params can only fix an hod index, cosmo index, or z or r
         assert len(fixed_params) <= 2
         # 'cosmo' and 'hod' not allowed here
-        assert all(key in {'z', 'r', 'rmin'} for key in fixed_params)
+        assert all(key in {'z', 'r', 'rmin', 'cosmo', 'HOD'} for key in fixed_params)
 
         f = h5py.File(filename, 'r')
 
@@ -2703,12 +2703,19 @@ class LemonPepperWet(NashvilleHot):
         # construct ordered_params
         # ordered_params is an ordered dict whose keys are the parameters in the
         # order they are in in the data. The values are their bounds in the training data
+        min_max_vals = []
+        op_names = []
 
-        op_names = list(cosmo_param_names[:])
-        op_names.extend(hod_param_names)
+        if 'cosmo' not in fixed_params:
+            op_names.extend(cosmo_param_names[:])
+            min_max_vals.extend(zip(cosmo_param_vals.min(axis=0), cosmo_param_vals.max(axis=0)))
 
-        min_max_vals = zip(np.r_[cosmo_param_vals.min(axis=0), hod_param_vals.min(axis=0)], \
-                           np.r_[cosmo_param_vals.max(axis=0), hod_param_vals.max(axis=0)])
+        if 'HOD' not in fixed_params:
+            op_names.extend(hod_param_names)
+            min_max_vals.extend(zip(hod_param_vals.min(axis=0), hod_param_vals.max(axis=0)))
+
+        #min_max_vals = zip(np.r_[cosmo_param_vals.min(axis=0), hod_param_vals.min(axis=0)], \
+        #                   np.r_[cosmo_param_vals.max(axis=0), hod_param_vals.max(axis=0)])
         ordered_params = OrderedDict(izip(op_names, min_max_vals))
 
         # NOTE if its single_valued, may have to fudge this somehow?
@@ -2830,8 +2837,8 @@ class LemonPepperWet(NashvilleHot):
             # stack so xs have shape (n points, n params)
         # ys have shape (npoints)
         # and ycov has shape (n_bins, n_bins, n_points/n_bins)
-        y = np.stack(y)
-        yerr = np.stack(yerr)
+        y = np.stack(y)#.squeeze()
+        yerr = np.stack(yerr)#.squeeze()
         if len(y.shape) == 2:
             y = np.expand_dims(y, 0)
             yerr = np.expand_dims(yerr, 0)  # make sure they all have the same shape, ain't that nice?
@@ -2848,7 +2855,18 @@ class LemonPepperWet(NashvilleHot):
         self._y_mean = y.mean() 
         self._y_std = 1.0
         
-        self.y  = y - self._y_mean
+        self.y  = y - self._y_mean # TODO squeeze here?
+        self.emulator_ndim = 0
+        if 'cosmo' not in self.fixed_params:
+            self.emulator_ndim+=self.x1.shape[1]
+        else:
+            self.y = self.y[self.fixed_params['cosmo']]
+        if 'HOD' not in self.fixed_params:
+            self.emulator_ndim+=self.x2.shape[1]
+        else:
+            self.y = self.y[:, self.fixed_params['HOD']]
+        # ignores r and z
+        self._n_kernels = len(self.y.shape)
         return out
 
     def _downsample_data(self, downsample_factor, x1, x2, y, yerr, attach=True):
@@ -2868,8 +2886,10 @@ class LemonPepperWet(NashvilleHot):
             downsample_N_points = int(downsample_factor * N_points)
             downsample_x2 = x2[:downsample_N_points, :]
             downsample_x1 = x1
-
-            downsample_y = y[:, :downsample_N_points]
+            if 'cosmo' in self.fixed_params: 
+                downsample_y = y[:downsample_N_points]
+            else:
+                downsample_y = y[:, :downsample_N_points]
             downsample_yerr = yerr[:, :downsample_N_points]
 
         if attach:
@@ -2889,18 +2909,19 @@ class LemonPepperWet(NashvilleHot):
         """
         output = self._make_kernel(hyperparams)
 
-        if len(output) == 3:
-            kern1, kern2, kern3 = output
+        if len(output) == self._n_kernels:
+            kerns = output
             noise_var = 1.0
 
-        elif len(output) == 4:
-            kern1, kern2, kern3, noise_var = output
-
+        elif len(output) == self._n_kernels+1:
+            kerns = output[:-1]
+            noise_var = output[-1]
         else:
             raise AssertionError("Incorrect kernel size specified.")
 
         # now, make a list of emulators
         # yerr taken care of in kernel
+
         if self._downsample_factor == 1.0:
             x1, x2 = self.x1, self.x2
             y = self.y
@@ -2910,13 +2931,22 @@ class LemonPepperWet(NashvilleHot):
             y = self.downsample_y
             yerr = self.downsample_yerr
 
+        xs = []
+
+        if 'cosmo' not in self.fixed_params:
+            xs.append(x1)
+        if 'HOD' not in self.fixed_params:
+            xs.append(x2)
+        x3 = np.log10(self.scale_bin_centers.reshape((-1, 1)))
+        xs.append(x3)
+         
         #emulator = GPKroneckerGaussianRegressionVar(x1, x2, y, yerr ** 2, kern1, kern2, noise_var=nv)
-        emulator = GPKroneckerGaussianRegression(x1, x2,\
-                                                      y, kern1, kern2, noise_var,\
-                                             additional_Xs=[np.log10(self.scale_bin_centers.reshape((-1,1)))], additional_kerns = [kern3])
+        emulator = GPKroneckerGaussianRegression(xs[0], xs[1],\
+                                                      y, kerns[0], kerns[1], noise_var,\
+                                             additional_Xs=xs[2:], additional_kerns = kerns[2:])
 
         self._emulator = emulator
-        self._kernel= (kern1, kern2, kern3)
+        self._kernel= kerns
 
     def _build_skl(self, hyperparams):
         warnings.warn("LemonPepperWer does not provide advantages for skl mode, so it is not reccomended.")
@@ -2978,14 +3008,14 @@ class LemonPepperWet(NashvilleHot):
                 if type(hyperparams['kernel']) is dict:  # describes one kernel
                     k = self._kernel_from_dict(hyperparams['kernel'])
                     return k, k.copy()
-                elif len(hyperparams['kernel']) == 3:  # one for each?
+                elif len(hyperparams['kernel']) == self._n_kernels:  # one for each?
                     k = hyperparams['kernel']
                     if type(k[0]) is dict:
                         return [self._kernel_from_dict(_k) for _k in k]
                     else:
                         assert isinstance(hyperparams['kernel'][0], Kern)
                         return hyperparams['kernel']
-                elif len(hyperparams['kernel']) == 4:  # one for each+ a var?
+                elif len(hyperparams['kernel']) == self._n_kernels+1:  # one for each+ a var?
                     k = hyperparams['kernel']
                     if type(k[0]) is dict:
                         return [self._kernel_from_dict(_k) for _k in k], float(k[2])
@@ -3011,13 +3041,30 @@ class LemonPepperWet(NashvilleHot):
         
         if x2 is None:
             if len(x1.shape) == 1:
-                x1, x2, x3 = x1[:self.x1.shape[-1]], x1[self.x1.shape[-1]:], x3
+                if 'cosmo' in self.fixed_params:
+                    x2 = x1
+                    #x1 = np.zeros((1,self.x1.shape[-1]))
+                # TODO fixed HOD here
+                else:
+                    x1, x2 = x1[:self.x1.shape[-1]], x1[self.x1.shape[-1]:]
 
             else:
-                x1, x2, x3 = x1[:, :self.x1.shape[-1]], x1[:, self.x1.shape[-1]:], x3.reshape((-1,1))
+                if 'cosmo' in self.fixed_params:
+                    x2 = x1
+                    #x1 = np.zeros((x1.shape[0], self.x1.shape[-1]))
 
-        # TODO whiten x3? Possibly log10...
-        #x3 = None if x3 is None else np.log10(x3)
+                else:
+                    x1, x2 = x1[:, :self.x1.shape[-1]], x1[:, self.x1.shape[-1]:]
+                x3 = x3.reshape((-1,1))
+
+
+            # TODO whiten x3? Possibly log10...
+            #x3 = None if x3 is None else np.log10(x3)
+            if 'cosmo' in self.fixed_params:
+                return ((x2-self._x2_mean)/(self._x2_std+1e-9), x3), None
+            elif 'HOD' in self.fixed_params:
+                return ((x1-self._x1_mean)/(self._x1_std+1e-9),  x3), None
+
         return ((x1-self._x1_mean)/(self._x1_std+1e-9), (x2-self._x2_mean)/(self._x2_std+1e-9),\
                 x3), None
 
@@ -3088,15 +3135,15 @@ class LemonPepperWet(NashvilleHot):
         """
         assert old_idxs is None, "Old_idxs not supported, not sure how you even got here!"
         #
-        t1, t2, t3 = t
+        #t1, t2, t3 = t
         if self.method == 'gp':
             # because were using a custom object here, don't have to do the copying stuff
             # however, have to split up t into the two groups
             # TODO may have weird behavior for larger t's? have to do some resizing
             if gp_errs:
-                mu, err = self._emulator.predict(t1, t2, additional_Xnews=[t3])
+                mu, err = self._emulator.predict(t[0], t[1], additional_Xnews=t[2:])
             else:
-                mu, _ = self._emulator.predict(t1, t2, additional_Xnews=[t3], mean_only=True)
+                mu, _ = self._emulator.predict(t[0], t[1], additional_Xnews=t[2:], mean_only=True)
                 # print local_mu
                 err = np.ones_like(mu)
 
@@ -3150,11 +3197,27 @@ class LemonPepperWet(NashvilleHot):
         # _py = [emu.predict(x1, x2)[0][:, 0] + ym for emu, ym in zip(self._emulators, self._y_mean)]
         pred_ys = []
         # there can be memory issues with trying to this all at once.
-        for i,_x2 in enumerate(x2):
-            _py = self._emulator.predict(x1, _x2.reshape((1,-1)), mean_only=True, additional_Xnews=[_scale_bin_centers.reshape((-1,1))])[0].squeeze() + self._y_mean  
+
+        xs = []
+        has_fixed = False
+        if 'cosmo' not in self.fixed_params:
+            xs.append(x1)
+            has_fixed=True
+        if 'HOD' not in self.fixed_params:
+            xs.append(x2)
+            has_fixed=True
+
+        xs.append(_scale_bin_centers.reshape((-1,1)))
+        if has_fixed:
+            _py = self._emulator.predict(xs[0],xs[1], mean_only=True, additional_Xnews=xs[2:])[0].squeeze() + self._y_mean  
             pred_ys.append(_py)
 
-        pred_y = np.array(pred_ys).reshape((-1, 18), order = 'F')#np.hstack(pred_ys)  # .T
+        else:
+            # for large emus its better to space this out
+            for i,_x2 in enumerate(x2):
+                 _py = self._emulator.predict(xs[0],xs[1][i].reshape((-1,1), order='F'), mean_only=True, additional_Xnews=xs[2:])[0].squeeze() + self._y_mean  
+                 pred_ys.append(_py)
+        pred_y = np.array(pred_ys).reshape((-1, _scale_bin_centers.shape[0]), order = 'F')#np.hstack(pred_ys)  # .T
         #pred_y = np.swapaxes(pred_y, 0, 1) # comes out in the wrong shape
 
         # NOTE think this is the right ordering, should check, though may not matter if i'm consistent...
@@ -3172,7 +3235,7 @@ class LemonPepperWet(NashvilleHot):
             y = y[:, self.scale_bin_centers[0] <= bin_centers <= self.scale_bin_centers[-1]]
 
         if statistic is None:
-            return pred_y.reshape((-1,18)).T, y.reshape((-1,18)).T
+            return pred_y.reshape((-1,_scale_bin_centers.shape[0])).T, y.reshape((-1,_scale_bin_centers.shape[0])).T
 
         y = y.reshape((y.shape[0], -1), order='F')
 
@@ -3230,7 +3293,7 @@ class LemonPepperWet(NashvilleHot):
 
         try:
             #self._emulator.optimize_restarts(parallel=False, num_restarts=5, verbose=True, robust=False)
-            self._emulator.optimize_restarts(optimizer='scg', num_restarts=5, verbose=True, max_iters=100)
+            self._emulator.optimize_restarts(optimizer='scg', num_restarts=5, verbose=True, max_iters=250)
         except:
             self._emulator.optimize_restarts(parallel=False, num_restarts=3, verbose=True, robust=True)
         sys.stdout.flush()
