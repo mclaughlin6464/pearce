@@ -1945,7 +1945,7 @@ class NashvilleHot(Emu):
         """
         assert path.isfile(filename)
         # fixed params can only fix an hod index, cosmo index, or z or r
-        assert len(fixed_params) <= 2
+        #assert len(fixed_params) <= 2
         # 'cosmo' and 'hod' not allowed here
         assert all(key in {'z', 'r', 'rmin'} for key in fixed_params)
 
@@ -2661,7 +2661,7 @@ class LemonPepperWet(NashvilleHot):
         """
         assert path.isfile(filename)
         # fixed params can only fix an hod index, cosmo index, or z or r
-        assert len(fixed_params) <= 2
+        #assert len(fixed_params) <= 2
         # 'cosmo' and 'hod' not allowed here
         assert all(key in {'z', 'r', 'rmin', 'cosmo', 'HOD'} for key in fixed_params)
 

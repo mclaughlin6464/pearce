@@ -1475,6 +1475,6 @@ class Cat(object):
 
         pos = return_xyz_formatted_array(x, y, z, period=self.Lbox)
         period = self.Lbox
-        vdf = void_density_function(pos, r_bins, period=period, n_jobs = n_cores,PBC=PBC, **vdf_kwargs)
+        vdf = void_density_function(pos, r_bins, period=period, n_jobs = n_cores,PBC=PBC,n_ran=n_ran, **vdf_kwargs)
 
         return vdf
