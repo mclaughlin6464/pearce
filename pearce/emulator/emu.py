@@ -2939,7 +2939,8 @@ class LemonPepperWet(NashvilleHot):
             xs.append(x2)
         x3 = np.log10(self.scale_bin_centers.reshape((-1, 1)))
         xs.append(x3)
-         
+
+        print len(xs) 
         #emulator = GPKroneckerGaussianRegressionVar(x1, x2, y, yerr ** 2, kern1, kern2, noise_var=nv)
         emulator = GPKroneckerGaussianRegression(xs[0], xs[1],\
                                                       y, kerns[0], kerns[1], noise_var,\
@@ -3200,14 +3201,15 @@ class LemonPepperWet(NashvilleHot):
 
         xs = []
         has_fixed = False
+        if 'cosmo' in self.fixed_params or 'HOD' in self.fixed_params:
+            has_fixed=True
         if 'cosmo' not in self.fixed_params:
             xs.append(x1)
-            has_fixed=True
         if 'HOD' not in self.fixed_params:
             xs.append(x2)
-            has_fixed=True
 
         xs.append(_scale_bin_centers.reshape((-1,1)))
+
         if has_fixed:
             _py = self._emulator.predict(xs[0],xs[1], mean_only=True, additional_Xnews=xs[2:])[0].squeeze() + self._y_mean  
             pred_ys.append(_py)
@@ -3215,10 +3217,11 @@ class LemonPepperWet(NashvilleHot):
         else:
             # for large emus its better to space this out
             for i,_x2 in enumerate(x2):
-                 _py = self._emulator.predict(xs[0],xs[1][i].reshape((-1,1), order='F'), mean_only=True, additional_Xnews=xs[2:])[0].squeeze() + self._y_mean  
+                 _py = self._emulator.predict(xs[0],xs[1][i].reshape((1,-1), order='F'), mean_only=True, additional_Xnews=xs[2:])[0].squeeze() + self._y_mean  
                  pred_ys.append(_py)
         pred_y = np.array(pred_ys).reshape((-1, _scale_bin_centers.shape[0]), order = 'F')#np.hstack(pred_ys)  # .T
-        #pred_y = np.swapaxes(pred_y, 0, 1) # comes out in the wrong shape
+        if not has_fixed:
+            pred_y = np.swapaxes(pred_y, 0, 1) # comes out in the wrong shape
 
         # NOTE think this is the right ordering, should check, though may not matter if i'm consistent...
 
@@ -3235,7 +3238,7 @@ class LemonPepperWet(NashvilleHot):
             y = y[:, self.scale_bin_centers[0] <= bin_centers <= self.scale_bin_centers[-1]]
 
         if statistic is None:
-            return pred_y.reshape((-1,_scale_bin_centers.shape[0])).T, y.reshape((-1,_scale_bin_centers.shape[0])).T
+            return pred_y, y.reshape((-1,_scale_bin_centers.shape[0])).T
 
         y = y.reshape((y.shape[0], -1), order='F')
 
