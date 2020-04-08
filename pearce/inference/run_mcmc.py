@@ -133,6 +133,8 @@ def _run_tests(y, cov, r_bin_centers, param_names, fixed_params, ncores):
     print 'N cores', ncores
 
     #make sure all inputs are of consistent shape
+    print y.shape
+    print cov.shape
     assert y.shape[0] == cov.shape[0] and cov.shape[1] == cov.shape[0]
 
     tot_bins = sum(len(rbc) for rbc in r_bin_centers)
@@ -472,22 +474,22 @@ def run_mcmc_config(config_fname, restart = False):
 
     rbins = obs_cfg['rbins']
     obs = obs_cfg['obs']
-
     if type(obs) is str:
         obs = [obs]
 
     if type(rbins[0]) is list: # is list of list
         rbins = [np.array(r) for r in rbins] # to numpy array
         assert len(rbins) == len(obs), "not equal number of r_bins to obs"
+
     else:
         rbins = np.array(rbins)
         rbins = [rbins for _ in xrange(len(obs))]
 
     rpoints = [(rb[1:]+rb[:-1])/2.0 for rb in rbins]
-
     y = f['data'][()].flatten()
     cov = f['cov'][()]
 
+    print y.shape
 
     emus = []
     _rp = []
@@ -495,6 +497,7 @@ def run_mcmc_config(config_fname, restart = False):
     init_idx = 0
 
     np.random.seed(seed)
+    print len(emu_type), len(training_file), len(rpoints), len(fixed_params)
     for et, tf, rp, fp in zip(emu_type, training_file, rpoints, fixed_params): # TODO iterate over the others?
         # TODO how will cic work with rmin?
         emu = emu_type_dict[et](tf, fixed_params = fp,
@@ -507,9 +510,10 @@ def run_mcmc_config(config_fname, restart = False):
 
 
         #assert np.all(np.isclose(_rp[-1], emu.scale_bin_centers))
-
+        print cut_n_bins
+        print 'y',y
         _y.append(y[init_idx+cut_n_bins:init_idx + orig_n_bins])
-
+        print '_y', _y
         cov_idxs = np.ones((cov.shape[0],), dtype = bool)
         cov_idxs[init_idx:init_idx+cut_n_bins] = False # deselect the bins we're cutting
 

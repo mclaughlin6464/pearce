@@ -2908,7 +2908,6 @@ class LemonPepperWet(NashvilleHot):
         :return: None
         """
         output = self._make_kernel(hyperparams)
-
         if len(output) == self._n_kernels:
             kerns = output
             noise_var = 1.0
@@ -2918,7 +2917,6 @@ class LemonPepperWet(NashvilleHot):
             noise_var = output[-1]
         else:
             raise AssertionError("Incorrect kernel size specified.")
-
         # now, make a list of emulators
         # yerr taken care of in kernel
 
@@ -2958,34 +2956,34 @@ class LemonPepperWet(NashvilleHot):
         # would probably have to work off a keyword dict
         if type(kernel_dict) is str:
             kernel_dict = literal_eval(kernel_dict)
-
         if type(kernel_dict) is list:
             if type(kernel_dict[0]) in (tuple, list):  # 2D
-                if len(kernel_dict[0]) == 3:
+                if len(kernel_dict[0]) == self._n_kernels:
                     return [[Kern.from_dict(kd[0]), Kern.from_dict(kd[1]), Kern.from_dict(kd[2])] for kd in kernel_dict]
                 else:  # 4?
                     return [[Kern.from_dict(kd[0]), Kern.from_dict(kd[1]),Kern.from_dict(kd[2]), float(kd[3])] for kd in kernel_dict]
+            elif type(kernel_dict[-1]) is float:
+                out = [Kern.from_dict(kd) for kd in kernel_dict[:-1]]
+                out.append(float(kernel_dict[-1]))
+                return out
             return [Kern.from_dict(kd) for kd in kernel_dict]
         return Kern.from_dict(kernel_dict)
 
     def _get_default_kernel(self):
         # TODO I should save these under the emu name, so different kernels don't overlap
-        f = h5py.File(self.filename, 'r')
-        if 'lpw_kernel' in f.attrs:
-           kernel_dict =f.attrs['lpw_kernel']
-        else:
-            raise KeyError("No default saved for this observable!")
-        f.close()
-
+        with h5py.File(self.filename, 'r') as f:
+            if 'lpw_kernel' in f.attrs:
+               kernel_dict =f.attrs['lpw_kernel']
+            else:
+                raise KeyError("No default saved for this observable!")
         return self._kernel_from_dict(kernel_dict)
 
     def save_as_default_kernel(self):
         # TODO how to clip of tye Yvar portion
         kernel_dict = [_k.to_dict() for _k in self._kernel]
-
-        f = h5py.File(self.filename)
-        f.attrs['lpw_kernel'] = str(kernel_dict)
-        f.close()
+        kernel_dict.append(self._emulator.likelihood.variance[0])
+        with h5py.File(self.filename) as f:
+            f.attrs['lpw_kernel'] = str(kernel_dict)
 
     def _make_kernel(self, hyperparams):
         """

@@ -146,6 +146,6 @@ emu:
   emu_hps: {}
   emu_type: [LemonPepperWet, LemonPepperWet]
   fixed_params: {z: 0.0}
-  training_file: [/u/ki/swmclau2/des/Aemulators/wp_hsab/PearceWpHSABCosmo.hdf5, /u/ki/swmclau2/des/Aemulators/ds_hsab/PearceDsHSABCosmo.hdf5]
+  training_file: [/u/ki/swmclau2/des/Aemulators/wp_hsab_h/PearceWpHSABCosmo.hdf5, /u/ki/swmclau2/des/Aemulators/ds_hsab_h/PearceHSABDsCosmo.hdf5]
 fname: /u/ki/swmclau2/des/PearceMCMC/HOD_wp_ds_rmin_None_HSAB.hdf5
 sim: *id002
