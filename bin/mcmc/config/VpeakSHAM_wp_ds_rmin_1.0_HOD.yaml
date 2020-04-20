@@ -145,5 +145,5 @@ emu:
   emu_hps: {}
   emu_type: [LemonPepperWet, LemonPepperWet]
   fixed_params: {rmin: 1.0, z: 0.0}
-  training_file: [/u/ki/swmclau2/des/Aemulators/wp_zheng07/PearceWpCosmo.hdf5, /u/ki/swmclau2/des/Aemulators/ds_zheng07/PearceDsCosmo.hdf5]
+  training_file: [/u/ki/swmclau2/des/Aemulators/wp_zheng07_h/PearceWpCosmo.hdf5, /u/ki/swmclau2/des/Aemulators/ds_zheng07_h/PearceDsCosmo.hdf5]
 fname: /u/ki/swmclau2/des/PearceMCMC/VpeakSHAM_wp_ds_rmin_1.0_HOD.hdf5

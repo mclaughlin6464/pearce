@@ -145,6 +145,6 @@ emu:
   emu_hps: {}
   emu_type: [LemonPepperWet, LemonPepperWet]
   fixed_params: {rmin: 0.5, z: 0.0}
-  training_file: [/u/ki/swmclau2/des/Aemulators/wp_corrab/PearceWpCorrABCosmo.hdf5,
-    /u/ki/swmclau2/des/Aemulators/ds_corrab/PearceDsCorrABCosmo.hdf5]
+  training_file: [/u/ki/swmclau2/des/Aemulators/wp_corrab_h/PearceWpCorrABCosmo.hdf5,
+    /u/ki/swmclau2/des/Aemulators/ds_corrab_h/PearceDsCorrABCosmo.hdf5]
 fname: /u/ki/swmclau2/des/PearceMCMC/VpeakSHAM_wp_ds_rmin_0.5_CorrAB.hdf5
