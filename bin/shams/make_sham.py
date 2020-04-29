@@ -67,7 +67,7 @@ smf = np.genfromtxt('/home/users/swmclau2/Git/pearce/bin/shams/smf_dr72bright34_
 # In[20]:
 
 
-nd = 3e-4#4.2e-4 #nd of final cat 
+nd = 5e-4#4.2e-4 #nd of final cat 
 
 
 # In[21]:
@@ -127,6 +127,6 @@ output['gal_smass'] = final_catalog
 #output.write('/nfs/slac/g/ki/ki18/des/swmclau2/catalog_ab_%s_large.hdf5'%ab_property, format = 'hdf5', path = '%s_catalog'%ab_property, overwrite=True)
 #output.write('/scratch/users/swmclau2/catalog_ab_%s_large_fixed.hdf5'%ab_property, format = 'hdf5', path = '%s_catalog'%ab_property, overwrite=True)
 # In[ ]:
-output.write('/scratch/users/swmclau2/MDPL2_%s_smf_sham_low_nd.hdf5'%ab_property, format = 'hdf5', path = '%s_catalog'%ab_property, overwrite=True)
-
+output.write('/scratch/users/swmclau2/MDPL2_%s_smf_sham.hdf5'%ab_property, format = 'hdf5', path = '%s_catalog'%ab_property, overwrite=True)
+np.save('/scratch/users/swmclau2/UniverseMachine/cut_sham_catalog.npy', output.as_array())
 #print ab_property

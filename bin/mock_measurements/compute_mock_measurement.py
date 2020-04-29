@@ -3,7 +3,7 @@
 import numpy as np
 from pearce.mocks.kittens import MDPL2
 from sys import argv
-from halotools.mock_observables import wp, delta_sigma
+from halotools.mock_observables import wp, mean_delta_sigma
 
 galcat_fname = argv[1]
 basename = argv[2]
@@ -39,9 +39,11 @@ sys.stdout.flush()
 
 print 'B'
 #mock_ds = calc_ds(cat, rbins, n_cores = 1, randoms = randoms) 
-mock_ds = delta_sigma(pos, pos_m, cat.pmass,\
-                     downsampling_factor=1./cat._downsample_factor, rp_bins=rbins,
-                     period=cat.Lbox, num_threads=1, cosmology=cat.cosmology)[1] / ((1e12))#*cat.h**2)
+mock_dss = []
+N = 20
+for pm in np.array_split(pos_m, N):
+    mock_dss.append(mean_delta_sigma(pos, pm, cat.pmass*1./cat._downsample_factor,\
+                     rbins, period=cat.Lbox, num_threads='max', per_object=True) / (1e12))#*cat.h**2)
 
 print 'C'
-np.save(basename+'mock_ds.npy', mock_ds)
+np.save(basename+'mock_ds.npy', np.sum(np.hstack(mock_dss), axis=1).mean(axis=0))
