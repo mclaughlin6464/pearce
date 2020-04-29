@@ -1463,7 +1463,7 @@ class Cat(object):
         return hist
 
     @observable()
-    def calc_vdf(self, r_bins, n_cores = 'all', halo = False, n_ran = 10, vdf_kwargs={}, PBC=True):
+    def calc_vdf(self, r_bins, n_cores = 'all', halo = False, n_ran = 1e9, vdf_kwargs={}, PBC=True):
         """Calculate the void density function."""
         n_cores = self._check_cores(n_cores)
 
