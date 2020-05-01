@@ -39,11 +39,11 @@ sys.stdout.flush()
 
 print 'B'
 #mock_ds = calc_ds(cat, rbins, n_cores = 1, randoms = randoms) 
-mock_dss = []
+mock_ds = np.zeros((pos.shape[0], len(rbins)-1)) 
 N = 20
 for pm in np.array_split(pos_m, N):
-    mock_dss.append(mean_delta_sigma(pos, pm, cat.pmass*1./cat._downsample_factor,\
-                     rbins, period=cat.Lbox, num_threads='max', per_object=True) / (1e12))#*cat.h**2)
+    mock_ds+=mean_delta_sigma(pos, pm, cat.pmass*1./cat._downsample_factor,\
+                     rbins, period=cat.Lbox, num_threads='max', per_object=True) / (1e12)#*cat.h**2)
 
 print 'C'
-np.save(basename+'mock_ds.npy', np.sum(np.hstack(mock_dss), axis=1).mean(axis=0))
+np.save(basename+'mock_ds.npy', mock_ds.mean(axis=0))
