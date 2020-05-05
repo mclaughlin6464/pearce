@@ -1463,10 +1463,10 @@ class Cat(object):
         return hist
 
     @observable()
-    def calc_vdf(self, r_bins, n_cores = 'all', halo = False, n_ran = 10, vdf_kwargs={}, PBC=True):
+    def calc_vdf(self, r_bins, n_cores = 'all', halo = False, n_ran = 1e9, vdf_kwargs={}, PBC=True, downsample_factor = 1.0):
         """Calculate the void density function."""
         n_cores = self._check_cores(n_cores)
-
+        assert 0 < downsample_factor <=1.0
         # TODO particles
         if halo:
             x, y, z = [self.model.mock.halo_table[c] for c in ['halo_x', 'halo_y', 'halo_z']]
@@ -1474,6 +1474,10 @@ class Cat(object):
             x, y, z = [self.model.mock.galaxy_table[c] for c in ['x', 'y', 'z']]
 
         pos = return_xyz_formatted_array(x, y, z, period=self.Lbox)
+        if downsample_factor < 1.0:
+            idxs = np.random.choice(pos.shape[0], size =int(downsample_factor*pos.shape[0]), replace=False)
+            pos = pos[idxs]
+
         period = self.Lbox
         vdf = void_density_function(pos, r_bins, period=period, n_jobs = n_cores,PBC=PBC,n_ran=n_ran, **vdf_kwargs)
 
