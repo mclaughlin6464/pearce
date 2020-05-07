@@ -50,7 +50,7 @@ print halocat.halo_table.colnames
 
 #### TMP ####
 # Gonna do a preliminary mass cut on the halocatalog
-n_part = 100
+n_part = 20
 # TODO do with mpeak instead
 pmass = 1.5e9
 halo_table = halocat.halo_table[halocat.halo_table['halo_mvir']>n_part*pmass]
@@ -115,9 +115,9 @@ n_obj_needed = int(nd*((1000.0)**3)) # don't divide by h
 
 non_nan_idxs = ~np.isnan(catalog)
 sort_idxs = np.argsort(catalog[non_nan_idxs])[::-1]
-final_catalog = catalog[non_nan_idxs][sort_idxs][:n_obj_needed]
+final_catalog = catalog[non_nan_idxs][sort_idxs]#[:n_obj_needed]
 
-output = halo_table[non_nan_idxs][sort_idxs][:n_obj_needed]
+output = halo_table[non_nan_idxs][sort_idxs]#[:n_obj_needed]
 
 
 output['gal_smass'] = final_catalog
@@ -125,8 +125,7 @@ output['gal_smass'] = final_catalog
 
 
 #output.write('/nfs/slac/g/ki/ki18/des/swmclau2/catalog_ab_%s_large.hdf5'%ab_property, format = 'hdf5', path = '%s_catalog'%ab_property, overwrite=True)
-#output.write('/scratch/users/swmclau2/catalog_ab_%s_large_fixed.hdf5'%ab_property, format = 'hdf5', path = '%s_catalog'%ab_property, overwrite=True)
-# In[ ]:
-output.write('/scratch/users/swmclau2/MDPL2_%s_smf_sham.hdf5'%ab_property, format = 'hdf5', path = '%s_catalog'%ab_property, overwrite=True)
-np.save('/scratch/users/swmclau2/UniverseMachine/cut_sham_catalog.npy', output.as_array())
+output.write('/scratch/users/swmclau2/test_MDPL2_%s_smf_sham_large.hdf5'%ab_property, format = 'hdf5', path = '%s_catalog'%ab_property, overwrite=True)
+#output.write('/scratch/users/swmclau2/MDPL2_%s_smf_sham.hdf5'%ab_property, format = 'hdf5', path = '%s_catalog'%ab_property, overwrite=True)
+#np.save('/scratch/users/swmclau2/UniverseMachine/cut_sham_catalog.npy', output.as_array())
 #print ab_property
