@@ -213,7 +213,8 @@ catalog['halo_mvir_host_halo'] = shuffled_host_mvir[:]
 
 
 # In[ ]:
-delete_keys = ['halo_vmax@mpeak', 'halo_rvir', 'halo_mpeak', 'halo_id', 'halo_rs', 'halo_nfw_conc', 'halo_hostid',
+# currently not deleting halo_id, see if that works? 
+delete_keys = ['halo_vmax@mpeak', 'halo_rvir', 'halo_mpeak', 'halo_rs', 'halo_nfw_conc', 'halo_hostid',
                'halo_mvir_host_halo', 'halo_x_host_halo', 'halo_y_host_halo', 'halo_z_host_halo', 'halo_vx_host_halo',
                'halo_vy_host_halo', 'halo_vz_host_halo', 'halo_rvir_host_halo', 'halo_nfw_conc_host_halo']
 for key in delete_keys:
@@ -222,10 +223,10 @@ for key in delete_keys:
     except KeyError:
         continue
 
+non_nan_idxs = ~np.isnan(catalog['gal_smass'])
+sort_idxs = np.argsort(catalog[non_nan_idxs])[::-1]
+catalog = catalog[non_nan_idxs][sort_idxs][:n_obj_needed]
 
-sort_idxs = np.argsort(catalog[~np.isnan(catalog['gal_smass'])]['gal_smass'])[::-1]
-#catalog = catalog[~np.isnan(catalog['gal_smass'])][sort_idxs[-1*n_obj_needed:]]
-catalog = catalog[~np.isnan(catalog['gal_smass'])][sort_idxs[:n_obj_needed]]
 
 # In[ ]:
 
