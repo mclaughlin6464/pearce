@@ -1102,7 +1102,10 @@ class MDPL2(Cat):
             # actually r200b, but halotools can have issues with other mass defs
             # I think i've corrected an issue there was with the h factor in rho_crit
             print 'Computing r200b'
-            reader.halo_table['halo_rvir'] = np.cbrt( (const.G*const.M_sun/(67.7*u.km/u.s/u.Mpc)**2)*reader.halo_table['halo_mvir']/100).to('Mpc').value
+            Om0 = 0.307
+            C = (const.G*const.M_sun/((100*u.km/u.s/u.Mpc)**2))
+            new_rvir = lambda m: np.cbrt( C*(m/(100*Om0))).to('Mpc').value
+            reader.halo_table['halo_rvir'] = new_rvir(reader.halo_table['halo_mvir'])
             #####################
             if add_local_density or add_particles:
                 particles = self._read_particles(snapdir, downsample_factor=downsample_factor)
