@@ -425,7 +425,7 @@ class Cat(object):
 
     # adding **kwargs cuz some invalid things can be passed in, hopefully not a pain
     # TODO some sort of spell check in the input file
-    def load(self, scale_factor, HOD='redMagic', biased_satellites=False, tol=0.01, particles=False, downsample_factor=1e-2, hod_kwargs={},
+    def load(self, scale_factor, HOD='zheng07', biased_satellites=False, tol=0.01, particles=False, downsample_factor=1e-2, hod_kwargs={},
              **kwargs):
         '''
         Load both a halocat and a model to prepare for population and calculation.
@@ -480,7 +480,7 @@ class Cat(object):
         self.populated_once = False  # no way this one's been populated!
 
     # TODO not sure if assembias should be boolean, or keep it as separate HODs?
-    def load_model(self, scale_factor, HOD='redMagic', biased_satellites=False, check_sf=True, hod_kwargs={}):
+    def load_model(self, scale_factor, HOD='zheng07', biased_satellites=False, check_sf=True, hod_kwargs={}):
         '''
         Load an HOD model. Not reccomended to be used separately from the load function. It
         is possible for the scale_factor of the model and catalog to be different.
