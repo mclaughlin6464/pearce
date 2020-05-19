@@ -121,6 +121,8 @@ shuffled_vel = np.zeros((len(catalog), 3))
 shuffled_ids = np.zeros((len(catalog)))
 shuffled_upids = np.zeros((len(catalog)))
 shuffled_host_mvir = np.zeros((len(catalog)))
+shuffled_host_rvir = np.zeros((len(catalog)))
+shuffled_host_conc = np.zeros((len(catalog)))
 
 
 # In[ ]:
@@ -169,7 +171,9 @@ for ibin in bins_in_halocat:
     shuffled_upids[indices_of_prim_haloprop_bin[centrals_idx]] = -1
     
     shuffled_host_mvir[indices_of_prim_haloprop_bin[centrals_idx]] =             catalog[indices_of_prim_haloprop_bin[centrals_idx]]['halo_mvir']
-        
+     shuffled_host_rvir[indices_of_prim_haloprop_bin[centrals_idx]] =             catalog[indices_of_prim_haloprop_bin[centrals_idx]]['halo_rvir']
+      shuffled_host_conc[indices_of_prim_haloprop_bin[centrals_idx]] =             catalog[indices_of_prim_haloprop_bin[centrals_idx]]['halo_nfw_conc']
+  
     unique_hosts_id, first_sat_idxs, inverse_idxs = np.unique(catalog[indices_of_prim_haloprop_bin[satellites_idx]]['halo_upid'],                                                       return_index=True, return_inverse=True)
 
     shuffled_idxs = np.random.permutation(unique_hosts_id.shape[0])
@@ -186,6 +190,8 @@ for ibin in bins_in_halocat:
     shuffled_upids[indices_of_prim_haloprop_bin[satellites_idx]] = new_host_ids
 
     shuffled_host_mvir[indices_of_prim_haloprop_bin[satellites_idx]] =             catalog[indices_of_prim_haloprop_bin[satellites_idx]][hosts_old_satellite_idxs]['halo_mvir_host_halo']
+    shuffled_host_rvir[indices_of_prim_haloprop_bin[satellites_idx]] =             catalog[indices_of_prim_haloprop_bin[satellites_idx]][hosts_old_satellite_idxs]['halo_rvir_host_halo']
+    shuffled_host_conc[indices_of_prim_haloprop_bin[satellites_idx]] =             catalog[indices_of_prim_haloprop_bin[satellites_idx]][hosts_old_satellite_idxs]['halo_nfw_conc_host_halo']
 
     for idx, coord in enumerate(['x','y','z']):
 
@@ -210,13 +216,15 @@ catalog['halo_vz'] = shuffled_vel[:,2]
 catalog['halo_id'] = shuffled_ids[:]
 catalog['halo_upid']=shuffled_upids[:]
 catalog['halo_mvir_host_halo'] = shuffled_host_mvir[:]
+catalog['halo_rvir_host_halo'] = shuffled_host_rvir[:]
+catalog['halo_nfw_conc_host_halo'] = shuffled_host_conc[:]
 
 
 # In[ ]:
 # currently not deleting halo_id, see if that works? 
 delete_keys = ['halo_vmax@mpeak', 'halo_rvir', 'halo_mpeak', 'halo_rs', 'halo_nfw_conc', 'halo_hostid',
                'halo_mvir_host_halo', 'halo_x_host_halo', 'halo_y_host_halo', 'halo_z_host_halo', 'halo_vx_host_halo',
-               'halo_vy_host_halo', 'halo_vz_host_halo', 'halo_rvir_host_halo', 'halo_nfw_conc_host_halo']
+               'halo_vy_host_halo', 'halo_vz_host_halo'] 
 for key in delete_keys:
     try:
         del catalog[key]
