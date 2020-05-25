@@ -37,7 +37,7 @@ n_obj_needed = int(nd*(Lbox**3))
 
 
 add_halo_hostid(catalog, delete_possibly_existing_column=True)
-
+catalog['halo_nfw_conc'] = catalog['halo_rvir']/catalog['halo_rs']
 
 for prop in ['halo_x', 'halo_y', 'halo_z','halo_vx', 'halo_vy', 'halo_vz', 'halo_nfw_conc', 'halo_rvir']:
     try:
@@ -171,8 +171,8 @@ for ibin in bins_in_halocat:
     shuffled_upids[indices_of_prim_haloprop_bin[centrals_idx]] = -1
     
     shuffled_host_mvir[indices_of_prim_haloprop_bin[centrals_idx]] =             catalog[indices_of_prim_haloprop_bin[centrals_idx]]['halo_mvir']
-     shuffled_host_rvir[indices_of_prim_haloprop_bin[centrals_idx]] =             catalog[indices_of_prim_haloprop_bin[centrals_idx]]['halo_rvir']
-      shuffled_host_conc[indices_of_prim_haloprop_bin[centrals_idx]] =             catalog[indices_of_prim_haloprop_bin[centrals_idx]]['halo_nfw_conc']
+    shuffled_host_rvir[indices_of_prim_haloprop_bin[centrals_idx]] =             catalog[indices_of_prim_haloprop_bin[centrals_idx]]['halo_rvir']
+    shuffled_host_conc[indices_of_prim_haloprop_bin[centrals_idx]] =             catalog[indices_of_prim_haloprop_bin[centrals_idx]]['halo_nfw_conc']
   
     unique_hosts_id, first_sat_idxs, inverse_idxs = np.unique(catalog[indices_of_prim_haloprop_bin[satellites_idx]]['halo_upid'],                                                       return_index=True, return_inverse=True)
 
