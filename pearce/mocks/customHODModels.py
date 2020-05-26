@@ -1233,7 +1233,7 @@ class TabulatedSats(OccupationComponent):
         self._prim_haloprop_vals = prim_haloprop_vals
         self._sat_hod_vals = sat_hod_vals
 
-        self._sat_hod_vals[self._sat_hod_vals < 1e-4] = 0.0 
+        self._sat_hod_vals[self._sat_hod_vals < 1e-7] = 0.0 
 
 
         self._mean_occupation = interp1d(np.log10(prim_haloprop_vals), sat_hod_vals, kind='cubic')
