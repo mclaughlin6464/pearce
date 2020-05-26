@@ -11,6 +11,7 @@ from itertools import izip, product
 from os import path
 import numpy as np
 from astropy import cosmology
+from astropy.cosmology import Planck13
 from astropy import units as u
 import astropy.constants as const
 import pandas as pd
@@ -104,6 +105,44 @@ class Bolshoi(Cat):
 
         super(Bolshoi, self).__init__(simname, version_name=version_name, scale_factors=scale_factors)
 
+class BolshoiPlanck(Cat):
+    'Bolshoi but run at the Planck cosmology'
+
+    def __init__(self, system='ki-ls', **kwargs):
+
+        # set these defaults
+        simname = 'bolshoiPlanck'
+        cosmo = Planck13#() 
+        pmass = 1.55e+08
+        Lbox = 250.0
+        columns_to_keep = HLIST_COLS
+
+        # some of the columns here are different
+        #columns_to_keep['halo_vpeak'] = (52, 'f4')
+        #columns_to_keep['halo_mpeak'] = (50, 'f4')
+        locations = {'ki-ls': '/nfs/slac/g/ki/ki21/cosmo/behroozi/Bolshoi-Planck/hlists/'}
+        locations['long'] = locations['ki-ls']
+
+        assert system in locations
+        loc = locations[system]
+
+        tmp_fnames = sorted(glob(loc + 'hlist_*.list'))  # snag all the hlists
+        tmp_fnames = [fname[len(loc):] for fname in tmp_fnames]  # just want the names in the dir
+        tmp_scale_factors = [float(fname[6:-5]) for fname in tmp_fnames]  # pull out scale factors
+
+        # If use specified scale factors or filenames, select only those.
+        # Looked into a way to put this in the global init.
+        # However, the amount of copy-pasting that would save would be minimal, it turns out.
+        self._update_lists(kwargs, tmp_fnames, tmp_scale_factors)
+        # Now fnames and scale factors are rolled into kwargs
+        new_kwargs = kwargs.copy()
+        # delete the keys that are fixed, if they exist
+        for key in ['simname', 'loc', 'columns_to_keep', 'Lbox', 'pmass', 'cosmo']:
+            if key in new_kwargs:
+                del new_kwargs[key]
+
+        super(BolshoiPlanck, self).__init__(simname, loc, columns_to_keep=columns_to_keep, Lbox=Lbox, \
+                                       pmass=pmass, cosmo=cosmo, **new_kwargs)
 
 class Chinchilla(Cat):
     'The most complicated (and biggest) subclass'
@@ -1122,7 +1161,7 @@ class MDPL2(Cat):
 
 # a dict that maps the default simnames to objects, which makes construction easier.
 # TODO kitten_dict
-cat_dict = {'bolshoi': Bolshoi, 'multidark': Multidark, 'emu': Emu, 'fox': Fox, 'multidark_highres': MDHR,
+cat_dict = {'bolshoi': Bolshoi,'bolshoiPlanck': BolshoiPlanck, 'multidark': Multidark, 'emu': Emu, 'fox': Fox, 'multidark_highres': MDHR,
             'chinchilla': Chinchilla, 'aardvark': Aardvark, 'guppy': Guppy,
             'trainingbox': TrainingBox, 'testbox': TestBox, 'fastpm':FastPM, 'resolution': ResolutionTestBox,
             'mdpl2': MDPL2}

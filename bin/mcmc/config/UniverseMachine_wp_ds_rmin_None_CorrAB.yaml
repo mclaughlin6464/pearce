@@ -9,7 +9,7 @@ data:
   cov:
     emu_cov_fname: &id001 [/u/ki/swmclau2/Git/pearce/bin/optimization/wp_corrab_emu_cov_lpw.npy,
       /u/ki/swmclau2/Git/pearce/bin/optimization/ds_corrab_emu_cov_lpw.npy]
-    meas_cov_fname: /u/ki/swmclau2/Git/pearce/bin/covmat/wp_ds_full_covmat.npy
+    meas_cov_fname: /u/ki/swmclau2/Git/pearce/bin/covmat/wp_ds_full_covmat_h.npy
   obs:
     mean: false
     obs: [wp, ds]
@@ -137,7 +137,7 @@ data:
     scatter: 0.2
     sim_hps: {system: ki-ls}
     simname: ds_14_b_sub
-  true_cov_fname: /u/ki/swmclau2/Git/pearce/bin/covmat/wp_ds_full_covmat.npy
+  true_cov_fname: /u/ki/swmclau2/Git/pearce/bin/covmat/wp_ds_full_covmat_h.npy
   true_data_fname: [/u/ki/swmclau2/Git/pearce/bin/mock_measurements/UMmock_wp.npy,
     /u/ki/swmclau2/Git/pearce/bin/mock_measurements/UMmock_ds.npy]
 emu:
