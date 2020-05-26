@@ -127,5 +127,5 @@ output['gal_smass'] = final_catalog
 #output.write('/nfs/slac/g/ki/ki18/des/swmclau2/catalog_ab_%s_large.hdf5'%ab_property, format = 'hdf5', path = '%s_catalog'%ab_property, overwrite=True)
 output.write('/scratch/users/swmclau2/test_MDPL2_%s_smf_sham_large.hdf5'%ab_property, format = 'hdf5', path = '%s_catalog'%ab_property, overwrite=True)
 #output.write('/scratch/users/swmclau2/MDPL2_%s_smf_sham.hdf5'%ab_property, format = 'hdf5', path = '%s_catalog'%ab_property, overwrite=True)
-#np.save('/scratch/users/swmclau2/UniverseMachine/cut_sham_catalog.npy', output.as_array())
+np.save('/scratch/users/swmclau2/UniverseMachine/cut_sham_catalog.npy', output.as_array()[:n_obj_needed])
 #print ab_property
