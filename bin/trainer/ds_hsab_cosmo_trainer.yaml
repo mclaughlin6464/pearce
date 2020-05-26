@@ -7,7 +7,7 @@ cosmology:
         system: ki-ls 
 HOD:
         model: hsabZheng07 
-        sec_haloprop_key: 'halo_local_density_10'
+        sec_haloprop_key: 'halo_nfw_conc'
         num_hods: 1000 
         fixed_nd: 5e-4
         biased_satellites: True 
@@ -23,7 +23,7 @@ observation:
         n_repops: 3 
         log_obs: True
 computation:
-        filename: /nfs/slac/g/ki/ki18/des/swmclau2/ds_hsab_h/PearceHSABDsCosmo.hdf5 
+        filename: /nfs/slac/g/ki/ki18/des/swmclau2/ds_hsab_conc_h/PearceHSABDsCosmo.hdf5 
         overwrite: True
         queue_skipper: True
         system: ki-ls 
