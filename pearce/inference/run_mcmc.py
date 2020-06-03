@@ -498,7 +498,8 @@ def run_mcmc_config(config_fname, restart = False):
 
     np.random.seed(seed)
     #print len(emu_type), len(training_file), len(rpoints), len(fixed_params)
-    for et, tf, rp, fp in zip(emu_type, training_file, rpoints, fixed_params): # TODO iterate over the others?
+    print cov.shape, np.sqrt(np.diag(cov))
+    for emu_idx, (et, tf, rp, fp) in enumerate(zip(emu_type, training_file, rpoints, fixed_params)): # TODO iterate over the others?
         # TODO how will cic work with rmin?
         emu = emu_type_dict[et](tf, fixed_params = fp,
                                  **emu_hps)
@@ -511,17 +512,22 @@ def run_mcmc_config(config_fname, restart = False):
 
         #assert np.all(np.isclose(_rp[-1], emu.scale_bin_centers))
         #print cut_n_bins
-        #print 'y',y
-        _y.append(y[init_idx+cut_n_bins:init_idx + orig_n_bins])
-        #print '_y', _y
+        _y.append(y[(orig_n_bins)*emu_idx+cut_n_bins:(orig_n_bins)*emu_idx+ orig_n_bins])
+
         cov_idxs = np.ones((cov.shape[0],), dtype = bool)
         cov_idxs[init_idx:init_idx+cut_n_bins] = False # deselect the bins we're cutting
+       # print 'y', y
+        print '_y', _y
 
+        #print cov_idxs.shape, cov_idxs
         cov = cov[cov_idxs]
         cov = cov[:, cov_idxs]
+        print 'cov',cov.shape, np.sqrt(np.diag(cov))
 
-        init_idx+=orig_n_bins#emu.n_bins
+        init_idx+= emu.n_bins
 
+    from sys import exit
+    exit(0)
     rpoints = _rp
 
     y = np.hstack(_y)

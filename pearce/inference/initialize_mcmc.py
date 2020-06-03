@@ -70,7 +70,7 @@ def emu_config(f, cfg):
             attr = int(time()) 
         else:
             attr = str(attr) if (type(attr) is dict or type(attr) is list) else attr 
-
+        print key, type(attr), attr
         f.attrs[key] = attr 
 
 def data_config(f, cfg):
