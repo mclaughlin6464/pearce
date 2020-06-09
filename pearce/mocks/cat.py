@@ -581,6 +581,8 @@ class Cat(object):
             assert self.halocat is not None
         except AssertionError:
             raise AssertionError("Please load a halocat before calling calc_mf.")
+        if hasattr(self, '_mf_min_%d'%min_ptcl):
+            return getattr(self, '_mf_min_%d'%min_ptcl)
         #if hasattr(self, '_last_halocat_id'):
         #    if self._last_halocat_id == id(self.halocat):
         #        return self._last_mf
@@ -593,6 +595,8 @@ class Cat(object):
         mf = np.histogram(masses, mass_bins)[0]
         #self._last_mf = mf
         #self._last_halocat_id = id(self.halocat)
+
+        setattr(self, '_mf_min_%d'%min_ptcl, mf)
 
         return mf
 
@@ -755,7 +759,7 @@ class Cat(object):
 
     # TODO do_jackknife to cov?
     @observable()
-    def calc_xi(self, rbins, n_cores='all', do_jackknife=False, use_corrfunc=False, jk_args={}, halo=False):
+    def calc_xi(self, rbins, n_cores='all', do_jackknife=False, use_corrfunc=False, jk_args={}, halo=False, PBC=True):
         '''
         Calculate a 3-D correlation function on a populated catalog.
         :param rbins:
@@ -777,6 +781,11 @@ class Cat(object):
                 xi_cov (if do_jacknife and ! use_corrfunc):
                 (len(rbins), len(rbins)) covariance matrix for xi.
         '''
+        if PBC:
+            period = self.Lbox
+        else:
+            period = None
+
         assert not (do_jackknife and use_corrfunc)  # can't both be true.
 
         n_cores = self._check_cores(n_cores)
@@ -802,9 +811,9 @@ class Cat(object):
                                    z.astype('float32') / self.h)
             xi_all = np.array(xi_all, dtype='float64')[:, 3]
             '''
-            out = xi(self.model.mock.Lbox / self.h, n_cores, rbins,
-                     x.astype('float32') / self.h, y.astype('float32') / self.h,
-                     z.astype('float32') / self.h)
+            out = xi(self.model.mock.Lbox , n_cores, rbins,
+                     x.astype('float32') , y.astype('float32') ,
+                     z.astype('float32') )
 
             xi_all = out[4]  # returns a lot of irrelevant info
             # TODO jackknife with corrfunc?
@@ -833,8 +842,8 @@ class Cat(object):
                     xis, covs = [], []
                     for rb, nr in zip([rbins_small, rbins_large], n_rands):  #
                         randoms = np.random.random((pos.shape[0] * nr,
-                                                    3)) * self.Lbox / self.h  # Solution to NaNs: Just fuck me up with randoms
-                        xi, cov = tpcf_jackknife(pos / self.h, randoms, rb, period=self.Lbox / self.h,
+                                                    3)) * self.Lbox   # Solution to NaNs: Just fuck me up with randoms
+                        xi, cov = tpcf_jackknife(pos , randoms, rb, period=self.Lbox ,
                                                  num_threads=n_cores, Nsub=n_sub, estimator='Landy-Szalay')
                         xis.append(xi)
                         covs.append(cov)
@@ -843,11 +852,11 @@ class Cat(object):
                     xi_cov = block_diag(*covs)  # note this appraoch creates block_diag cov mat
                 else:
                     randoms = np.random.random((pos.shape[0] * n_rands,
-                                                3)) * self.Lbox / self.h  # Solution to NaNs: Just fuck me up with randoms
-                    xi_all, xi_cov = tpcf_jackknife(pos / self.h, randoms, rbins, period=self.Lbox / self.h,
+                                                3)) * self.Lbox   # Solution to NaNs: Just fuck me up with randoms
+                    xi_all, xi_cov = tpcf_jackknife(pos , randoms, rbins, period=self.Lbox,
                                                     num_threads=n_cores, Nsub=n_sub, estimator='Landy-Szalay')
             else:
-                xi_all = tpcf(pos / self.h, rbins, period=self.Lbox / self.h, num_threads=n_cores,
+                xi_all = tpcf(pos, rbins, period=self.Lbox , num_threads=n_cores,
                               estimator='Landy-Szalay')
 
         # TODO 1, 2 halo terms?
@@ -885,10 +894,10 @@ class Cat(object):
         n_cores = self._check_cores(n_cores)
 
         x_g, y_g, z_g = [self.model.mock.galaxy_table[c] for c in ['x', 'y', 'z']]
-        pos_g = return_xyz_formatted_array(x_g, y_g, z_g, period=self.Lbox)
+        pos_g = return_xyz_formatted_array(x_g, y_g, z_g, period=period)
 
         x_m, y_m, z_m = [self.halocat.ptcl_table[c] for c in ['x', 'y', 'z']]
-        pos_m = return_xyz_formatted_array(x_m, y_m, z_m, period=self.Lbox)
+        pos_m = return_xyz_formatted_array(x_m, y_m, z_m, period=period)
 
         if use_corrfunc:
             # corrfunc doesn't have built in cross correlations
@@ -949,7 +958,7 @@ class Cat(object):
                         randoms = np.random.random((pos_g.shape[0] * nr,
                                                     3)) * self.Lbox  # Solution to NaNs: Just fuck me up with randoms
                         _, xi, _, _, cov, _ = tpcf_jackknife(pos_g , randoms, rb, sample2=pos_m,
-                                                             period=self.Lbox,
+                                                             period=period,
                                                              num_threads=n_cores, Nsub=n_sub, estimator='Landy-Szalay')
                         xis.append(xi)
                         covs.append(cov)
@@ -961,11 +970,11 @@ class Cat(object):
                     randoms = np.random.random((pos_g.shape[0] * n_rands,
                                                 3)) * self.Lbox   # Solution to NaNs: Just fuck me up with randoms
                     _, xi_all, _, _, xi_cov, _ = tpcf_jackknife(pos_g, randoms, rbins, sample2=pos_m,
-                                                                period=self.Lbox,
+                                                                period=period,
                                                                 num_threads=n_cores, Nsub=n_sub,
                                                                 estimator='Landy-Szalay')  # , do_auto=False)
             else:
-                xi_all = tpcf(pos_g, rbins, sample2=pos_m, period=self.Lbox,
+                xi_all = tpcf(pos_g, rbins, sample2=pos_m, period=period,
                               num_threads=n_cores, 
                               estimator='Landy-Szalay', do_auto=False)
 
