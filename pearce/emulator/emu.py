@@ -2938,7 +2938,7 @@ class LemonPepperWet(NashvilleHot):
         x3 = np.log10(self.scale_bin_centers.reshape((-1, 1)))
         xs.append(x3)
 
-        print len(xs) 
+        #print len(xs) 
         #emulator = GPKroneckerGaussianRegressionVar(x1, x2, y, yerr ** 2, kern1, kern2, noise_var=nv)
         emulator = GPKroneckerGaussianRegression(xs[0], xs[1],\
                                                       y, kerns[0], kerns[1], noise_var,\
@@ -3064,6 +3064,7 @@ class LemonPepperWet(NashvilleHot):
             elif 'HOD' in self.fixed_params:
                 return ((x1-self._x1_mean)/(self._x1_std+1e-9),  x3), None
 
+        #print x1.shape, self._x1_mean.shape, x2.shape, self._x2_mean.shape
         return ((x1-self._x1_mean)/(self._x1_std+1e-9), (x2-self._x2_mean)/(self._x2_std+1e-9),\
                 x3), None
 
