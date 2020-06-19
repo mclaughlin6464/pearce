@@ -616,9 +616,10 @@ class Cat(object):
         logMmin_bounds = (12.0, 15.0)
         hod_params = self.model.param_dict.copy()
         def func(logMmin, hod_params):
+            print logMmin
             hod_params.update({'logMmin': logMmin})
             return (self.calc_analytic_nd(hod_params, min_ptcl = min_ptcl) - nd) ** 2
-
+            
         res = minimize_scalar(func, bounds=logMmin_bounds, args=(hod_params,), options={'maxiter': 100},
                               method='Bounded')
 
