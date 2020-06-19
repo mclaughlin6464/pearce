@@ -2,13 +2,13 @@ chain:
   fixed_params: {}
   mcmc_type: normal
   nburn: 0
-  nsteps: 10000
-  nwalkers: 200
+  nsteps: 100000
+  nwalkers: 250
   seed: 0
 data:
   cov:
-    emu_cov_fname: &id001 /u/ki/swmclau2/Git/pearce/bin/optimization/wp_hod_emu_cov.npy
-    meas_cov_fname: /u/ki/swmclau2/Git/pearce/bin/covmat/wp_full_covmat.npy
+    emu_cov_fname: &id001 /u/ki/swmclau2/Git/pearce/bin/optimization/wp_hod_emu_cov_lpw.npy
+    meas_cov_fname: /u/ki/swmclau2/Git/pearce/bin/covmat/wp_full_covmat_h.npy
   obs:
     mean: false
     obs: wp
@@ -131,17 +131,19 @@ data:
     gal_type: HOD
     hod_name: zheng07
     hod_params: {alpha: 1.083, conc_gal_bias: 1.0, logM0: 13.2, logM1: 14.2, sigma_logM: 0.2}
-    min_ptcl: 100
+    min_ptcl: 20
     nd: 5e-4
     scale_factor: 1.0
-    sim_hps: {boxno: 1, downsample_factor: 0.01, particles: true, realization: 0,
+    sim_hps: {boxno: 1, downsample_factor: 0.01, particles: true, realization: 1,
       system: ki-ls}
     simname: testbox
+  true_cov_fname: /u/ki/swmclau2/Git/pearce/bin/covmat/wp_full_covmat_h.npy
+  true_data_fname: /u/ki/swmclau2/Git/pearce/bin/mock_measurements/HOD4mock_wp.npy
 emu:
   emu_cov_fname: *id001
   emu_hps: {}
-  emu_type: NashvilleHot
+  emu_type: LemonPepperWet
   fixed_params: {rmin: 0.5, z: 0.0}
-  training_file: /u/ki/swmclau2/des/wp_zheng07/PearceWpCosmo.hdf5
-fname: /nfs/slac/g/ki/ki18/des/swmclau2/PearceMCMC/HOD_wp_rmin_0.5_HOD.hdf5
+  training_file: /u/ki/swmclau2/des/Aemulators/wp_zheng07_h/PearceWpCosmo.hdf5
+fname: /u/ki/swmclau2/des/PearceMCMC/HOD_wp_rmin_0.5_HOD.hdf5
 sim: *id002
