@@ -26,7 +26,7 @@ from halotools.mock_observables import *  # i'm importing so much this is just e
 from halotools.custom_exceptions import InvalidCacheLogEntry
 
 from .customHODModels import *
-from .void_density_function import void_density_function
+from .void_density_function import *
 
 # try to import corrfunc, determine if it was successful
 try:
@@ -1492,3 +1492,21 @@ class Cat(object):
         vdf = void_density_function(pos, r_bins, period=period, n_jobs = n_cores,PBC=PBC,n_ran=n_ran, **vdf_kwargs)
 
         return vdf
+
+    @observable()
+    def calc_knn_cdf(self, r_bins, k, n_cores = 'all', halo = False, n_ran = 1e9, PBC=True):
+        """Calculate the cdf of the knn function."""
+        n_cores = self._check_cores(n_cores)
+        assert type(k) is int
+        # TODO particles
+        if halo:
+            x, y, z = [self.model.mock.halo_table[c] for c in ['halo_x', 'halo_y', 'halo_z']]
+        else:
+            x, y, z = [self.model.mock.galaxy_table[c] for c in ['x', 'y', 'z']]
+
+        pos = return_xyz_formatted_array(x, y, z, period=self.Lbox)
+
+        period = self.Lbox
+
+        return knn_cdf(pos, r_bins,k=k, period=period, n_jobs = n_cores,PBC=PBC,n_ran=n_ran, **vdf_kwargs)
+
