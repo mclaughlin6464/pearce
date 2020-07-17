@@ -8,12 +8,12 @@ cosmology:
 HOD:
         model: zheng07
 #        sec_haloprop_key: 'halo_local_density_10'
-        num_hods: 50
+        num_hods: 100
         fixed_nd: 5e-4
         biased_satellites: True
         ordered_params: {'logMmin': [12.0, 16.0], 'sigma_logM': [0.05, 0.5], 'logM0': [12.6, 13.6], 'logM1': [13.7, 14.7], 'alpha': [0.7, 1.3], 'conc_gal_bias': [0.5, 2.0]}
         system: ki-ls 
-        min_ptcl: 50
+        min_ptcl: 20
 observation:
         obs: xi 
         bins: [   0.50118723,    0.65313055,    0.85113804,    1.10917482,

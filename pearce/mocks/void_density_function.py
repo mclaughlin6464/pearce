@@ -77,8 +77,7 @@ def knn_cdf(sample1, rbins, k, n_ran=1e9, randoms=None,
     boxsize = period+1e-6 if PBC else None 
     tree = cKDTree(sample1, boxsize=boxsize, leafsize=leafsize)
 
-    void_size, _ = tree.query(randoms, k=k, eps=eps, n_jobs=n_jobs)
-
+    void_size = tree.query(randoms, k=[k], eps=eps, n_jobs=n_jobs)[0].squeeze()
     bin_centers = (rbins[1:]+rbins[:-1])/2.0
 
     sorted_void_size = np.sort(void_size)
