@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=cache_halocat
-#SBATCH --time=4:00:00
+#SBATCH --time=24:00:00
 #SBATCH -p iric 
 #SBATCH -o /home/users/swmclau2/Git/pearce/bin/cache/cache_halocat.out
 #SBATCH --exclusive

@@ -386,7 +386,7 @@ class Cat(object):
                                           str(downsample_factor),
                                           overwrite=True)  # TODO would be nice to make a note of the downsampling without having to do some voodoo to get it.
 
-    def add_local_density(self, reader, all_particles, downsample_factor=1e-2, radius=[1, 5, 10]):  # [1,5,10]
+    def add_local_density(self, reader, all_particles, downsample_factor=1e-2, radius=[10]):  # [1,5,10]
         """
         Calculates the local density around each halo and adds it to the halo table, to be cached.
         :param reader:
@@ -422,8 +422,9 @@ class Cat(object):
                 volume = (4 * np.pi / 3 * r ** 3)
                 reader.halo_table['halo_local_density_%d' % (int(r))] = densities[:, r_idx] / (
                             volume * mean_particle_density)
-
-    # adding **kwargs cuz some invalid things can be passed in, hopefully not a pain
+                np.save('/scratch/users/swmclau2/mdpl2_densities_tmp.npy', densities[:, r_idx] / (
+                            volume * mean_particle_density))
+   # adding **kwargs cuz some invalid things can be passed in, hopefully not a pain
     # TODO some sort of spell check in the input file
     def load(self, scale_factor, HOD='zheng07', biased_satellites=False, tol=0.01, particles=False, downsample_factor=1e-2, hod_kwargs={},
              **kwargs):

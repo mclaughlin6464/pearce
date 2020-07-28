@@ -1135,6 +1135,8 @@ class MDPL2(Cat):
             reader = RockstarHlistReader(fname, self.columns_to_keep, cache_fnames, self.simname,
                                          self.halo_finder, z, self.version_name, self.Lbox, self.pmass,
                                          overwrite=overwrite)
+            print self.columns_to_keep
+            print self.columns_to_convert
             reader.read_halocat(self.columns_to_convert)
 
             ###### New stuff ####
@@ -1146,12 +1148,15 @@ class MDPL2(Cat):
             new_rvir = lambda m: np.cbrt( C*(m/(100*Om0))).to('Mpc').value
             reader.halo_table['halo_rvir'] = new_rvir(reader.halo_table['halo_mvir'])
             #####################
+            print reader.halo_table.colnames
             if add_local_density or add_particles:
                 particles = self._read_particles(snapdir, downsample_factor=downsample_factor)
                 print 'sneaky', particles.shape
                 if add_local_density:
                     self.add_local_density(reader, particles, downsample_factor)  # TODO how to add radius?
-
+            print reader.halo_table.colnames
+            print reader.halo_table['halo_x']
+            print reader.halo_table['halo_local_density_10']
             reader.write_to_disk()  # do these after so we have a halo table to work off of
             reader.update_cache_log()
 

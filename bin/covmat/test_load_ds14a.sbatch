@@ -1,9 +1,13 @@
 #!/bin/bash
 #SBATCH --job-name=test_load_ds14a
-#SBATCH -p iric 
-#SBATCH --time=48:00:00
+#SBATCH -p bigmem 
+#SBATCH --time=24:00:00
 #SBATCH -o test_load_ds14a.out
-#SBATCH --exclusive
+###SBATCH --exclusive
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=32
+#SBATCH --mem-per-cpu=16G
+
 
 module load python/2.7.13
 module load py-scipystack
