@@ -1495,7 +1495,7 @@ class Cat(object):
         return vdf
 
     @observable()
-    def calc_knn_cdf(self, r_bins, k, n_cores = 'all', halo = False, n_ran = 1e9, PBC=True):
+    def calc_knn_cdf(self, r_bins, k, n_cores = 'all', halo = False, n_ran = 1e9, PBC=True, knn_cdf_kwargs={}):
         """Calculate the cdf of the knn function."""
         n_cores = self._check_cores(n_cores)
         assert type(k) is int
@@ -1509,5 +1509,5 @@ class Cat(object):
 
         period = self.Lbox
 
-        return knn_cdf(pos, r_bins,k=k, period=period, n_jobs = n_cores,PBC=PBC,n_ran=n_ran, **vdf_kwargs)
+        return knn_cdf(pos, r_bins,k=k, period=period, n_jobs = n_cores,PBC=PBC,n_ran=n_ran, **knn_cdf_kwargs)
 
