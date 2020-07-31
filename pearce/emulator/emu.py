@@ -2816,7 +2816,7 @@ class LemonPepperWet(NashvilleHot):
             # print np.where(nan_idxs)
             # num_skipped = np.sum(y_nans)
             for a, b, c in zip(*nan_idxs):
-                yerr[a, b, c] = np.nanmean(y[a])
+                yerr[a, b, c] = -2#np.nanmean(y[a])
 
             ycov_list = []
 
@@ -3295,7 +3295,7 @@ class LemonPepperWet(NashvilleHot):
 
         try:
             #self._emulator.optimize_restarts(parallel=False, num_restarts=5, verbose=True, robust=False)
-            self._emulator.optimize_restarts(num_restarts=10, verbose=True, max_iters=250, robust=False)
+            self._emulator.optimize_restarts(optimizer='scg',num_restarts=5, verbose=True, max_iters=250, robust=True)
         except:
             self._emulator.optimize_restarts(parallel=False, num_restarts=3, verbose=True, robust=True)
         sys.stdout.flush()
