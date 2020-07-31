@@ -644,7 +644,7 @@ class Trainer(object):
 
         idxs_to_do = []
         for idx in xrange(self.n_jobs):
-
+            print idx, 
             # slice out a portion of the poitns
             jobname = 'trainer_%04d' %idx
             param_filename = path.join(output_directory, jobname + '.npy')

@@ -2805,7 +2805,7 @@ class LemonPepperWet(NashvilleHot):
             # print np.where(nan_idxs)
             num_skipped = np.sum(y_nans)
             for a, b, c in zip(*nan_idxs):
-                y[a, b, c] = np.nanmean(y[a])
+                y[a, b, c] = -2#np.nanmean(y[a])
 
             y_infs_idxs = ~np.isfinite(y) # usually -np.inf due to log, just assuem that for now
             y[y_infs_idxs] = -10 # large negative number
