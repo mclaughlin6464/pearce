@@ -12,7 +12,7 @@ from pearce.mocks.kittens import cat_dict
 #cat.cache(overwrite = True, add_local_density=False)#, add_particles=True,downsample_factor = 1e-3)
 print 'running'
 cat = cat_dict['mdpl2'](scale_factors = [1.0], system = 'sherlock')
-cat.cache(overwrite = True, add_local_density=True, add_particles=True,downsample_factor = 1e-2)
+cat.cache(overwrite = True, add_local_density=False, add_particles=True,downsample_factor = 1e-2)
 
 #for boxno in xrange(7):
 #    for realization in xrange(5):
