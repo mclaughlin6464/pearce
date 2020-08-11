@@ -232,7 +232,7 @@ for key in delete_keys:
         continue
 
 non_nan_idxs = ~np.isnan(catalog['gal_smass'])
-sort_idxs = np.argsort(catalog[non_nan_idxs])[::-1]
+sort_idxs = np.argsort(catalog[non_nan_idxs])#[::-1]
 catalog = catalog[non_nan_idxs][sort_idxs][:n_obj_needed]
 
 
