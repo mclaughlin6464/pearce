@@ -998,7 +998,10 @@ class TabulatedCens(OccupationComponent):
         """
 
         upper_occupation_bound = 1.0
-
+        if type(prim_haloprop_vals) is str:
+            prim_haloprop_vals = np.load(prim_haloprop_vals)
+        if type(cen_hod_vals) is str:
+            cen_hod_vals = np.load(cen_hod_vals)
         assert np.all(cen_hod_vals >= 0) and np.all(upper_occupation_bound >= cen_hod_vals)
         assert cen_hod_vals.shape == prim_haloprop_vals.shape
         assert np.all(prim_haloprop_vals >= 0)
@@ -1225,6 +1228,11 @@ class TabulatedSats(OccupationComponent):
 
         """
         upper_occupation_bound = float("inf")
+
+        if type(prim_haloprop_vals) is str:
+            prim_haloprop_vals = np.load(prim_haloprop_vals)
+        if type(sat_hod_vals) is str:
+            sat_hod_vals = np.load(sat_hod_vals)
 
         assert np.all(sat_hod_vals >= 0)
         assert sat_hod_vals.shape == prim_haloprop_vals.shape
