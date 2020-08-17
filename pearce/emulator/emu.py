@@ -2678,6 +2678,12 @@ class LemonPepperWet(NashvilleHot):
             cosmo_param_vals = np.array(f['attrs/cosmo_param_vals'])
             hod_param_vals = np.array(f['attrs/hod_param_vals'])
 
+        if len(cosmo_param_vals.shape)==1:
+            cosmo_param_vals = cosmo_param_vals.reshape((-1,1))
+
+        if len(hod_param_vals.shape)==1:
+            hod_param_vals = hod_param_vals.reshape((-1,1))
+
         x1, x2 = cosmo_param_vals, hod_param_vals
 
         scale_factors = f.attrs['scale_factors']
@@ -2712,6 +2718,7 @@ class LemonPepperWet(NashvilleHot):
 
         if 'HOD' not in fixed_params:
             op_names.extend(hod_param_names)
+
             min_max_vals.extend(zip(hod_param_vals.min(axis=0), hod_param_vals.max(axis=0)))
 
         #min_max_vals = zip(np.r_[cosmo_param_vals.min(axis=0), hod_param_vals.min(axis=0)], \
