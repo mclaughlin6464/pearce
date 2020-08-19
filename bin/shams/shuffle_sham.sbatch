@@ -1,9 +1,11 @@
 #!/bin/bash
 #SBATCH --job-name=shuffle_sham
 #SBATCH --time=02:00:00
-#SBATCH -p iric 
+#SBATCH -p iric,kipac,owners
 #SBATCH -o shuffle_sham.out
-#SBATCH --exclusive
+#SBATCH -c 8 
+#SBATCH --mem=MaxMemPerCPU
+##SBATCH --exclusive
 
 module load python/2.7.13
 module load py-scipystack
