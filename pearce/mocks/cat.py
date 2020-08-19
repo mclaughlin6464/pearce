@@ -756,7 +756,7 @@ class Cat(object):
             Whether to calculate hte number density of halos instead of galaxies. Default is false.
         :return: Number density of a populated box.
         '''
-        return self.model.mock.number_density * self.h ** 3
+        return self.model.mock.number_density #* self.h ** 3
 
     # TODO do_jackknife to cov?
     @observable()
