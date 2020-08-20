@@ -2882,22 +2882,25 @@ class LemonPepperWet(NashvilleHot):
             # downsample x1
             N_points = x1.shape[0]
             downsample_N_points = int(downsample_factor * N_points)
-            downsample_x1 = x1[:downsample_N_points, :]
+            downsample_idxs = np.random.choice(x1.shape[0], size=downsample_N_points, replace=False)
+            downsample_x1 = x1[downsample_idxs, :]
             downsample_x2 = x2
 
-            downsample_y = y[:downsample_N_points, :]
-            downsample_yerr = yerr[:downsample_N_points, :]
+            downsample_y = y[downsample_idxs, :]
+            downsample_yerr = yerr[downsample_idxs, :]
 
         else:  # downsample x2
             N_points = x2.shape[0]
             downsample_N_points = int(downsample_factor * N_points)
-            downsample_x2 = x2[:downsample_N_points, :]
+            downsample_idxs = np.random.choice(x2.shape[0], size=downsample_N_points, replace=False)
+
+            downsample_x2 = x2[downsample_idxs, :]
             downsample_x1 = x1
             if 'cosmo' in self.fixed_params: 
-                downsample_y = y[:downsample_N_points]
+                downsample_y = y[downsample_idxs]
             else:
-                downsample_y = y[:, :downsample_N_points]
-            downsample_yerr = yerr[:, :downsample_N_points]
+                downsample_y = y[:, downsample_idxs]
+            downsample_yerr = yerr[:, downsample_idxs]
 
         if attach:
             self.downsample_x1 = np.stack(downsample_x1)

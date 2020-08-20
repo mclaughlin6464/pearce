@@ -233,11 +233,9 @@ for key in delete_keys:
 
 non_nan_idxs = ~np.isnan(catalog['gal_smass'])
 sort_idxs = np.argsort(catalog[non_nan_idxs]['gal_smass'])[::-1]
-print catalog['gal_smass'].min(), catalog['gal_smass'].max()
 catalog = catalog[non_nan_idxs][sort_idxs][:n_obj_needed]
-print catalog['gal_smass'].min(), catalog['gal_smass'].max()
 
-
+print len(catalog)
 # In[ ]:
 
 
@@ -298,6 +296,6 @@ print xi
 #catalog.write('/scratch/users/swmclau2/MDPL2_sham_%s_shuffled.hdf5'%ab_property,
 #              format = 'hdf5', path = '%s_shuffled'%ab_property, overwrite=True)
 
-np.save('/scratch/users/swmclau2/UniverseMachine/cut_shuffled_sham_catalog.npy', catalog.as_array())
+#np.save('/scratch/users/swmclau2/UniverseMachine/cut_shuffled_sham_catalog.npy', catalog.as_array())
 
 # In[ ]:
