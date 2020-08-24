@@ -49,7 +49,7 @@ except ImportError:
 #              'zheng07', 'leauthaud11', 'tinker13', 'hearin15', 'reddick14+redMagic', 'tabulated',\
 #              'hsabTabulated', 'abTabulated','fsabTabulated','fscabTabulated','corrTabulated', 'tabulated2D'}
 
-DEFAULT_HODS = {'zheng07', 'leauthaud11', 'tinker13', 'hearin15'}
+DEFAULT_HODS = {'leauthaud11', 'tinker13', 'hearin15'}
 VALID_HODS = set(HOD_DICT.keys()).union(DEFAULT_HODS)
 
 
@@ -318,7 +318,6 @@ class Cat(object):
         for a, z, fname, cache_fnames, snapdir in izip(self.scale_factors, self.redshifts, self.filenames,
                                                        self.cache_filenames, snapdirs):
             # TODO get right reader for each halofinder.
-            print a, z
             if scale_factors != 'all' and a not in scale_factors:
                 continue
             reader = RockstarHlistReader(fname, self.columns_to_keep, cache_fnames, self.simname,
@@ -522,8 +521,13 @@ class Cat(object):
                 # TODO  this is a hack, something better would be better
                 try: #hack for central modulation
                     # the ab ones need to modulated with the baseline model
-                    sats_occ = HOD_DICT[HOD][1](redshift=z, cenocc_model=cens_occ, **hod_kwargs)
+                    if HOD=='zheng07':
+                        hod_kwargs['modulate_with_cenocc']=True
+
+                    sats_occ = HOD_DICT[HOD][1](redshift=z, cenocc_model=cens_occ,
+                              **hod_kwargs)
                 except: #assume the error is a cenocc issue
+                    #print 'B'
                     sats_occ = HOD_DICT[HOD][1](redshift=z,  **hod_kwargs)
 
                 sats_occ._suppress_repeated_param_warning = True
@@ -536,7 +540,8 @@ class Cat(object):
             else:
                 self.model = PrebuiltHodModelFactory(HOD,redshift=z, **hod_kwargs)
                 if biased_satellites:
-                    self.model = HodModelFactory(baseline_model_instance=self.model, satellites_profile = sat_phase_space)
+                    self.model = HodModelFactory(baseline_model_instance=self.model, satellites_profile = sat_phase_space,
+                                                 modulate_with_cenocc=True)
         else:
             cens_occ = HOD[0](redshift=z, **hod_kwargs)
             try:
@@ -617,7 +622,7 @@ class Cat(object):
         logMmin_bounds = (12.0, 15.0)
         hod_params = self.model.param_dict.copy()
         def func(logMmin, hod_params):
-            print logMmin
+            #print logMmin
             hod_params.update({'logMmin': logMmin})
             return (self.calc_analytic_nd(hod_params, min_ptcl = min_ptcl) - nd) ** 2
             

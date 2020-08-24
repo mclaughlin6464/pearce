@@ -7,7 +7,7 @@ Details can be found in` McLaughlin et al 2018 (in prep)`_.
 
 from functools import wraps
 import numpy as np
-from scipy.stats import poisson, bernoulli, rankdata
+from scipy.stats import gamma, poisson, bernoulli, rankdata, norm, halfnorm
 
 from halotools.empirical_models.assembias_models import HeavisideAssembias
 from halotools.custom_exceptions import HalotoolsError
@@ -18,6 +18,29 @@ from halotools.empirical_models.abunmatch.noisy_percentile import noisy_percenti
 
 __all__ = ('CorrelationAssembias',)
 __author__ = ('Sean McLaughlin', )
+
+@compute_conditional_decorator
+def compute_conditional_ranks(indices_of_prim_haloprop_bin, sec_haloprop, correlation_coeff, **kwargs):
+    '''
+    TODO Docs
+    '''
+    if sec_haloprop is None:
+        msg = ("\n``sec_haloprop`` must be passed into compute_conditional_shuffled_ranks, or a table"
+                       "with ``sec_haloprop_key`` as a column.\n")
+        raise HalotoolsError(msg)
+
+    try:
+        assert np.all(np.logical_and(-1 <= correlation_coeff, correlation_coeff<= 1))
+    except AssertionError:
+        msg = ("\n``correlation_coeff`` must be passed into compute_conditional_percentiles,"
+                       "and must be between -1 and 1\n")
+        raise HalotoolsError(msg)
+
+
+    num_in_bin = len(indices_of_prim_haloprop_bin)
+    original_ranks = rankdata(sec_haloprop[indices_of_prim_haloprop_bin], 'ordinal')*1.0# - 0.5
+    original_ranks /= num_in_bin
+    return original_ranks
 
 @compute_conditional_decorator
 def compute_conditional_shuffled_ranks(indices_of_prim_haloprop_bin, sec_haloprop, correlation_coeff, **kwargs):
@@ -43,10 +66,10 @@ def compute_conditional_shuffled_ranks(indices_of_prim_haloprop_bin, sec_halopro
     # there's a bug in noisy percentile for -1
     if np.all(correlation_coeff[indices_of_prim_haloprop_bin] == -1):
         output = noisy_percentile(original_ranks, correlation_coeff=-0.999999*np.ones_like(indices_of_prim_haloprop_bin))
-        return output
+        return output#, original_ranks
     else:
         output = noisy_percentile(original_ranks, correlation_coeff=correlation_coeff[indices_of_prim_haloprop_bin])
-        return output
+        return output#, original_ranks
 
 
 class CorrelationAssembias(HeavisideAssembias):
@@ -136,7 +159,9 @@ class CorrelationAssembias(HeavisideAssembias):
 
             #  Compute the baseline, undecorated result
             result = func(*args, **kwargs)
-
+            gt = 'cen' if baseline_upper_bound == 1 else 'sat'
+            np.save('/afs/slac.stanford.edu/u/ki/swmclau2/Git/pearce/notebooks/%s_old_result.npy'%gt, result)
+            #self._old_result = result
             #  We will only decorate values that are not edge cases,
             #  so first compute the mask for non-edge cases
             no_edge_mask = (
@@ -147,43 +172,22 @@ class CorrelationAssembias(HeavisideAssembias):
             no_edge_result = result[no_edge_mask]
             no_edge_split = split[no_edge_mask]
 
-            # TODO i can maybe figure out how to cache the percentiles in the table, but for hte time being i'll just to retrieve them everytime 
-            if _HAS_table is True:
-                if self.sec_haloprop_key + '_percentile_values' in table.keys():
-#                    no_edge_percentile_values = table[self.sec_haloprop_key + '_percentile_value'][no_edge_mask]
-                    pass
-                else:
-                    #  the value of sec_haloprop_percentile will be computed from scratch
-                    #no_edge_percentile_values = compute_conditional_percentile_values( p=no_edge_split,
-                    #    prim_haloprop=prim_haloprop[no_edge_mask],
-                    #    sec_haloprop=sec_haloprop[no_edge_mask]
-                    #)
-                    pass
-            else:
-                pass
-                '''
-                try:
-                    percentiles = kwargs['sec_haloprop_percentile_values']
-                    if custom_len(percentiles) == 1:
-                        percentiles = np.zeros(custom_len(prim_haloprop)) + percentiles
-                    no_edge_percentile_values = percentiles[no_edge_mask]
-                except KeyError:
-                    no_edge_percentile_values = compute_conditional_percentile_values(p=no_edge_split,
-                        prim_haloprop=prim_haloprop[no_edge_mask],
-                        sec_haloprop=sec_haloprop[no_edge_mask]
-                    )
-                 '''
-
             #  NOTE I've removed the type 1 mask as it is not well-defined in this implementation
             strength = self.assembias_strength(prim_haloprop[no_edge_mask])
+            #original_ranks = compute_conditional_ranks(prim_haloprop = prim_haloprop[no_edge_mask], sec_haloprop=sec_haloprop[no_edge_mask], correlation_coeff=strength)
+
             shuffled_ranks = compute_conditional_shuffled_ranks(prim_haloprop = prim_haloprop[no_edge_mask], sec_haloprop=sec_haloprop[no_edge_mask], correlation_coeff=strength)
-            gt = 'cen' if baseline_upper_bound == 1 else 'sat'
             dist = bernoulli if gt == 'cen' else poisson 
+            #dist = norm
             # TODO getting some inf and nans results i still don't understand
             #shuffled_ranks[strength>0] = 1 - shuffled_ranks[strength>0]
             new_result = dist.isf(1-shuffled_ranks, no_edge_result)
+            #new_result = dist.isf(1-shuffled_ranks,no_edge_result, loc=no_edge_result)
+            #new_result = dist.ppf(shuffled_ranks, loc=no_edge_result)#,\
+                                                  #scale=np.sqrt(no_edge_result)/10)
             new_result[new_result<0] = 0.0
             nan_or_inf_idx = np.logical_or(~np.isfinite(new_result), np.isnan(new_result))
+
             if gt == 'cen':
                 new_result[nan_or_inf_idx] = 1.0
             else:
@@ -192,9 +196,20 @@ class CorrelationAssembias(HeavisideAssembias):
                 new_result[nan_or_inf_idx] = no_edge_result[nan_or_inf_idx] 
 
             result[no_edge_mask] = new_result
+            np.save('/afs/slac.stanford.edu/u/ki/swmclau2/Git/pearce/notebooks/%s_new_result.npy'%gt, result)
+
             return result
 
         return wrapper
+
+    def mc_occupation(self, seed=None, **kwargs):
+        # overload the other one based on how weve defined things
+        # The definitions here are a bit confusing and inconsistent, fwiw
+        #with NumpyRNGContext(seed):
+        result= self.mean_occupation(**kwargs).astype(np.int)
+        if 'table' in kwargs:
+            kwargs['table']['halo_num_'+self.gal_type] = result
+        return result
 
 
 

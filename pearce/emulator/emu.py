@@ -2194,10 +2194,10 @@ class NashvilleHot(Emu):
 
         self._y_mean = [_y.mean() for _y in y] 
         #self._y_mean = np.stack([ 0.0 for _y in y] ) #np.stack([_y.mean() for _y in y] )
-        #self._y_std = np.stack([_y.std() for _y in y])
-        self._y_std = np.ones_like(self._y_mean) 
+        self._y_std = np.stack([_y.std() for _y in y])
+        #self._y_std = #np.ones_like(self._y_mean) 
 
-        self.y  = np.stack([_y - _ym for _y, _ym in zip(y, self._y_mean )])
+        self.y  = np.stack([(_y - _ym)/_ys for _y, _ym, _ys in zip(y, self._y_mean, self._y_std )])
         self.yerr = np.stack(yerr)
 
         self.mean_function = self._make_custom_mean_function(custom_mean_function)
@@ -2860,9 +2860,9 @@ class LemonPepperWet(NashvilleHot):
         # redo the normalization cuz its different than in NH. Its the only thing different, so its a coda here
         y = np.array([_y*_ys + _ym for _y, _ym, _ys in zip(self.y, self._y_mean, self._y_std)])
         self._y_mean = y.mean() 
-        self._y_std = 1.0
+        self._y_std = y.std()#1.0
         
-        self.y  = y - self._y_mean # TODO squeeze here?
+        self.y  = (y - self._y_mean)/self._y_std # TODO squeeze here?
         self.emulator_ndim = 0
         if 'cosmo' not in self.fixed_params:
             self.emulator_ndim+=self.x1.shape[1]
