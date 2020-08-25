@@ -9,7 +9,7 @@ from scipy.spatial import cKDTree
 from time import time
 
 def void_density_function(sample1, rbins, n_ran=1e9, randoms=None,
-                         period = None, seed = None, leafsize=16, eps=0.0, n_jobs = 1, PBC=True):
+                         period = None, seed = None, leafsize=16, eps=0.0, n_jobs = 16, PBC=True):
     """
     Compute the CDF of void sizes for the sample
     :param sample1:
@@ -36,7 +36,7 @@ def void_density_function(sample1, rbins, n_ran=1e9, randoms=None,
                          PBC=PBC)
 
 def knn_cdf(sample1, rbins, k, n_ran=1e9, randoms=None,
-                         period = None, seed = None, leafsize=16, eps=0.0, n_jobs = 1, PBC=True):
+                         period = None, seed = None, leafsize=16, eps=0.0, n_jobs = 16, PBC=True):
     """
     Compute the CDF of void sizes for the sample
     :param sample1:
