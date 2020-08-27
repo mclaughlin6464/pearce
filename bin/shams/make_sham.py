@@ -1,6 +1,5 @@
 
-# coding: utf-8
-
+# coding: utf-8 
 # This notebook will make abundance matched catalogs for Jeremy and Zhongxu. I'm gonna send this notebook along to them as well in case there's something not quite right that they want to adjust. The catalogs requested were defined as follows:
 # - 2 catalogs, M_peak and V_max @ M_peak (which is how, I believe, V_max is defined in this catalog. Will check tho).
 # - scatter 0.18 dex
@@ -74,9 +73,10 @@ nd = 5e-4#4.2e-4 #nd of final cat
 
 
 #ab_property = 'halo_mpeak'
+ab_property = 'halo_mvir'
 #ab_property = 'halo_vmax@mpeak'
 #ab_property = 'halo_vmax'
-ab_property = 'halo_vpeak'
+#ab_property = 'halo_vpeak'
 
 
 # In[22]:
@@ -115,9 +115,9 @@ n_obj_needed = int(nd*((1000.0)**3)) # don't divide by h
 
 non_nan_idxs = ~np.isnan(catalog)
 sort_idxs = np.argsort(catalog[non_nan_idxs])[::-1]
-final_catalog = catalog[non_nan_idxs][sort_idxs]#[:n_obj_needed]
+final_catalog = catalog[non_nan_idxs][sort_idxs][:n_obj_needed]
 
-output = halo_table[non_nan_idxs][sort_idxs]#[:n_obj_needed]
+output = halo_table[non_nan_idxs][sort_idxs][:n_obj_needed]
 
 
 output['gal_smass'] = final_catalog
@@ -125,7 +125,7 @@ output['gal_smass'] = final_catalog
 
 
 #output.write('/nfs/slac/g/ki/ki18/des/swmclau2/catalog_ab_%s_large.hdf5'%ab_property, format = 'hdf5', path = '%s_catalog'%ab_property, overwrite=True)
-output.write('/scratch/users/swmclau2/test_MDPL2_%s_smf_sham_large.hdf5'%ab_property, format = 'hdf5', path = '%s_catalog'%ab_property, overwrite=True)
+#output.write('/scratch/users/swmclau2/test_MDPL2_%s_smf_sham_large.hdf5'%ab_property, format = 'hdf5', path = '%s_catalog'%ab_property, overwrite=True)
 #output.write('/scratch/users/swmclau2/MDPL2_%s_smf_sham.hdf5'%ab_property, format = 'hdf5', path = '%s_catalog'%ab_property, overwrite=True)
-np.save('/scratch/users/swmclau2/UniverseMachine/cut_sham_catalog.npy', output.as_array()[:n_obj_needed])
+np.save('/scratch/users/swmclau2/UniverseMachine/cut_macc_sham_catalog.npy', output.as_array()[:n_obj_needed])
 #print ab_property
