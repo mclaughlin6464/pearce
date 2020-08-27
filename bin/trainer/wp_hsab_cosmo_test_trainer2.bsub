@@ -1,0 +1,9 @@
+###!/bin/bash
+#BSUB -q medium 
+#BSUB -W 1:00
+#BSUB -J wp_hsab_cosmology_train 
+####BSUB -R span[ptile=1]
+#BSUB -oo /u/ki/swmclau2/Git/pearce/bin/trainer/wp_hsab_cosmology_train.out    
+#BSUB -n 4 
+
+python /u/ki/swmclau2/Git/pearce/pearce/emulator/trainer.py wp_hsab_cosmo_test_trainer2.yaml #--rerun

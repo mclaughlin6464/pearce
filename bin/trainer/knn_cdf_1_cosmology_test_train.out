@@ -1,0 +1,50 @@
+Job <231907> is submitted to queue <long>.
+0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 ['bsub', '-J', 'trainer[1-120]', '-q', 'long', '-n', '12', '-oo', '/nfs/slac/g/ki/ki18/des/swmclau2/knn_cdf_zheng07_test/trainer_%I.out', '-W', '48:00', '-R span[ptile=12]', 'tmp=`printf "%04d" $((${LSB_JOBINDEX}-1))`\n', 'python', '/u/ki/swmclau2/Git/pearce/pearce/emulator/trainingHelper.py', '/nfs/slac/g/ki/ki18/des/swmclau2/knn_cdf_zheng07_test/trainer_$tmp.npy']
+
+------------------------------------------------------------
+Sender: LSF System <lsf@hequ0155>
+Subject: Job 231821: <knn_cdf_1_cosmology_test_train> in cluster <slac> Done
+
+Job <knn_cdf_1_cosmology_test_train> was submitted from host <ki-ls10> by user <swmclau2> in cluster <slac> at Mon Aug 17 10:33:26 2020
+Job was executed on host(s) <1*hequ0155>, in queue <medium>, as user <swmclau2> in cluster <slac> at Mon Aug 17 10:33:28 2020
+                            <1*hequ0162>
+                            <2*kiso0012>
+</u/ki/swmclau2> was used as the home directory.
+</u/ki/swmclau2/Git/pearce/bin/trainer> was used as the working directory.
+Started at Mon Aug 17 10:33:28 2020
+Terminated at Mon Aug 17 10:33:49 2020
+Results reported at Mon Aug 17 10:33:49 2020
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+###!/bin/bash
+#BSUB -q medium 
+#BSUB -W 1:00
+#BSUB -J knn_cdf_1_cosmology_test_train 
+####BSUB -R span[ptile=1]
+#BSUB -oo /u/ki/swmclau2/Git/pearce/bin/trainer/knn_cdf_1_cosmology_test_train.out    
+#BSUB -n 4 
+
+python /u/ki/swmclau2/Git/pearce/pearce/emulator/trainer.py knn_cdf_1_cosmo_test_trainer.yaml #--rerun
+
+------------------------------------------------------------
+
+Successfully completed.
+
+Resource usage summary:
+
+    CPU time :                                   3.91 sec.
+    Max Memory :                                 15 MB
+    Average Memory :                             15.00 MB
+    Total Requested Memory :                     -
+    Delta Memory :                               -
+    Max Swap :                                   -
+    Max Processes :                              4
+    Max Threads :                                5
+    Run time :                                   24 sec.
+    Turnaround time :                            23 sec.
+
+The output (if any) is above this job summary.
+

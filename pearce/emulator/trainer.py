@@ -463,8 +463,11 @@ class Trainer(object):
                          downsample_factor=self._downsample_factor, hod_kwargs= self._hod_kwargs  )
                 self._check_params(cat) 
                 calc_observable = self._get_calc_observable(cat)
+            if len(self._hod_param_names)==1:
+                hod_params = {self._hod_param_names[0]: self._hod_param_vals[hod_idx]}
 
-            hod_params = dict(zip(self._hod_param_names, self._hod_param_vals[hod_idx, :]))
+            else:
+                hod_params = dict(zip(self._hod_param_names, self._hod_param_vals[hod_idx]))
             #print hod_params
             if self._fixed_nd is not None:
             # TODO this does not respect min_ptcl
@@ -488,12 +491,13 @@ class Trainer(object):
 
                 for repop in xrange(self._n_repops):
                     #print repop
-                    try:
-                        cat.populate(hod_params, min_ptcl= self._min_ptcl)
-                    except ValueError:
+                    #try:
+                    print hod_params
+                    cat.populate(hod_params, min_ptcl= self._min_ptcl)
+                    #except ValueError:
                         # try again, sometimes things are tempermental?
-                        print repop, cat.model.mock.Ngals, cat.model.mock._total_abundance
-                        cat.populate(hod_params, min_ptcl= self._min_ptcl)
+                    #    print repop, cat.model.mock.Ngals, cat.model.mock._total_abundance
+                    #    cat.populate(hod_params, min_ptcl= self._min_ptcl)
 
                     try:
                         obs_repops[repop] = self._transform_func(calc_observable())

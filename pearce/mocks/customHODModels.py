@@ -271,7 +271,6 @@ class HSAssembiasZheng07Cens(Zheng07Cens, HeavisideAssembias):
                                     method_name_to_decorate='mean_occupation',
                                     **kwargs)
 
-
 class FSAssembiasZheng07Cens(Zheng07Cens, FreeSplitAssembias):
     '''RedMagic Cens with Heaviside Assembly bias'''
 
@@ -325,6 +324,9 @@ class CorrAssembiasZheng07Cens(Zheng07Cens, CorrelationAssembias):
                                       method_name_to_decorate='mean_occupation',
                                       **kwargs)
 
+
+    def mc_occupation(self, **kwargs):
+        return CorrelationAssembias.mc_occupation(self, **kwargs)
 
 class AssembiasZheng07Sats(Zheng07Sats, ContinuousAssembias):
     '''RedMagic Cens with Assembly bias'''
@@ -397,7 +399,7 @@ class FSCAssembiasZheng07Sats(Zheng07Sats, FreeSplitContinuousAssembias):
                                               **kwargs)
 
 
-class CorrAssembiasZheng07Sats(Zheng07Sats, CorrelationAssembias):
+class CorrAssembiasZheng07Sats(Zheng07Sats,CorrelationAssembias):
     '''RedMagic Cens with Assembly bias'''
 
     def __init__(self, cenocc_model, **kwargs):
@@ -412,6 +414,9 @@ class CorrAssembiasZheng07Sats(Zheng07Sats, CorrelationAssembias):
                                       upper_assembias_bound=self._upper_occupation_bound,
                                       method_name_to_decorate='mean_occupation',
                                       **kwargs)
+
+    def mc_occupation(self, **kwargs):
+        return CorrelationAssembias.mc_occupation(self, **kwargs)
 
 
 class Reddick14Cens(OccupationComponent):
@@ -1819,7 +1824,8 @@ class Tabulated2DSats(OccupationComponent):
 
         return dict()
 
-HOD_DICT = {'abZheng07': (AssembiasZheng07Cens, AssembiasZheng07Sats), 
+HOD_DICT = {'zheng07': (Zheng07Cens, Zheng07Sats),
+            'abZheng07': (AssembiasZheng07Cens, AssembiasZheng07Sats), 
             'hsabZheng07': (HSAssembiasZheng07Cens, HSAssembiasZheng07Sats), 
             'fsabZheng07': (FSAssembiasZheng07Cens, FSAssembiasZheng07Sats),
             'fscabZheng07': (FSCAssembiasZheng07Cens, FSCAssembiasZheng07Sats),

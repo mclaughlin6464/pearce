@@ -4,6 +4,7 @@ cosmology:
         simname: testbox
         scale_factors: 1.0 
         particles: False 
+<<<<<<< HEAD
         system: sherlock 
 HOD:
         model: abZheng07 
@@ -13,6 +14,17 @@ HOD:
         biased_satellites: True 
         ordered_params: {'logMmin': [12.0, 16.0], 'sigma_logM': [0.1, 0.6], 'logM0': [12.6, 13.6], 'logM1': [13.7, 14.7], 'alpha': [0.7, 1.3], 'conc_gal_bias': [0.5, 2.0], 'mean_occupation_centrals_assembias_param1':[-1.0, 1.0], 'mean_occupation_satellites_assembias_param1':[-1.0, 1.0], 'mean_occupation_centrals_assembias_slope1':[-3.0, 3.0], 'mean_occupation_satellites_assembias_slope1':[-3.0, 3.0]}
         system: sherlock 
+=======
+        system: ki-ls 
+HOD:
+        model: abZheng07 
+        sec_haloprop_key: 'halo_local_density_10'
+        num_hods: 500 
+        fixed_nd: 5e-4
+        biased_satellites: True 
+        ordered_params: {'logMmin': [12.0, 16.0], 'sigma_logM': [0.1, 0.6], 'logM0': [12.6, 13.6], 'logM1': [13.7, 14.7], 'alpha': [0.7, 1.3], 'conc_gal_bias': [0.5, 2.0], 'mean_occupation_centrals_assembias_param1':[-1.0, 1.0], 'mean_occupation_satellites_assembias_param1':[-1.0, 1.0], 'mean_occupation_centrals_assembias_slope1':[0.0, 2.0], 'mean_occupation_satellites_assembias_slope1':[0.0, 2.0]}
+        system: ki-ls
+>>>>>>> c7ece5e77b6dc0822997f181b2e69d617faadfca
         min_ptcl: 20
 observation:
         obs: wp 
@@ -23,10 +35,18 @@ observation:
         n_repops: 5 
         log_obs: True
 computation:
+<<<<<<< HEAD
         filename: /scratch/users/swmclau2/wp_cab_test_h/PearceWpCABCosmoTest.hdf5 
         overwrite: True
         queue_skipper: True
         system: sherlock 
         n_jobs: 40
+=======
+        filename: /nfs/slac/g/ki/ki18/des/swmclau2/wp_cab_test4_h/PearceWpCABCosmoTest.hdf5 
+        overwrite: True
+        queue_skipper: True
+        system: ki-ls 
+        n_jobs: 70 
+>>>>>>> c7ece5e77b6dc0822997f181b2e69d617faadfca
         max_time: 12 
 
