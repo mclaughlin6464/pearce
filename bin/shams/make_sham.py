@@ -73,17 +73,17 @@ nd = 5e-4#4.2e-4 #nd of final cat
 
 
 #ab_property = 'halo_mpeak'
-ab_property = 'halo_mvir'
+#ab_property = 'halo_mvir'
 #ab_property = 'halo_vmax@mpeak'
 #ab_property = 'halo_vmax'
-#ab_property = 'halo_vpeak'
+ab_property = 'halo_vpeak'
 
 
 # In[22]:
 
 af = AbundanceFunction(smf[:,0], smf[:,1], (9.0, 12.9), faint_end_first = True)
 
-scatter = 0.2#0.15
+scatter = 0.1#0.2#0.15
 remainder = af.deconvolute(scatter, 20)
 
 
@@ -127,5 +127,5 @@ output['gal_smass'] = final_catalog
 #output.write('/nfs/slac/g/ki/ki18/des/swmclau2/catalog_ab_%s_large.hdf5'%ab_property, format = 'hdf5', path = '%s_catalog'%ab_property, overwrite=True)
 #output.write('/scratch/users/swmclau2/test_MDPL2_%s_smf_sham_large.hdf5'%ab_property, format = 'hdf5', path = '%s_catalog'%ab_property, overwrite=True)
 #output.write('/scratch/users/swmclau2/MDPL2_%s_smf_sham.hdf5'%ab_property, format = 'hdf5', path = '%s_catalog'%ab_property, overwrite=True)
-np.save('/scratch/users/swmclau2/UniverseMachine/cut_macc_sham_catalog.npy', output.as_array()[:n_obj_needed])
+np.save('/scratch/users/swmclau2/UniverseMachine/cut_vpeak_loscat_sham_catalog.npy', output.as_array()[:n_obj_needed])
 #print ab_property
