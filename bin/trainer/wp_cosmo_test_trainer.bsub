@@ -6,4 +6,4 @@
 #BSUB -oo /u/ki/swmclau2/Git/pearce/bin/trainer/wp_cosmology_test_train.out    
 #BSUB -n 4 
 
-python /u/ki/swmclau2/Git/pearce/pearce/emulator/trainer.py wp_cosmo_test_trainer.yaml  --rerun
+python /u/ki/swmclau2/Git/pearce/pearce/emulator/trainer.py wp_cosmo_test_trainer.yaml  #--rerun

@@ -418,8 +418,10 @@ class Trainer(object):
             raise AssertionError("Incorrect  parameters specified. Compare the outputs above to resovle the issue.")
 
     def compute_measurement(self, param_idxs, rank = None):
-        h = hpy()
+        #h = hpy()
         param_idxs = param_idxs.astype(int)
+        # Try to load the file first 
+
         if self.n_bins > 1 :
             output = np.zeros((param_idxs.shape[0], self.n_bins))
             output_cov = np.zeros((param_idxs.shape[0], self.n_bins, self.n_bins))
@@ -431,6 +433,7 @@ class Trainer(object):
         last_cosmo_idx, last_scale_factor_idx = -1, -1
         t0 = time()
         for output_idx, (cosmo_idx, scale_factor_idx, hod_idx) in enumerate(param_idxs):
+            # If output_idx is nonzero, continue 
             #print
             #print h.heap()
             #print 
@@ -510,6 +513,7 @@ class Trainer(object):
 
             output[output_idx] = obs_val
             output_cov[output_idx] = obs_cov
+            # write output here
 
             last_cosmo_idx = cosmo_idx
             last_scale_factor_idx = scale_factor_idx
@@ -655,6 +659,7 @@ class Trainer(object):
             if not rerun:
                 np.savetxt(param_filename, all_param_idxs[idx])
                 idxs_to_do.append(idx)
+            # change existance check to any zeros check
             elif path.exists(path.join(output_directory, 'output_%04d.npy'%idx)) and path.exists(path.join(output_directory, 'output_cov_%04d.npy'%idx)):\
                 continue # this one ran successfully
             else:

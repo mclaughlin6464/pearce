@@ -14,8 +14,8 @@ HOD:
         system: ki-ls
         min_ptcl: 20
         prim_haloprop_vals: '/u/ki/swmclau2/des/aemulus_mock_catalogs/prim_haloprop_vals.npy'
-        cen_hod_vals: '/u/ki/swmclau2/des/aemulus_mock_catalogs/sham_cen_hod.npy' 
-        sat_hod_vals: '/u/ki/swmclau2/des/aemulus_mock_catalogs/sham_sat_hod.npy' 
+        cen_hod_vals: '/u/ki/swmclau2/des/aemulus_mock_catalogs/best_fit_zheng_cen_hod.npy' 
+        sat_hod_vals: '/u/ki/swmclau2/des/aemulus_mock_catalogs/best_fit_zheng_sat_hod.npy' 
 observation:
         obs: wp 
         bins: [ 0.1,  0.13945832,  0.19448624,  0.27122726,  0.37824899,
@@ -25,7 +25,7 @@ observation:
         n_repops: 5 
         log_obs: True
 computation:
-        filename: /nfs/slac/g/ki/ki18/des/swmclau2/wp_tab_test_h/PearceWpCosmoTABTest.hdf5 
+        filename: /nfs/slac/g/ki/ki18/des/swmclau2/wp_tab_zheng_test_h/PearceWpCosmoTABZhengTest.hdf5 
         overwrite: True
         queue_skipper: True
         system: ki-ls 
