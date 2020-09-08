@@ -18,7 +18,7 @@ from scipy.optimize import minimize_scalar
 import pandas as pd
 import h5py
 import gc
-from guppy import hpy
+#from guppy import hpy
 
 from pearce.mocks import cat_dict
 
@@ -417,23 +417,28 @@ class Trainer(object):
             print "Cfg params", cfg_pnames
             raise AssertionError("Incorrect  parameters specified. Compare the outputs above to resovle the issue.")
 
-    def compute_measurement(self, param_idxs, rank = None):
+    def compute_measurement(self, param_idxs, job_number, output_directory, rank = None):
         #h = hpy()
         param_idxs = param_idxs.astype(int)
-        # Try to load the file first 
 
-        if self.n_bins > 1 :
-            output = np.zeros((param_idxs.shape[0], self.n_bins))
-            output_cov = np.zeros((param_idxs.shape[0], self.n_bins, self.n_bins))
-
+        if path.exists(path.join(output_directory, 'output_%04d.npy'%job_number)):
+            output = np.load(path.join(output_directory, 'output_%04d.npy'%job_number))
+            output_cov = np.load(path.join(output_directory, 'output_cov_%04d.npy'%job_number))
         else:
-            output = np.zeros((param_idxs.shape[0],))
-            output_cov = np.zeros((param_idxs.shape[0]))
+            if self.n_bins > 1 :
+                output = np.zeros((param_idxs.shape[0], self.n_bins))
+                output_cov = np.zeros((param_idxs.shape[0], self.n_bins, self.n_bins))
+
+            else:
+                output = np.zeros((param_idxs.shape[0],))
+                output_cov = np.zeros((param_idxs.shape[0]))
 
         last_cosmo_idx, last_scale_factor_idx = -1, -1
         t0 = time()
         for output_idx, (cosmo_idx, scale_factor_idx, hod_idx) in enumerate(param_idxs):
-            # If output_idx is nonzero, continue 
+            # If output_idx is nonzero, continue
+            if np.all(output[output_idx]!=0):
+                continue # this one has been done already
             #print
             #print h.heap()
             #print 
@@ -514,6 +519,9 @@ class Trainer(object):
             output[output_idx] = obs_val
             output_cov[output_idx] = obs_cov
             # write output here
+
+            np.save(path.join(output_directory, 'output_%04d.npy' % job_number), output)
+            np.save(path.join(output_directory, 'output_cov_%04d.npy' % job_number), output_cov)
 
             last_cosmo_idx = cosmo_idx
             last_scale_factor_idx = scale_factor_idx
@@ -660,8 +668,12 @@ class Trainer(object):
                 np.savetxt(param_filename, all_param_idxs[idx])
                 idxs_to_do.append(idx)
             # change existance check to any zeros check
-            elif path.exists(path.join(output_directory, 'output_%04d.npy'%idx)) and path.exists(path.join(output_directory, 'output_cov_%04d.npy'%idx)):\
-                continue # this one ran successfully
+            elif path.exists(path.join(output_directory, 'output_%04d.npy'%idx)) and path.exists(path.join(output_directory, 'output_cov_%04d.npy'%idx)):
+                output = np.load(path.join(output_directory, 'output_%04d.npy'%idx))
+                if np.any(np.all(output==0.0, axis =1)):
+                    idxs_to_do.append(idx)
+                else:
+                    continue # this one ran successfully
             else:
                 idxs_to_do.append(idx)
 

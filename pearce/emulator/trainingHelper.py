@@ -38,10 +38,10 @@ def compute_on_subset(param_fname):
 
     param_idxs = np.loadtxt(param_fname)
     # change compute measurement to take a job number
-    output, output_cov = trainer.compute_measurement(param_idxs)
+    output, output_cov = trainer.compute_measurement(param_idxs, job_number, output_directory)
 
-    np.save(path.join(output_directory, 'output_%04d.npy'%job_number), output)
-    np.save(path.join(output_directory, 'output_cov_%04d.npy'%job_number), output_cov)
+    #np.save(path.join(output_directory, 'output_%04d.npy'%job_number), output)
+    #np.save(path.join(output_directory, 'output_cov_%04d.npy'%job_number), output_cov)
 
 
 def consolidate_outputs(directory=None):
