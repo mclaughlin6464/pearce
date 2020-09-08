@@ -77,15 +77,15 @@ def calc_ds(cat, rp_bins, n_cores, tm_rand=None, randoms = None):
     x_m, y_m, z_m = [cat.halocat.ptcl_table[c] for c in ['x', 'y', 'z']]
     pos_m = return_xyz_formatted_array(x_m, y_m, z_m, period=cat.Lbox)
 
-    tm_gal = total_mass_enclosed_per_cylinder(pos_g / cat.h, pos_m / cat.h,
-                                                  cat.pmass / cat.h, 1. / cat._downsample_factor, rp_bins,
-                                                  cat.Lbox / cat.h,
+    tm_gal = total_mass_enclosed_per_cylinder(pos_g, pos_m ,
+                                                  cat.pmass, 1. / cat._downsample_factor, rp_bins,
+                                                  cat.Lbox,
                                                   num_threads=n_cores)
     if tm_rand is None:
         assert randoms is not None
-        tm_rand = total_mass_enclosed_per_cylinder(randoms / cat.h, pos_m / cat.h,
-                                                   cat.pmass / cat.h, 1. / cat._downsample_factor, rp_bins,
-                                                   cat.Lbox / cat.h,
+        tm_rand = total_mass_enclosed_per_cylinder(randoms, pos_m,
+                                                   cat.pmass, 1. / cat._downsample_factor, rp_bins,
+                                                   cat.Lbox,
                                                    num_threads=n_cores)
     if tm_rand.shape[0] > tm_gal.shape[0]:
         tm_rand_idxs = np.random.choice(tm_rand.shape[0], tm_gal.shape[0], replace = False)
@@ -94,8 +94,8 @@ def calc_ds(cat, rp_bins, n_cores, tm_rand=None, randoms = None):
     elif tm_rand.shape[0] < tm_gal.shape[0]:
         raise AssertionError("Need more randoms!")
 
-    return delta_sigma(pos_g / cat.h, tm_gal, tm_rand,
-                       cat.Lbox / cat.h, rp_bins, cosmology=cat.cosmology) / (1e12)#, tm_gal, tm_rand
+    return delta_sigma(pos_g, tm_gal, tm_rand,
+                       cat.Lbox, rp_bins, cosmology=cat.cosmology) / (1e12)#, tm_gal, tm_rand
 
 
 def delta_sigma(galaxies, mass_enclosed_per_galaxy,
@@ -134,7 +134,7 @@ def compute_obs(cat, rp_bins, cic_bins, randoms, total_mass_randoms=None):
 
     n_cores = cat._check_cores(1)
 
-    wp = cat.calc_wp(rp_bins, PBC=False, randoms=randoms/cat.h, n_cores = n_cores)
+    wp = cat.calc_wp(rp_bins, PBC=False, randoms=randoms, n_cores = n_cores)
     # have to make a custom function to do no PBC
     ds = calc_ds(cat, rp_bins, n_cores=n_cores, randoms = randoms)# tm_rand = total_mass_randoms)
     cic = cat.calc_cic(cic_bins, PBC=False, n_cores = n_cores)

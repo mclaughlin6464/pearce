@@ -1,0 +1,32 @@
+cosmology:
+        boxno: 0:40 
+        simname: trainingbox
+        scale_factors: 1.0
+        particles: False
+        system: ki-ls 
+HOD:
+        model: hsabZheng07
+        sec_haloprop_key: 'halo_nfw_conc'
+        num_hods: 1000
+        fixed_nd: 5e-4
+        biased_satellites: True
+        ordered_params: {'logMmin': [12.0, 16.0], 'sigma_logM': [0.05, 0.5], 'logM0': [12.6, 13.6], 'logM1': [13.7, 14.7], 'alpha': [0.7, 1.3], 'conc_gal_bias': [0.5, 2.0], 'mean_occupation_centrals_assembias_param1':[-1.0, 1.0], 'mean_occupation_satellites_assembias_param1':[-1.0, 1.0]}
+        system: ki-ls 
+        min_ptcl: 20
+observation:
+        obs: knn_cdf 
+        k: 2
+        bins: [   0.50118723,    0.65313055,    0.85113804,    1.10917482,
+                  1.44543977,    1.88364909,    2.45470892,    3.19889511,
+                            4.16869383,    5.43250331,    7.07945784,    9.22571427,
+                                     12.02264435,   15.6675107 ,   20.41737945,   26.6072506 ,
+                                              34.67368505,   45.18559444,   58.88436554,   76.73614894,  100.        ]
+        n_repops: 5
+        log_obs: True
+computation:
+        filename: /nfs/slac/g/ki/ki18/des/swmclau2/knn_2_cdf_zheng07/PearceKNN2CDFCosmo.hdf5
+        overwrite: True
+        queue_skipper: True
+        system: ki-ls 
+        n_jobs: 1200 
+        max_time: 48 

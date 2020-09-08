@@ -9,7 +9,7 @@ data:
   cov:
     emu_cov_fname: &id001 [/u/ki/swmclau2/Git/pearce/bin/optimization/wp_corrab_emu_cov_lpw.npy,
       /u/ki/swmclau2/Git/pearce/bin/optimization/ds_corrab_emu_cov_lpw.npy]
-    meas_cov_fname: /u/ki/swmclau2/Git/pearce/bin/covmat/wp_ds_full_covmat.npy
+    meas_cov_fname: /u/ki/swmclau2/Git/pearce/bin/covmat/wp_ds_full_covmat_h.npy
   obs:
     mean: false
     obs: [wp, ds]
@@ -132,21 +132,23 @@ data:
     gal_type: HOD
     hod_name: zheng07
     hod_params: {alpha: 1.083, conc_gal_bias: 1.0, logM0: 13.2, logM1: 14.2, sigma_logM: 0.2}
-    min_ptcl: 100
+    min_ptcl: 20
     nd: 5e-4
     scale_factor: 1.0
-    sim_hps: {boxno: 1, downsample_factor: 0.01, particles: true, realization: 0,
+    sim_hps: {boxno: 1, downsample_factor: 0.01, particles: true, realization: 1,
       system: ki-ls}
     simname: testbox
-  true_cov_fname: /u/ki/swmclau2/Git/pearce/bin/covmat/wp_ds_full_covmat.npy
-  true_data_fname: [/u/ki/swmclau2/Git/pearce/bin/mock_measurements/HODmock_wp.npy,
-    /u/ki/swmclau2/Git/pearce/bin/mock_measurements/HODmock_ds.npy]
+  true_cov_fname: /u/ki/swmclau2/Git/pearce/bin/covmat/wp_ds_full_covmat_h.npy
+  true_data_fname: [/u/ki/swmclau2/Git/pearce/bin/mock_measurements/HOD4mock_wp.npy,
+    /u/ki/swmclau2/Git/pearce/bin/mock_measurements/HOD4mock_ds.npy]
 emu:
   emu_cov_fname: *id001
   emu_hps: {}
   emu_type: [LemonPepperWet, LemonPepperWet]
-  fixed_params: {z: 0.0}
-  training_file: [/u/ki/swmclau2/des/Aemulators/wp_corrab/PearceWpCorrABCosmo.hdf5,
-    /u/ki/swmclau2/des/Aemulators/ds_corrab/PearceDsCorrABCosmo.hdf5]
+  fixed_params:
+  - {z: 0.0}
+  - {rmin: 0.5, z: 0.0}
+  training_file: [/u/ki/swmclau2/des/Aemulators/wp_corrab_h/PearceWpCorrABCosmo.hdf5,
+    /u/ki/swmclau2/des/Aemulators/ds_corrab_h/PearceDsCorrABCosmo.hdf5]
 fname: /u/ki/swmclau2/des/PearceMCMC/HOD_wp_ds_rmin_None_CorrAB.hdf5
 sim: *id002

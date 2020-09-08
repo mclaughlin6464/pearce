@@ -1,9 +1,12 @@
 #!/bin/bash
 #SBATCH --job-name=make_sham
 #SBATCH --time=02:00:00
-#SBATCH -p iric 
+#SBATCH -p iric,kipac,owners
 #SBATCH -o make_sham.out
-#SBATCH --exclusive
+#SBATCH --ntasks=8
+#SBATCH --mem-per-cpu=MaxMemPerCPU
+
+###SBATCH --exclusive
 
 module load python/2.7.13
 module load py-scipystack

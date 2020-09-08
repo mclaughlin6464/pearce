@@ -9,7 +9,7 @@ data:
   cov:
     emu_cov_fname: &id001 [/u/ki/swmclau2/Git/pearce/bin/optimization/wp_hod_emu_cov_lpw.npy,
       /u/ki/swmclau2/Git/pearce/bin/optimization/ds_hod_emu_cov_lpw.npy]
-    meas_cov_fname: /u/ki/swmclau2/Git/pearce/bin/covmat/wp_ds_full_covmat.npy
+    meas_cov_fname: /u/ki/swmclau2/Git/pearce/bin/covmat/wp_ds_full_covmat_h.npy
   obs:
     mean: false
     obs: [wp, ds]
@@ -137,13 +137,15 @@ data:
     scatter: 0.2
     sim_hps: {system: ki-ls}
     simname: ds_14_b_sub
-  true_cov_fname: /u/ki/swmclau2/Git/pearce/bin/covmat/wp_ds_full_covmat.npy
+  true_cov_fname: /u/ki/swmclau2/Git/pearce/bin/covmat/wp_ds_full_covmat_h.npy
   true_data_fname: [/u/ki/swmclau2/Git/pearce/bin/mock_measurements/SHAMmock_wp.npy,
     /u/ki/swmclau2/Git/pearce/bin/mock_measurements/SHAMmock_ds.npy]
 emu:
   emu_cov_fname: *id001
   emu_hps: {}
   emu_type: [LemonPepperWet, LemonPepperWet]
-  fixed_params: {z: 0.0}
-  training_file: [/u/ki/swmclau2/des/Aemulators/wp_zheng07/PearceWpCosmo.hdf5, /u/ki/swmclau2/des/Aemulators/ds_zheng07/PearceDsCosmo.hdf5]
+  fixed_params:
+  - {z: 0.0}
+  - {rmin: 0.5, z: 0.0}
+  training_file: [/u/ki/swmclau2/des/Aemulators/wp_zheng07_h/PearceWpCosmo.hdf5, /u/ki/swmclau2/des/Aemulators/ds_zheng07_h/PearceDsCosmo.hdf5]
 fname: /u/ki/swmclau2/des/PearceMCMC/VpeakSHAM_wp_ds_rmin_None_HOD.hdf5

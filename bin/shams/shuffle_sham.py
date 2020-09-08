@@ -26,21 +26,24 @@ from halotools.utils import *
 Lbox = 1000.0
 
 #ab_property = 'halo_mpeak'
-ab_property = 'halo_vmax@mpeak'
-catalog = astropy.table.Table.read('/scratch/users/swmclau2/catalog_ab_%s_large_fixed.hdf5'%ab_property, format = 'hdf5')
+#ab_property = 'halo_vmax@mpeak'
+#catalog = astropy.table.Table.read('/scratch/users/swmclau2/catalog_ab_%s_large_fixed.hdf5'%ab_property, format = 'hdf5')
+ab_property = 'halo_vpeak'
+catalog = astropy.table.Table.read('/scratch/users/swmclau2/test_MDPL2_%s_smf_sham_large.hdf5'%ab_property, format = 'hdf5')
 
-
-PMASS = 7.62293e+07
-nd = 4.2e-4 #nd of final cat 
+#PMASS = 7.62293e+07
+nd = 5e-4#4.2e-4 #nd of final cat 
 n_obj_needed = int(nd*(Lbox**3))
 
 
 add_halo_hostid(catalog, delete_possibly_existing_column=True)
-
+catalog['halo_nfw_conc'] = catalog['halo_rvir']/catalog['halo_rs']
 
 for prop in ['halo_x', 'halo_y', 'halo_z','halo_vx', 'halo_vy', 'halo_vz', 'halo_nfw_conc', 'halo_rvir']:
-    broadcast_host_halo_property(catalog, prop, delete_possibly_existing_column=True)
-
+    try:
+        broadcast_host_halo_property(catalog, prop, delete_possibly_existing_column=True)
+    except:
+        pass
 
 # lifted from halotools
 def compute_prim_haloprop_bins(dlog10_prim_haloprop=0.05, **kwargs):
@@ -118,6 +121,8 @@ shuffled_vel = np.zeros((len(catalog), 3))
 shuffled_ids = np.zeros((len(catalog)))
 shuffled_upids = np.zeros((len(catalog)))
 shuffled_host_mvir = np.zeros((len(catalog)))
+shuffled_host_rvir = np.zeros((len(catalog)))
+shuffled_host_conc = np.zeros((len(catalog)))
 
 
 # In[ ]:
@@ -166,7 +171,9 @@ for ibin in bins_in_halocat:
     shuffled_upids[indices_of_prim_haloprop_bin[centrals_idx]] = -1
     
     shuffled_host_mvir[indices_of_prim_haloprop_bin[centrals_idx]] =             catalog[indices_of_prim_haloprop_bin[centrals_idx]]['halo_mvir']
-        
+    shuffled_host_rvir[indices_of_prim_haloprop_bin[centrals_idx]] =             catalog[indices_of_prim_haloprop_bin[centrals_idx]]['halo_rvir']
+    shuffled_host_conc[indices_of_prim_haloprop_bin[centrals_idx]] =             catalog[indices_of_prim_haloprop_bin[centrals_idx]]['halo_nfw_conc']
+  
     unique_hosts_id, first_sat_idxs, inverse_idxs = np.unique(catalog[indices_of_prim_haloprop_bin[satellites_idx]]['halo_upid'],                                                       return_index=True, return_inverse=True)
 
     shuffled_idxs = np.random.permutation(unique_hosts_id.shape[0])
@@ -183,6 +190,8 @@ for ibin in bins_in_halocat:
     shuffled_upids[indices_of_prim_haloprop_bin[satellites_idx]] = new_host_ids
 
     shuffled_host_mvir[indices_of_prim_haloprop_bin[satellites_idx]] =             catalog[indices_of_prim_haloprop_bin[satellites_idx]][hosts_old_satellite_idxs]['halo_mvir_host_halo']
+    shuffled_host_rvir[indices_of_prim_haloprop_bin[satellites_idx]] =             catalog[indices_of_prim_haloprop_bin[satellites_idx]][hosts_old_satellite_idxs]['halo_rvir_host_halo']
+    shuffled_host_conc[indices_of_prim_haloprop_bin[satellites_idx]] =             catalog[indices_of_prim_haloprop_bin[satellites_idx]][hosts_old_satellite_idxs]['halo_nfw_conc_host_halo']
 
     for idx, coord in enumerate(['x','y','z']):
 
@@ -207,36 +216,26 @@ catalog['halo_vz'] = shuffled_vel[:,2]
 catalog['halo_id'] = shuffled_ids[:]
 catalog['halo_upid']=shuffled_upids[:]
 catalog['halo_mvir_host_halo'] = shuffled_host_mvir[:]
+catalog['halo_rvir_host_halo'] = shuffled_host_rvir[:]
+catalog['halo_nfw_conc_host_halo'] = shuffled_host_conc[:]
 
 
 # In[ ]:
+# currently not deleting halo_id, see if that works? 
+delete_keys = ['halo_vmax@mpeak', 'halo_rvir', 'halo_mpeak', 'halo_rs', 'halo_nfw_conc', 'halo_hostid',
+               'halo_mvir_host_halo', 'halo_x_host_halo', 'halo_y_host_halo', 'halo_z_host_halo', 'halo_vx_host_halo',
+               'halo_vy_host_halo', 'halo_vz_host_halo'] 
+for key in delete_keys:
+    try:
+        del catalog[key]
+    except KeyError:
+        continue
 
+non_nan_idxs = ~np.isnan(catalog['gal_smass'])
+sort_idxs = np.argsort(catalog[non_nan_idxs]['gal_smass'])[::-1]
+catalog = catalog[non_nan_idxs][sort_idxs][:n_obj_needed]
 
-del catalog['halo_vmax@mpeak']
-del catalog['halo_rvir']
-del catalog['halo_mpeak']
-#del catalog['halo_id']
-del catalog['halo_rs']
-del catalog['halo_nfw_conc']
-del catalog['halo_hostid']
-#del catalog['halo_mvir_host_halo']
-del catalog['halo_x_host_halo']
-del catalog['halo_y_host_halo']
-del catalog['halo_z_host_halo']
-del catalog['halo_vx_host_halo']
-del catalog['halo_vy_host_halo']
-del catalog['halo_vz_host_halo']
-del catalog['halo_rvir_host_halo']
-del catalog['halo_nfw_conc_host_halo']
-
-
-# In[ ]:
-
-
-sort_idxs = np.argsort(catalog[~np.isnan(catalog['gal_smass'])]['gal_smass'])[::-1]
-#catalog = catalog[~np.isnan(catalog['gal_smass'])][sort_idxs[-1*n_obj_needed:]]
-catalog = catalog[~np.isnan(catalog['gal_smass'])][sort_idxs[:n_obj_needed]]
-
+print len(catalog)
 # In[ ]:
 
 
@@ -294,8 +293,9 @@ print xi
 
 # In[ ]:
 
-catalog.write('/scratch/users/swmclau2/catalog_ab_%s_shuffled_fixed.hdf5'%ab_property,
-              format = 'hdf5', path = '%s_shuffled'%ab_property, overwrite=True)
+#catalog.write('/scratch/users/swmclau2/MDPL2_sham_%s_shuffled.hdf5'%ab_property,
+#              format = 'hdf5', path = '%s_shuffled'%ab_property, overwrite=True)
 
+#np.save('/scratch/users/swmclau2/UniverseMachine/cut_shuffled_sham_catalog.npy', catalog.as_array())
 
 # In[ ]:

@@ -271,7 +271,6 @@ class HSAssembiasZheng07Cens(Zheng07Cens, HeavisideAssembias):
                                     method_name_to_decorate='mean_occupation',
                                     **kwargs)
 
-
 class FSAssembiasZheng07Cens(Zheng07Cens, FreeSplitAssembias):
     '''RedMagic Cens with Heaviside Assembly bias'''
 
@@ -325,6 +324,9 @@ class CorrAssembiasZheng07Cens(Zheng07Cens, CorrelationAssembias):
                                       method_name_to_decorate='mean_occupation',
                                       **kwargs)
 
+
+    def mc_occupation(self, **kwargs):
+        return CorrelationAssembias.mc_occupation(self, **kwargs)
 
 class AssembiasZheng07Sats(Zheng07Sats, ContinuousAssembias):
     '''RedMagic Cens with Assembly bias'''
@@ -397,7 +399,7 @@ class FSCAssembiasZheng07Sats(Zheng07Sats, FreeSplitContinuousAssembias):
                                               **kwargs)
 
 
-class CorrAssembiasZheng07Sats(Zheng07Sats, CorrelationAssembias):
+class CorrAssembiasZheng07Sats(Zheng07Sats,CorrelationAssembias):
     '''RedMagic Cens with Assembly bias'''
 
     def __init__(self, cenocc_model, **kwargs):
@@ -412,6 +414,9 @@ class CorrAssembiasZheng07Sats(Zheng07Sats, CorrelationAssembias):
                                       upper_assembias_bound=self._upper_occupation_bound,
                                       method_name_to_decorate='mean_occupation',
                                       **kwargs)
+
+    def mc_occupation(self, **kwargs):
+        return CorrelationAssembias.mc_occupation(self, **kwargs)
 
 
 class Reddick14Cens(OccupationComponent):
@@ -998,7 +1003,10 @@ class TabulatedCens(OccupationComponent):
         """
 
         upper_occupation_bound = 1.0
-
+        if type(prim_haloprop_vals) is str:
+            prim_haloprop_vals = np.load(prim_haloprop_vals)
+        if type(cen_hod_vals) is str:
+            cen_hod_vals = np.load(cen_hod_vals)
         assert np.all(cen_hod_vals >= 0) and np.all(upper_occupation_bound >= cen_hod_vals)
         assert cen_hod_vals.shape == prim_haloprop_vals.shape
         assert np.all(prim_haloprop_vals >= 0)
@@ -1226,6 +1234,11 @@ class TabulatedSats(OccupationComponent):
         """
         upper_occupation_bound = float("inf")
 
+        if type(prim_haloprop_vals) is str:
+            prim_haloprop_vals = np.load(prim_haloprop_vals)
+        if type(sat_hod_vals) is str:
+            sat_hod_vals = np.load(sat_hod_vals)
+
         assert np.all(sat_hod_vals >= 0)
         assert sat_hod_vals.shape == prim_haloprop_vals.shape
         assert np.all(prim_haloprop_vals >= 0)
@@ -1233,7 +1246,7 @@ class TabulatedSats(OccupationComponent):
         self._prim_haloprop_vals = prim_haloprop_vals
         self._sat_hod_vals = sat_hod_vals
 
-        self._sat_hod_vals[self._sat_hod_vals < 1e-4] = 0.0 
+        self._sat_hod_vals[self._sat_hod_vals < 1e-7] = 0.0 
 
 
         self._mean_occupation = interp1d(np.log10(prim_haloprop_vals), sat_hod_vals, kind='cubic')
@@ -1811,7 +1824,8 @@ class Tabulated2DSats(OccupationComponent):
 
         return dict()
 
-HOD_DICT = {'abZheng07': (AssembiasZheng07Cens, AssembiasZheng07Sats), 
+HOD_DICT = {'zheng07': (Zheng07Cens, Zheng07Sats),
+            'abZheng07': (AssembiasZheng07Cens, AssembiasZheng07Sats), 
             'hsabZheng07': (HSAssembiasZheng07Cens, HSAssembiasZheng07Sats), 
             'fsabZheng07': (FSAssembiasZheng07Cens, FSAssembiasZheng07Sats),
             'fscabZheng07': (FSCAssembiasZheng07Cens, FSCAssembiasZheng07Sats),

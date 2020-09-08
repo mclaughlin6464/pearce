@@ -1,0 +1,33 @@
+cosmology:
+        boxno: 0:7 
+        realization: 0:5
+        simname: testbox
+        scale_factors: 1.0 
+        particles: False 
+        system: ki-ls 
+HOD:
+        model: hsabZheng07 
+        #sec_haloprop_key: 'halo_local_density_10'
+        sec_haloprop_key: 'halo_nfw_conc'
+        num_hods: 100 
+        fixed_nd: 5e-4
+        biased_satellites: True 
+        ordered_params: {'logMmin': [12.0, 16.0], 'sigma_logM': [0.1, 0.6], 'logM0': [12.6, 13.6], 'logM1': [13.7, 14.7], 'alpha': [0.7, 1.3], 'conc_gal_bias': [0.5, 2.0], 'mean_occupation_centrals_assembias_param1':[-1.0, 1.0], 'mean_occupation_satellites_assembias_param1':[-1.0, 1.0]}
+        system: ki-ls
+        min_ptcl: 20
+observation:
+        obs: wp 
+        bins: [ 0.1,  0.13945832,  0.19448624,  0.27122726,  0.37824899,
+                0.52749971,  0.73564225,  1.02591437,  1.43072299,  1.99526231,
+                2.7825594 ,  3.88051073,  5.41169527,  7.54705957, 10.52500285,
+                14.67799268, 20.46968272, 28.54667663, 39.81071706] 
+        n_repops: 5 
+        log_obs: True
+computation:
+        filename: /nfs/slac/g/ki/ki18/des/swmclau2/wp_hsab_conc_test_h/PearceWpHSABCosmoTest2.hdf5 
+        overwrite: True
+        queue_skipper: True
+        system: ki-ls 
+        n_jobs: 35 
+        max_time: 12 
+

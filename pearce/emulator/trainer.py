@@ -17,6 +17,8 @@ import numpy as np
 from scipy.optimize import minimize_scalar
 import pandas as pd
 import h5py
+import gc
+from guppy import hpy
 
 from pearce.mocks import cat_dict
 
@@ -416,8 +418,10 @@ class Trainer(object):
             raise AssertionError("Incorrect  parameters specified. Compare the outputs above to resovle the issue.")
 
     def compute_measurement(self, param_idxs, rank = None):
-
+        #h = hpy()
         param_idxs = param_idxs.astype(int)
+        # Try to load the file first 
+
         if self.n_bins > 1 :
             output = np.zeros((param_idxs.shape[0], self.n_bins))
             output_cov = np.zeros((param_idxs.shape[0], self.n_bins, self.n_bins))
@@ -429,6 +433,10 @@ class Trainer(object):
         last_cosmo_idx, last_scale_factor_idx = -1, -1
         t0 = time()
         for output_idx, (cosmo_idx, scale_factor_idx, hod_idx) in enumerate(param_idxs):
+            # If output_idx is nonzero, continue 
+            #print
+            #print h.heap()
+            #print 
             if rank is not None:
                 print 'Rank: %d, Cosmo: %d, Scale_Factor: %d, HOD: %d'%(rank, cosmo_idx, scale_factor_idx, hod_idx)
             else:
@@ -445,6 +453,7 @@ class Trainer(object):
                     last_cat = self.cats[last_cosmo_idx]
                     del last_cat.halocat
                     del last_cat.model
+                    gc.collect()
 
                 cat = self.cats[cosmo_idx]
 
@@ -457,8 +466,12 @@ class Trainer(object):
                          downsample_factor=self._downsample_factor, hod_kwargs= self._hod_kwargs  )
                 self._check_params(cat) 
                 calc_observable = self._get_calc_observable(cat)
+            if len(self._hod_param_names)==1:
+                hod_params = {self._hod_param_names[0]: self._hod_param_vals[hod_idx]}
 
-            hod_params = dict(zip(self._hod_param_names, self._hod_param_vals[hod_idx, :]))
+            else:
+                hod_params = dict(zip(self._hod_param_names, self._hod_param_vals[hod_idx]))
+            #print hod_params
             if self._fixed_nd is not None:
             # TODO this does not respect min_ptcl
                 self._add_logMmin(hod_params, cat)
@@ -481,12 +494,13 @@ class Trainer(object):
 
                 for repop in xrange(self._n_repops):
                     #print repop
-                    try:
-                        cat.populate(hod_params, min_ptcl= self._min_ptcl)
-                    except ValueError:
+                    #try:
+                    print hod_params
+                    cat.populate(hod_params, min_ptcl= self._min_ptcl)
+                    #except ValueError:
                         # try again, sometimes things are tempermental?
-                        print repop, cat.model.mock.Ngals, cat.model.mock._total_abundance
-                        cat.populate(hod_params, min_ptcl= self._min_ptcl)
+                    #    print repop, cat.model.mock.Ngals, cat.model.mock._total_abundance
+                    #    cat.populate(hod_params, min_ptcl= self._min_ptcl)
 
                     try:
                         obs_repops[repop] = self._transform_func(calc_observable())
@@ -499,9 +513,11 @@ class Trainer(object):
 
             output[output_idx] = obs_val
             output_cov[output_idx] = obs_cov
+            # write output here
 
             last_cosmo_idx = cosmo_idx
             last_scale_factor_idx = scale_factor_idx
+            gc.collect()
 
         return output, output_cov
 
@@ -634,26 +650,38 @@ class Trainer(object):
         else:
             assert self.n_jobs == len(glob(path.join(output_directory, 'trainer_*.npy'))), 'n_jobs has changed, cannot rerun'
 
-
+        idxs_to_do = []
         for idx in xrange(self.n_jobs):
-
+            print idx, 
             # slice out a portion of the poitns
             jobname = 'trainer_%04d' %idx
             param_filename = path.join(output_directory, jobname + '.npy')
             if not rerun:
                 np.savetxt(param_filename, all_param_idxs[idx])
+                idxs_to_do.append(idx)
+            # change existance check to any zeros check
             elif path.exists(path.join(output_directory, 'output_%04d.npy'%idx)) and path.exists(path.join(output_directory, 'output_cov_%04d.npy'%idx)):\
                 continue # this one ran successfully
+            else:
+                idxs_to_do.append(idx)
 
-            # TODO allow queue changing
-            command = make_command(jobname, self.max_time, output_directory)
-            # the odd shell call is to deal with minute differences in the systems.
-            # TODO make this more general
-            call(command, shell=self.system == 'sherlock')
-            #break
+        # TODO allow queue changing
+
+        if len(idxs_to_do) == 0:
+            raise AssertionError("No unfinished jobs found")
+        elif len(idxs_to_do) == self.n_jobs:
+            command = make_command('trainer', self.max_time, output_directory + '/', self.n_jobs)
+        else: # dont blindy submit all of em
+            command = make_command('trainer', self.max_time, output_directory + '/',\
+                                   self.n_jobs, idxs_to_do, rerun=True)
+
+        # the odd shell call is to deal with minute differences in the systems.
+        # TODO make this more general
+        call(command, shell=self.system == 'sherlock')
+        #break
 
 
-def make_kils_command(jobname, max_time, outputdir, queue= 'long'):
+def make_kils_command(jobname, max_time, outputdir, N, idxs_to_do=[], rerun=False, queue= 'long'):
     '''
     Return a list of strings that comprise a bash command to call trainingHelper.py on the cluster.
     Designed to work on ki-ls's batch system
@@ -668,23 +696,36 @@ def make_kils_command(jobname, max_time, outputdir, queue= 'long'):
     :return:
         Command, a list of strings that can be ' '.join'd to form a bash command.
     '''
-    log_file = jobname + '.out'
-    param_file = jobname + '.npy'
+    log_file = jobname + '_%I.out'
+    param_file = jobname + '_$tmp.npy'
     command = ['bsub',
+               '-J', '%s[1-%d]'%(jobname,N),
                '-q', queue,
-               '-n', str(8),
-               '-J', jobname,
+               '-n', str(12),
                '-oo', path.join(outputdir, log_file),
                '-W', '%d:00' % max_time,
-               '-R span[ptile=8]',
+               '-R span[ptile=12]',# select[hname!=bubble0002 && hname!=bubble0003]',
+               # todo add memory requirements as well
                #'--exclusive',
+               'tmp=`printf "%04d" $((${LSB_JOBINDEX}-1))`\n',
+               #'echo $tmp \n',
                'python', path.join(path.dirname(__file__), 'trainingHelper.py'),
-               path.join(outputdir, param_file)]
+               outputdir + param_file]
 
+    if rerun:
+        command.pop(2)
+        N = 100
+        if len(idxs_to_do) > N:
+            idxs_to_do = idxs_to_do[:N] # reduce quantity
+        idxs_to_do = np.array(idxs_to_do)+1
+        idxs_to_do = [str(i) for i in idxs_to_do]
+
+        command.insert(2, '%s%s'%(jobname, '['+','.join(idxs_to_do)+']') )
+    print command
     return command
 
 
-def make_sherlock_command(jobname, max_time, outputdir, queue=None):
+def make_sherlock_command(jobname, max_time, outputdir, N, idxs_to_do=[], rerun=False, queue=None):
     '''
     Return a list of strings that comprise a bash command to call trainingHelper.py on the cluster.
     Designed to work on sherlock's sbatch system. Differnet from the above in that it must write a file
@@ -700,12 +741,13 @@ def make_sherlock_command(jobname, max_time, outputdir, queue=None):
     :return:
         Command, a string to call to submit the job.
     '''
-    log_file = jobname + '.out'
-    err_file = jobname + '.err'
-    param_file = jobname + '.npy'
+    log_file = jobname + '_%a.out'
+    err_file = jobname + '_%a.err'
+
     sbatch_header = ['#!/bin/bash',
                      '--job-name=%s' % jobname,
                      '-p kipac,iric',  # KIPAC queue
+                     '--array=0-%d' % (N - 1),
                      '--output=%s' % path.join(outputdir, log_file),
                      '--error=%s' % path.join(outputdir, err_file),
                      '--time=%d:00' % (max_time * 60),  # max_time is in minutes
@@ -718,10 +760,16 @@ def make_sherlock_command(jobname, max_time, outputdir, queue=None):
                      #'--mem-per-cpu=32000',
                      #'--cpus-per-task=%d' % 16]
 
-    sbatch_header = '\n#SBATCH '.join(sbatch_header)
+    if rerun:
+        sbatch_header.pop[3]
+        sbatch_header.insert(3, '--array='%(str(idxs_to_do)[1:-1]) )
 
-    call_str = ['python', path.join(path.dirname(__file__), 'trainingHelper.py'),
-                path.join(outputdir, param_file)]
+    sbatch_header = '\n#SBATCH '.join(sbatch_header)
+    param_file = jobname + '_$tmp.npy'
+
+    call_str = ['tmp=`printf "%04d" ${SLURM_ARRAY_TASK_ID}`\n',
+                'python', path.join(path.dirname(__file__), 'trainingHelper.py'),
+                outputdir+ param_file]
 
     call_str = ' '.join(call_str)
     # have to write to file in order to work.

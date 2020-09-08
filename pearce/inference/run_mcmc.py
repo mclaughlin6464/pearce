@@ -133,6 +133,8 @@ def _run_tests(y, cov, r_bin_centers, param_names, fixed_params, ncores):
     print 'N cores', ncores
 
     #make sure all inputs are of consistent shape
+    ##print y.shape
+    #print cov.shape
     assert y.shape[0] == cov.shape[0] and cov.shape[1] == cov.shape[0]
 
     tot_bins = sum(len(rbc) for rbc in r_bin_centers)
@@ -347,7 +349,7 @@ def run_nested_mcmc(emus,  param_names, y, cov, r_bin_centers,fixed_params = {},
     yield results
     '''
     res = sampler.results
-    print res.summary()
+    #print res.summary()
     ## should i return the results or just these things?
     chain = res['samples']
     evidence = res['logz'].reshape((-1, 1))
@@ -440,6 +442,7 @@ def run_mcmc_config(config_fname, restart = False):
                      'NashvilleHot': NashvilleHot,
                      'LemonPepperWet':LemonPepperWet}
     fixed_params = f.attrs['fixed_params']
+    fixed_params = {} if fixed_params is None else literal_eval(fixed_params)
     #metric = f.attrs['metric'] if 'metric' in f.attrs else {}
     emu_hps = f.attrs['emu_hps']
     emu_hps = {} if emu_hps is None else literal_eval(emu_hps)
@@ -464,7 +467,6 @@ def run_mcmc_config(config_fname, restart = False):
         fixed_params = [fixed_params for e in emu_type]
     else:
         assert len(fixed_params) == len(emu_type)
-        fixed_params = [eval(fp) for fp in fixed_params]
 
     assert 'obs' in f.attrs.keys(), "No obs info in config file."
 
@@ -472,22 +474,22 @@ def run_mcmc_config(config_fname, restart = False):
 
     rbins = obs_cfg['rbins']
     obs = obs_cfg['obs']
-
     if type(obs) is str:
         obs = [obs]
 
     if type(rbins[0]) is list: # is list of list
         rbins = [np.array(r) for r in rbins] # to numpy array
         assert len(rbins) == len(obs), "not equal number of r_bins to obs"
+
     else:
         rbins = np.array(rbins)
         rbins = [rbins for _ in xrange(len(obs))]
 
     rpoints = [(rb[1:]+rb[:-1])/2.0 for rb in rbins]
-
     y = f['data'][()].flatten()
     cov = f['cov'][()]
 
+    #print y.shape
 
     emus = []
     _rp = []
@@ -495,11 +497,10 @@ def run_mcmc_config(config_fname, restart = False):
     init_idx = 0
 
     np.random.seed(seed)
-    for et, tf, rp, fp in zip(emu_type, training_file, rpoints, fixed_params): # TODO iterate over the others?
+    #print len(emu_type), len(training_file), len(rpoints), len(fixed_params)
+    for emu_idx, (et, tf, rp, fp) in enumerate(zip(emu_type, training_file, rpoints, fixed_params)): # TODO iterate over the others?
         # TODO how will cic work with rmin?
-        print fp, type(fp)
-        emu = emu_type_dict[et](tf,
-                                 fixed_params = fp,
+        emu = emu_type_dict[et](tf, fixed_params = fp,
                                  **emu_hps)
         emus.append(emu)
 
@@ -507,19 +508,20 @@ def run_mcmc_config(config_fname, restart = False):
         cut_n_bins = orig_n_bins - emu.n_bins
         _rp.append(np.array(rp[-emu.n_bins:]))
 
-        print 'Cut N bins', cut_n_bins 
-        print 'Emu SBC', emu.scale_bin_centers
-        #assert np.all(np.isclose(_rp[-1], emu.scale_bin_centers))
 
-        _y.append(y[init_idx+cut_n_bins:init_idx + orig_n_bins])
+        #assert np.all(np.isclose(_rp[-1], emu.scale_bin_centers))
+        #print cut_n_bins
+        _y.append(y[(orig_n_bins)*emu_idx+cut_n_bins:(orig_n_bins)*emu_idx+ orig_n_bins])
 
         cov_idxs = np.ones((cov.shape[0],), dtype = bool)
         cov_idxs[init_idx:init_idx+cut_n_bins] = False # deselect the bins we're cutting
+       # print 'y', y
 
+        #print cov_idxs.shape, cov_idxs
         cov = cov[cov_idxs]
         cov = cov[:, cov_idxs]
 
-        init_idx+=orig_n_bins#emu.n_bins
+        init_idx+= emu.n_bins
 
     rpoints = _rp
 
@@ -608,7 +610,8 @@ def run_mcmc_config(config_fname, restart = False):
         if nsteps<=0:
             return
         # TODO add a way to start a new chain from the end of an old one
-        print 'hi'
+        #print 'hi'
+        print 'Resuming with nsteps=%d remaining'%nsteps
 
     f.close()
     np.random.seed(seed)
@@ -645,7 +648,7 @@ def run_mcmc_config(config_fname, restart = False):
             chain_dset.resize((l + size), axis=0)
             ev_dset.resize((l + size), axis=0)
 
-            print pos.shape
+            #print pos.shape
             chain_dset[-size:] = pos[:, :-1]
             ev_dset[-size:] = pos[:,-1]
 
