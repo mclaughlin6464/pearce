@@ -37,6 +37,7 @@ def compute_on_subset(param_fname):
     trainer = get_trainer(output_directory)
 
     param_idxs = np.loadtxt(param_fname)
+    # change compute measurement to take a job number
     output, output_cov = trainer.compute_measurement(param_idxs)
 
     np.save(path.join(output_directory, 'output_%04d.npy'%job_number), output)
