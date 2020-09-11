@@ -684,6 +684,7 @@ class Trainer(object):
         elif len(idxs_to_do) == self.n_jobs:
             command = make_command('trainer', self.max_time, output_directory + '/', self.n_jobs)
         else: # dont blindy submit all of em
+            
             command = make_command('trainer', self.max_time, output_directory + '/',\
                                    self.n_jobs, idxs_to_do, rerun=True)
 
@@ -728,9 +729,31 @@ def make_kils_command(jobname, max_time, outputdir, N, idxs_to_do=[], rerun=Fals
         command.pop(2)
         N = 100
         if len(idxs_to_do) > N:
-            idxs_to_do = idxs_to_do[:N] # reduce quantity
-        idxs_to_do = np.array(idxs_to_do)+1
-        idxs_to_do = [str(i) for i in idxs_to_do]
+            # try to contract them
+            new_idxs = []
+
+            for idx in idxs_to_do:
+                if not new_idxs:
+                    new_idxs.append([idx,idx])
+                elif idx - new_idxs[-1][1] == 1:
+                    new_idxs[-1][1] = idx
+                else:
+                    new_idxs.append([idx,idx])
+
+            #print new_idxs
+
+            str_segments = []
+            for pair in new_idxs:
+                if pair[0]!=pair[1]:
+                    str_segments.append('%d-%d'%(pair[0]+1,pair[1]+1))
+                else:
+                    str_segments.append(str(pair[0]+1))
+
+            idxs_to_do = str_segments
+
+            #idxs_to_do = idxs_to_do[:N] # reduce quantity
+        #idxs_to_do = np.array(idxs_to_do)+1
+        #idxs_to_do = [str(i) for i in idxs_to_do]
 
         command.insert(2, '%s%s'%(jobname, '['+','.join(idxs_to_do)+']') )
     print command
