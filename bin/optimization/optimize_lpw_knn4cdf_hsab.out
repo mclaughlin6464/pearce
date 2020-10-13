@@ -1,0 +1,34 @@
+-------------------------------------------------------------------------------
+There are messages associated with the following module(s):
+-------------------------------------------------------------------------------
+
+py-scipystack/1.0_py27:
+    The SciPy Stack module is deprecated. Please use those individual
+    modules instead: py-scipy, py-numpy, py-matplotlib, py-pandas, py-sympy
+
+-------------------------------------------------------------------------------
+
+Traceback (most recent call last):
+  File "/home/users/swmclau2/Git/pearce/bin/optimization/optimize_lpw.py", line 1, in <module>
+    from pearce.emulator import LemonPepperWet 
+  File "/home/users/swmclau2/.local/lib/python2.7/site-packages/pearce/emulator/__init__.py", line 2, in <module>
+    from .trainer import *
+  File "/home/users/swmclau2/.local/lib/python2.7/site-packages/pearce/emulator/trainer.py", line 23, in <module>
+    from pearce.mocks import cat_dict
+  File "/home/users/swmclau2/.local/lib/python2.7/site-packages/pearce/mocks/__init__.py", line 1, in <module>
+    from .cat import *
+  File "/home/users/swmclau2/.local/lib/python2.7/site-packages/pearce/mocks/cat.py", line 25, in <module>
+    from halotools.mock_observables import *  # i'm importing so much this is just easier
+  File "/home/users/swmclau2/.local/lib/python2.7/site-packages/halotools/mock_observables/__init__.py", line 8, in <module>
+    from .group_identification import *
+  File "/home/users/swmclau2/.local/lib/python2.7/site-packages/halotools/mock_observables/group_identification/__init__.py", line 6, in <module>
+    from .fof_groups import FoFGroups
+  File "/home/users/swmclau2/.local/lib/python2.7/site-packages/halotools/mock_observables/group_identification/fof_groups.py", line 10, in <module>
+    from ..pair_counters.pairwise_distance_xy_z import pairwise_distance_xy_z
+  File "/home/users/swmclau2/.local/lib/python2.7/site-packages/halotools/mock_observables/pair_counters/__init__.py", line 5, in <module>
+    from .npairs_3d import npairs_3d
+  File "/home/users/swmclau2/.local/lib/python2.7/site-packages/halotools/mock_observables/pair_counters/npairs_3d.py", line 11, in <module>
+    from .cpairs import npairs_3d_engine
+  File "/home/users/swmclau2/.local/lib/python2.7/site-packages/halotools/mock_observables/pair_counters/cpairs/__init__.py", line 5, in <module>
+    from .pairwise_distances import *
+ImportError: /lib64/libstdc++.so.6: version `GLIBCXX_3.4.21' not found (required by /home/users/swmclau2/.local/lib/python2.7/site-packages/halotools/mock_observables/pair_counters/cpairs/pairwise_distances.so)
