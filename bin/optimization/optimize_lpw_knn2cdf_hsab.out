@@ -8,27 +8,132 @@ py-scipystack/1.0_py27:
 
 -------------------------------------------------------------------------------
 
-Traceback (most recent call last):
-  File "/home/users/swmclau2/Git/pearce/bin/optimization/optimize_lpw.py", line 1, in <module>
-    from pearce.emulator import LemonPepperWet 
-  File "/home/users/swmclau2/.local/lib/python2.7/site-packages/pearce/emulator/__init__.py", line 2, in <module>
-    from .trainer import *
-  File "/home/users/swmclau2/.local/lib/python2.7/site-packages/pearce/emulator/trainer.py", line 23, in <module>
-    from pearce.mocks import cat_dict
-  File "/home/users/swmclau2/.local/lib/python2.7/site-packages/pearce/mocks/__init__.py", line 1, in <module>
-    from .cat import *
-  File "/home/users/swmclau2/.local/lib/python2.7/site-packages/pearce/mocks/cat.py", line 25, in <module>
-    from halotools.mock_observables import *  # i'm importing so much this is just easier
-  File "/home/users/swmclau2/.local/lib/python2.7/site-packages/halotools/mock_observables/__init__.py", line 8, in <module>
-    from .group_identification import *
-  File "/home/users/swmclau2/.local/lib/python2.7/site-packages/halotools/mock_observables/group_identification/__init__.py", line 6, in <module>
-    from .fof_groups import FoFGroups
-  File "/home/users/swmclau2/.local/lib/python2.7/site-packages/halotools/mock_observables/group_identification/fof_groups.py", line 10, in <module>
-    from ..pair_counters.pairwise_distance_xy_z import pairwise_distance_xy_z
-  File "/home/users/swmclau2/.local/lib/python2.7/site-packages/halotools/mock_observables/pair_counters/__init__.py", line 5, in <module>
-    from .npairs_3d import npairs_3d
-  File "/home/users/swmclau2/.local/lib/python2.7/site-packages/halotools/mock_observables/pair_counters/npairs_3d.py", line 11, in <module>
-    from .cpairs import npairs_3d_engine
-  File "/home/users/swmclau2/.local/lib/python2.7/site-packages/halotools/mock_observables/pair_counters/cpairs/__init__.py", line 5, in <module>
-    from .pairwise_distances import *
-ImportError: /lib64/libstdc++.so.6: version `GLIBCXX_3.4.21' not found (required by /home/users/swmclau2/.local/lib/python2.7/site-packages/halotools/mock_observables/pair_counters/cpairs/pairwise_distances.so)
+ /home/users/swmclau2/Git/GPy/GPy/models/gp_kronecker_gaussian_regression.py:104: RuntimeWarning:overflow encountered in multiply
+ /home/users/swmclau2/Git/GPy/GPy/models/gp_kronecker_gaussian_regression.py:135: RuntimeWarning:overflow encountered in square
+ /home/users/swmclau2/Git/GPy/GPy/kern/src/stationary.py:166: RuntimeWarning:overflow encountered in divide
+ /home/users/swmclau2/Git/GPy/GPy/kern/src/stationary.py:137: RuntimeWarning:overflow encountered in square
+Optimization restart 1/5, f = -3481839.1515
+Optimization restart 2/5, f = 494767.803647
+Optimization restart 3/5, f = -3505387.0824
+Optimization restart 4/5, f = -3571221.51443
+Optimization restart 5/5, f = -3642742.03649
+Downsample Factor 1.0
+0 0 0
+Total Acc 0.0720777331588 0.173167171955
+Acc [ 0.29899304  0.26750528  0.22721923  0.18256912  0.13738108  0.09402632
+  0.05560782  0.02769519  0.02064019  0.0280049   0.03273702  0.03087354
+  0.02209024  0.00978783  0.00157009  0.00142263  0.00067463  0.00100174
+  0.00086144  0.00089333]
+Rel Diag [ 0.46187637  0.39666821  0.32120125  0.24680203  0.17933123  0.12010583
+  0.07071893  0.03631536  0.03415205  0.04976317  0.05854873  0.05539263
+  0.04000343  0.01786344  0.00333788  0.00151188  0.00079455  0.00107033
+  0.00092615  0.0009543 ]
+Bias [  7.57792187e-02   6.03178585e-02   4.32223337e-02   2.76717925e-02
+   1.58790902e-02   7.52662531e-03   3.56645493e-03   1.64095677e-03
+   1.75722509e-03   2.98885227e-03   2.88562047e-03   3.09529253e-03
+   2.00264019e-03  -3.61300147e-04   4.12267509e-05  -1.38558154e-03
+  -6.13961034e-04  -9.95853509e-04  -8.61436669e-04  -8.93333078e-04]
+Normal Cov [ 0.36539547  0.33030136  0.2843789   0.23141396  0.17528834  0.12025416
+  0.07156603  0.03727399  0.03103312  0.04169665  0.04809652  0.04589695
+  0.03452851  0.01647742  0.00325974  0.00151191  0.00079455  0.00107033
+  0.00092615  0.0009543 ]
+Planck mock for knn_cdf missing, using mean
+Rel Cov [ 0.46187637  0.39666821  0.32120125  0.24680203  0.17933123  0.12010583
+  0.07071893  0.03631536  0.03415205  0.04976317  0.05854873  0.05539263
+  0.04000343  0.01786344  0.00333788  0.00151188  0.00079455  0.00107033
+  0.00092615  0.0009543 ]
+******************************
+Optimization restart 1/5, f = -3566529.66363
+Optimization restart 2/5, f = -2529928.10087
+Optimization restart 3/5, f = -3514805.03508
+Optimization restart 4/5, f = -3709353.44594
+Optimization restart 5/5, f = -3700537.16914
+ /home/users/swmclau2/Git/GPy/GPy/models/gp_kronecker_gaussian_regression.py:103: RuntimeWarning:overflow encountered in divide
+Downsample Factor 1.0
+0 1 0
+Total Acc 0.0594850934978 0.139744035844
+Acc [ 0.24572736  0.21960552  0.18612289  0.14894043  0.11133942  0.07567066
+  0.04420651  0.02186662  0.01720705  0.02512882  0.03042534  0.028794
+  0.02042307  0.00891027  0.00173799  0.00071915  0.00072259  0.0007173
+  0.00071893  0.00071798]
+Rel Diag [ 0.36869891  0.31841917  0.25988598  0.2012505   0.14690395  0.09846104
+  0.05747838  0.02972969  0.03086612  0.04484536  0.05263411  0.04952658
+  0.03561457  0.01622105  0.0031941   0.00089778  0.00090199  0.00089554
+  0.00089776  0.00089674]
+Bias [ 0.04847656  0.03696965  0.02469545  0.01411523  0.00656625  0.00225905
+  0.00082933  0.00141458  0.0030237   0.00467658  0.00573854  0.00541106
+  0.00360962  0.00126954 -0.00016573 -0.00053918 -0.00053908 -0.00054176
+ -0.0005419  -0.00054141]
+Normal Cov [ 0.31624865  0.28539145  0.24468596  0.19790831  0.14881619  0.10094878
+  0.05895182  0.03010272  0.02748659  0.03772806  0.04355032  0.04138847
+  0.03095131  0.01499361  0.00312886  0.00089777  0.00090199  0.00089554
+  0.00089776  0.00089674]
+Planck mock for knn_cdf missing, using mean
+Rel Cov [ 0.36869891  0.31841917  0.25988598  0.2012505   0.14690395  0.09846104
+  0.05747838  0.02972969  0.03086612  0.04484536  0.05263411  0.04952658
+  0.03561457  0.01622105  0.0031941   0.00089778  0.00090199  0.00089554
+  0.00089776  0.00089674]
+******************************
+Optimization restart 1/5, f = -3627333.3442
+Optimization restart 2/5, f = -3598441.97158
+Optimization restart 3/5, f = -3704950.248
+Optimization restart 4/5, f = -3169660.53693
+Optimization restart 5/5, f = -3562618.59313
+Downsample Factor 1.0
+1 0 0
+Total Acc 0.0524602545911 0.120185325522
+Acc [ 0.20433997  0.18235019  0.15416903  0.12283803  0.09155224  0.06258743
+  0.03784694  0.02037347  0.01801111  0.02511723  0.02870487  0.02729584
+  0.0208113   0.01198455  0.00712432  0.00684043  0.00681801  0.0068162
+  0.00681241  0.00681151]
+Rel Diag [ 0.31474024  0.27319017  0.22329638  0.17281593  0.12610111  0.0848336
+  0.05053524  0.02902457  0.03084292  0.04226455  0.04854493  0.04546235
+  0.03329039  0.01678311  0.00861571  0.00837303  0.00835681  0.00836364
+  0.00836125  0.00836098]
+Bias [ 0.05693404  0.04667358  0.03535655  0.02487604  0.0163719   0.01017635
+  0.00613198  0.00374771  0.00246369  0.00151723  0.00060044 -0.00097973
+ -0.00305549 -0.00524367 -0.00641964 -0.00679454 -0.00677813 -0.00678828
+ -0.00678675 -0.00678618]
+Normal Cov [ 0.27129864  0.2436469   0.2080201   0.16783698  0.12634538  0.08641851
+  0.05181011  0.02929432  0.02770559  0.03574526  0.0403078   0.03824104
+  0.02936326  0.01597421  0.00861318  0.0083731   0.00835681  0.00836364
+  0.00836125  0.00836098]
+Planck mock for knn_cdf missing, using mean
+Rel Cov [ 0.31474024  0.27319017  0.22329638  0.17281593  0.12610111  0.0848336
+  0.05053524  0.02902457  0.03084292  0.04226455  0.04854493  0.04546235
+  0.03329039  0.01678311  0.00861571  0.00837303  0.00835681  0.00836364
+  0.00836125  0.00836098]
+******************************
+Optimization restart 1/5, f = -3747747.26618
+Optimization restart 2/5, f = 583320.198312
+Optimization restart 3/5, f = -3574442.79889
+Optimization restart 4/5, f = 552631.525696
+Optimization restart 5/5, f = 288584.911828
+Downsample Factor 1.0
+1 1 0
+Total Acc 0.0504948481065 0.115987867486
+Acc [ 0.20275892  0.18206109  0.15527691  0.12496443  0.09386105  0.06398969
+  0.03728544  0.01889556  0.01508295  0.02207162  0.02658822  0.02534963
+  0.01863288  0.00887425  0.00286058  0.00233286  0.00223544  0.002273
+  0.0022504   0.00225203]
+Rel Diag [ 0.3010312   0.26289713  0.21693684  0.16950211  0.12454116  0.08381015
+  0.04891254  0.02586121  0.02791869  0.04040017  0.04717848  0.04441651
+  0.03243365  0.01506546  0.00378871  0.00277286  0.00269393  0.0027245
+  0.00270871  0.00271078]
+Bias [ 0.03298896  0.02522794  0.01700156  0.00991931  0.00486004  0.00205124
+  0.00093305  0.00129312  0.00210456  0.00304376  0.00352033  0.00288326
+  0.00141015 -0.00081233 -0.00184718 -0.0023003  -0.00220932 -0.00225845
+ -0.00224036 -0.00224502]
+Normal Cov [ 0.27958571  0.25141744  0.21437751  0.17222218  0.1286051   0.08666256
+  0.0503055   0.02616598  0.0247613   0.03374425  0.03872808  0.03691255
+  0.02813253  0.01397787  0.0037505   0.00277292  0.00269393  0.0027245
+  0.00270871  0.00271078]
+Planck mock for knn_cdf missing, using mean
+Rel Cov [ 0.3010312   0.26289713  0.21693684  0.16950211  0.12454116  0.08381015
+  0.04891254  0.02586121  0.02791869  0.04040017  0.04717848  0.04441651
+  0.03243365  0.01506546  0.00378871  0.00277286  0.00269393  0.0027245
+  0.00270871  0.00271078]
+******************************
+Best
+0.0504948481065
+(1, 1, 0)
