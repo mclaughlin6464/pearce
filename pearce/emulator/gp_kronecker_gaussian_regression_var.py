@@ -24,6 +24,7 @@ class GPKroneckerGaussianRegressionVar(GPKroneckerGaussianRegression):
 
     def parameters_changed(self):
         # lifted whole cloth from the super class to add one line.
+
         dims = len(self.Y.shape)
         Ss, Us = [], []
         for i in range(dims):
