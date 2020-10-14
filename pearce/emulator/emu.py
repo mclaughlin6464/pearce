@@ -2949,10 +2949,13 @@ class LemonPepperWet(NashvilleHot):
         xs.append(x3)
 
         #print len(xs) 
-        #emulator = GPKroneckerGaussianRegressionVar(x1, x2, y, yerr ** 2, kern1, kern2, noise_var=nv)
-        emulator = GPKroneckerGaussianRegression(xs[0], xs[1],\
-                                                      y, kerns[0], kerns[1], noise_var,\
+        emulator = GPKroneckerGaussianRegressionVar(xs[0], xs[1],\
+                                                      y, yerr**2, kerns[0], kerns[1], noise_var,\
                                              additional_Xs=xs[2:], additional_kerns = kerns[2:])
+
+        #emulator = GPKroneckerGaussianRegression(xs[0], xs[1],\
+        #                                              y, kerns[0], kerns[1], noise_var,\
+        #                                     additional_Xs=xs[2:], additional_kerns = kerns[2:])
 
         self._emulator = emulator
         self._kernel= kerns
