@@ -336,7 +336,7 @@ class Emu(object):
 
         # whiten the training data
         self._x_mean, self._x_std = x.mean(axis = 0), x.std(axis = 0)
-        self._y_mean, self._y_std = 0.0, 1.0#y.mean(axis = 0), y.std(axis = 0)
+        self._y_mean, self._y_std = y.mean(axis = 0), y.std(axis = 0)
 
         ycov_list = []
         for yc in ycov: 
@@ -2859,8 +2859,13 @@ class LemonPepperWet(NashvilleHot):
         out = super(LemonPepperWet, self).load_training_data(filename, custom_mean_function)
         # redo the normalization cuz its different than in NH. Its the only thing different, so its a coda here
         y = np.array([_y*_ys + _ym for _y, _ym, _ys in zip(self.y, self._y_mean, self._y_std)])
-        self._y_mean = y.mean() 
-        self._y_std = 1.0#y.std()#1.0
+
+        self._y_mean = y.mean(axis=(0,1)) 
+        self._y_std = y.std(axis=(0,1))#1.0
+        too_small_std = self._y_std<1e-6
+        self._y_std[too_small_std] = 1e-6
+        print 'Mean', self._y_mean
+        print 'Std', self._y_std
         
         self.y  = (y - self._y_mean)/self._y_std # TODO squeeze here?
         self.emulator_ndim = 0
@@ -3223,15 +3228,18 @@ class LemonPepperWet(NashvilleHot):
         xs.append(_scale_bin_centers.reshape((-1,1)))
 
         if has_fixed:
-            _py = self._emulator.predict(xs[0],xs[1], mean_only=True, additional_Xnews=xs[2:])[0].squeeze() + self._y_mean  
+            _py = self._emulator.predict(xs[0],xs[1], mean_only=True, additional_Xnews=xs[2:])[0].squeeze()*self._y_std + self._y_mean  
             pred_ys.append(_py)
 
         else:
             # for large emus its better to space this out
             for i,_x2 in enumerate(x2):
-                 _py = self._emulator.predict(xs[0],xs[1][i].reshape((1,-1), order='F'), mean_only=True, additional_Xnews=xs[2:])[0].squeeze() + self._y_mean  
+                 _py = self._emulator.predict(xs[0],xs[1][i].reshape((1,-1), order='F'), mean_only=True, additional_Xnews=xs[2:])[0].squeeze()#*self._y_std + self._y_mean  
+
                  pred_ys.append(_py)
         pred_y = np.array(pred_ys).reshape((-1, _scale_bin_centers.shape[0]), order = 'F')#np.hstack(pred_ys)  # .T
+        pred_y*=self._y_std
+        pred_y+=self._y_mean
         if not has_fixed:
             pred_y = np.swapaxes(pred_y, 0, 1) # comes out in the wrong shape
 
