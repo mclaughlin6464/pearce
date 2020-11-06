@@ -11,4 +11,4 @@ module load python/2.7.13
 module load py-scipystack
 module load hdf5/1.10.0p1
 
-python /home/users/swmclau2/Git/pearce/bin/optimization/optimize_lpw.py                       ~/scratch/Aemulators/knn_2_cdf_hsab/PearceKNN2CDFHSABCosmo.hdf5                       ~/scratch/Aemulators/knn_2_cdf_hsab_test/PearceKNN2CDFHSABCosmoTest.hdf5                       knn_2_cdf_hsab_emu_cov_lpw.npy                       2 3 1
+python /home/users/swmclau2/Git/pearce/bin/optimization/optimize_lpw.py                       ~/scratch/Aemulators/knn_2_cdf_hsab/PearceKNN2CDFCutHSABCosmo.hdf5                       ~/scratch/Aemulators/knn_2_cdf_hsab_test/PearceKNN2CDFCutHSABCosmoTest.hdf5                       knn_2_cdf_cut_hsab_emu_cov_lpw.npy                       2 3 1
