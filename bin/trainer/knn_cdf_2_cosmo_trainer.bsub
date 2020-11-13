@@ -6,4 +6,4 @@
 #BSUB -oo /u/ki/swmclau2/Git/pearce/bin/trainer/knn_cdf_2_cosmology_train.out    
 #BSUB -n 4 
 
-python /u/ki/swmclau2/Git/pearce/pearce/emulator/trainer.py knn_cdf_2_cosmo_trainer.yaml #--rerun
+python /u/ki/swmclau2/Git/pearce/pearce/emulator/trainer.py knn_cdf_2_cosmo_trainer.yaml --rerun
