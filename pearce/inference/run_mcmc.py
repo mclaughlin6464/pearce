@@ -81,7 +81,7 @@ def lnlike(theta, param_names, fixed_params, r_bin_centers, y, combined_inv_cov)
 
     emu_preds = []
     for _emu, rbc in izip(_emus, r_bin_centers):
-        y_bar = _emu.emulate_wrt_r(param_dict, rbc)[0]
+        y_bar = _emu.emulate_wrt_r(param_dict, rbc).squeeze()#[0]
 
         emu_preds.append(10**y_bar)
         #delta = y_bar - y

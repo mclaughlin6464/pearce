@@ -150,8 +150,9 @@ class Trainer(object):
         if 'paramfile' in hod_cfg:
             assert path.exists(hod_cfg['paramfile'])
             df = pd.read_csv(hod_cfg['paramfile'])
+            
             self._hod_param_names = df.columns
-            self._hod_param_vals = df.data
+            self._hod_param_vals = df.to_numpy()#data
 
             del hod_cfg['paramfile']
         else:

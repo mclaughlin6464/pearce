@@ -3169,7 +3169,10 @@ class LemonPepperWet(NashvilleHot):
             mu = self._emulator.predict(t)
             err = np.ones_like(mu)  # weight with this instead of the errors.
 
+        #print mu.shape, self._y_std.shape, self._y_mean.shape
+        mu = mu.squeeze()
         mu = self._y_std * mu + self._y_mean
+        #print mu.shape, self._y_std.shape, self._y_mean.shape
         err = err * self._y_std
 
         # for r_idx in xrange(self.n_bins):

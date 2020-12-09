@@ -24,7 +24,7 @@ observation:
         n_repops: 5
         log_obs: True
 computation:
-        filename: /nfs/slac/g/ki/ki18/des/swmclau2/knn_2_cdf_zheng07/PearceKNN2CDFCosmo.hdf5
+        filename: /nfs/slac/g/ki/ki18/des/swmclau2/knn_2_cdf_zheng07_v2/PearceKNN2CDFCosmo.hdf5
         overwrite: True
         queue_skipper: True
         system: ki-ls 
