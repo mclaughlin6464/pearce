@@ -2860,8 +2860,8 @@ class LemonPepperWet(NashvilleHot):
         # redo the normalization cuz its different than in NH. Its the only thing different, so its a coda here
         y = np.array([_y*_ys + _ym for _y, _ym, _ys in zip(self.y, self._y_mean, self._y_std)])
 
-        self._y_mean = y.mean(axis=(0,1)) 
-        self._y_std = y.std(axis=(0,1))#1.0
+        self._y_mean = y.mean()#axis=(0,1)) 
+        self._y_std = 1.0#y.std()#axis=(0,1))#1.0
         #too_small_std = self._y_std<1e-6
         #self._y_std[too_small_std] = 1e-6
         print 'Mean', self._y_mean
@@ -3171,7 +3171,9 @@ class LemonPepperWet(NashvilleHot):
 
         #print mu.shape, self._y_std.shape, self._y_mean.shape
         mu = mu.squeeze()
-        mu = self._y_std.squeeze() * mu + self._y_mean.squeeze()
+        #mu = self._y_std.squeeze() * mu + self._y_mean.squeeze()
+        mu = self._y_std * mu + self._y_mean
+
         #print mu.shape, self._y_std.shape, self._y_mean.shape
         err = err * self._y_std
 
