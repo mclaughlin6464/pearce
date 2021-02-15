@@ -1,0 +1,150 @@
+chain:
+  fixed_params: {}
+  mcmc_type: normal
+  nburn: 0
+  nsteps: 100000
+  nwalkers: 250
+  seed: 0
+data:
+  cov:
+    emu_cov_fname: &id001 [/u/ki/swmclau2/Git/pearce/bin/optimization/wp_hsab_emu_cov_lpw.npy,
+      /u/ki/swmclau2/Git/pearce/bin/optimization/ds_hsab_emu_cov_lpw.npy]
+    meas_cov_fname: /u/ki/swmclau2/Git/pearce/bin/covmat/wp_ds_full_covmat_h.npy
+  obs:
+    mean: false
+    obs: [wp, ds]
+    rbins:
+    - !!python/object/apply:numpy.core.multiarray.scalar
+      - !!python/object/apply:numpy.dtype
+        args: [f8, 0, 1]
+        state: !!python/tuple [3, <, null, null, null, -1, -1, 0]
+      - !!binary |
+        mpmZmZmZuT8=
+    - !!python/object/apply:numpy.core.multiarray.scalar
+      - !!python/object/apply:numpy.dtype
+        args: [f8, 0, 1]
+        state: !!python/tuple [3, <, null, null, null, -1, -1, 0]
+      - !!binary |
+        LJ5XOMXZwT8=
+    - !!python/object/apply:numpy.core.multiarray.scalar
+      - !!python/object/apply:numpy.dtype
+        args: [f8, 0, 1]
+        state: !!python/tuple [3, <, null, null, null, -1, -1, 0]
+      - !!binary |
+        MNKF3OzkyD8=
+    - !!python/object/apply:numpy.core.multiarray.scalar
+      - !!python/object/apply:numpy.dtype
+        args: [f8, 0, 1]
+        state: !!python/tuple [3, <, null, null, null, -1, -1, 0]
+      - !!binary |
+        19amkslb0T8=
+    - !!python/object/apply:numpy.core.multiarray.scalar
+      - !!python/object/apply:numpy.dtype
+        args: [f8, 0, 1]
+        state: !!python/tuple [3, <, null, null, null, -1, -1, 0]
+      - !!binary |
+        F4MiQTs12D8=
+    - !!python/object/apply:numpy.core.multiarray.scalar
+      - !!python/object/apply:numpy.dtype
+        args: [f8, 0, 1]
+        state: !!python/tuple [3, <, null, null, null, -1, -1, 0]
+      - !!binary |
+        7FBwEEfh4D8=
+    - !!python/object/apply:numpy.core.multiarray.scalar
+      - !!python/object/apply:numpy.dtype
+        args: [f8, 0, 1]
+        state: !!python/tuple [3, <, null, null, null, -1, -1, 0]
+      - !!binary |
+        QbcOoGGK5z8=
+    - !!python/object/apply:numpy.core.multiarray.scalar
+      - !!python/object/apply:numpy.dtype
+        args: [f8, 0, 1]
+        state: !!python/tuple [3, <, null, null, null, -1, -1, 0]
+      - !!binary |
+        aQuDLiVq8D8=
+    - !!python/object/apply:numpy.core.multiarray.scalar
+      - !!python/object/apply:numpy.dtype
+        args: [f8, 0, 1]
+        state: !!python/tuple [3, <, null, null, null, -1, -1, 0]
+      - !!binary |
+        k48Dyj3k9j8=
+    - !!python/object/apply:numpy.core.multiarray.scalar
+      - !!python/object/apply:numpy.dtype
+        args: [f8, 0, 1]
+        state: !!python/tuple [3, <, null, null, null, -1, -1, 0]
+      - !!binary |
+        sLhbLZjs/z8=
+    - !!python/object/apply:numpy.core.multiarray.scalar
+      - !!python/object/apply:numpy.dtype
+        args: [f8, 0, 1]
+        state: !!python/tuple [3, <, null, null, null, -1, -1, 0]
+      - !!binary |
+        XUH9gK5CBkA=
+    - !!python/object/apply:numpy.core.multiarray.scalar
+      - !!python/object/apply:numpy.dtype
+        args: [f8, 0, 1]
+        state: !!python/tuple [3, <, null, null, null, -1, -1, 0]
+      - !!binary |
+        QfX0NUkLD0A=
+    - !!python/object/apply:numpy.core.multiarray.scalar
+      - !!python/object/apply:numpy.dtype
+        args: [f8, 0, 1]
+        state: !!python/tuple [3, <, null, null, null, -1, -1, 0]
+      - !!binary |
+        yVqUcZOlFUA=
+    - !!python/object/apply:numpy.core.multiarray.scalar
+      - !!python/object/apply:numpy.dtype
+        args: [f8, 0, 1]
+        state: !!python/tuple [3, <, null, null, null, -1, -1, 0]
+      - !!binary |
+        rGEUYjAwHkA=
+    - !!python/object/apply:numpy.core.multiarray.scalar
+      - !!python/object/apply:numpy.dtype
+        args: [f8, 0, 1]
+        state: !!python/tuple [3, <, null, null, null, -1, -1, 0]
+      - !!binary |
+        gviFLM0MJUA=
+    - !!python/object/apply:numpy.core.multiarray.scalar
+      - !!python/object/apply:numpy.dtype
+        args: [f8, 0, 1]
+        state: !!python/tuple [3, <, null, null, null, -1, -1, 0]
+      - !!binary |
+        RZcm2yFbLUA=
+    - !!python/object/apply:numpy.core.multiarray.scalar
+      - !!python/object/apply:numpy.dtype
+        args: [f8, 0, 1]
+        state: !!python/tuple [3, <, null, null, null, -1, -1, 0]
+      - !!binary |
+        JKFpID14NEA=
+    - !!python/object/apply:numpy.core.multiarray.scalar
+      - !!python/object/apply:numpy.dtype
+        args: [f8, 0, 1]
+        state: !!python/tuple [3, <, null, null, null, -1, -1, 0]
+      - !!binary |
+        O7n8//KLPEA=
+    - !!python/object/apply:numpy.core.multiarray.scalar
+      - !!python/object/apply:numpy.dtype
+        args: [f8, 0, 1]
+        state: !!python/tuple [3, <, null, null, null, -1, -1, 0]
+      - !!binary |
+        rYSTk8XnQ0A=
+  sim:
+    gal_type: SHAM
+    halo_property: halo_vpeak
+    min_ptcl: 100
+    nd: 5e-4
+    scale_factor: 1.001
+    scatter: 0.2
+    sim_hps: {system: ki-ls}
+    simname: ds_14_b_sub
+  true_cov_fname: /u/ki/swmclau2/Git/pearce/bin/covmat/wp_ds_full_covmat_h.npy
+  true_data_fname: [/u/ki/swmclau2/Git/pearce/bin/mock_measurements/TAB_HODmock_wp.npy,
+    /u/ki/swmclau2/Git/pearce/bin/mock_measurements/TAB_HODmock_ds.npy]
+emu:
+  emu_cov_fname: *id001
+  emu_hps: {}
+  emu_type: [LemonPepperWet, LemonPepperWet]
+  fixed_params: {rmin: 0.5, z: 0.0}
+  training_file: [/u/ki/swmclau2/des/Aemulators/wp_hsab_h/PearceWpHSABCosmo.hdf5,
+    /u/ki/swmclau2/des/Aemulators/ds_hsab_h/PearceDsHSABCosmo.hdf5]
+fname: /u/ki/swmclau2/des/PearceMCMC/TAB_HOD_wp_ds_rmin_0.5_HSAB.hdf5

@@ -1,0 +1,8 @@
+#BSUB -q long 
+#BSUB -W 72:00
+#BSUB -J make_s8_chain
+#BSUB -oo /u/ki/swmclau2/Git/pearce/bin/mcmc/config/make_s8_chain.out    
+#BSUB -n 8 
+#BSUB -R "span[ptile=8]"
+
+python /u/ki/swmclau2/Git/pearce/bin/mcmc/config/make_s8_chain.py /nfs/slac/g/ki/ki18/des/swmclau2/PearceMCMC/HOD_wp_ds_rmin_None_HOD.hdf5 

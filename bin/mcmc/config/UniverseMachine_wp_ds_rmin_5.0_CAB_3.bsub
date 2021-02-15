@@ -1,0 +1,9 @@
+#BSUB -q medium 
+#BSUB -W 24:00
+#BSUB -J UniverseMachine_wp_ds_rmin_5.0_CAB_3
+#BSUB -oo /u/ki/swmclau2/Git/pearce/bin/mcmc/config/UniverseMachine_wp_ds_rmin_5.0_CAB_3.out    
+#BSUB -n 8 
+#BSUB -R "span[ptile=8]"
+
+#python /u/ki/swmclau2/Git/pearce/pearce/inference/initialize_mcmc.py UniverseMachine_wp_ds_rmin_5.0_CAB_3.yaml
+python /u/ki/swmclau2/Git/pearce/pearce/inference/run_mcmc.py UniverseMachine_wp_ds_rmin_5.0_CAB_3.yaml --restart

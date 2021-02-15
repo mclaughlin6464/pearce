@@ -1,0 +1,9 @@
+#BSUB -q long 
+#BSUB -W 72:00
+#BSUB -J HOD_ds_h_rmin_0.5_HOD
+#BSUB -oo /u/ki/swmclau2/Git/pearce/bin/mcmc/config/HOD_ds_rmin_0.5_HOD.out    
+#BSUB -n 8 
+#BSUB -R "span[ptile=8]"
+
+python /u/ki/swmclau2/Git/pearce/pearce/inference/initialize_mcmc.py HOD_ds_h_rmin_0.5_HOD.yaml
+python /u/ki/swmclau2/Git/pearce/pearce/inference/run_mcmc.py HOD_ds_h_rmin_0.5_HOD.yaml
